@@ -1,5 +1,11 @@
+'use client';
+
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState } from 'react';
-import { Trophy, Users, Shield, MapPin } from 'lucide-react';
+import { ImageIcon, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { getSportTheme } from '@/lib/sportThemes';
+import { cn } from '@/lib/utils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackType?: 'athlete' | 'team' | 'sport' | 'stadium';
@@ -17,27 +23,31 @@ export function ImageWithFallback({
   ...props 
 }: ImageWithFallbackProps) {
   const [error, setError] = useState(false);
+  const theme = getSportTheme(sport);
+  const Icon = fallbackType === 'team' ? Users : fallbackType === 'athlete' ? Trophy : fallbackType === 'sport' ? theme.icon : ShieldCheck;
 
   if (error || !src) {
-    const getGradient = () => {
-      switch (sport?.toLowerCase()) {
-        case 'football': return 'from-emerald-900 to-green-950';
-        case 'basketball': return 'from-orange-900 to-amber-950';
-        case 'rugby': return 'from-blue-900 to-indigo-950';
-        default: return 'from-primary/20 to-background';
-      }
-    };
-
     return (
-      <div className={`flex items-center justify-center bg-gradient-to-br ${getGradient()} ${className}`}>
-        {fallbackType === 'athlete' && (
-          <span className="text-xl font-bold text-white/70 tracking-widest">{initials || <Trophy className="w-8 h-8 text-white/50" />}</span>
+      <div
+        className={cn(
+          'relative flex items-center justify-center overflow-hidden bg-gradient-to-br',
+          theme.mutedGradient,
+          className
         )}
-        {fallbackType === 'team' && (
-          <span className="text-xl font-bold text-white/70 tracking-widest">{initials || <Users className="w-8 h-8 text-white/50" />}</span>
-        )}
-        {(fallbackType === 'sport' || fallbackType === 'stadium') && (
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-background/80 to-background/90" />
+        aria-label={alt}
+        role="img"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.12),transparent_32%,rgba(255,255,255,0.06)_64%,transparent)]" />
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
+        {fallbackType === 'athlete' || fallbackType === 'team' ? (
+          <span className="relative z-10 rounded-lg border border-white/12 bg-black/24 px-2.5 py-1.5 text-base font-black tracking-widest text-white/82 shadow-xl backdrop-blur-sm">
+            {initials || <Icon className="size-6 text-white/60" />}
+          </span>
+        ) : (
+          <div className="relative z-10 flex flex-col items-center gap-2 text-white/70">
+            {fallbackType === 'stadium' ? <ImageIcon className="size-8" /> : <Icon className="size-8" />}
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">{theme.name}</span>
+          </div>
         )}
       </div>
     );

@@ -1,150 +1,185 @@
 'use client';
 
-import React from 'react';
-import { useParams } from 'next/navigation';
-import { mockAthletes, mockTeams, mockLeagues, mockChallenges, mockFeed } from '@/lib/mockData';
-import { VerificationBadge } from '@/components/ui/verification-badge';
-import { GlassCard } from '@/components/ui/glass-card';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Calendar, HeartHandshake, MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { Athlete } from '@/lib/types';
+import { mockAthletes, mockChallenges, mockFeed, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
+import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
 import { FeedCard } from '@/components/ui/feed-card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, MapPin, Trophy, Users, Star, Car, Coffee, HeartPulse } from 'lucide-react';
-import Link from 'next/link';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VerificationBadge } from '@/components/ui/verification-badge';
+import { CommentsDrawer, PledgeModal, SupportModal } from '@/components/modals/app-modals';
+import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 
 export default function AthleteProfilePage() {
-  const { athleteId } = useParams();
-  const athlete = mockAthletes.find(a => a.id === athleteId);
+  const router = useRouter();
+  const { athleteId } = useParams<{ athleteId: string }>();
+  const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
+  const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const athlete = mockAthletes.find((item) => item.id === athleteId);
 
-  if (!athlete) return <div className="p-8 text-center">Athlete not found</div>;
+  if (!athlete) {
+    return (
+      <PageContainer compact>
+        <Link href="/athletes" className="text-sm font-bold text-[var(--goal-mint)]">Back to athletes</Link>
+        <div className="glass-panel mt-6 rounded-xl p-8 text-center text-slate-300">Athlete not found.</div>
+      </PageContainer>
+    );
+  }
 
-  const team = mockTeams.find(t => t.id === athlete.teamId);
-  const league = mockLeagues.find(l => l.id === athlete.leagueId);
-  const athleteChallenges = mockChallenges.filter(c => c.athleteId === athlete.id);
-  const athleteFeed = mockFeed.filter(f => f.authorId === athlete.id || f.caption.includes(athlete.name.split(' ')[0]));
+  const team = mockTeams.find((item) => item.id === athlete.teamId);
+  const league = mockLeagues.find((item) => item.id === athlete.leagueId);
+  const nextMatch = mockMatches.find((match) => match.teamAId === athlete.teamId || match.teamBId === athlete.teamId);
+  const athleteChallenges = mockChallenges.filter((challenge) => challenge.athleteId === athlete.id);
+  const athleteFeed = mockFeed.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 4);
+  const theme = getSportTheme(athlete.sport);
 
   return (
-    <div className="pb-24">
-      {/* Hero */}
-      <div className="relative h-64 md:h-80 w-full overflow-hidden">
-        <img src={athlete.coverUrl} alt="Cover" className="w-full h-full object-cover opacity-50" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        <Link href="/athletes" className="absolute top-6 left-6 inline-flex items-center text-sm font-semibold bg-black/50 px-3 py-1.5 rounded-full hover:bg-black/80 transition-colors backdrop-blur-md">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back
-        </Link>
-      </div>
-
-      <div className="container max-w-4xl mx-auto px-4 -mt-24 relative z-10">
-        <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8">
-          <img src={athlete.avatarUrl} alt={athlete.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-background object-cover bg-muted" />
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-4xl font-black">{athlete.name}</h1>
-              {athlete.verified && <VerificationBadge />}
+    <div>
+      <section className={`relative overflow-hidden ${theme.edgeClass}`}>
+        <div className="absolute inset-0">
+          <ImageWithFallback
+            src={athlete.coverUrl}
+            alt={`${athlete.name} cover`}
+            fallbackType="stadium"
+            sport={athlete.sport}
+            className="h-full w-full object-cover opacity-45"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#05070A] via-[#05070A]/75 to-[#05070A]/20" />
+        </div>
+        <PageContainer compact className="relative z-10">
+          <Link href="/athletes" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
+            <ArrowLeft className="size-4" />
+            Back to Athletes
+          </Link>
+          <div className="grid gap-6 lg:grid-cols-[auto_1fr_auto] lg:items-end">
+            <div className="size-28 overflow-hidden rounded-xl border-4 border-[#05070A] bg-white/8 shadow-2xl md:size-36">
+              <ImageWithFallback
+                src={athlete.avatarUrl}
+                alt={athlete.name}
+                fallbackType="athlete"
+                initials={getInitials(athlete.name)}
+                sport={athlete.sport}
+                className="h-full w-full object-cover"
+              />
             </div>
-            <p className="text-lg text-muted-foreground mb-2">{athlete.position} • {team?.name}</p>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1"><MapPin className="w-4 h-4"/> {athlete.city}, {athlete.country}</span>
-              <span className="flex items-center gap-1 text-primary glow-text"><Trophy className="w-4 h-4"/> {league?.name}</span>
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <SportBadge sport={athlete.sport} />
+                {athlete.verified && <VerificationBadge />}
+              </div>
+              <h1 className="font-heading text-4xl font-black tracking-tight text-white md:text-6xl">{athlete.name}</h1>
+              <p className="mt-3 text-base font-bold text-slate-300">{athlete.position} - {team?.name}</p>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-300">
+                <span className="flex items-center gap-1"><MapPin className="size-4" /> {athlete.city}, {athlete.country}</span>
+                <span className="flex items-center gap-1"><Trophy className="size-4 text-[var(--goal-gold)]" /> {league?.name}</span>
+                <span className="flex items-center gap-1"><Calendar className="size-4 text-[var(--goal-mint)]" /> Next: {nextMatch?.venue}</span>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3 lg:w-64 lg:grid-cols-1">
+              <Button onClick={() => setSupportAthlete(athlete)}>Support Athlete</Button>
+              <Button variant="outline" onClick={() => router.push('/feed')}>Join Fan Club</Button>
+              <Button variant="secondary" onClick={() => setPledgeAthlete(athlete)}>Pledge Performance Reward</Button>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <Button size="lg" className="bg-primary text-primary-foreground shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-              Support Athlete
-            </Button>
-            <Button size="lg" variant="outline" className="bg-white/5">
-              Join Fan Club
-            </Button>
-          </div>
+        </PageContainer>
+      </section>
+
+      <PageContainer compact>
+        <div className="grid gap-3 md:grid-cols-4">
+          <ImpactStatCard label="Total support" value={formatUGX(athlete.totalEarnings)} icon={HeartHandshake} />
+          <ImpactStatCard label="Supporters" value={String(athlete.supportersCount)} icon={Users} tone="gold" />
+          <ImpactStatCard label="Verified" value={athlete.verified ? 'Yes' : 'Pending'} icon={ShieldCheck} tone="blue" />
+          <ImpactStatCard label="Next match" value={nextMatch?.status ?? 'Upcoming'} icon={Calendar} tone="orange" />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <GlassCard className="p-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Supporters</p>
-            <p className="text-xl font-bold flex items-center justify-center gap-1"><Users className="w-4 h-4 text-primary"/> {athlete.supportersCount}</p>
-          </GlassCard>
-          <GlassCard className="p-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Earnings</p>
-            <p className="text-xl font-bold text-primary">{athlete.totalEarnings.toLocaleString()} <span className="text-xs">UGX</span></p>
-          </GlassCard>
-          {Object.entries(athlete.stats).slice(0, 2).map(([key, val]) => (
-            <GlassCard key={key} className="p-4 text-center">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{key}</p>
-              <p className="text-xl font-bold">{val}</p>
-            </GlassCard>
-          ))}
-        </div>
-
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full bg-white/5 border border-white/10 p-1 rounded-full mb-8 flex overflow-x-auto hide-scrollbar">
-            {['overview', 'stats', 'challenges', 'feed'].map(t => (
-              <TabsTrigger key={t} value={t} className="rounded-full flex-1 min-w-[100px] capitalize data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                {t}
+        <Tabs defaultValue="overview" className="mt-8 w-full">
+          <TabsList className="hide-scrollbar mb-6 w-full justify-start overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-1">
+            {['overview', 'stats', 'challenges', 'highlights', 'feed'].map((tab) => (
+              <TabsTrigger key={tab} value={tab} className="min-w-28 rounded-lg capitalize data-active:bg-[var(--goal-emerald)] data-active:text-[#031008]">
+                {tab}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-8">
-            <section>
-              <h3 className="text-xl font-bold mb-4">About</h3>
-              <p className="text-muted-foreground leading-relaxed">{athlete.bio}</p>
-            </section>
-            
-            <section>
-              <h3 className="text-xl font-bold mb-4">Earnings Impact</h3>
-              <p className="text-muted-foreground mb-6">See how fan support is helping {athlete.name.split(' ')[0]} succeed off the pitch.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3">
-                  <div className="bg-primary/20 p-2 rounded-lg text-primary"><Car className="w-5 h-5"/></div>
-                  <div><h4 className="font-bold text-sm">Transport</h4><p className="text-xs text-muted-foreground">To training & matches</p></div>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3">
-                  <div className="bg-secondary/20 p-2 rounded-lg text-secondary"><Coffee className="w-5 h-5"/></div>
-                  <div><h4 className="font-bold text-sm">Meals</h4><p className="text-xs text-muted-foreground">Pre-match nutrition</p></div>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3">
-                  <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400"><HeartPulse className="w-5 h-5"/></div>
-                  <div><h4 className="font-bold text-sm">Medical</h4><p className="text-xs text-muted-foreground">Physio & recovery</p></div>
-                </div>
-              </div>
-            </section>
-          </TabsContent>
-
-          <TabsContent value="challenges" className="space-y-4">
-            <h3 className="text-xl font-bold mb-4">Performance Challenges</h3>
-            {athleteChallenges.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {athleteChallenges.map(c => <ChallengeCard key={c.id} challenge={c} />)}
-              </div>
-            ) : (
-              <GlassCard className="p-8 text-center text-muted-foreground">No active challenges right now.</GlassCard>
-            )}
-          </TabsContent>
-
-          <TabsContent value="feed" className="space-y-4">
-            {athleteFeed.length > 0 ? (
-              athleteFeed.map(f => <FeedCard key={f.id} post={f} />)
-            ) : (
-              <GlassCard className="p-8 text-center text-muted-foreground">No feed posts yet.</GlassCard>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="stats">
-             <GlassCard className="p-6">
-                <h3 className="text-xl font-bold mb-4">Full Season Stats</h3>
-                <div className="space-y-3">
-                  {Object.entries(athlete.stats).map(([key, val]) => (
-                    <div key={key} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                      <span className="text-muted-foreground">{key}</span>
-                      <span className="font-bold text-lg">{val}</span>
+          <TabsContent value="overview">
+            <div className="grid gap-8 lg:grid-cols-[1fr_0.8fr]">
+              <div className="glass-panel rounded-xl p-5">
+                <SectionHeader eyebrow="Portfolio" title="Athlete story" className="mb-4" />
+                <p className="text-sm leading-7 text-slate-300">{athlete.bio}</p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  {['Transport support', 'Meals and recovery', 'Training access'].map((item) => (
+                    <div key={item} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <p className="font-heading text-base font-black text-white">{item}</p>
                     </div>
                   ))}
                 </div>
-             </GlassCard>
+              </div>
+              <TrustNote compact />
+            </div>
           </TabsContent>
 
+          <TabsContent value="stats">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(athlete.stats).map(([key, value]) => (
+                <ImpactStatCard key={key} label={key} value={String(value)} />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="challenges">
+            <div className="grid gap-4 md:grid-cols-3">
+              {athleteChallenges.map((challenge) => (
+                <ChallengeCard key={challenge.id} challenge={challenge} onSupport={() => setPledgeAthlete(athlete)} />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="highlights">
+            <div className="grid gap-4 md:grid-cols-2">
+              {athleteFeed.slice(0, 2).map((post) => (
+                <FeedCard key={post.id} post={post} onComment={() => setCommentsOpen(true)} onSupport={() => setSupportAthlete(athlete)} />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="feed">
+            <div className="space-y-4">
+              {athleteFeed.map((post) => (
+                <FeedCard key={post.id} post={post} onComment={() => setCommentsOpen(true)} onSupport={() => setSupportAthlete(athlete)} />
+              ))}
+            </div>
+          </TabsContent>
         </Tabs>
-      </div>
+
+        <section className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="glass-panel rounded-xl p-5">
+            <SectionHeader eyebrow="Supporter Wall" title="Top supporters" className="mb-4" />
+            {['Mariam K.', 'Lule S.', 'Coach Ivan'].map((name, index) => (
+              <div key={name} className="flex items-center justify-between border-b border-white/8 py-3 last:border-0">
+                <p className="font-bold text-white">{name}</p>
+                <p className="text-sm font-black text-[var(--goal-gold)]">#{index + 1}</p>
+              </div>
+            ))}
+          </div>
+          <div className="glass-panel rounded-xl p-5">
+            <SectionHeader eyebrow="Impact" title="Support impact" className="mb-4" />
+            <p className="text-sm leading-7 text-slate-300">
+              Verified support helps {athlete.name.split(' ')[0]} cover travel, nutrition, equipment, and recovery while keeping fans connected to measurable progress.
+            </p>
+          </div>
+        </section>
+      </PageContainer>
+
+      <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
+      <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
+      <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
     </div>
   );
 }

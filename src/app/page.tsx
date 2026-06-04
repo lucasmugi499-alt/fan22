@@ -1,350 +1,415 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
+import {
+  ArrowRight,
+  Award,
+  Building2,
+  Coins,
+  HeartHandshake,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
+import { Athlete } from '@/lib/types';
+import {
+  mockAthletes,
+  mockChallenges,
+  mockCurrentUser,
+  mockFeed,
+  mockLeagues,
+  mockMatches,
+  sponsorPackages,
+} from '@/lib/mockData';
+import { sports, formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
-import { MatchCard } from '@/components/ui/match-card';
 import { AthleteCard } from '@/components/ui/athlete-card';
 import { ChallengeCard } from '@/components/ui/challenge-card';
 import { FeedCard } from '@/components/ui/feed-card';
-import { mockMatches, mockAthletes, mockChallenges, mockFeed } from '@/lib/mockData';
-import { PlayCircle, ShieldCheck, Trophy, Target, ArrowRight, Shield, Globe, Award, Medal, CheckCircle2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
-import { motion } from 'framer-motion';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { MatchCard } from '@/components/ui/match-card';
+import {
+  BackgroundOrbs,
+  GoalPlacePointsBadge,
+  ImpactStatCard,
+  PageContainer,
+  SectionHeader,
+  SportBadge,
+  StadiumGlow,
+  StickyStorySection,
+  TrustNote,
+} from '@/components/ui/product';
+import {
+  CommentsDrawer,
+  PledgeModal,
+  SponsorInterestModal,
+  SupportModal,
+} from '@/components/modals/app-modals';
 
 export default function Home() {
   const router = useRouter();
-  
-  const liveMatches = mockMatches.filter(m => m.status === 'Live');
-  const featuredAthletes = mockAthletes.slice(0, 4);
-  const activeChallenges = mockChallenges.filter(c => c.status === 'Active').slice(0, 3);
-  const feedPreview = mockFeed.slice(0, 2);
+  const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
+  const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [sponsorOpen, setSponsorOpen] = useState(false);
+
+  const liveMatches = mockMatches.filter((match) => match.status === 'Live');
+  const featuredAthletes = [...mockAthletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4);
+  const activeChallenges = mockChallenges.filter((challenge) => challenge.status === 'Active').slice(0, 3);
 
   return (
-    <div className="flex flex-col w-full">
-      {/* 1. Cinematic Hero Section */}
-      <section className="relative w-full min-h-[90vh] flex flex-col items-center justify-center overflow-hidden pt-20 pb-32">
-        <div className="absolute inset-0 z-0 bg-black">
-          {/* Dark stadium background with emerald/gold radial glow */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/40 via-background to-black" />
-          <div className="absolute top-0 right-0 w-3/4 h-3/4 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent opacity-50 blur-[100px]" />
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e11415053?auto=format&fit=crop&q=80')] opacity-10 mix-blend-overlay bg-cover bg-center" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-        </div>
-        
-        <div className="relative z-10 container mx-auto px-6 flex flex-col lg:flex-row items-center gap-16">
-          <div className="flex-1 flex flex-col items-start text-left max-w-3xl">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-              className="flex gap-3 mb-6"
+    <div className="w-full overflow-hidden">
+      <section className="relative min-h-[calc(100dvh-4rem)] overflow-hidden pt-5 md:min-h-[760px] md:pt-0">
+        <StadiumGlow />
+        <BackgroundOrbs />
+        <PageContainer className="relative z-10 grid gap-8 md:min-h-[690px] md:grid-cols-[1.08fr_0.92fr] md:items-center">
+          <div className="max-w-3xl">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="mb-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--goal-mint)] backdrop-blur-xl"
             >
-              {['Football', 'Basketball', 'Rugby'].map((sport) => (
-                <span key={sport} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-emerald-400 backdrop-blur-md">
-                  {sport}
-                </span>
-              ))}
+              <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] text-[10px] text-white">
+                GP
+              </span>
+              Today on GoalPlace256
             </motion.div>
-            
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-6 leading-[1.1] text-white drop-shadow-2xl"
+
+            <motion.h1
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.05 }}
+              className="max-w-4xl text-balance font-heading text-[clamp(2.45rem,10vw,5.7rem)] font-black leading-[0.98] tracking-tight text-white"
             >
-              Back the <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200">athletes.</span><br />
-              Build the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">game.</span>
+              Back the athletes. <span className="bg-gradient-to-r from-[var(--goal-mint)] to-[var(--goal-gold)] bg-clip-text text-transparent">Build the game.</span>
             </motion.h1>
-            
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 leading-relaxed font-medium"
+
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.1 }}
+              className="mt-5 max-w-2xl text-base leading-7 text-slate-300 md:text-xl md:leading-8"
             >
-              GoalPlace256 is Uganda's home for grassroots sports. Support verified athletes, celebrate their achievements, and build the future of our local leagues.
+              Uganda&apos;s mobile-first multi-sport hub for football, basketball, and rugby. Follow local action, support verified athletes, pledge performance rewards, and earn GoalPlace Points for recognition.
             </motion.p>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
+
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.16 }}
+              className="mt-6 grid gap-2 sm:grid-cols-3"
             >
-              <Button size="lg" className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-700 text-white hover:from-emerald-400 hover:to-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all font-bold" onClick={() => router.push('/register')}>
-                Join as Fan
-              </Button>
-              <Button size="lg" variant="outline" className="h-14 px-8 text-lg border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10 font-bold" onClick={() => router.push('/register-athlete')}>
-                Register Athlete
-              </Button>
-              <Button size="lg" variant="ghost" className="h-14 px-8 text-lg hover:bg-white/5 font-semibold text-muted-foreground hover:text-white" onClick={() => router.push('/register-league')}>
-                Register League
-              </Button>
+              <Button size="lg" onClick={() => router.push('/register?role=fan')}>Join as Fan</Button>
+              <Button size="lg" variant="outline" onClick={() => router.push('/register?role=athlete')}>Register Athlete</Button>
+              <Button size="lg" variant="secondary" onClick={() => router.push('/register?role=league-admin')}>Register League</Button>
             </motion.div>
+
+            <div className="mt-6 hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {sports.map((sport) => {
+                const Icon = sport.icon;
+                return (
+                  <button
+                    key={sport.slug}
+                    className="flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-black text-white backdrop-blur-xl transition-colors hover:bg-white/12"
+                    onClick={() => router.push(`/sports?sport=${sport.slug}`)}
+                  >
+                    <Icon className="size-4" style={{ color: sport.color }} />
+                    {sport.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          
-          {/* Floating Cards */}
-          <div className="flex-1 w-full h-[500px] relative hidden lg:block">
-            <motion.div 
-              animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-              className="absolute top-0 right-10 w-72 rotate-6 z-10"
-            >
-              <div className="bg-black/40 backdrop-blur-xl border border-emerald-500/30 p-4 rounded-2xl shadow-2xl">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Live Match</span>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.12 }}
+            className="relative min-h-[330px] md:min-h-[540px]"
+          >
+            <div className="glass-panel absolute right-0 top-0 w-[78%] rounded-xl p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-red-300">
+                  <span className="size-2 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.9)]" />
+                  Live Now
+                </span>
+                <SportBadge sport={liveMatches[0]?.sport ?? 'Football'} />
+              </div>
+              <div className="flex items-center justify-between text-center">
+                <p className="max-w-24 text-sm font-black text-white">Kisenyi FC</p>
+                <p className="rounded-xl bg-black/30 px-4 py-2 font-heading text-3xl font-black text-white">2 - 1</p>
+                <p className="max-w-24 text-sm font-black text-white">Makindye Stars</p>
+              </div>
+              <Button className="mt-4 w-full" size="sm" onClick={() => router.push('/matches/m1')}>View Match</Button>
+            </div>
+
+            <div className="glass-panel absolute left-0 top-28 w-[72%] rounded-xl p-4 md:top-40">
+              <div className="flex items-center gap-3">
+                <div className="size-14 overflow-hidden rounded-xl border border-white/10 bg-white/8">
+                  <ImageWithFallback
+                    src={featuredAthletes[0].avatarUrl}
+                    alt={featuredAthletes[0].name}
+                    fallbackType="athlete"
+                    initials={getInitials(featuredAthletes[0].name)}
+                    sport={featuredAthletes[0].sport}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-                <div className="flex justify-between items-center text-xl font-black">
-                  <span>KSY</span>
-                  <span className="text-emerald-400 bg-emerald-950/50 px-3 py-1 rounded-lg">2 - 1</span>
-                  <span>MKD</span>
+                <div>
+                  <SportBadge sport={featuredAthletes[0].sport} />
+                  <h3 className="mt-2 font-heading text-lg font-black text-white">{featuredAthletes[0].name}</h3>
+                  <p className="text-xs text-slate-400">Top supported athlete</p>
                 </div>
               </div>
-            </motion.div>
-            
-            <motion.div 
-              animate={{ y: [0, 15, 0] }} transition={{ repeat: Infinity, duration: 6, ease: "easeInOut", delay: 1 }}
-              className="absolute top-32 left-0 w-64 -rotate-3 z-20"
-            >
-               <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-900 overflow-hidden"><img src={mockAthletes[0].avatarUrl} className="w-full h-full object-cover" alt="Athlete"/></div>
-                  <div>
-                    <h4 className="font-bold text-sm">Brian Okello</h4>
-                    <p className="text-xs text-muted-foreground">Forward • Kampala</p>
-                  </div>
-                </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/50 rounded-lg p-2 flex justify-between items-center">
-                  <span className="text-xs text-emerald-500">Verified Support</span>
-                  <span className="font-bold text-sm">1.5M UGX</span>
-                </div>
+              <div className="mt-4 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Verified Support</p>
+                <p className="mt-1 font-heading text-xl font-black text-white">{formatUGX(featuredAthletes[0].totalEarnings)}</p>
               </div>
-            </motion.div>
-            
-            <motion.div 
-              animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut", delay: 2 }}
-              className="absolute bottom-10 right-20 w-56 rotate-3 z-30"
-            >
-               <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-xl border border-amber-500/30 p-5 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-200/70 mb-1">GoalPlace Points</p>
-                <h3 className="text-3xl font-black text-amber-400">8,450</h3>
-                <p className="text-xs text-amber-200/50 mt-1">Ready for Awards</p>
+            </div>
+
+            <div className="glass-panel absolute bottom-2 right-5 w-[64%] rounded-xl border-[var(--goal-gold)]/25 p-4 md:bottom-10">
+              <div className="flex items-center gap-3 text-[var(--goal-gold)]">
+                <Coins className="size-6" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em]">GoalPlace Points</p>
               </div>
-            </motion.div>
-          </div>
-        </div>
+              <p className="mt-2 font-heading text-4xl font-black text-white">{mockCurrentUser.points.toLocaleString()}</p>
+              <p className="mt-1 text-xs text-slate-400">Annual Awards recognition race</p>
+            </div>
+          </motion.div>
+        </PageContainer>
       </section>
 
-      <div className="container mx-auto px-6 py-12 space-y-32">
-        {/* 2. Live Matches */}
+      <PageContainer className="space-y-14 md:space-y-24">
         <section>
-          <div className="flex items-center justify-between mb-10">
-            <h2 className="text-3xl font-bold flex items-center gap-3">
-              <span className="w-3 h-3 rounded-full bg-destructive animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]" /> Live & Upcoming
-            </h2>
-            <Button variant="ghost" className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30" onClick={() => router.push('/matches')}>
-              View Schedule <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {liveMatches.concat(mockMatches.filter(m => m.status === 'Upcoming')).slice(0,3).map(match => (
-              <MatchCard key={match.id} match={match} onView={() => router.push(`/matches/${match.id}`)} />
-            ))}
-          </div>
-        </section>
-
-        {/* 3. Explore Sports */}
-        <section>
-          <h2 className="text-3xl font-bold mb-10 text-center">Explore Sports</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {['Football', 'Basketball', 'Rugby'].map((sport) => (
-              <div key={sport} className="relative h-48 rounded-2xl overflow-hidden group cursor-pointer border border-white/5 hover:border-emerald-500/30 transition-all">
-                <div className="absolute inset-0 bg-black">
-                  <div className={`absolute inset-0 bg-gradient-to-t ${sport === 'Football' ? 'from-emerald-900/80' : sport === 'Basketball' ? 'from-amber-900/80' : 'from-blue-900/80'} to-transparent opacity-80 group-hover:opacity-100 transition-opacity z-10`} />
-                  <img src={sport === 'Football' ? 'https://images.unsplash.com/photo-1518605368461-1e1e11415053?auto=format&fit=crop&q=80' : sport === 'Basketball' ? 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1555592837-1959b3986a77?auto=format&fit=crop&q=80'} alt={sport} className="w-full h-full object-cover opacity-50 group-hover:scale-110 transition-transform duration-700" />
-                </div>
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center">
-                  <h3 className="text-2xl font-black mb-2">{sport}</h3>
-                  <span className="text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-300">Explore Athletes <ArrowRight className="w-4 h-4 inline" /></span>
-                </div>
+          <SectionHeader
+            eyebrow="Match Center"
+            title="Live now across Uganda"
+            description="Follow fixtures, active support challenges, venues, and verified results without hunting across group chats."
+            action={<Button variant="outline" onClick={() => router.push('/matches')}>All Matches <ArrowRight className="size-4" /></Button>}
+          />
+          <div className="hide-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
+            {mockMatches.slice(0, 3).map((match) => (
+              <div key={match.id} className="w-[86vw] shrink-0 snap-start md:w-auto">
+                <MatchCard match={match} onView={() => router.push(`/matches/${match.id}`)} />
               </div>
             ))}
           </div>
         </section>
 
-        {/* 4. Top Supported Athletes */}
         <section>
-          <div className="flex items-center justify-between mb-10">
-            <h2 className="text-3xl font-bold flex items-center gap-3">
-              <Trophy className="text-amber-400 w-8 h-8 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" /> Top Supported Athletes
-            </h2>
-            <Button variant="ghost" className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30" onClick={() => router.push('/athletes')}>
-              See Leaderboard <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+          <SectionHeader
+            eyebrow="Sports Ecosystem"
+            title="Choose your sport, then follow the people building it."
+            description="GoalPlace256 starts with football, basketball, and rugby, each with sport-specific stats, challenges, cards, and discovery."
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            {sports.map((sport) => {
+              const Icon = sport.icon;
+              return (
+                <button
+                  key={sport.slug}
+                  className={`glass-panel group relative min-h-52 overflow-hidden rounded-xl p-5 text-left transition-all hover:-translate-y-1 ${sport.edgeClass}`}
+                  onClick={() => router.push(`/sports?sport=${sport.slug}`)}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${sport.mutedGradient} opacity-70`} />
+                  <div className="relative z-10">
+                    <div className="mb-10 flex items-center justify-between">
+                      <div className="rounded-xl border border-white/10 bg-black/24 p-3">
+                        <Icon className="size-6" style={{ color: sport.color }} />
+                      </div>
+                      <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-300">{sport.shortLabel}</span>
+                    </div>
+                    <h3 className="font-heading text-2xl font-black text-white">{sport.name}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">{sport.statLabels.slice(0, 4).join(' / ')}</p>
+                    <span className="mt-5 inline-flex items-center gap-2 text-sm font-black" style={{ color: sport.color }}>
+                      Explore Sport <ArrowRight className="size-4" />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredAthletes.map(athlete => (
-              <AthleteCard key={athlete.id} athlete={athlete} onView={() => router.push(`/athletes/${athlete.id}`)} />
+        </section>
+
+        <section>
+          <SectionHeader
+            eyebrow="Support Challenges"
+            title="Trending verified performance rewards"
+            description="Support specific athlete achievements, then wait for official confirmation before rewards are paid."
+            action={<Button onClick={() => setPledgeAthlete(featuredAthletes[0])}>Pledge Support</Button>}
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            {activeChallenges.map((challenge) => {
+              const athlete = mockAthletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
+              return (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  onSupport={() => setPledgeAthlete(athlete)}
+                />
+              );
+            })}
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader
+            eyebrow="Athlete Economy"
+            title="Top supported athletes"
+            description="Compact cards built for quick daily scanning, direct support, and deeper athlete profiles."
+            action={<Button variant="outline" onClick={() => router.push('/athletes')}>All Athletes <ArrowRight className="size-4" /></Button>}
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {featuredAthletes.map((athlete) => (
+              <AthleteCard
+                key={athlete.id}
+                athlete={athlete}
+                onSupport={() => setSupportAthlete(athlete)}
+                onView={() => router.push(`/athletes/${athlete.id}`)}
+              />
             ))}
           </div>
         </section>
 
-        {/* 5. Verified Performance Challenges */}
-        <section className="bg-emerald-950/20 border border-emerald-900/30 rounded-3xl p-8 lg:p-12 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] -z-10" />
-          <div className="flex flex-col lg:flex-row items-center justify-between mb-10 gap-6">
-             <div>
-               <h2 className="text-3xl font-bold mb-3 flex items-center gap-3">
-                 <ShieldCheck className="text-emerald-400 w-8 h-8" /> Verified Performance Challenges
-               </h2>
-               <p className="text-muted-foreground text-lg max-w-2xl">Support your favorite athletes by backing specific on-field targets. Funds are only paid out when league officials verify the result.</p>
-             </div>
-             <Button className="shrink-0 bg-white text-black hover:bg-gray-200 font-bold">View All Challenges</Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {activeChallenges.map(challenge => (
-              <ChallengeCard key={challenge.id} challenge={challenge} />
-            ))}
-          </div>
-        </section>
+        <StickyStorySection />
 
-        {/* 6. How Support Works */}
-        <section>
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-4xl font-black mb-6">Support That Builds the Game</h2>
-            <p className="text-xl text-muted-foreground">GoalPlace256 is built on trust and direct impact. We ensure every shilling pledged goes directly to the athlete only after they prove their performance on the field.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto relative">
-            <div className="hidden md:block absolute top-1/2 left-[15%] right-[15%] h-0.5 bg-gradient-to-r from-emerald-900 via-emerald-500/50 to-emerald-900 -z-10 -translate-y-1/2" />
-            
-            <div className="flex flex-col items-center text-center gap-6 relative group">
-              <div className="w-20 h-20 rounded-2xl bg-black border border-white/10 text-emerald-400 flex items-center justify-center shadow-xl group-hover:border-emerald-500/50 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
-                <Target className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl mb-2">1. Pledge Support</h3>
-                <p className="text-muted-foreground leading-relaxed">Fans pledge support for specific verifiable athletic challenges.</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center gap-6 relative group">
-              <div className="w-20 h-20 rounded-2xl bg-black border border-white/10 text-emerald-400 flex items-center justify-center shadow-xl group-hover:border-emerald-500/50 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
-                <PlayCircle className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl mb-2">2. Athlete Performs</h3>
-                <p className="text-muted-foreground leading-relaxed">The athlete plays the match and attempts to complete the challenge.</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center gap-6 relative group">
-              <div className="w-20 h-20 rounded-2xl bg-black border border-white/10 text-emerald-400 flex items-center justify-center shadow-xl group-hover:border-emerald-500/50 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
-                <ShieldCheck className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl mb-2">3. Verified Payout</h3>
-                <p className="text-muted-foreground leading-relaxed">League admins verify the result. If successful, funds are transferred securely.</p>
-              </div>
+        <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="lg:sticky lg:top-24">
+            <SectionHeader
+              eyebrow="Community Feed"
+              title="The Social Heartbeat"
+              description="Highlights, results, verified achievements, and community moments from Uganda's grassroots sport."
+              action={<Button onClick={() => router.push('/feed')}>Open Feed <ArrowRight className="size-4" /></Button>}
+            />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <ImpactStatCard label="Community posts" value="1.8k" icon={Sparkles} detail="Highlights, milestones, and updates." />
+              <ImpactStatCard label="Verified achievements" value="426" icon={ShieldCheck} tone="gold" detail="Confirmed by admins or officials." />
             </div>
           </div>
+          <div className="space-y-4">
+            {mockFeed.slice(0, 3).map((post) => (
+              <FeedCard
+                key={post.id}
+                post={post}
+                onSupport={() => setSupportAthlete(featuredAthletes[0])}
+                onComment={() => setCommentsOpen(true)}
+                onViewProfile={() => router.push(post.authorType === 'Athlete' ? `/athletes/${post.authorId}` : '/feed')}
+                onViewMatch={() => router.push('/matches/m1')}
+              />
+            ))}
+          </div>
         </section>
 
-        {/* 7. Community Feed Preview */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-          <div className="lg:col-span-5 sticky top-24">
-            <h2 className="text-4xl font-black mb-6">The Social Heartbeat</h2>
-            <p className="text-muted-foreground mb-8 text-lg leading-relaxed">
-              Follow the moments, milestones, and athletes shaping the future of African sport. Real stories from real pitches, verified achievements, and community support in action.
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-panel rounded-xl p-5 md:p-6">
+            <GoalPlacePointsBadge points={mockCurrentUser.points} />
+            <h2 className="mt-6 font-heading text-3xl font-black text-white">GoalPlace Points</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Earn loyalty and recognition points for supporting athletes, engaging with verified moments, and participating in the Annual Awards race.
             </p>
-            <Button size="lg" className="w-full sm:w-auto bg-white text-black hover:bg-gray-200 font-bold" onClick={() => router.push('/feed')}>
-              Join the Conversation
-            </Button>
+            <Button className="mt-6" variant="gold" onClick={() => router.push('/awards')}>View Awards</Button>
           </div>
-          <div className="lg:col-span-7 space-y-6">
-            {feedPreview.map(post => (
-              <FeedCard key={post.id} post={post} />
+          <div className="glass-panel rounded-xl p-5 md:p-6">
+            <div className="mb-4 flex items-center gap-3 text-[var(--goal-gold)]">
+              <Award className="size-7" />
+              <span className="text-xs font-black uppercase tracking-[0.18em]">Annual Recognition</span>
+            </div>
+            <h2 className="font-heading text-3xl font-black text-white">GoalPlace Annual Awards</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Fans, athletes, teams, leagues, youth programs, and women and youth sport impact all get a year-end spotlight.
+            </p>
+            <Button className="mt-6" variant="outline" onClick={() => router.push('/awards')}>See Award Race</Button>
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader
+            eyebrow="Leagues"
+            title="Featured verified leagues"
+            description="League admins confirm achievements, manage fixtures, and keep local sport organized."
+            action={<Button variant="outline" onClick={() => router.push('/leagues')}>Explore Leagues</Button>}
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            {mockLeagues.map((league) => (
+              <button
+                key={league.id}
+                className={`glass-panel rounded-xl p-5 text-left transition-all hover:-translate-y-1 ${getSportTheme(league.sport).edgeClass}`}
+                onClick={() => router.push(`/leagues/${league.id}`)}
+              >
+                <SportBadge sport={league.sport} />
+                <h3 className="mt-4 font-heading text-xl font-black text-white">{league.name}</h3>
+                <p className="mt-2 text-sm text-slate-400">{league.city}, {league.country}</p>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <ImpactMini label="Verified" value={`${league.verifiedPercentage}%`} />
+                  <ImpactMini label="Complete" value={`${league.completionRate}%`} />
+                </div>
+              </button>
             ))}
           </div>
         </section>
 
-        {/* 8. GoalPlace Points & 9. Annual Awards */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-amber-500/10 to-orange-600/10 border border-amber-500/20 rounded-3xl p-10 flex flex-col items-start justify-between min-h-[400px]">
-             <div>
-               <div className="w-14 h-14 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-6 border border-amber-500/30">
-                 <Trophy className="w-7 h-7 text-amber-400" />
-               </div>
-               <h2 className="text-3xl font-black mb-4">GoalPlace Points</h2>
-               <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-md">
-                 Earn loyalty points for every action on the platform. Support athletes, engage with content, and rise up the fan leaderboards to earn exclusive recognition.
-               </p>
-             </div>
-             <Button variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300">
-               Learn About Points
-             </Button>
-          </div>
-          
-          <div className="bg-gradient-to-bl from-purple-500/10 to-indigo-600/10 border border-purple-500/20 rounded-3xl p-10 flex flex-col items-start justify-between min-h-[400px]">
-             <div>
-               <div className="w-14 h-14 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/30">
-                 <Medal className="w-7 h-7 text-purple-400" />
-               </div>
-               <h2 className="text-3xl font-black mb-4">GoalPlace Annual Awards</h2>
-               <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-md">
-                 The most prestigious grassroots sports awards in Uganda. Fans use their GoalPlace Points to cast votes for the best athletes, teams, and moments of the year.
-               </p>
-             </div>
-             <Button variant="outline" className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300">
-               View Awards Preview
-             </Button>
+        <section className="glass-panel relative overflow-hidden rounded-xl p-5 md:p-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--goal-gold)]/12 via-transparent to-[var(--goal-emerald)]/12" />
+          <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--goal-gold)]">Sponsor Impact</p>
+              <h2 className="mt-3 font-heading text-3xl font-black text-white md:text-4xl">Local brands can build real sporting infrastructure.</h2>
+              <p className="mt-4 text-sm leading-7 text-slate-300">
+                Sponsor athletes, teams, leagues, youth programs, women and youth sport, or the Annual Awards with transparent demo reporting.
+              </p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <Button variant="gold" onClick={() => setSponsorOpen(true)}>Become a Sponsor</Button>
+                <Button variant="outline" onClick={() => router.push('/sponsors')}>View Packages</Button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sponsorPackages.slice(0, 4).map((item) => (
+                <div key={item.name} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <Building2 className="mb-3 size-5 text-[var(--goal-gold)]" />
+                  <h3 className="font-heading text-base font-black text-white">{item.name}</h3>
+                  <p className="mt-1 text-xs font-bold text-[var(--goal-gold)]">{item.price}</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-400">{item.detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* 12. Trust and Compliance Section */}
-        <section className="bg-secondary/30 rounded-3xl p-10 border border-white/5">
-           <div className="max-w-3xl mx-auto text-center mb-10">
-             <Shield className="w-12 h-12 text-emerald-500 mx-auto mb-6" />
-             <h2 className="text-3xl font-black mb-4">Built on Trust & Integrity</h2>
-             <p className="text-muted-foreground text-lg">GoalPlace256 is dedicated to empowering athletes through direct, verifiable fan support. We operate with strict compliance and transparency.</p>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-             <div className="flex gap-4 items-start">
-               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-1" />
-               <div>
-                 <h4 className="font-bold text-lg mb-2">Direct Athlete Impact</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">Fans support athletes directly. There are no fan cash winnings. This platform is exclusively for funding and celebrating athletic performance.</p>
-               </div>
-             </div>
-             <div className="flex gap-4 items-start">
-               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-1" />
-               <div>
-                 <h4 className="font-bold text-lg mb-2">Verified Performance</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">Rewards are paid to athletes only after verified performance. Achievements are strictly verified by designated league admins or officials.</p>
-               </div>
-             </div>
-             <div className="flex gap-4 items-start">
-               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-1" />
-               <div>
-                 <h4 className="font-bold text-lg mb-2">Loyalty & Recognition</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">GoalPlace Points are loyalty and recognition points used for platform features and voting. They are not cash and cannot be withdrawn.</p>
-               </div>
-             </div>
-             <div className="flex gap-4 items-start">
-               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-1" />
-               <div>
-                 <h4 className="font-bold text-lg mb-2">Not for Speculation</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">GoalPlace256 is a sports-tech community built for athlete support, empowerment, and league visibility, never for speculation.</p>
-               </div>
-             </div>
-           </div>
+        <section>
+          <TrustNote />
         </section>
 
-        {/* 13. Final CTA */}
-        <section className="relative rounded-3xl overflow-hidden py-24 text-center">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-900 to-teal-900" />
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e11415053?auto=format&fit=crop&q=80')] opacity-20 mix-blend-overlay bg-cover bg-center" />
-          <div className="relative z-10 max-w-2xl mx-auto px-6">
-            <h2 className="text-4xl md:text-5xl font-black mb-6 text-white">Ready to Shape the Game?</h2>
-            <p className="text-xl text-emerald-100/80 mb-10">Join thousands of fans and athletes building the future of Ugandan grassroots sports.</p>
-            <Button size="lg" className="h-14 px-10 text-lg bg-white text-emerald-950 hover:bg-emerald-50 font-black shadow-2xl" onClick={() => router.push('/register')}>
-              Get Started Now
-            </Button>
+        <section className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-[var(--goal-emerald)]/20 via-[#111827] to-[var(--rugby)]/18 p-6 text-center md:p-12">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[var(--goal-mint)]">
+            <HeartHandshake className="size-6" />
+          </div>
+          <h2 className="mx-auto mt-5 max-w-3xl font-heading text-3xl font-black text-white md:text-5xl">Ready to shape the game in Uganda?</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
+            Join as a fan, register as an athlete, or help organize verified league activity on GoalPlace256.
+          </p>
+          <div className="mt-6 grid gap-2 sm:mx-auto sm:max-w-xl sm:grid-cols-3">
+            <Button onClick={() => router.push('/register?role=fan')}>Join as Fan</Button>
+            <Button variant="outline" onClick={() => router.push('/register?role=athlete')}>Register Athlete</Button>
+            <Button variant="secondary" onClick={() => router.push('/register?role=league-admin')}>Register League</Button>
           </div>
         </section>
-      </div>
+      </PageContainer>
+
+      <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
+      <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
+      <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
+      <SponsorInterestModal open={sponsorOpen} onOpenChange={setSponsorOpen} />
+    </div>
+  );
+}
+
+function ImpactMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/8 bg-white/5 p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 font-heading text-xl font-black text-white">{value}</p>
     </div>
   );
 }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-label="Rugby gradient placeholder">
+  <defs>
+    <radialGradient id="a" cx="18%" cy="22%" r="55%">
+      <stop offset="0" stop-color="#4DFFB3" stop-opacity=".7"/>
+      <stop offset=".43" stop-color="#3B82F6" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#05070A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#05070A"/>
+      <stop offset=".58" stop-color="#111827"/>
+      <stop offset="1" stop-color="#1E3A8A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#b)"/>
+  <rect width="1200" height="700" fill="url(#a)"/>
+  <g fill="none" stroke="#F8FAFC" stroke-opacity=".12" stroke-width="4">
+    <path d="M160 545h880M250 545V230M950 545V230M285 230h-70M985 230h-70"/>
+    <ellipse cx="600" cy="386" rx="260" ry="124"/>
+    <path d="M380 386h440M600 262v248"/>
+  </g>
+  <circle cx="960" cy="135" r="7" fill="#F5B942" opacity=".55"/>
+  <circle cx="1014" cy="180" r="4" fill="#F8FAFC" opacity=".32"/>
+</svg>

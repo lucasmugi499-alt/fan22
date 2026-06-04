@@ -1,25 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "GoalPlace256",
-  description: "Back the athletes. Build the game.",
+  title: {
+    default: "GoalPlace256 | Back the athletes. Build the game.",
+    template: "%s | GoalPlace256",
+  },
+  description:
+    "GoalPlace256 is Uganda's mobile-first sports platform for fans, verified athletes, leagues, teams, sponsors, and community impact.",
+  applicationName: "GoalPlace256",
+  keywords: [
+    "GoalPlace256",
+    "Uganda sport",
+    "grassroots football",
+    "Uganda basketball",
+    "Uganda rugby",
+    "athlete support",
+    "GoalPlace Points",
+  ],
 };
 
-import { Toaster } from 'sonner';
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -29,11 +32,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className="h-full antialiased dark"
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AppShell>{children}</AppShell>
-        <Toaster theme="dark" position="bottom-right" />
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          toastOptions={{
+            className:
+              "border-white/10 bg-[#111827]/95 text-slate-50 backdrop-blur-xl",
+          }}
+        />
       </body>
     </html>
   );

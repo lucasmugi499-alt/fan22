@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Stadium glow placeholder">
+  <defs>
+    <radialGradient id="a" cx="50%" cy="10%" r="70%">
+      <stop offset="0" stop-color="#F8FAFC" stop-opacity=".28"/>
+      <stop offset=".2" stop-color="#00C46A" stop-opacity=".23"/>
+      <stop offset=".55" stop-color="#3B82F6" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#05070A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#05070A"/>
+      <stop offset=".5" stop-color="#0B1117"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#b)"/>
+  <rect width="1600" height="900" fill="url(#a)"/>
+  <g stroke="#F8FAFC" stroke-opacity=".1" fill="none">
+    <path d="M120 700C360 560 1240 560 1480 700" stroke-width="5"/>
+    <path d="M220 742C430 640 1170 640 1380 742" stroke-width="3"/>
+    <path d="M800 125L505 705M800 125l295 580M650 105L430 690M950 105l220 585"/>
+  </g>
+</svg>

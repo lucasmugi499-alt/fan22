@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  --font-heading: "Sora", "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,82 +49,164 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --night: #05070A;
+  --charcoal: #0B1117;
+  --surface: #111827;
+  --surface-soft: #17202B;
+  --surface-glass: rgba(255, 255, 255, 0.06);
+  --goal-emerald: #00C46A;
+  --goal-emerald-dark: #008F4C;
+  --goal-mint: #4DFFB3;
+  --goal-gold: #F5B942;
+  --goal-warm-gold: #D99A1E;
+  --football: #22C55E;
+  --basketball: #F97316;
+  --rugby: #3B82F6;
+  --text-main: #F8FAFC;
+  --text-soft: #CBD5E1;
+  --text-muted: #94A3B8;
+  --border-soft: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-glow: rgba(0, 196, 106, 0.35);
+  --background: var(--night);
+  --foreground: var(--text-main);
+  --card: var(--surface);
+  --card-foreground: var(--text-main);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-main);
+  --primary: var(--goal-emerald);
+  --primary-foreground: var(--night);
+  --secondary: var(--goal-gold);
+  --secondary-foreground: var(--night);
+  --muted: var(--surface-soft);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--surface-soft);
+  --accent-foreground: var(--text-main);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.13);
+  --ring: var(--goal-emerald);
+  --chart-1: var(--goal-emerald);
+  --chart-2: var(--goal-gold);
+  --chart-3: var(--basketball);
+  --chart-4: var(--rugby);
+  --chart-5: #A78BFA;
+  --radius: 0.75rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text-main);
+  --sidebar-primary: var(--goal-emerald);
+  --sidebar-primary-foreground: var(--night);
+  --sidebar-accent: var(--surface-soft);
+  --sidebar-accent-foreground: var(--text-main);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: var(--goal-emerald);
 }
 
 .dark {
-  --background: oklch(0.14 0 0); /* Charcoal/Deep Black */
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.62 0.15 150); /* Emerald Green */
-  --primary-foreground: oklch(0.14 0 0);
-  --secondary: oklch(0.80 0.15 85); /* Gold */
-  --secondary-foreground: oklch(0.14 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.22 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.6 0.19 22);
-  --border: oklch(0.25 0 0);
-  --input: oklch(0.25 0 0);
-  --ring: oklch(0.62 0.15 150); /* Emerald Green ring */
-  --chart-1: oklch(0.62 0.15 150);
-  --chart-2: oklch(0.80 0.15 85);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.18 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.62 0.15 150);
-  --sidebar-primary-foreground: oklch(0.14 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.25 0 0);
-  --sidebar-ring: oklch(0.62 0.15 150);
+  --background: var(--night);
+  --foreground: var(--text-main);
+  --card: var(--surface);
+  --card-foreground: var(--text-main);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-main);
+  --primary: var(--goal-emerald);
+  --primary-foreground: var(--night);
+  --secondary: var(--goal-gold);
+  --secondary-foreground: var(--night);
+  --muted: var(--surface-soft);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--surface-soft);
+  --accent-foreground: var(--text-main);
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.13);
+  --ring: var(--goal-emerald);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    overflow-x: hidden;
+    min-height: 100%;
+    background: var(--night);
+  }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   html {
     @apply font-sans;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-5 lg:px-8;
+  }
+
+  .page-safe {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 1024px) {
+    .page-safe {
+      padding-bottom: 4rem;
+    }
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .glass-panel {
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.035)),
+      rgba(17, 24, 39, 0.72);
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(22px);
+  }
+
+  .stadium-vignette {
+    background:
+      radial-gradient(circle at 18% 12%, rgba(0, 196, 106, 0.25), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(245, 185, 66, 0.16), transparent 26%),
+      radial-gradient(circle at 55% 65%, rgba(59, 130, 246, 0.14), transparent 36%),
+      linear-gradient(180deg, rgba(5, 7, 10, 0.2), var(--night) 76%);
+  }
+
+  .stadium-rays {
+    background:
+      linear-gradient(105deg, transparent 0 15%, rgba(255, 255, 255, 0.08) 16%, transparent 24%),
+      linear-gradient(78deg, transparent 0 52%, rgba(77, 255, 179, 0.08) 53%, transparent 61%),
+      linear-gradient(135deg, transparent 0 70%, rgba(245, 185, 66, 0.08) 71%, transparent 78%);
+    opacity: 0.55;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .sport-edge-football {
+    box-shadow: inset 3px 0 0 var(--football), 0 20px 60px rgba(34, 197, 94, 0.13);
+  }
+
+  .sport-edge-basketball {
+    box-shadow: inset 3px 0 0 var(--basketball), 0 20px 60px rgba(249, 115, 22, 0.13);
+  }
+
+  .sport-edge-rugby {
+    box-shadow: inset 3px 0 0 var(--rugby), 0 20px 60px rgba(59, 130, 246, 0.13);
   }
 }

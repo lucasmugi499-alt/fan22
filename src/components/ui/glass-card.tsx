@@ -10,14 +10,14 @@ export function GlassCard({ children, className, glow = false, ...props }: Glass
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-md border border-white/10",
-        glow && "shadow-[0_0_15px_rgba(16,185,129,0.1)]",
+        "glass-panel relative overflow-hidden rounded-xl",
+        glow && "shadow-[0_0_32px_rgba(0,196,106,0.16)]",
         className
       )}
       {...props}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-      <div className="relative z-10 p-4">
+      <div className="relative z-10">
         {children}
       </div>
     </div>

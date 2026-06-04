@@ -97,7 +97,14 @@ export interface FeedPost {
   authorId: string;
   authorType: 'Athlete' | 'Team' | 'League' | 'Sponsor' | 'Fan' | 'Admin';
   sport: SportType;
-  type: 'Highlight' | 'VerifiedAchievement' | 'MatchResult' | 'SupportMilestone' | 'LeagueUpdate' | 'SponsorImpact' | 'AnnualAwards';
+  type:
+    | 'VerifiedAchievement'
+    | 'AthleteHighlight'
+    | 'MatchResult'
+    | 'SupportMilestone'
+    | 'LeagueUpdate'
+    | 'SponsorImpact'
+    | 'AnnualAwards';
   caption: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video';

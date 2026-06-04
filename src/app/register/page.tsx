@@ -1,5 +1,10 @@
-import React from 'react';
+import RegisterClient from './RegisterClient';
 
-export default function Page() {
-  return <div className="container mx-auto p-8 text-center text-muted-foreground">Coming Soon: register</div>;
+type Props = {
+  searchParams: Promise<{ role?: string }>;
+};
+
+export default async function RegisterPage({ searchParams }: Props) {
+  const params = await searchParams;
+  return <RegisterClient initialRole={params.role ?? 'fan'} />;
 }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-label="Football gradient placeholder">
+  <defs>
+    <radialGradient id="a" cx="25%" cy="20%" r="55%">
+      <stop offset="0" stop-color="#4DFFB3" stop-opacity=".85"/>
+      <stop offset=".45" stop-color="#22C55E" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#05070A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#05070A"/>
+      <stop offset=".58" stop-color="#0B1117"/>
+      <stop offset="1" stop-color="#008F4C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#b)"/>
+  <rect width="1200" height="700" fill="url(#a)"/>
+  <g fill="none" stroke="#F8FAFC" stroke-opacity=".12" stroke-width="4">
+    <path d="M120 540h960M210 540V265h780v275M350 540V390h500v150M600 540V265"/>
+    <circle cx="600" cy="402" r="86"/>
+  </g>
+  <g fill="#F5B942" opacity=".55">
+    <circle cx="985" cy="130" r="8"/>
+    <circle cx="1030" cy="170" r="4"/>
+    <circle cx="930" cy="185" r="5"/>
+  </g>
+</svg>
