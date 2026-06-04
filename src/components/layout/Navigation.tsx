@@ -57,8 +57,10 @@ export function DesktopNav() {
   return (
     <div className="hidden md:flex sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 h-16 items-center px-8">
       <div className="flex items-center gap-2 mr-8">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center glow-text font-bold text-background">FP</div>
-        <span className="font-black tracking-tight text-xl">FanPlay<span className="text-primary">Africa</span></span>
+        <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-900 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-emerald-500/50">
+          <span className="font-black text-white tracking-tighter text-sm">GP<span className="text-emerald-200">256</span></span>
+        </div>
+        <span className="font-black tracking-tight text-xl text-foreground">GoalPlace<span className="text-emerald-500">256</span></span>
       </div>
       
       <nav className="flex items-center gap-6 flex-1">
