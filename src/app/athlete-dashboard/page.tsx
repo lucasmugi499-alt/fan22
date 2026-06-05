@@ -6,6 +6,7 @@ import { Calendar, CheckCircle2, ImageUp, LineChart, ReceiptText, ShieldCheck, T
 import { dashboardSeries, mockAthletes, mockChallenges, mockFeed, walletTransactions } from '@/lib/mockData';
 import { formatUGX } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 import { ChallengeCard } from '@/components/ui/challenge-card';
 import { FeedCard } from '@/components/ui/feed-card';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge } from '@/components/ui/product';
@@ -17,7 +18,8 @@ export default function AthleteDashboardPage() {
   const athleteFeed = mockFeed.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 2);
 
   return (
-    <PageContainer compact>
+    <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>
+      <PageContainer compact>
       <SectionHeader
         eyebrow="Athlete Dashboard"
         title={`Welcome, ${athlete.name}`}
@@ -116,6 +118,7 @@ export default function AthleteDashboardPage() {
           ))}
         </div>
       </section>
-    </PageContainer>
+      </PageContainer>
+    </RoleGuard>
   );
 }

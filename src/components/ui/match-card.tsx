@@ -6,7 +6,7 @@ import { GlassCard } from './glass-card';
 import { Badge } from './badge';
 import { Button } from './button';
 import { Calendar, MapPin, ShieldCheck, Users, Zap } from 'lucide-react';
-import { mockChallenges, mockTeams } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatCompact, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { SportBadge } from './product';
@@ -32,8 +32,9 @@ function TeamLogo({ name, logoUrl, sport }: { name: string; logoUrl: string; spo
 }
 
 export function MatchCard({ match, onView }: MatchCardProps) {
-  const teamA = mockTeams.find((team) => team.id === match.teamAId);
-  const teamB = mockTeams.find((team) => team.id === match.teamBId);
+  const { challenges, teams } = useGoalPlaceData();
+  const teamA = teams.find((team) => team.id === match.teamAId);
+  const teamB = teams.find((team) => team.id === match.teamBId);
 
   if (!teamA || !teamB) return null;
 
@@ -41,7 +42,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
   const date = new Date(match.date);
   const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const formattedTime = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const activeChallenges = mockChallenges.filter((challenge) => challenge.matchId === match.id && challenge.status === 'Active');
+  const activeChallenges = challenges.filter((challenge) => challenge.matchId === match.id && challenge.status === 'Active');
   const supporterCount = activeChallenges.reduce((sum, challenge) => sum + challenge.supportersCount, 0);
   const statusTone = match.status === 'Live' ? 'destructive' : match.status === 'Completed' ? 'secondary' : 'outline';
 

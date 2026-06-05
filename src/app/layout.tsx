@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -35,7 +36,9 @@ export default function RootLayout({
       className="h-full antialiased dark"
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
         <Toaster
           theme="dark"
           position="bottom-right"

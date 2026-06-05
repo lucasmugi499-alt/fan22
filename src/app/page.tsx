@@ -14,14 +14,10 @@ import {
 } from 'lucide-react';
 import { Athlete } from '@/lib/types';
 import {
-  mockAthletes,
-  mockChallenges,
   mockCurrentUser,
-  mockFeed,
-  mockLeagues,
-  mockMatches,
   sponsorPackages,
 } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { sports, formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { AthleteCard } from '@/components/ui/athlete-card';
@@ -53,10 +49,11 @@ export default function Home() {
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [sponsorOpen, setSponsorOpen] = useState(false);
+  const { athletes, challenges, feedPosts, leagues, matches } = useGoalPlaceData();
 
-  const liveMatches = mockMatches.filter((match) => match.status === 'Live');
-  const featuredAthletes = [...mockAthletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4);
-  const activeChallenges = mockChallenges.filter((challenge) => challenge.status === 'Active').slice(0, 3);
+  const liveMatches = matches.filter((match) => match.status === 'Live');
+  const featuredAthletes = [...athletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4);
+  const activeChallenges = challenges.filter((challenge) => challenge.status === 'Active').slice(0, 3);
 
   return (
     <div className="w-full overflow-hidden">
@@ -190,7 +187,7 @@ export default function Home() {
             action={<Button variant="outline" onClick={() => router.push('/matches')}>All Matches <ArrowRight className="size-4" /></Button>}
           />
           <div className="hide-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
-            {mockMatches.slice(0, 3).map((match) => (
+            {matches.slice(0, 3).map((match) => (
               <div key={match.id} className="w-[86vw] shrink-0 snap-start md:w-auto">
                 <MatchCard match={match} onView={() => router.push(`/matches/${match.id}`)} />
               </div>
@@ -242,7 +239,7 @@ export default function Home() {
           />
           <div className="grid gap-4 md:grid-cols-3">
             {activeChallenges.map((challenge) => {
-              const athlete = mockAthletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
+              const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
               return (
                 <ChallengeCard
                   key={challenge.id}
@@ -289,7 +286,7 @@ export default function Home() {
             </div>
           </div>
           <div className="space-y-4">
-            {mockFeed.slice(0, 3).map((post) => (
+            {feedPosts.slice(0, 3).map((post) => (
               <FeedCard
                 key={post.id}
                 post={post}
@@ -332,7 +329,7 @@ export default function Home() {
             action={<Button variant="outline" onClick={() => router.push('/leagues')}>Explore Leagues</Button>}
           />
           <div className="grid gap-4 md:grid-cols-3">
-            {mockLeagues.map((league) => (
+            {leagues.map((league) => (
               <button
                 key={league.id}
                 className={`glass-panel rounded-xl p-5 text-left transition-all hover:-translate-y-1 ${getSportTheme(league.sport).edgeClass}`}

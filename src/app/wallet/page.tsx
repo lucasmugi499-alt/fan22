@@ -8,6 +8,7 @@ import { mockCurrentUser, walletTransactions } from '@/lib/mockData';
 import { formatUGX } from '@/lib/sportThemes';
 import { AddFundsModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { GoalPlacePointsBadge, ImpactStatCard, PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +20,8 @@ export default function WalletPage() {
   const [addFundsOpen, setAddFundsOpen] = useState(false);
 
   return (
-    <PageContainer compact>
+    <ProtectedRoute>
+      <PageContainer compact>
       <SectionHeader
         eyebrow="Wallet"
         title="GoalPlace Wallet"
@@ -116,6 +118,7 @@ export default function WalletPage() {
       </section>
 
       <AddFundsModal open={addFundsOpen} onOpenChange={setAddFundsOpen} />
-    </PageContainer>
+      </PageContainer>
+    </ProtectedRoute>
   );
 }

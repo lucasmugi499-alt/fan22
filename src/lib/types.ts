@@ -3,11 +3,39 @@ export type SportType = 'Football' | 'Basketball' | 'Rugby';
 export type UserRole = 'Fan' | 'Athlete' | 'Team Admin' | 'League Admin' | 'Sponsor' | 'Scout';
 
 export type LeagueStatus =
-  | 'Draft League'
-  | 'Community League'
-  | 'Verified League'
-  | 'Partner League'
-  | 'Suspended';
+  | 'draft'
+  | 'community'
+  | 'verified'
+  | 'partner'
+  | 'suspended';
+
+export type AppRole =
+  | 'fan'
+  | 'athlete'
+  | 'team_admin'
+  | 'league_admin'
+  | 'sponsor'
+  | 'platform_admin'
+  | 'super_admin';
+
+export type ProfileStatus = 'active' | 'pending' | 'suspended';
+
+export interface UserProfile {
+  id: string;
+  uid: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  status: ProfileStatus;
+  avatarUrl?: string;
+  points: number;
+  walletBalance: number;
+  followedAthletes: string[];
+  followedTeams: string[];
+  followedLeagues: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface GoalPlaceIndexSignals {
   verification: number;
@@ -69,12 +97,21 @@ export interface League {
   country: string;
   city: string;
   status: LeagueStatus;
+  plan?: 'free' | 'pro' | 'partner';
+  adminUserIds?: string[];
   ranking: number;
   logoUrl: string;
+  verified?: boolean;
   verifiedPercentage: number;
   completionRate: number;
+  teamsCount?: number;
+  athletesCount?: number;
+  matchesCount?: number;
   goalPlaceIndex: number;
   indexSignals: GoalPlaceIndexSignals;
+  verificationRules?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Match {

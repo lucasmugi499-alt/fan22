@@ -4,6 +4,9 @@ import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Athlete, SportType } from '@/lib/types';
 import { mockAthletes, mockChallenges } from '@/lib/mockData';
+import { useAuth } from '@/context/AuthProvider';
+import { isFirebaseConfigured } from '@/lib/firebase/client';
+import { createFeedPost, createSupportPledge } from '@/lib/firebase/firestore';
 import { formatUGX, getInitials, getSportTheme, trustStatements } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,17 +67,37 @@ export function SupportModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [amount, setAmount] = useState(25000);
+  const { currentUser } = useAuth();
   const deductWalletBalance = useAppStore((state) => state.deductWalletBalance);
   const addPoints = useAppStore((state) => state.addPoints);
   const selectedAthlete = athlete ?? mockAthletes[0];
   const theme = getSportTheme(selectedAthlete.sport);
   const quickAmounts = [5000, 10000, 25000, 50000, 100000];
 
-  const submit = () => {
-    deductWalletBalance(amount);
-    addPoints(Math.max(50, Math.round(amount / 100)));
-    toast.success(`Support sent to ${selectedAthlete.name}`);
-    onOpenChange(false);
+  const submit = async () => {
+    if (isFirebaseConfigured && !currentUser) {
+      toast.error('Please log in to support an athlete.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured && currentUser) {
+        await createSupportPledge({
+          fanId: currentUser.uid,
+          athleteId: selectedAthlete.id,
+          amount,
+          type: 'direct_support',
+          status: 'pending',
+        });
+      }
+
+      deductWalletBalance(amount);
+      addPoints(Math.max(50, Math.round(amount / 100)));
+      toast.success('Demo support recorded. Real payments are not enabled yet.');
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Support could not be recorded');
+    }
   };
 
   return (
@@ -164,6 +187,7 @@ export function PledgeModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [amount, setAmount] = useState(10000);
+  const { currentUser } = useAuth();
   const selectedAthlete = athlete ?? mockAthletes[0];
   const challenges = useMemo(
     () => mockChallenges.filter((challenge) => challenge.athleteId === selectedAthlete.id && challenge.status === 'Active'),
@@ -173,10 +197,31 @@ export function PledgeModal({
   const selectedChallenge = mockChallenges.find((challenge) => challenge.id === challengeId) ?? mockChallenges[0];
   const addPoints = useAppStore((state) => state.addPoints);
 
-  const submit = () => {
-    addPoints(Math.max(25, Math.round(amount / 200)));
-    toast.success('Pledge support added in demo mode');
-    onOpenChange(false);
+  const submit = async () => {
+    if (isFirebaseConfigured && !currentUser) {
+      toast.error('Please log in to pledge support.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured && currentUser) {
+        await createSupportPledge({
+          fanId: currentUser.uid,
+          athleteId: selectedAthlete.id,
+          challengeId: selectedChallenge.id,
+          leagueId: selectedAthlete.leagueId,
+          amount,
+          type: 'performance_pledge',
+          status: 'held',
+        });
+      }
+
+      addPoints(Math.max(25, Math.round(amount / 200)));
+      toast.success('Demo support recorded. Real payments are not enabled yet.');
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Pledge could not be recorded');
+    }
   };
 
   return (
@@ -231,10 +276,27 @@ export function CreatePostModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [sport, setSport] = useState<SportType>('Football');
+  const [caption, setCaption] = useState('');
+  const { currentUser, role } = useAuth();
 
-  const submit = () => {
-    toast.success('Post created in demo mode.');
-    onOpenChange(false);
+  const submit = async () => {
+    try {
+      if (isFirebaseConfigured && currentUser) {
+        await createFeedPost({
+          authorId: currentUser.uid,
+          authorRole: role ?? 'fan',
+          sport,
+          type: 'AthleteHighlight',
+          caption: caption || 'GoalPlace256 community update',
+        });
+      }
+
+      setCaption('');
+      toast.success('Post created in demo mode.');
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Post could not be created');
+    }
   };
 
   return (
@@ -282,6 +344,8 @@ export function CreatePostModal({
               <textarea
                 className="min-h-32 w-full resize-none rounded-lg border border-white/10 bg-white/6 p-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-[var(--goal-emerald)]/55"
                 placeholder="Share the result, highlight, or community moment..."
+                value={caption}
+                onChange={(event) => setCaption(event.target.value)}
               />
             </div>
             <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-white/16 bg-white/5 p-4 text-center">

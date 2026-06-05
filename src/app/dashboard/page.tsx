@@ -7,12 +7,14 @@ import { mockAthletes, mockCurrentUser, mockFeed, mockMatches } from '@/lib/mock
 import { Button } from '@/components/ui/button';
 import { FeedCard } from '@/components/ui/feed-card';
 import { GoalPlacePointsBadge, ImpactStatCard, PageContainer, SectionHeader } from '@/components/ui/product';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 export default function DashboardPage() {
   const router = useRouter();
 
   return (
-    <PageContainer compact>
+    <ProtectedRoute>
+      <PageContainer compact>
       <SectionHeader
         eyebrow="Fan Dashboard"
         title={`Good to see you, ${mockCurrentUser.name}`}
@@ -59,6 +61,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </section>
-    </PageContainer>
+      </PageContainer>
+    </ProtectedRoute>
   );
 }

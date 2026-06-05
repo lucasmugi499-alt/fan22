@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Radio, ShieldCheck, Sparkles } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import { mockAthletes, mockFeed } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Button } from '@/components/ui/button';
 import { FeedCard } from '@/components/ui/feed-card';
 import { CommentsDrawer, CreatePostModal, SupportModal } from '@/components/modals/app-modals';
@@ -14,13 +14,14 @@ const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Following', 'Highlig
 
 export default function FeedPage() {
   const router = useRouter();
+  const { athletes, feedPosts } = useGoalPlaceData();
   const [activeFilter, setActiveFilter] = useState('All');
   const [createOpen, setCreateOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
 
   const filteredFeed = useMemo(() => {
-    return mockFeed.filter((post) => {
+    return feedPosts.filter((post) => {
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return post.sport === activeFilter;
       if (activeFilter === 'Following') return ['a1', 'a3', 'a5', 't1', 't4'].includes(post.authorId);
@@ -29,9 +30,9 @@ export default function FeedPage() {
       if (activeFilter === 'Awards') return post.type === 'AnnualAwards';
       return true;
     });
-  }, [activeFilter]);
+  }, [activeFilter, feedPosts]);
 
-  const findAthlete = (authorId: string) => mockAthletes.find((athlete) => athlete.id === authorId) ?? mockAthletes[0];
+  const findAthlete = (authorId: string) => athletes.find((athlete) => athlete.id === authorId) ?? athletes[0] ?? null;
 
   return (
     <PageContainer compact className="max-w-6xl">

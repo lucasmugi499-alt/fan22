@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, ShieldCheck, Trophy, Users } from 'lucide-react';
-import { mockAthletes, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } f
 export default function LeagueDetailPage() {
   const router = useRouter();
   const { leagueId } = useParams<{ leagueId: string }>();
-  const league = mockLeagues.find((item) => item.id === leagueId);
+  const data = useGoalPlaceData();
+  const league = data.leagues.find((item) => item.id === leagueId);
 
   if (!league) {
     return (
@@ -27,9 +28,9 @@ export default function LeagueDetailPage() {
   }
 
   const theme = getSportTheme(league.sport);
-  const teams = mockTeams.filter((team) => team.leagueId === league.id);
-  const athletes = mockAthletes.filter((athlete) => athlete.leagueId === league.id);
-  const matches = mockMatches.filter((match) => match.leagueId === league.id);
+  const teams = data.teams.filter((team) => team.leagueId === league.id);
+  const athletes = data.athletes.filter((athlete) => athlete.leagueId === league.id);
+  const matches = data.matches.filter((match) => match.leagueId === league.id);
   const standings = buildLeagueStandings(teams, matches);
 
   return (

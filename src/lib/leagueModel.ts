@@ -4,17 +4,17 @@ export const leagueRankingDisclaimer =
   'League standings are based only on match results. Paid tools never affect sporting rankings.';
 
 export const leagueStatuses: LeagueStatus[] = [
-  'Draft League',
-  'Community League',
-  'Verified League',
-  'Partner League',
-  'Suspended',
+  'draft',
+  'community',
+  'verified',
+  'partner',
+  'suspended',
 ];
 
 export const leagueStatusMeta: Record<
   LeagueStatus,
   {
-    label: LeagueStatus;
+    label: string;
     shortLabel: string;
     description: string;
     capabilities: string[];
@@ -22,7 +22,7 @@ export const leagueStatusMeta: Record<
     panelClass: string;
   }
 > = {
-  'Draft League': {
+  draft: {
     label: 'Draft League',
     shortLabel: 'Draft',
     description: 'Created but not public.',
@@ -30,7 +30,7 @@ export const leagueStatusMeta: Record<
     badgeClass: 'border-slate-300/25 bg-slate-300/10 text-slate-200',
     panelClass: 'border-slate-300/15 bg-slate-300/7',
   },
-  'Community League': {
+  community: {
     label: 'Community League',
     shortLabel: 'Community',
     description:
@@ -39,7 +39,7 @@ export const leagueStatusMeta: Record<
     badgeClass: 'border-[var(--goal-mint)]/30 bg-[var(--goal-emerald)]/12 text-[var(--goal-mint)]',
     panelClass: 'border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8',
   },
-  'Verified League': {
+  verified: {
     label: 'Verified League',
     shortLabel: 'Verified',
     description:
@@ -48,7 +48,7 @@ export const leagueStatusMeta: Record<
     badgeClass: 'border-blue-300/30 bg-blue-500/12 text-blue-200',
     panelClass: 'border-blue-300/20 bg-blue-500/8',
   },
-  'Partner League': {
+  partner: {
     label: 'Partner League',
     shortLabel: 'Partner',
     description:
@@ -57,7 +57,7 @@ export const leagueStatusMeta: Record<
     badgeClass: 'border-[var(--goal-gold)]/35 bg-[var(--goal-gold)]/14 text-[var(--goal-gold)]',
     panelClass: 'border-[var(--goal-gold)]/24 bg-[var(--goal-gold)]/9',
   },
-  Suspended: {
+  suspended: {
     label: 'Suspended',
     shortLabel: 'Suspended',
     description: 'League restricted due to fraud, disputes, or verification issues.',

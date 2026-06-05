@@ -29,11 +29,11 @@ export function LeagueStatusBadge({
         className
       )}
     >
-      {status === 'Draft League' && <Lock className="size-3" />}
-      {status === 'Community League' && <ClipboardCheck className="size-3" />}
-      {status === 'Verified League' && <ShieldCheck className="size-3" />}
-      {status === 'Partner League' && <CheckCircle2 className="size-3" />}
-      {status === 'Suspended' && <AlertTriangle className="size-3" />}
+      {status === 'draft' && <Lock className="size-3" />}
+      {status === 'community' && <ClipboardCheck className="size-3" />}
+      {status === 'verified' && <ShieldCheck className="size-3" />}
+      {status === 'partner' && <CheckCircle2 className="size-3" />}
+      {status === 'suspended' && <AlertTriangle className="size-3" />}
       {meta.shortLabel}
     </span>
   );

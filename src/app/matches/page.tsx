@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarClock, CheckCircle2, Radio, Trophy } from 'lucide-react';
-import { mockMatches } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterBar } from '@/components/ui/product';
 import { MatchCard } from '@/components/ui/match-card';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,18 @@ const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Live', 'Upcoming', '
 
 export default function MatchesPage() {
   const router = useRouter();
+  const { matches } = useGoalPlaceData();
   const [activeFilter, setActiveFilter] = useState('All');
 
   const filteredMatches = useMemo(() => {
-    return mockMatches.filter((match) => {
+    return matches.filter((match) => {
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return match.sport === activeFilter;
       if (['Live', 'Upcoming', 'Completed'].includes(activeFilter)) return match.status === activeFilter;
       if (activeFilter === 'Following') return ['m1', 'm2', 'm3'].includes(match.id);
       return true;
     });
-  }, [activeFilter]);
+  }, [activeFilter, matches]);
 
   const liveMatches = filteredMatches.filter((match) => match.status === 'Live');
   const upcomingMatches = filteredMatches.filter((match) => match.status === 'Upcoming');
@@ -38,9 +39,9 @@ export default function MatchesPage() {
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
-        <ImpactStatCard label="Live now" value={String(mockMatches.filter((match) => match.status === 'Live').length)} icon={Radio} />
-        <ImpactStatCard label="Upcoming" value={String(mockMatches.filter((match) => match.status === 'Upcoming').length)} icon={CalendarClock} tone="gold" />
-        <ImpactStatCard label="Verified results" value={String(mockMatches.filter((match) => match.verificationStatus === 'Verified').length)} icon={CheckCircle2} tone="blue" />
+        <ImpactStatCard label="Live now" value={String(matches.filter((match) => match.status === 'Live').length)} icon={Radio} />
+        <ImpactStatCard label="Upcoming" value={String(matches.filter((match) => match.status === 'Upcoming').length)} icon={CalendarClock} tone="gold" />
+        <ImpactStatCard label="Verified results" value={String(matches.filter((match) => match.verificationStatus === 'Verified').length)} icon={CheckCircle2} tone="blue" />
       </div>
 
       <StickyFilterBar filters={filters} active={activeFilter} onChange={setActiveFilter} />

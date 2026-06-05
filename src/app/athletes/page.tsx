@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeartHandshake, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import { mockAthletes } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { AthleteCard } from '@/components/ui/athlete-card';
 import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterBar } from '@/components/ui/product';
 import { SupportModal } from '@/components/modals/app-modals';
@@ -13,11 +13,12 @@ const filters = ['All Sports', 'Football', 'Basketball', 'Rugby', 'Top Supported
 
 export default function AthletesPage() {
   const router = useRouter();
+  const { athletes } = useGoalPlaceData();
   const [activeFilter, setActiveFilter] = useState('All Sports');
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
 
   const filteredAthletes = useMemo(() => {
-    return mockAthletes.filter((athlete) => {
+    return athletes.filter((athlete) => {
       if (activeFilter === 'All Sports') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return athlete.sport === activeFilter;
       if (activeFilter === 'Verified Only') return athlete.verified;
@@ -25,7 +26,7 @@ export default function AthletesPage() {
       if (activeFilter === 'Rising') return athlete.supportersCount < 100 || !athlete.verified;
       return true;
     });
-  }, [activeFilter]);
+  }, [activeFilter, athletes]);
 
   return (
     <PageContainer compact>
@@ -36,10 +37,10 @@ export default function AthletesPage() {
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <ImpactStatCard label="Athletes" value={String(mockAthletes.length)} icon={Users} />
-        <ImpactStatCard label="Verified" value={String(mockAthletes.filter((athlete) => athlete.verified).length)} icon={ShieldCheck} tone="gold" />
-        <ImpactStatCard label="Supporters" value={mockAthletes.reduce((sum, athlete) => sum + athlete.supportersCount, 0).toLocaleString()} icon={HeartHandshake} tone="blue" />
-        <ImpactStatCard label="Rising" value={String(mockAthletes.filter((athlete) => athlete.supportersCount < 100).length)} icon={TrendingUp} tone="orange" />
+        <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Users} />
+        <ImpactStatCard label="Verified" value={String(athletes.filter((athlete) => athlete.verified).length)} icon={ShieldCheck} tone="gold" />
+        <ImpactStatCard label="Supporters" value={athletes.reduce((sum, athlete) => sum + athlete.supportersCount, 0).toLocaleString()} icon={HeartHandshake} tone="blue" />
+        <ImpactStatCard label="Rising" value={String(athletes.filter((athlete) => athlete.supportersCount < 100).length)} icon={TrendingUp} tone="orange" />
       </div>
 
       <StickyFilterBar filters={filters} active={activeFilter} onChange={setActiveFilter} />

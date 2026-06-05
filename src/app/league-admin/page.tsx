@@ -4,10 +4,15 @@ import React, { useState, useSyncExternalStore } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CheckCircle2, Clock, FileCheck2, Landmark, ShieldAlert, Trophy, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { dashboardSeries, mockAthletes, mockChallenges, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
+import { dashboardSeries } from '@/lib/mockData';
+import { useAuth } from '@/context/AuthProvider';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { isFirebaseConfigured } from '@/lib/firebase/client';
+import { updateVerificationStatus } from '@/lib/firebase/firestore';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { LeagueStatus, SportType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 import {
   GoalPlaceIndexPanel,
   LeagueIntegrityNote,
@@ -22,22 +27,49 @@ const formControlClass =
 
 export default function LeagueAdminPage() {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const league = mockLeagues[0];
-  const fixtures = mockMatches.filter((match) => match.leagueId === league.id);
-  const athletes = mockAthletes.filter((athlete) => athlete.leagueId === league.id);
-  const teams = mockTeams.filter((team) => team.leagueId === league.id);
+  const { currentUser } = useAuth();
+  const { athletes: allAthletes, challenges, leagues, matches, teams: allTeams } = useGoalPlaceData();
+  const league = leagues[0];
+  const fixtures = matches.filter((match) => match.leagueId === league.id);
+  const athletes = allAthletes.filter((athlete) => athlete.leagueId === league.id);
+  const teams = allTeams.filter((team) => team.leagueId === league.id);
   const standings = buildLeagueStandings(teams, fixtures);
   const [newLeagueName, setNewLeagueName] = useState('Kampala Youth Cup');
   const [newLeagueSport, setNewLeagueSport] = useState<SportType>('Football');
-  const [newLeagueStatus, setNewLeagueStatus] = useState<LeagueStatus>('Draft League');
+  const [newLeagueStatus, setNewLeagueStatus] = useState<LeagueStatus>('draft');
 
   const createLeague = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     toast.success(`${newLeagueName || 'New league'} saved as ${newLeagueStatus} in demo mode`);
   };
 
+  const updateMatchVerification = async (matchId: string, verificationStatus: 'Verified' | 'Disputed') => {
+    if (!isFirebaseConfigured) {
+      toast.success(`Demo ${verificationStatus.toLowerCase()} status recorded locally.`);
+      return;
+    }
+
+    if (!currentUser) {
+      toast.error('Please log in as a league admin.');
+      return;
+    }
+
+    try {
+      await updateVerificationStatus({
+        collectionName: 'matches',
+        id: matchId,
+        verificationStatus,
+        verifiedBy: currentUser.uid,
+      });
+      toast.success(`Match marked ${verificationStatus}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update verification status');
+    }
+  };
+
   return (
-    <PageContainer compact>
+    <RoleGuard allowedRoles={['league_admin', 'platform_admin', 'super_admin']}>
+      <PageContainer compact>
       <SectionHeader
         eyebrow="League Admin"
         title={`${league.name} operations`}
@@ -109,11 +141,11 @@ export default function LeagueAdminPage() {
                 value={newLeagueStatus}
                 onChange={(event) => setNewLeagueStatus(event.target.value as LeagueStatus)}
               >
-                <option>Draft League</option>
-                <option>Community League</option>
-                <option>Verified League</option>
-                <option>Partner League</option>
-                <option>Suspended</option>
+                <option value="draft">Draft League</option>
+                <option value="community">Community League</option>
+                <option value="verified">Verified League</option>
+                <option value="partner">Partner League</option>
+                <option value="suspended">Suspended</option>
               </select>
             </label>
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
@@ -186,15 +218,20 @@ export default function LeagueAdminPage() {
               </thead>
               <tbody className="divide-y divide-white/8 bg-white/[0.03]">
                 {fixtures.map((match) => {
-                  const teamA = mockTeams.find((team) => team.id === match.teamAId);
-                  const teamB = mockTeams.find((team) => team.id === match.teamBId);
+                  const teamA = allTeams.find((team) => team.id === match.teamAId);
+                  const teamB = allTeams.find((team) => team.id === match.teamBId);
                   return (
                     <tr key={match.id}>
                       <td className="px-4 py-4 font-bold text-white">{teamA?.name} vs {teamB?.name}</td>
                       <td className="px-4 py-4 text-slate-300">{match.venue}</td>
                       <td className="px-4 py-4 text-slate-300">{match.status}</td>
                       <td className="px-4 py-4 text-slate-300">{match.verificationStatus}</td>
-                      <td className="px-4 py-4"><Button size="sm" variant="outline">Review</Button></td>
+                      <td className="px-4 py-4">
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => updateMatchVerification(match.id, 'Verified')}>Verify</Button>
+                          <Button size="sm" variant="ghost" onClick={() => updateMatchVerification(match.id, 'Disputed')}>Dispute</Button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -206,10 +243,11 @@ export default function LeagueAdminPage() {
 
       <section className="mt-8 grid gap-4 md:grid-cols-3">
         <QueueCard icon={Users} title="Athlete approval queue" items={['Ruth Nansubuga profile update', 'Moses Baluku verification docs', 'Youth academy athlete import']} />
-        <QueueCard icon={CheckCircle2} title="Payout review queue" items={mockChallenges.slice(0, 3).map((challenge) => challenge.targetDescription)} />
+        <QueueCard icon={CheckCircle2} title="Payout review queue" items={challenges.slice(0, 3).map((challenge) => challenge.targetDescription)} />
         <QueueCard icon={Trophy} title="League operations" items={['Publish weekend schedule', 'Confirm officials list', 'Export verified results']} />
       </section>
-    </PageContainer>
+      </PageContainer>
+    </RoleGuard>
   );
 }
 

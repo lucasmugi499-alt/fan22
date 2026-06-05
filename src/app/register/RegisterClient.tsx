@@ -7,32 +7,52 @@ import { Building2, Eye, Medal, Shield, Trophy, User, Users } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league';
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
+import { registerAccount, routeForAppRole } from '@/lib/firebase/auth';
+import { isFirebaseConfigured } from '@/lib/firebase/client';
+import { AppRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const roles = [
   { slug: 'fan', label: 'Fan', icon: User, detail: 'Follow sport, support athletes, earn GoalPlace Points.' },
   { slug: 'athlete', label: 'Athlete', icon: Trophy, detail: 'Build your profile, challenges, highlights, and support base.' },
-  { slug: 'team-admin', label: 'Team Admin', icon: Users, detail: 'Manage team presence, rosters, and support activity.' },
-  { slug: 'league-admin', label: 'League Admin', icon: Shield, detail: 'Create a Draft League, verify fixtures, confirm results, and manage payouts.' },
+  { slug: 'team_admin', label: 'Team Admin', icon: Users, detail: 'Manage team presence, rosters, and support activity.' },
+  { slug: 'league_admin', label: 'League Admin', icon: Shield, detail: 'Create a Draft League, verify fixtures, confirm results, and manage payouts.' },
   { slug: 'sponsor', label: 'Sponsor', icon: Building2, detail: 'Support athletes, teams, leagues, youth, and women and youth sport.' },
-  { slug: 'scout', label: 'Scout', icon: Eye, detail: 'Track rising talent and verified performance history.' },
-];
+  { slug: 'platform_admin', label: 'Scout/Admin', icon: Eye, detail: 'Track rising talent and verified performance history.' },
+] satisfies Array<{ slug: AppRole; label: string; icon: React.ComponentType<{ className?: string }>; detail: string }>;
 
-function routeForRole(role: string) {
-  if (role === 'athlete') return '/athlete-dashboard';
-  if (role === 'league-admin' || role === 'team-admin') return '/league-admin';
-  if (role === 'sponsor') return '/sponsors';
-  return '/dashboard';
+function normalizeInitialRole(role: string): AppRole {
+  const normalized = role.replaceAll('-', '_');
+  if (roles.some((item) => item.slug === normalized)) return normalized as AppRole;
+  return 'fan';
 }
 
 export default function RegisterClient({ initialRole }: { initialRole: string }) {
   const router = useRouter();
-  const [role, setRole] = useState(initialRole);
+  const [role, setRole] = useState<AppRole>(normalizeInitialRole(initialRole));
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    toast.success('Account created in demo mode');
-    router.push(routeForRole(role));
+    if (!isFirebaseConfigured) {
+      toast.error('Firebase is not configured yet. Add NEXT_PUBLIC_FIREBASE_* env vars.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await registerAccount({ email, password, name, role });
+      toast.success(role === 'fan' ? 'Account created' : 'Account created and marked pending review');
+      router.push(routeForAppRole(role));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Registration failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -68,10 +88,10 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
               );
             })}
           </div>
-          {role === 'league-admin' && (
+          {role === 'league_admin' && (
             <div className="mt-5 grid gap-4">
               <LeagueIntegrityNote />
-              <LeagueStatusRoadmap activeStatus="Draft League" className="md:grid-cols-1 xl:grid-cols-5" />
+              <LeagueStatusRoadmap activeStatus="draft" className="md:grid-cols-1 xl:grid-cols-5" />
             </div>
           )}
         </div>
@@ -81,14 +101,15 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
             <Medal className="size-7 text-[var(--goal-gold)]" />
             <div>
               <h2 className="font-heading text-2xl font-black text-white">Create Demo Account</h2>
-              <p className="text-sm text-slate-400">No real authentication yet.</p>
+              <p className="text-sm text-slate-400">Creates Firebase Auth user and Firestore profile.</p>
             </div>
           </div>
           <div className="grid gap-4">
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Full name" />
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Email address" type="email" />
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Phone or organization contact" />
-            <Button size="lg" type="submit">Submit Registration</Button>
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Full name" value={name} onChange={(event) => setName(event.target.value)} required />
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Email address" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Phone or organization contact" value={phone} onChange={(event) => setPhone(event.target.value)} />
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} required />
+            <Button size="lg" type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Submit Registration'}</Button>
             <Button variant="outline" type="button" onClick={() => router.push('/login')}>Already Have Account</Button>
           </div>
           <div className="mt-6">

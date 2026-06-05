@@ -5,13 +5,14 @@ import { FeedPost } from '@/lib/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Award, Bookmark, HeartHandshake, MessageSquare, Share2, ShieldCheck } from 'lucide-react';
-import { mockAthletes, mockLeagues, mockTeams } from '@/lib/mockData';
+import { Athlete, League, Team } from '@/lib/types';
 import { getInitials, getSportTheme, timeAgo } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { Button } from './button';
 import { SportBadge } from './product';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 interface FeedCardProps {
   post: FeedPost;
@@ -21,17 +22,17 @@ interface FeedCardProps {
   onViewMatch?: () => void;
 }
 
-function getAuthor(post: FeedPost) {
+function getAuthor(post: FeedPost, athletes: Athlete[], teams: Team[], leagues: League[]) {
   if (post.authorType === 'Athlete') {
-    const athlete = mockAthletes.find((item) => item.id === post.authorId);
+    const athlete = athletes.find((item) => item.id === post.authorId);
     if (athlete) return { name: athlete.name, avatar: athlete.avatarUrl, role: athlete.position, hrefType: 'profile' };
   }
   if (post.authorType === 'Team') {
-    const team = mockTeams.find((item) => item.id === post.authorId);
+    const team = teams.find((item) => item.id === post.authorId);
     if (team) return { name: team.name, avatar: team.logoUrl, role: 'Team', hrefType: 'team' };
   }
   if (post.authorType === 'League') {
-    const league = mockLeagues.find((item) => item.id === post.authorId);
+    const league = leagues.find((item) => item.id === post.authorId);
     if (league) return { name: league.name, avatar: league.logoUrl, role: 'League', hrefType: 'league' };
   }
   if (post.authorType === 'Sponsor') {
@@ -49,7 +50,8 @@ function prettyType(type: FeedPost['type']) {
 
 export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatch }: FeedCardProps) {
   const [saved, setSaved] = useState(false);
-  const author = getAuthor(post);
+  const { athletes, leagues, teams } = useGoalPlaceData();
+  const author = getAuthor(post, athletes, teams, leagues);
   const theme = getSportTheme(post.sport);
   const showMatchAction = post.type === 'MatchResult';
 
