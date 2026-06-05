@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { mockAthletes, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
+import { buildLeagueStandings } from '@/lib/leagueModel';
 import { getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
+import { GoalPlaceIndexPanel, LeagueIntegrityNote, LeagueStandingsTable, LeagueStatusBadge } from '@/components/ui/league';
 import { MatchCard } from '@/components/ui/match-card';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 
@@ -28,6 +30,7 @@ export default function LeagueDetailPage() {
   const teams = mockTeams.filter((team) => team.leagueId === league.id);
   const athletes = mockAthletes.filter((athlete) => athlete.leagueId === league.id);
   const matches = mockMatches.filter((match) => match.leagueId === league.id);
+  const standings = buildLeagueStandings(teams, matches);
 
   return (
     <PageContainer compact>
@@ -36,7 +39,10 @@ export default function LeagueDetailPage() {
         Back to Leagues
       </Link>
       <section className={`glass-panel rounded-xl p-5 md:p-8 ${theme.edgeClass}`}>
-        <SportBadge sport={league.sport} />
+        <div className="flex flex-wrap items-center gap-2">
+          <SportBadge sport={league.sport} />
+          <LeagueStatusBadge status={league.status} />
+        </div>
         <h1 className="mt-4 font-heading text-4xl font-black text-white md:text-6xl">{league.name}</h1>
         <p className="mt-3 text-sm text-slate-400">{league.city}, {league.country}</p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
@@ -51,6 +57,19 @@ export default function LeagueDetailPage() {
         <ImpactStatCard label="Matches" value={String(matches.length)} icon={Calendar} tone="blue" />
         <ImpactStatCard label="Verified" value={`${league.verifiedPercentage}%`} icon={ShieldCheck} tone="orange" />
       </div>
+
+      <section className="mt-8 grid gap-8 xl:grid-cols-[1.08fr_0.92fr]">
+        <div>
+          <SectionHeader
+            eyebrow="League Standings"
+            title="Sporting table"
+            description="The table is calculated from completed match scores only."
+          />
+          <LeagueStandingsTable standings={standings} />
+          <LeagueIntegrityNote className="mt-4" />
+        </div>
+        <GoalPlaceIndexPanel league={league} />
+      </section>
 
       <section className="mt-8">
         <SectionHeader eyebrow="Teams" title="League teams" />

@@ -2,6 +2,23 @@ export type SportType = 'Football' | 'Basketball' | 'Rugby';
 
 export type UserRole = 'Fan' | 'Athlete' | 'Team Admin' | 'League Admin' | 'Sponsor' | 'Scout';
 
+export type LeagueStatus =
+  | 'Draft League'
+  | 'Community League'
+  | 'Verified League'
+  | 'Partner League'
+  | 'Suspended';
+
+export interface GoalPlaceIndexSignals {
+  verification: number;
+  matchCompletionRate: number;
+  athleteProfileCompletion: number;
+  fanEngagement: number;
+  supportActivity: number;
+  adminReliability: number;
+  mediaUploads: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -51,10 +68,13 @@ export interface League {
   sport: SportType;
   country: string;
   city: string;
+  status: LeagueStatus;
   ranking: number;
   logoUrl: string;
   verifiedPercentage: number;
   completionRate: number;
+  goalPlaceIndex: number;
+  indexSignals: GoalPlaceIndexSignals;
 }
 
 export interface Match {

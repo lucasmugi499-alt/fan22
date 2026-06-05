@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Landmark, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { mockAthletes, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
 import { getSportTheme } from '@/lib/sportThemes';
+import { LeagueStatusBadge } from '@/components/ui/league';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 
 export default function LeaguesPage() {
@@ -27,11 +28,14 @@ export default function LeaguesPage() {
           const theme = getSportTheme(league.sport);
           return (
             <Link key={league.id} href={`/leagues/${league.id}`} className={`glass-panel rounded-xl p-5 transition-all hover:-translate-y-1 ${theme.edgeClass}`}>
-              <SportBadge sport={league.sport} />
+              <div className="flex flex-wrap items-center gap-2">
+                <SportBadge sport={league.sport} />
+                <LeagueStatusBadge status={league.status} />
+              </div>
               <h2 className="mt-4 font-heading text-2xl font-black text-white">{league.name}</h2>
               <p className="mt-2 text-sm text-slate-400">{league.city}, {league.country}</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <Mini label="Verified" value={`${league.verifiedPercentage}%`} />
+                <Mini label="GoalPlace Index" value={String(league.goalPlaceIndex)} />
                 <Mini label="Complete" value={`${league.completionRate}%`} />
               </div>
             </Link>

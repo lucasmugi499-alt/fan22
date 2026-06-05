@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Building2, Eye, Medal, Shield, Trophy, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league';
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +13,7 @@ const roles = [
   { slug: 'fan', label: 'Fan', icon: User, detail: 'Follow sport, support athletes, earn GoalPlace Points.' },
   { slug: 'athlete', label: 'Athlete', icon: Trophy, detail: 'Build your profile, challenges, highlights, and support base.' },
   { slug: 'team-admin', label: 'Team Admin', icon: Users, detail: 'Manage team presence, rosters, and support activity.' },
-  { slug: 'league-admin', label: 'League Admin', icon: Shield, detail: 'Verify achievements, fixtures, results, and payouts.' },
+  { slug: 'league-admin', label: 'League Admin', icon: Shield, detail: 'Create a Draft League, verify fixtures, confirm results, and manage payouts.' },
   { slug: 'sponsor', label: 'Sponsor', icon: Building2, detail: 'Support athletes, teams, leagues, youth, and women and youth sport.' },
   { slug: 'scout', label: 'Scout', icon: Eye, detail: 'Track rising talent and verified performance history.' },
 ];
@@ -67,6 +68,12 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
               );
             })}
           </div>
+          {role === 'league-admin' && (
+            <div className="mt-5 grid gap-4">
+              <LeagueIntegrityNote />
+              <LeagueStatusRoadmap activeStatus="Draft League" className="md:grid-cols-1 xl:grid-cols-5" />
+            </div>
+          )}
         </div>
 
         <div className="glass-panel h-fit rounded-xl p-5 md:p-6">

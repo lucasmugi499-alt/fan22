@@ -108,7 +108,7 @@ export const trustStatements = [
   'Rewards are paid only after verified performance.',
   'Achievements are confirmed by league admins or officials.',
   'GoalPlace Points are loyalty and recognition points, not cash.',
-  'GoalPlace256 is built for athlete support, not gambling.',
+  'GoalPlace256 is built for athlete support, not games of chance.',
 ];
 
 export const activityIcon = Activity;

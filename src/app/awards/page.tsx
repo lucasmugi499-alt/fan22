@@ -129,7 +129,7 @@ export default function AwardsPage() {
             'No fan cash winnings.',
             'GoalPlace Points are loyalty and recognition points, not cash.',
             'Achievements are confirmed by league admins or officials.',
-            'GoalPlace256 is built for athlete support, not gambling.',
+            'GoalPlace256 is built for athlete support, not games of chance.',
           ]}
         />
       </section>
