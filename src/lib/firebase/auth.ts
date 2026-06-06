@@ -117,5 +117,5 @@ export function routeForAppRole(role?: AppRole | null) {
   if (role === 'league_admin') return '/league-admin';
   if (role === 'sponsor') return '/sponsor-dashboard';
   if (role === 'platform_admin' || role === 'super_admin') return '/admin';
-  return '/dashboard';
+  return '/home';
 }

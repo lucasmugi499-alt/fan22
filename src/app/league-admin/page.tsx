@@ -2,8 +2,24 @@
 
 import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckCircle2, ClipboardCheck, ShieldCheck, Trophy, Users } from 'lucide-react';
+import {
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  Flag,
+  HandCoins,
+  Handshake,
+  MessageSquare,
+  PlusCircle,
+  Settings,
+  ShieldCheck,
+  Trophy,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
+import { CreatePostModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
 import {
   GoalPlaceIndexPanel,
@@ -38,6 +54,7 @@ function LeagueAdminDashboard() {
   const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id ?? '');
   const [activeTab, setActiveTab] = useState('Overview');
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [postOpen, setPostOpen] = useState(false);
   
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
 
@@ -81,6 +98,11 @@ function LeagueAdminDashboard() {
     } finally {
       setPendingId(null);
     }
+  };
+
+  const demoAction = (message: string, nextTab?: string) => {
+    if (nextTab) setActiveTab(nextTab);
+    toast.success(message);
   };
 
   if (!selectedLeague) {
@@ -151,6 +173,31 @@ function LeagueAdminDashboard() {
 
       <div className="flex-1 overflow-y-auto bg-[#05070A] p-4 md:p-8">
         <div className="mx-auto max-w-7xl space-y-8">
+          <section className="rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <p className="max-w-3xl text-sm leading-6 text-slate-200">
+                League standings are based only on match results. Paid plans never affect sporting rankings. GoalPlace Index is separate and measures verification, activity, engagement, and operational quality.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => demoAction('Demo fixture composer opened.', 'Fixtures')}>
+                  <PlusCircle className="size-4" />
+                  Create Fixture
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => demoAction('Team setup section opened.', 'Teams')}>
+                  <UserPlus className="size-4" />
+                  Add Team
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPostOpen(true)}>
+                  <MessageSquare className="size-4" />
+                  Create League Post
+                </Button>
+                <Button size="sm" variant="gold" onClick={() => demoAction('Partner status request saved in demo mode.', 'Sponsor Visibility')}>
+                  <Handshake className="size-4" />
+                  Request Partner Status
+                </Button>
+              </div>
+            </div>
+          </section>
           
           {activeTab === 'Overview' && (
             <>
@@ -165,7 +212,119 @@ function LeagueAdminDashboard() {
                 <SectionHeader eyebrow="League Onboarding" title="Verification model" />
                 <LeagueStatusRoadmap activeStatus={selectedLeague.status} />
               </section>
+
+              <section className="grid gap-4 lg:grid-cols-3">
+                {[
+                  ['Create Fixture', 'Add the next scheduled match and assign participating teams.', CalendarClock, 'Fixtures'],
+                  ['Verification Queue', 'Review match results and performance challenges awaiting approval.', ClipboardCheck, 'Verification Queue'],
+                  ['Payout Review', 'Inspect support releases connected to verified challenges.', HandCoins, 'Payout Review'],
+                ].map(([title, detail, Icon, tab]) => {
+                  const ActionIcon = Icon as typeof CalendarClock;
+                  return (
+                    <button
+                      key={title as string}
+                      className="rounded-xl border border-white/10 bg-white/5 p-5 text-left transition-colors hover:border-[var(--goal-emerald)]/35 hover:bg-[var(--goal-emerald)]/8"
+                      onClick={() => setActiveTab(tab as string)}
+                    >
+                      <ActionIcon className="mb-4 size-6 text-[var(--goal-mint)]" />
+                      <h3 className="font-heading text-xl font-black text-white">{title as string}</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">{detail as string}</p>
+                    </button>
+                  );
+                })}
+              </section>
             </>
+          )}
+
+          {activeTab === 'League Profile' && (
+            <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <SectionHeader eyebrow="Profile" title={selectedLeague.name} className="mb-4" />
+                <div className="space-y-3 text-sm text-slate-300">
+                  <p>{selectedLeague.description}</p>
+                  <p><span className="font-bold text-white">Season:</span> {selectedLeague.season}</p>
+                  <p><span className="font-bold text-white">City:</span> {selectedLeague.city}</p>
+                  <p><span className="font-bold text-white">Supporters:</span> {selectedLeague.supportersCount}</p>
+                </div>
+                <Button className="mt-5" variant="outline" onClick={() => demoAction('League profile update saved in demo mode.')}>
+                  Save Profile
+                </Button>
+              </div>
+              <LeagueStatusRoadmap activeStatus={selectedLeague.status} />
+            </section>
+          )}
+
+          {activeTab === 'Teams' && (
+            <section>
+              <SectionHeader
+                eyebrow="Teams"
+                title="League teams"
+                action={<Button onClick={() => demoAction('Demo team invitation created.')}>Add Team</Button>}
+              />
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {leagueTeams.map((team) => (
+                  <div key={team.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <Building2 className="mb-4 size-5 text-[var(--goal-mint)]" />
+                    <h3 className="font-heading text-lg font-black text-white">{team.name}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{team.city}</p>
+                    <p className="mt-3 text-xs font-bold text-slate-300">{team.wins}W {team.draws ?? 0}D {team.losses}L</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'Athletes' && (
+            <section>
+              <SectionHeader eyebrow="Athletes" title="Athlete roster" />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {leagueAthletes.slice(0, 12).map((athlete) => (
+                  <div key={athlete.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h3 className="font-heading text-lg font-black text-white">{athlete.name}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{athlete.position} - {athlete.city}</p>
+                    <p className="mt-3 text-xs font-bold text-[var(--goal-mint)]">{athlete.verificationStatus}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'Fixtures' && (
+            <section>
+              <SectionHeader
+                eyebrow="Fixtures"
+                title="Fixture planner"
+                description="Create fixtures, assign venues, and prepare verification rules before matchday."
+                action={<Button onClick={() => demoAction('Demo fixture draft created.')}>Create Fixture</Button>}
+              />
+              <div className="space-y-3">
+                {leagueMatches.map((match) => (
+                  <div key={match.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <p className="font-heading text-lg font-black text-white">{match.venue}</p>
+                    <p className="mt-1 text-sm text-slate-400">{match.city} - {match.status}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'Results' && (
+            <section>
+              <SectionHeader eyebrow="Results" title="Result review" />
+              <div className="space-y-3">
+                {leagueMatches.map((match) => (
+                  <div key={match.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-heading text-lg font-black text-white">{match.venue}</p>
+                      <p className="mt-1 text-sm text-slate-400">{match.score.home ?? '-'} - {match.score.away ?? '-'} | {match.verificationStatus}</p>
+                    </div>
+                    <Button size="sm" onClick={() => updateMatch(match, 'verified')} disabled={pendingId === match.id}>
+                      Verify Result
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
 
           {activeTab === 'Standings' && (
@@ -250,18 +409,96 @@ function LeagueAdminDashboard() {
             </section>
           )}
 
-          {![ 'Overview', 'Standings', 'GoalPlace Index', 'Verification Queue' ].includes(activeTab) && (
-            <div className="flex min-h-[40vh] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
-              <div>
-                <ShieldCheck className="mx-auto mb-4 size-10 text-slate-500" />
-                <h2 className="font-heading text-2xl font-black text-white">{activeTab}</h2>
-                <p className="mt-2 max-w-md text-sm text-slate-400">This powerful administrative section is currently in mock mode. Official league operations will be managed here once the full backend is connected.</p>
+          {activeTab === 'Challenges' && (
+            <section>
+              <SectionHeader eyebrow="Challenges" title="Performance challenges" />
+              <div className="grid gap-3 md:grid-cols-2">
+                {leagueChallenges.map((challenge) => (
+                  <div key={challenge.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h3 className="font-heading text-lg font-black text-white">{challenge.targetDescription ?? challenge.description}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{challenge.status} - {challenge.verificationStatus}</p>
+                    <Button className="mt-4" size="sm" onClick={() => updateChallenge(challenge.id, 'verified')} disabled={pendingId === challenge.id}>
+                      Verify Challenge
+                    </Button>
+                  </div>
+                ))}
               </div>
-            </div>
+            </section>
+          )}
+
+          {activeTab === 'Feed Posts' && (
+            <section className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <SectionHeader
+                eyebrow="Feed Posts"
+                title="League communications"
+                description="Publish fixture notes, verified result updates, sponsor moments, and athlete announcements."
+                action={<Button onClick={() => setPostOpen(true)}>Create League Post</Button>}
+              />
+              <p className="text-sm leading-6 text-slate-300">Demo mode uses the shared post composer and records a provider-backed post action.</p>
+            </section>
+          )}
+
+          {activeTab === 'Disputes' && (
+            <section className="grid gap-4 md:grid-cols-2">
+              {[1, 2].map((item) => (
+                <div key={item} className="rounded-xl border border-white/10 bg-white/5 p-5">
+                  <Flag className="mb-4 size-6 text-[var(--goal-gold)]" />
+                  <h3 className="font-heading text-xl font-black text-white">Result dispute #{item}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">Review notes, media, and admin response before closing the dispute.</p>
+                  <Button className="mt-4" variant="outline" onClick={() => demoAction(`Dispute #${item} marked reviewed.`)}>
+                    Review Dispute
+                  </Button>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {activeTab === 'Payout Review' && (
+            <section className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <SectionHeader eyebrow="Payout Review" title="Verified challenge releases" />
+              <div className="grid gap-3 md:grid-cols-3">
+                {leagueChallenges.slice(0, 3).map((challenge) => (
+                  <div key={challenge.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <HandCoins className="mb-4 size-5 text-[var(--goal-gold)]" />
+                    <p className="font-heading text-lg font-black text-white">{challenge.totalPledged.toLocaleString()} UGX</p>
+                    <p className="mt-1 text-sm text-slate-400">{challenge.targetDescription ?? challenge.description}</p>
+                    <Button className="mt-4" size="sm" variant="gold" onClick={() => demoAction('Payout review approved in demo mode.')}>
+                      Review Payout
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'Sponsor Visibility' && (
+            <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <Handshake className="mb-4 size-6 text-[var(--goal-gold)]" />
+                <h3 className="font-heading text-2xl font-black text-white">Partner league tools</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">Sponsor reporting, analytics, and priority support become available after partner review.</p>
+                <Button className="mt-5" variant="gold" onClick={() => demoAction('Partner status request submitted.')}>
+                  Request Partner Status
+                </Button>
+              </div>
+              <GoalPlaceIndexPanel league={selectedLeague} />
+            </section>
+          )}
+
+          {activeTab === 'Settings' && (
+            <section className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <Settings className="mb-4 size-6 text-[var(--goal-mint)]" />
+              <h3 className="font-heading text-2xl font-black text-white">League settings</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-300">Configure moderation, verification rules, admin access, and public visibility.</p>
+              <Button className="mt-5" variant="outline" onClick={() => demoAction('League settings saved in demo mode.')}>
+                Save Settings
+              </Button>
+            </section>
           )}
 
         </div>
       </div>
+      <CreatePostModal open={postOpen} onOpenChange={setPostOpen} />
     </div>
   );
 }

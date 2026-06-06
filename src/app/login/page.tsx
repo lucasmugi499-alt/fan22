@@ -11,20 +11,20 @@ import { AppRole } from '@/types';
 import { toast } from 'sonner';
 
 function AuthContent() {
-  const { authStatus, role, setDemoRole } = useAuth();
+  const { authStatus, role, setDemoRole, userProfile } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const nextRoute = searchParams.get('next');
 
   useEffect(() => {
     if (authStatus === 'logged_in') {
-      if (nextRoute && canAccessRoute({ authStatus, role, userProfile: null }, nextRoute)) {
+      if (nextRoute && canAccessRoute({ authStatus, role, userProfile }, nextRoute)) {
         router.push(nextRoute);
       } else {
         router.push(getDefaultRouteForRole(role));
       }
     }
-  }, [authStatus, role, router, nextRoute]);
+  }, [authStatus, role, router, nextRoute, userProfile]);
 
   const handleDemoLogin = (selectedRole: AppRole) => {
     setDemoRole(selectedRole);

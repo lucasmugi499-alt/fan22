@@ -38,7 +38,7 @@ function RoleGuardInner({ auth, allowedRoles, children }: { auth: AuthState; all
           <Link href={defaultRoute} className="rounded-lg bg-[var(--goal-emerald)] px-6 py-2.5 text-sm font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]">
             Go to My Dashboard
           </Link>
-          <Link href="/" className="rounded-lg bg-white/10 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/20">
+          <Link href="/home" className="rounded-lg bg-white/10 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/20">
             Return Home
           </Link>
         </div>

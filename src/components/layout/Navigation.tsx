@@ -41,7 +41,7 @@ export function MobileNav() {
     switch(role) {
       case 'athlete':
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Feed', href: '/feed', icon: List },
           { name: 'Matches', href: '/matches', icon: Calendar },
           { name: 'Dashboard', href: '/athlete-dashboard', icon: LayoutDashboard },
@@ -49,7 +49,7 @@ export function MobileNav() {
         ];
       case 'team_admin':
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Matches', href: '/matches', icon: Calendar },
           { name: 'Teams', href: '/teams', icon: Building2 },
           { name: 'Admin', href: '/team-admin', icon: LayoutDashboard },
@@ -57,7 +57,7 @@ export function MobileNav() {
         ];
       case 'league_admin':
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Matches', href: '/matches', icon: Calendar },
           { name: 'Leagues', href: '/leagues', icon: Landmark },
           { name: 'Verify', href: '/league-admin', icon: ShieldCheck },
@@ -65,7 +65,7 @@ export function MobileNav() {
         ];
       case 'sponsor':
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Feed', href: '/feed', icon: List },
           { name: 'Sponsors', href: '/sponsors', icon: Handshake },
           { name: 'Dashboard', href: '/sponsor-dashboard', icon: LayoutDashboard },
@@ -74,7 +74,7 @@ export function MobileNav() {
       case 'platform_admin':
       case 'super_admin':
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Admin', href: '/admin', icon: ShieldCheck },
           { name: 'Verify', href: '/league-admin', icon: ShieldCheck },
           { name: 'Reports', href: '/admin', icon: List },
@@ -83,7 +83,7 @@ export function MobileNav() {
       case 'fan':
       default:
         return [
-          { name: 'Home', href: '/', icon: Home },
+          { name: 'Home', href: '/home', icon: Home },
           { name: 'Feed', href: '/feed', icon: List },
           { name: 'Matches', href: '/matches', icon: Calendar },
           { name: 'Athletes', href: '/athletes', icon: Users },
@@ -138,28 +138,28 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   switch (role) {
     case 'athlete':
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Matches', href: '/matches', icon: Calendar },
         { name: 'Athletes', href: '/athletes', icon: Users },
       ];
     case 'team_admin':
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Matches', href: '/matches', icon: Calendar },
         { name: 'Teams', href: '/teams', icon: Building2 },
       ];
     case 'league_admin':
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Matches', href: '/matches', icon: Calendar },
         { name: 'Leagues', href: '/leagues', icon: Landmark },
       ];
     case 'sponsor':
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Sports', href: '/sports', icon: Trophy },
         { name: 'Sponsors', href: '/sponsors', icon: Handshake },
@@ -167,7 +167,7 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
     case 'platform_admin':
     case 'super_admin':
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Matches', href: '/matches', icon: Calendar },
         { name: 'Leagues', href: '/leagues', icon: Landmark },
@@ -176,7 +176,7 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
     case 'fan':
     default:
       return [
-        { name: 'Home', href: '/', icon: Home },
+        { name: 'Home', href: '/home', icon: Home },
         { name: 'Feed', href: '/feed', icon: List },
         { name: 'Sports', href: '/sports', icon: Trophy },
         { name: 'Matches', href: '/matches', icon: Calendar },
@@ -254,10 +254,11 @@ export function DesktopNav() {
   const { authStatus, role } = useAuth();
   
   const navItems = getDesktopNavItems(authStatus, role);
+  const brandHref = authStatus === 'logged_in' ? '/home' : '/';
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center border-b border-white/10 bg-[#05070A]/76 px-4 shadow-[0_14px_60px_rgba(0,0,0,0.26)] backdrop-blur-2xl xl:px-8">
-      <Link href="/" className="mr-5 flex shrink-0 items-center gap-2 xl:mr-8">
+      <Link href={brandHref} className="mr-5 flex shrink-0 items-center gap-2 xl:mr-8">
         <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
           <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
         </div>

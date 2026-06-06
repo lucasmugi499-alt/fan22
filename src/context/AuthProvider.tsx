@@ -57,16 +57,15 @@ function clearStoredDemoRole() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const initialDemoRole = getStoredDemoRole();
-  const initialDemoProfile = initialDemoRole ? MOCK_PROFILES[initialDemoRole] : null;
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (initialDemoRole ? 'logged_in' : isFirebaseConfigured ? 'loading' : 'logged_out'));
-  const [currentUser, setCurrentUser] = useState<User | null>(() => initialDemoProfile ? { uid: initialDemoProfile.uid, email: initialDemoProfile.email } as User : null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(initialDemoProfile);
-  const [role, setRole] = useState<AppRole | null>(initialDemoRole);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
   
   // Demo Mode State
-  const [isDemoMode, setIsDemoMode] = useState(Boolean(initialDemoRole));
-  const [, setDemoRoleState] = useState<AppRole | null>(initialDemoRole);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [, setDemoRoleState] = useState<AppRole | null>(null);
+  const [storageChecked, setStorageChecked] = useState(false);
 
   const setDemoRole = useCallback((newRole: AppRole | null) => {
     if (newRole) {
@@ -103,7 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isDemoMode, setDemoRole]);
 
   useEffect(() => {
-    if (isDemoMode) return;
+    const restoreDemoRole = window.setTimeout(() => {
+      const storedDemoRole = getStoredDemoRole();
+
+      if (storedDemoRole) {
+        setDemoRole(storedDemoRole);
+      } else if (!isFirebaseConfigured) {
+        setAuthStatus('logged_out');
+      }
+
+      setStorageChecked(true);
+    }, 0);
+
+    return () => window.clearTimeout(restoreDemoRole);
+  }, [setDemoRole]);
+
+  useEffect(() => {
+    if (!storageChecked || isDemoMode) return;
 
     if (!isFirebaseConfigured) {
       return;
@@ -132,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthStatus('logged_out');
       }
     });
-  }, [isDemoMode]);
+  }, [isDemoMode, storageChecked]);
 
   const value = useMemo(
     () => ({

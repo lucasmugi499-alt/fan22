@@ -92,7 +92,7 @@ export function canAccessSuperAdmin(auth: AuthState): boolean {
 export function getDefaultRouteForRole(role: AppRole | null): string {
   switch (role) {
     case 'fan':
-      return '/dashboard';
+      return '/home';
     case 'athlete':
       return '/athlete-dashboard';
     case 'team_admin':
