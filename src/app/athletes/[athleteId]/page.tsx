@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, HeartHandshake, MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
+import { dataProvider } from '@/data/dataProvider';
+import { useAuth } from '@/context/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
 import { FeedCard } from '@/components/ui/feed-card';
@@ -18,11 +21,12 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { canonicalEntityId } from '@/lib/idAliases';
 
 export default function AthleteProfilePage() {
-  const router = useRouter();
   const { athleteId } = useParams<{ athleteId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [joinedFanClub, setJoinedFanClub] = useState(false);
+  const { authStatus, currentUser, userProfile } = useAuth();
   const { athletes, challenges, feedPosts, leagues, matches, teams } = useGoalPlaceData();
   const resolvedAthleteId = canonicalEntityId(athleteId, 'ath', 'a');
   const athlete = athletes.find((item) => item.id === athleteId || item.id === resolvedAthleteId);
@@ -42,6 +46,26 @@ export default function AthleteProfilePage() {
   const athleteChallenges = challenges.filter((challenge) => challenge.athleteId === athlete.id);
   const athleteFeed = feedPosts.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 4);
   const theme = getSportTheme(athlete.sport);
+
+  const toggleFanClub = async () => {
+    if (authStatus !== 'logged_in') {
+      toast.error('Please log in to follow this athlete.');
+      return;
+    }
+
+    const nextJoined = !joinedFanClub;
+    setJoinedFanClub(nextJoined);
+
+    try {
+      const result = await dataProvider.toggleFollow(currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid', 'athlete', athlete.id);
+      if (result.mode !== 'mock') {
+        toast.success(nextJoined ? 'Athlete followed' : 'Athlete unfollowed');
+      }
+    } catch (error) {
+      setJoinedFanClub(joinedFanClub);
+      toast.error(error instanceof Error ? error.message : 'Follow action could not be recorded');
+    }
+  };
 
   return (
     <div>
@@ -87,7 +111,7 @@ export default function AthleteProfilePage() {
             </div>
             <div className="grid gap-2 sm:grid-cols-3 lg:w-64 lg:grid-cols-1">
               <Button onClick={() => setSupportAthlete(athlete)}>Support Athlete</Button>
-              <Button variant="outline" onClick={() => router.push('/feed')}>Join Fan Club</Button>
+              <Button variant="outline" onClick={toggleFanClub}>{joinedFanClub ? 'Fan Club Joined' : 'Join Fan Club'}</Button>
               <Button variant="secondary" onClick={() => setPledgeAthlete(athlete)}>Pledge Performance Reward</Button>
             </div>
           </div>

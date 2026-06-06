@@ -8,6 +8,8 @@ import { AppRole, UserProfile } from '@/types';
 import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 
+const demoRoleStorageKey = 'goalplace256.demoRole';
+
 type AuthContextValue = {
   authStatus: AuthStatus;
   currentUser: User | null;
@@ -22,18 +24,53 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function isAppRole(value: string | null): value is AppRole {
+  return Boolean(value && value in MOCK_PROFILES);
+}
+
+function getStoredDemoRole() {
+  if (typeof window === 'undefined') return null;
+  const storedRole = window.sessionStorage?.getItem?.(demoRoleStorageKey) ?? getCookieDemoRole();
+  return isAppRole(storedRole) ? storedRole : null;
+}
+
+function getCookieDemoRole() {
+  if (typeof document === 'undefined') return null;
+  const value = document.cookie
+    .split('; ')
+    .find((item) => item.startsWith(`${demoRoleStorageKey}=`))
+    ?.split('=')
+    .slice(1)
+    .join('=');
+
+  return value ? decodeURIComponent(value) : null;
+}
+
+function storeDemoRole(role: AppRole) {
+  window.sessionStorage?.setItem?.(demoRoleStorageKey, role);
+  document.cookie = `${demoRoleStorageKey}=${encodeURIComponent(role)}; path=/; SameSite=Lax`;
+}
+
+function clearStoredDemoRole() {
+  window.sessionStorage?.removeItem?.(demoRoleStorageKey);
+  document.cookie = `${demoRoleStorageKey}=; path=/; Max-Age=0; SameSite=Lax`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (isFirebaseConfigured ? 'loading' : 'logged_out'));
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
+  const initialDemoRole = getStoredDemoRole();
+  const initialDemoProfile = initialDemoRole ? MOCK_PROFILES[initialDemoRole] : null;
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (initialDemoRole ? 'logged_in' : isFirebaseConfigured ? 'loading' : 'logged_out'));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => initialDemoProfile ? { uid: initialDemoProfile.uid, email: initialDemoProfile.email } as User : null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(initialDemoProfile);
+  const [role, setRole] = useState<AppRole | null>(initialDemoRole);
   
   // Demo Mode State
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [, setDemoRoleState] = useState<AppRole | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(Boolean(initialDemoRole));
+  const [, setDemoRoleState] = useState<AppRole | null>(initialDemoRole);
 
   const setDemoRole = useCallback((newRole: AppRole | null) => {
     if (newRole) {
+      storeDemoRole(newRole);
       setIsDemoMode(true);
       setDemoRoleState(newRole);
       setUserProfile(MOCK_PROFILES[newRole]);
@@ -43,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setIsDemoMode(false);
       setDemoRoleState(null);
+      clearStoredDemoRole();
       setUserProfile(null);
       setRole(null);
       setAuthStatus('logged_out');

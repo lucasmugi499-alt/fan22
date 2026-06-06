@@ -12,6 +12,8 @@ import { SportBadge } from './product';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useAuth } from '@/context/AuthProvider';
+import { dataProvider } from '@/data/dataProvider';
 
 interface FeedCardProps {
   post: FeedPost;
@@ -50,6 +52,7 @@ function prettyType(type: FeedPost['type']) {
 export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatch }: FeedCardProps) {
   const [saved, setSaved] = useState(false);
   const { athletes, leagues, teams } = useGoalPlaceData();
+  const { authStatus, currentUser, userProfile } = useAuth();
   const sport = post.sport ?? 'Football';
   const timestamp = post.timestamp ?? post.createdAt;
   const mediaUrl = post.mediaUrl ?? post.mediaURL ?? '';
@@ -139,9 +142,24 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
         </button>
         <button
           className={cn('flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6', saved ? 'text-[var(--goal-gold)]' : 'text-slate-300 hover:text-white')}
-          onClick={() => {
-            setSaved((value) => !value);
-            toast.success(saved ? 'Post removed from saved' : 'Post saved');
+          onClick={async () => {
+            const nextSaved = !saved;
+            setSaved(nextSaved);
+
+            if (authStatus !== 'logged_in') {
+              toast.success(nextSaved ? 'Post saved in demo view' : 'Post removed from demo view');
+              return;
+            }
+
+            try {
+              const result = await dataProvider.toggleSave(currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid', 'feedPost', post.id);
+              if (result.mode !== 'mock') {
+                toast.success(nextSaved ? 'Post saved' : 'Post removed from saved');
+              }
+            } catch (error) {
+              setSaved(saved);
+              toast.error(error instanceof Error ? error.message : 'Save action could not be recorded');
+            }
           }}
         >
           <Bookmark className={cn('size-4', saved && 'fill-current')} />

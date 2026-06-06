@@ -14,7 +14,8 @@ import {
   GoalPlaceDataProvider,
   SaveTargetType,
 } from './types';
-import { VerificationStatus } from '@/types';
+import { Match, Team, VerificationStatus } from '@/types';
+import { StandingRow } from '../mockDatabase';
 
 function missingFirebase<T>(fallback: T): T {
   if (typeof window !== 'undefined') {
@@ -32,11 +33,95 @@ async function readDoc<T>(collectionName: string, id: string) {
   if (!isFirebaseConfigured) return missingFirebase(undefined as T | undefined);
   const { db } = requireFirebaseClient();
   const snapshot = await getDoc(doc(db, collectionName, id));
-  return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as T) : undefined;
+  if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as T;
+
+  const docs = await readCollection<T & { id?: string }>(collectionName as FirestoreCollectionName);
+  return docs.find((item) => item.id === id) as T | undefined;
 }
 
 async function writeResult(id: string, message?: string): Promise<DataWriteResult> {
   return { ok: true, id, mode: 'firebase', message };
+}
+
+function emptyStanding(team: Team): StandingRow {
+  return {
+    teamId: team.id,
+    teamName: team.name,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    difference: 0,
+    points: 0,
+  };
+}
+
+function resultScore(match: Match) {
+  const home = match.teamAScore ?? match.score?.home;
+  const away = match.teamBScore ?? match.score?.away;
+  return typeof home === 'number' && typeof away === 'number' ? { home, away } : undefined;
+}
+
+function hasResult(match: Match) {
+  const status = String(match.status).toLowerCase();
+  return ['completed', 'verified', 'disputed'].includes(status) && Boolean(resultScore(match));
+}
+
+function isFootball(match: Match) {
+  return String(match.sport).toLowerCase() === 'football';
+}
+
+function buildStandings(leagueId: string, teams: Team[], matches: Match[]) {
+  const standings = new Map(
+    teams.filter((team) => team.leagueId === leagueId).map((team) => [team.id, emptyStanding(team)])
+  );
+
+  matches.filter((match) => match.leagueId === leagueId && hasResult(match)).forEach((match) => {
+    const score = resultScore(match);
+    const homeTeamId = match.teamAId ?? match.homeTeamId;
+    const awayTeamId = match.teamBId ?? match.awayTeamId;
+    const home = standings.get(homeTeamId);
+    const away = standings.get(awayTeamId);
+    if (!score || !home || !away) return;
+
+    home.played += 1;
+    away.played += 1;
+    home.pointsFor += score.home;
+    home.pointsAgainst += score.away;
+    away.pointsFor += score.away;
+    away.pointsAgainst += score.home;
+
+    if (score.home > score.away) {
+      home.wins += 1;
+      away.losses += 1;
+      home.points += isFootball(match) ? 3 : 1;
+    } else if (score.home < score.away) {
+      away.wins += 1;
+      home.losses += 1;
+      away.points += isFootball(match) ? 3 : 1;
+    } else {
+      home.draws += 1;
+      away.draws += 1;
+      if (isFootball(match)) {
+        home.points += 1;
+        away.points += 1;
+      }
+    }
+  });
+
+  return [...standings.values()]
+    .map((standing) => ({
+      ...standing,
+      difference: standing.pointsFor - standing.pointsAgainst,
+    }))
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.difference !== a.difference) return b.difference - a.difference;
+      if (b.pointsFor !== a.pointsFor) return b.pointsFor - a.pointsFor;
+      return a.teamName.localeCompare(b.teamName);
+    });
 }
 
 export const firebaseProvider: GoalPlaceDataProvider = {
@@ -108,7 +193,9 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return notifications.filter((notification) => notification.userId === userId);
   },
   async getStandingsByLeague(leagueId) {
-    return mockProvider.getStandingsByLeague(leagueId);
+    if (!isFirebaseConfigured) return mockProvider.getStandingsByLeague(leagueId);
+    const [teams, matches] = await Promise.all([this.getTeams(), this.getMatches()]);
+    return buildStandings(leagueId, teams, matches);
   },
   async getTopSupportedAthletes(limit = 10) {
     const athletes = await this.getAthletes();
@@ -116,11 +203,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async getActiveChallenges() {
     const challenges = await this.getChallenges();
-    return challenges.filter((challenge) => challenge.status === 'open');
+    return challenges.filter((challenge) => ['open', 'active'].includes(String(challenge.status).toLowerCase()));
   },
   async getVerifiedMatches() {
     const matches = await this.getMatches();
-    return matches.filter((match) => match.verificationStatus === 'verified');
+    return matches.filter((match) => String(match.verificationStatus).toLowerCase() === 'verified');
   },
   async createSupportPledge(data: CreateSupportPledgeInput) {
     if (!isFirebaseConfigured) return mockProvider.createSupportPledge(data);

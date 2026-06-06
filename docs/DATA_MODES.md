@@ -1,6 +1,6 @@
 # Data Modes
 
-GoalPlace256 runs with one data interface and two providers.
+GoalPlace256 runs through one data provider interface with mock, Firebase, and local emulator workflows.
 
 ## Mock Mode
 
@@ -11,6 +11,8 @@ Run it with:
 ```bash
 pnpm dev:mock
 ```
+
+Mock mode must not require Firebase environment variables.
 
 ## Firebase Mode
 
@@ -36,7 +38,25 @@ NEXT_PUBLIC_FIREBASE_DATABASE_ID=
 NEXT_PUBLIC_FIREBASE_DATABASE_URL=
 ```
 
-Admin scripts also need either Firebase Admin service account env vars or emulator hosts.
+Only the `NEXT_PUBLIC_` Firebase config belongs in browser code. Do not commit Firebase Admin service-account JSON, private keys, refresh tokens, `.env.local`, or any other server secret.
+
+Admin scripts also need Firebase Admin service account env vars, or emulator hosts when seeding locally.
+
+## Emulator Mode
+
+The emulator uses the same mock seed source but writes to local Firebase emulators. Start the emulators in another terminal, then seed with:
+
+```bash
+pnpm seed:emulator
+```
+
+Typical emulator env vars:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
+```
 
 ## Seed And Backup
 
@@ -44,6 +64,15 @@ Seed Firestore from the canonical mock database:
 
 ```bash
 pnpm seed:firebase
+```
+
+The Firestore seed uses `src/data/mockDatabase.ts` as the central source and writes deterministic document IDs for core collections, including:
+
+```text
+users/user_fan_001
+athletes/ath_football_001
+teams/team_football_001
+leagues/league_football_001
 ```
 
 Seed the local emulator:

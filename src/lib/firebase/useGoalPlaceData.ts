@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { dataProvider } from '@/data/dataProvider';
-import { mockDatabase } from '@/data/mockDatabase';
+import { mockProvider } from '@/data/providers/mockProvider';
 import {
   Athlete,
   Challenge,
@@ -154,13 +154,33 @@ export function adaptFeedPost(post: FeedPost): FeedPost {
 }
 
 const initialData = {
-  athletes: mockDatabase.athletes.map(adaptAthlete),
-  teams: mockDatabase.teams.map(adaptTeam),
-  leagues: mockDatabase.leagues.map(adaptLeague),
-  matches: mockDatabase.matches.map(adaptMatch),
-  challenges: mockDatabase.challenges.map(adaptChallenge),
-  feedPosts: mockDatabase.feedPosts.map(adaptFeedPost),
+  athletes: [] as Athlete[],
+  teams: [] as Team[],
+  leagues: [] as League[],
+  matches: [] as Match[],
+  challenges: [] as Challenge[],
+  feedPosts: [] as FeedPost[],
 };
+
+async function loadGoalPlaceData(provider = dataProvider) {
+  const [athletes, teams, leagues, matches, challenges, feedPosts] = await Promise.all([
+    provider.getAthletes(),
+    provider.getTeams(),
+    provider.getLeagues(),
+    provider.getMatches(),
+    provider.getChallenges(),
+    provider.getFeedPosts(),
+  ]);
+
+  return {
+    athletes: athletes.map(adaptAthlete),
+    teams: teams.map(adaptTeam),
+    leagues: leagues.map(adaptLeague),
+    matches: matches.map(adaptMatch),
+    challenges: challenges.map(adaptChallenge),
+    feedPosts: feedPosts.map(adaptFeedPost),
+  };
+}
 
 export function useGoalPlaceData() {
   const [items, setItems] = useState(initialData);
@@ -171,30 +191,15 @@ export function useGoalPlaceData() {
 
     async function load() {
       setLoading(true);
-      const [athletes, teams, leagues, matches, challenges, feedPosts] = await Promise.all([
-        dataProvider.getAthletes(),
-        dataProvider.getTeams(),
-        dataProvider.getLeagues(),
-        dataProvider.getMatches(),
-        dataProvider.getChallenges(),
-        dataProvider.getFeedPosts(),
-      ]);
-
+      const nextItems = await loadGoalPlaceData();
       if (cancelled) return;
-      setItems({
-        athletes: athletes.map(adaptAthlete),
-        teams: teams.map(adaptTeam),
-        leagues: leagues.map(adaptLeague),
-        matches: matches.map(adaptMatch),
-        challenges: challenges.map(adaptChallenge),
-        feedPosts: feedPosts.map(adaptFeedPost),
-      });
+      setItems(nextItems);
       setLoading(false);
     }
 
-    load().catch(() => {
+    load().catch(async () => {
       if (!cancelled) {
-        setItems(initialData);
+        setItems(await loadGoalPlaceData(mockProvider));
         setLoading(false);
       }
     });
@@ -215,16 +220,27 @@ export function useGoalPlaceData() {
 }
 
 export function useUserWalletTransactions(userId?: string | null) {
-  const fallback = mockDatabase.walletTransactions as WalletTransaction[];
-  const [items, setItems] = useState<WalletTransaction[]>(fallback);
+  const [items, setItems] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(Boolean(userId));
 
   useEffect(() => {
     let cancelled = false;
 
+    async function loadDemoWallet() {
+      const users = await mockProvider.getUsers();
+      const candidates = [...users.filter((user) => user.role === 'fan'), ...users];
+
+      for (const user of candidates) {
+        const transactions = await mockProvider.getWalletTransactionsByUser(user.id);
+        if (transactions.length) return transactions;
+      }
+
+      return [];
+    }
+
     async function load() {
       if (!userId) {
-        setItems(fallback);
+        setItems(dataProvider.mode === 'mock' ? await loadDemoWallet() : []);
         setLoading(false);
         return;
       }
@@ -232,14 +248,14 @@ export function useUserWalletTransactions(userId?: string | null) {
       setLoading(true);
       const nextItems = await dataProvider.getWalletTransactionsByUser(userId);
       if (!cancelled) {
-        setItems(nextItems.length ? nextItems : fallback);
+        setItems(nextItems.length || dataProvider.mode === 'firebase' ? nextItems : await loadDemoWallet());
         setLoading(false);
       }
     }
 
-    load().catch(() => {
+    load().catch(async () => {
       if (!cancelled) {
-        setItems(fallback);
+        setItems(dataProvider.mode === 'mock' ? await loadDemoWallet() : []);
         setLoading(false);
       }
     });
@@ -247,8 +263,7 @@ export function useUserWalletTransactions(userId?: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [fallback, userId]);
+  }, [userId]);
 
   return { items, loading };
 }
-

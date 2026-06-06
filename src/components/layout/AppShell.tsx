@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="pointer-events-none fixed inset-0 z-0 stadium-rays" />
       <div className="relative z-10 flex min-h-dvh flex-col">
         <DesktopNav />
-        <main className="relative flex flex-1 flex-col">
+        <main className="relative flex flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
           {children}
         </main>
         <MobileNav />
