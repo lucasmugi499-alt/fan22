@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:demo": "node --experimental-strip-types scripts/seed-demo.ts",
+    "set-admin-claims": "node --experimental-strip-types scripts/set-admin-claims.ts",
+    "reset:demo": "node --experimental-strip-types scripts/reset-demo-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

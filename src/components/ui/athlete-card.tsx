@@ -7,9 +7,9 @@ import { VerificationBadge } from './verification-badge';
 import { Button } from './button';
 import { ArrowUpRight, MapPin, Users } from 'lucide-react';
 import { ImageWithFallback } from './image-with-fallback';
-import { mockTeams } from '@/lib/mockData';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { SportBadge } from './product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 interface AthleteCardProps {
   athlete: Athlete;
@@ -38,7 +38,8 @@ function getKeyStats(athlete: Athlete) {
 }
 
 export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
-  const team = mockTeams.find((item) => item.id === athlete.teamId);
+  const { teams } = useGoalPlaceData();
+  const team = teams.find((item) => item.id === athlete.teamId);
   const theme = getSportTheme(athlete.sport);
   const keyStats = getKeyStats(athlete);
 

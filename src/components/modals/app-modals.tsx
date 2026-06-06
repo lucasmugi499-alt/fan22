@@ -3,10 +3,10 @@
 import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Athlete, SportType } from '@/lib/types';
-import { mockAthletes, mockChallenges } from '@/lib/mockData';
 import { useAuth } from '@/context/AuthProvider';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { createFeedPost, createSupportPledge } from '@/lib/firebase/firestore';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX, getInitials, getSportTheme, trustStatements } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import {
@@ -68,9 +68,11 @@ export function SupportModal({
 }) {
   const [amount, setAmount] = useState(25000);
   const { currentUser } = useAuth();
+  const { athletes } = useGoalPlaceData();
   const deductWalletBalance = useAppStore((state) => state.deductWalletBalance);
   const addPoints = useAppStore((state) => state.addPoints);
-  const selectedAthlete = athlete ?? mockAthletes[0];
+  const selectedAthlete = athlete ?? athletes[0];
+  if (!selectedAthlete) return null;
   const theme = getSportTheme(selectedAthlete.sport);
   const quickAmounts = [5000, 10000, 25000, 50000, 100000];
 
@@ -188,14 +190,20 @@ export function PledgeModal({
 }) {
   const [amount, setAmount] = useState(10000);
   const { currentUser } = useAuth();
-  const selectedAthlete = athlete ?? mockAthletes[0];
-  const challenges = useMemo(
-    () => mockChallenges.filter((challenge) => challenge.athleteId === selectedAthlete.id && challenge.status === 'Active'),
-    [selectedAthlete.id]
+  const { athletes, challenges: allChallenges } = useGoalPlaceData();
+  const selectedAthlete = athlete ?? athletes[0];
+  const activeChallenges = useMemo(
+    () => (selectedAthlete ? allChallenges.filter((challenge) => challenge.athleteId === selectedAthlete.id && challenge.status === 'Active') : []),
+    [allChallenges, selectedAthlete]
   );
-  const [challengeId, setChallengeId] = useState(challenges[0]?.id ?? mockChallenges[0].id);
-  const selectedChallenge = mockChallenges.find((challenge) => challenge.id === challengeId) ?? mockChallenges[0];
+  const challenges = useMemo(
+    () => (activeChallenges.length ? activeChallenges : allChallenges),
+    [activeChallenges, allChallenges]
+  );
+  const [challengeId, setChallengeId] = useState('');
+  const selectedChallenge = challenges.find((challenge) => challenge.id === challengeId) ?? challenges[0];
   const addPoints = useAppStore((state) => state.addPoints);
+  if (!selectedAthlete || !selectedChallenge) return null;
 
   const submit = async () => {
     if (isFirebaseConfigured && !currentUser) {
@@ -237,7 +245,7 @@ export function PledgeModal({
             <div>
               <FieldLabel>Challenge</FieldLabel>
               <DemoSelect value={selectedChallenge.id} onChange={(event) => setChallengeId(event.target.value)}>
-                {(challenges.length ? challenges : mockChallenges).map((challenge) => (
+                {challenges.map((challenge) => (
                   <option key={challenge.id} value={challenge.id}>
                     {challenge.targetDescription}
                   </option>
@@ -278,6 +286,7 @@ export function CreatePostModal({
   const [sport, setSport] = useState<SportType>('Football');
   const [caption, setCaption] = useState('');
   const { currentUser, role } = useAuth();
+  const { athletes } = useGoalPlaceData();
 
   const submit = async () => {
     try {
@@ -334,7 +343,7 @@ export function CreatePostModal({
             <div>
               <FieldLabel>Related Athlete / Team / League</FieldLabel>
               <DemoSelect defaultValue="Brian Okello">
-                {mockAthletes.map((athlete) => (
+                {athletes.map((athlete) => (
                   <option key={athlete.id}>{athlete.name}</option>
                 ))}
               </DemoSelect>

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, HeartHandshake, MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import { mockAthletes, mockChallenges, mockFeed, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
@@ -15,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VerificationBadge } from '@/components/ui/verification-badge';
 import { CommentsDrawer, PledgeModal, SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 export default function AthleteProfilePage() {
   const router = useRouter();
@@ -22,7 +22,8 @@ export default function AthleteProfilePage() {
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const athlete = mockAthletes.find((item) => item.id === athleteId);
+  const { athletes, challenges, feedPosts, leagues, matches, teams } = useGoalPlaceData();
+  const athlete = athletes.find((item) => item.id === athleteId);
 
   if (!athlete) {
     return (
@@ -33,11 +34,11 @@ export default function AthleteProfilePage() {
     );
   }
 
-  const team = mockTeams.find((item) => item.id === athlete.teamId);
-  const league = mockLeagues.find((item) => item.id === athlete.leagueId);
-  const nextMatch = mockMatches.find((match) => match.teamAId === athlete.teamId || match.teamBId === athlete.teamId);
-  const athleteChallenges = mockChallenges.filter((challenge) => challenge.athleteId === athlete.id);
-  const athleteFeed = mockFeed.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 4);
+  const team = teams.find((item) => item.id === athlete.teamId);
+  const league = leagues.find((item) => item.id === athlete.leagueId);
+  const nextMatch = matches.find((match) => match.teamAId === athlete.teamId || match.teamBId === athlete.teamId);
+  const athleteChallenges = challenges.filter((challenge) => challenge.athleteId === athlete.id);
+  const athleteFeed = feedPosts.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 4);
   const theme = getSportTheme(athlete.sport);
 
   return (

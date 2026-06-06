@@ -136,6 +136,11 @@ export async function createFeedPost(input: {
   const { db } = requireFirebaseClient();
   const docRef = await addDoc(collection(db, 'feedPosts'), {
     ...input,
+    authorType: input.authorRole === 'sponsor' ? 'Sponsor' : input.authorRole === 'platform_admin' || input.authorRole === 'super_admin' ? 'Admin' : 'Fan',
+    mediaUrl: input.mediaURL ?? '',
+    likes: 0,
+    comments: 0,
+    shares: 0,
     likesCount: 0,
     commentsCount: 0,
     status: 'published',

@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, HeartHandshake, LineChart, Medal, ShieldCheck, Users } from 'lucide-react';
-import { mockAthletes, mockFeed, sponsorPackages } from '@/lib/mockData';
+import { sponsorPackages } from '@/lib/mockData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { SponsorInterestModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
 import { FeedCard } from '@/components/ui/feed-card';
@@ -14,6 +15,7 @@ import { formatUGX, getInitials } from '@/lib/sportThemes';
 export default function SponsorsPage() {
   const router = useRouter();
   const [interestOpen, setInterestOpen] = useState(false);
+  const { athletes, feedPosts } = useGoalPlaceData();
 
   return (
     <PageContainer compact>
@@ -62,7 +64,7 @@ export default function SponsorsPage() {
       <section className="mt-10">
         <SectionHeader eyebrow="Featured Talent" title="Sponsor-ready athletes" />
         <div className="grid gap-4 md:grid-cols-3">
-          {mockAthletes.slice(0, 3).map((athlete) => (
+          {athletes.slice(0, 3).map((athlete) => (
             <button key={athlete.id} className="glass-panel rounded-xl p-4 text-left transition-all hover:-translate-y-1" onClick={() => router.push(`/athletes/${athlete.id}`)}>
               <div className="flex items-center gap-3">
                 <div className="size-14 overflow-hidden rounded-xl border border-white/10 bg-white/8">
@@ -103,7 +105,7 @@ export default function SponsorsPage() {
           </div>
         </div>
         <div className="space-y-4">
-          {mockFeed.filter((post) => post.type === 'SponsorImpact' || post.type === 'AnnualAwards').map((post) => (
+          {feedPosts.filter((post) => post.type === 'SponsorImpact' || post.type === 'AnnualAwards').map((post) => (
             <FeedCard key={post.id} post={post} onViewProfile={() => router.push('/sponsors')} onComment={() => setInterestOpen(true)} onSupport={() => router.push('/athletes')} />
           ))}
         </div>

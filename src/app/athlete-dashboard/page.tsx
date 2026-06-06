@@ -3,7 +3,9 @@
 import React, { useSyncExternalStore } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Calendar, CheckCircle2, ImageUp, LineChart, ReceiptText, ShieldCheck, Trophy, Users } from 'lucide-react';
-import { dashboardSeries, mockAthletes, mockChallenges, mockFeed, walletTransactions } from '@/lib/mockData';
+import { dashboardSeries, walletTransactions } from '@/lib/mockData';
+import { useAuth } from '@/context/AuthProvider';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { RoleGuard } from '@/components/auth/RoleGuard';
@@ -13,9 +15,21 @@ import { ImpactStatCard, PageContainer, SectionHeader, SportBadge } from '@/comp
 
 export default function AthleteDashboardPage() {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const athlete = mockAthletes[0];
-  const athleteChallenges = mockChallenges.filter((challenge) => challenge.athleteId === athlete.id);
-  const athleteFeed = mockFeed.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 2);
+  const { currentUser } = useAuth();
+  const { athletes, challenges, feedPosts } = useGoalPlaceData();
+  const athlete = athletes.find((item) => item.userId === currentUser?.uid) ?? athletes[0];
+  const athleteChallenges = athlete ? challenges.filter((challenge) => challenge.athleteId === athlete.id) : [];
+  const athleteFeed = athlete ? feedPosts.filter((post) => post.authorId === athlete.id || post.sport === athlete.sport).slice(0, 2) : [];
+
+  if (!athlete) {
+    return (
+      <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>
+        <PageContainer compact>
+          <div className="glass-panel rounded-xl p-8 text-center text-slate-300">No athlete profile is linked yet.</div>
+        </PageContainer>
+      </RoleGuard>
+    );
+  }
 
   return (
     <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>

@@ -5,10 +5,10 @@ import { Challenge } from '@/lib/types';
 import { GlassCard } from './glass-card';
 import { Button } from './button';
 import { CheckCircle2, Coins, ShieldCheck, Users } from 'lucide-react';
-import { mockAthletes } from '@/lib/mockData';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { SportBadge } from './product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 interface ChallengeCardProps {
   challenge: Challenge;
@@ -16,7 +16,8 @@ interface ChallengeCardProps {
 }
 
 export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
-  const athlete = mockAthletes.find((item) => item.id === challenge.athleteId);
+  const { athletes } = useGoalPlaceData();
+  const athlete = athletes.find((item) => item.id === challenge.athleteId);
   if (!athlete) return null;
 
   const theme = getSportTheme(athlete.sport);

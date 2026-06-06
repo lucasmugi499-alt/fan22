@@ -3,15 +3,20 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Award, Medal, ShieldCheck, Star, Trophy, Users } from 'lucide-react';
-import { awardCategories, mockAthletes, mockCurrentUser, mockTeams } from '@/lib/mockData';
+import { awardCategories, mockCurrentUser } from '@/lib/mockData';
+import { useAuth } from '@/context/AuthProvider';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { GoalPlacePointsBadge, ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 
 export default function AwardsPage() {
   const router = useRouter();
+  const { userProfile } = useAuth();
+  const { athletes, teams } = useGoalPlaceData();
+  const profile = userProfile ?? mockCurrentUser;
   const leaders = [
-    { name: 'Ben O.', label: 'Top Contributor', points: mockCurrentUser.points },
+    { name: profile.name, label: 'Top Contributor', points: profile.points },
     { name: 'Mariam K.', label: 'Most Active Fan', points: 7920 },
     { name: 'Coach Ivan', label: 'Community Champion', points: 7110 },
   ];
@@ -38,7 +43,7 @@ export default function AwardsPage() {
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/24 p-5">
-            <GoalPlacePointsBadge points={mockCurrentUser.points} className="mb-5" />
+            <GoalPlacePointsBadge points={profile.points} className="mb-5" />
             <p className="text-sm leading-6 text-slate-300">
               GoalPlace Points are loyalty and recognition points, not cash. They help fans qualify for platform recognition and Annual Awards activity.
             </p>
@@ -53,7 +58,7 @@ export default function AwardsPage() {
       <section className="mt-8 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Award categories" value={String(awardCategories.length)} icon={Medal} />
         <ImpactStatCard label="Fan finalists" value="120" icon={Users} tone="gold" />
-        <ImpactStatCard label="Athlete races" value={String(mockAthletes.length)} icon={Trophy} tone="blue" />
+        <ImpactStatCard label="Athlete races" value={String(athletes.length)} icon={Trophy} tone="blue" />
         <ImpactStatCard label="Verified moments" value="426" icon={ShieldCheck} tone="orange" />
       </section>
 
@@ -92,7 +97,7 @@ export default function AwardsPage() {
       <section className="mt-10">
         <SectionHeader eyebrow="Athlete Races" title="Athlete award races" />
         <div className="grid gap-4 md:grid-cols-3">
-          {mockAthletes.slice(0, 6).map((athlete, index) => (
+          {athletes.slice(0, 6).map((athlete, index) => (
             <div key={athlete.id} className="glass-panel rounded-xl p-4">
               <div className="mb-4 flex items-center justify-between">
                 <SportBadge sport={athlete.sport} />
@@ -112,7 +117,7 @@ export default function AwardsPage() {
       <section className="mt-10">
         <SectionHeader eyebrow="Team & League Awards" title="Team and league recognition" />
         <div className="grid gap-4 md:grid-cols-3">
-          {mockTeams.slice(0, 6).map((team) => (
+          {teams.slice(0, 6).map((team) => (
             <div key={team.id} className="glass-panel rounded-xl p-4">
               <SportBadge sport={team.sport} />
               <h3 className="mt-4 font-heading text-lg font-black text-white">{team.name}</h3>

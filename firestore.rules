@@ -1,0 +1,164 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isPlatformAdmin() {
+      return role() == 'platform_admin' || role() == 'super_admin';
+    }
+
+    function isSuperAdmin() {
+      return role() == 'super_admin';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function hasAdminList(data) {
+      return data.adminUserIds is list;
+    }
+
+    function uidInAdminList(data) {
+      return signedIn() && hasAdminList(data) && request.auth.uid in data.adminUserIds;
+    }
+
+    function leaguePath(leagueId) {
+      return /databases/$(database)/documents/leagues/$(leagueId);
+    }
+
+    function canManageLeagueById(leagueId) {
+      return isPlatformAdmin() ||
+        (signedIn() &&
+          exists(leaguePath(leagueId)) &&
+          hasAdminList(get(leaguePath(leagueId)).data) &&
+          request.auth.uid in get(leaguePath(leagueId)).data.adminUserIds);
+    }
+
+    function nonNegativeAmount() {
+      return request.resource.data.amount is number && request.resource.data.amount > 0;
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+      allow read: if isOwner(uid) || isPlatformAdmin();
+      allow update: if isOwner(uid) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /athletes/{athleteId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || isOwner(request.resource.data.userId);
+      allow update: if isPlatformAdmin() || isOwner(resource.data.userId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
+      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /leagues/{leagueId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
+      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /feedPosts/{postId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isPlatformAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow delete: if isSuperAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isPlatformAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /supportPledges/{pledgeId} {
+      allow create: if signedIn() &&
+        request.resource.data.fanId == request.auth.uid &&
+        nonNegativeAmount() &&
+        request.resource.data.status in ['pending', 'held'];
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.fanId == request.auth.uid);
+      allow update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /walletTransactions/{transactionId} {
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.amount is number;
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow create: if isPlatformAdmin();
+      allow read, update: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /sponsors/{sponsorId} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update: if isPlatformAdmin() || (signedIn() && resource.data.adminUserIds is list && request.auth.uid in resource.data.adminUserIds);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /awards/{awardId} {
+      allow read: if true;
+      allow create, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /verifications/{verificationId} {
+      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow create: if canManageLeagueById(request.resource.data.leagueId) || isPlatformAdmin();
+      allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /adminLogs/{logId} {
+      allow create, read: if isPlatformAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}

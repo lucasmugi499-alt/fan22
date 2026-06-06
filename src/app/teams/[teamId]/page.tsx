@@ -5,19 +5,20 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, HeartHandshake, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import { mockAthletes, mockFeed, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
 import { formatUGX, getSportTheme } from '@/lib/sportThemes';
 import { AthleteCard } from '@/components/ui/athlete-card';
 import { FeedCard } from '@/components/ui/feed-card';
 import { MatchCard } from '@/components/ui/match-card';
 import { SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 export default function TeamDetailPage() {
   const router = useRouter();
   const { teamId } = useParams<{ teamId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
-  const team = mockTeams.find((item) => item.id === teamId);
+  const { athletes: allAthletes, feedPosts, leagues, matches: allMatches, teams } = useGoalPlaceData();
+  const team = teams.find((item) => item.id === teamId);
 
   if (!team) {
     return (
@@ -29,10 +30,10 @@ export default function TeamDetailPage() {
   }
 
   const theme = getSportTheme(team.sport);
-  const league = mockLeagues.find((item) => item.id === team.leagueId);
-  const athletes = mockAthletes.filter((athlete) => athlete.teamId === team.id);
-  const matches = mockMatches.filter((match) => match.teamAId === team.id || match.teamBId === team.id);
-  const feed = mockFeed.filter((post) => post.authorId === team.id || post.sport === team.sport).slice(0, 3);
+  const league = leagues.find((item) => item.id === team.leagueId);
+  const athletes = allAthletes.filter((athlete) => athlete.teamId === team.id);
+  const matches = allMatches.filter((match) => match.teamAId === team.id || match.teamBId === team.id);
+  const feed = feedPosts.filter((post) => post.authorId === team.id || post.sport === team.sport).slice(0, 3);
 
   return (
     <PageContainer compact>
@@ -77,7 +78,7 @@ export default function TeamDetailPage() {
           <SectionHeader eyebrow="Feed" title="Team activity" />
           <div className="space-y-4">
             {feed.map((post) => (
-              <FeedCard key={post.id} post={post} onSupport={() => setSupportAthlete(athletes[0] ?? mockAthletes[0])} />
+              <FeedCard key={post.id} post={post} onSupport={() => setSupportAthlete(athletes[0] ?? null)} />
             ))}
           </div>
         </div>

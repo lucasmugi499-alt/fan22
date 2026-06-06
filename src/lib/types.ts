@@ -62,6 +62,7 @@ export interface User {
 
 export interface Athlete {
   id: string;
+  userId?: string;
   name: string;
   sport: SportType;
   position: string;
@@ -84,6 +85,7 @@ export interface Team {
   sport: SportType;
   location: string;
   leagueId: string;
+  adminUserIds?: string[];
   logoUrl: string;
   supportPool: number;
   recentResults: string[]; // e.g. ["W", "L", "D"]
@@ -126,26 +128,35 @@ export interface Match {
   date: string;
   venue: string;
   verificationStatus: 'Pending' | 'Verified' | 'Disputed';
+  verifiedBy?: string;
+  updatedAt?: string;
 }
 
 export interface Challenge {
   id: string;
   athleteId: string;
   matchId: string;
+  leagueId?: string;
   targetDescription: string;
   totalPledged: number;
   supportersCount: number;
   status: 'Active' | 'Achieved' | 'Failed';
-  verificationStatus: 'Pending' | 'Verified';
+  verificationStatus: 'Pending' | 'Verified' | 'Disputed' | 'Rejected';
+  verifiedBy?: string;
+  updatedAt?: string;
 }
 
 export interface SupportPledge {
   id: string;
   fanId: string;
-  athleteId: string;
+  athleteId?: string;
+  teamId?: string;
+  leagueId?: string;
   challengeId?: string;
   amount: number;
-  status: 'Pledged' | 'Paid' | 'Refunded';
+  currency?: 'UGX';
+  type?: 'direct_support' | 'performance_pledge' | 'team_pool' | 'league_campaign';
+  status: 'pending' | 'held' | 'released' | 'refunded' | 'failed' | 'Pledged' | 'Paid' | 'Refunded';
   createdAt: string;
 }
 

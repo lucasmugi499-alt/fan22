@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowDownToLine, CreditCard, HeartHandshake, History, Landmark, Plus, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react';
 import { mockCurrentUser, walletTransactions } from '@/lib/mockData';
+import { useAuth } from '@/context/AuthProvider';
 import { formatUGX } from '@/lib/sportThemes';
 import { AddFundsModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ export default function WalletPage() {
   const router = useRouter();
   const historyRef = useRef<HTMLDivElement>(null);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const { userProfile } = useAuth();
+  const profile = userProfile ?? mockCurrentUser;
 
   return (
     <ProtectedRoute>
@@ -36,10 +39,10 @@ export default function WalletPage() {
               <div className="flex size-12 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[var(--goal-mint)]">
                 <WalletCards className="size-6" />
               </div>
-              <GoalPlacePointsBadge points={mockCurrentUser.points} />
+              <GoalPlacePointsBadge points={profile.points} />
             </div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Available Balance</p>
-            <h2 className="mt-2 font-heading text-5xl font-black text-white md:text-7xl">{formatUGX(mockCurrentUser.walletBalance)}</h2>
+            <h2 className="mt-2 font-heading text-5xl font-black text-white md:text-7xl">{formatUGX(profile.walletBalance)}</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300">
               Use your demo wallet to support verified athletes, pledge performance rewards, and track community impact.
             </p>

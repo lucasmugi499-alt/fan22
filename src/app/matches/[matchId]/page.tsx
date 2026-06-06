@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, CheckCircle2, MapPin, ShieldCheck, Trophy, Users, Zap } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import { mockAthletes, mockChallenges, mockFeed, mockMatches, mockTeams } from '@/lib/mockData';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
@@ -13,6 +12,7 @@ import { FeedCard } from '@/components/ui/feed-card';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { CommentsDrawer, PledgeModal, SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 export default function MatchDetailsPage() {
   const router = useRouter();
@@ -20,7 +20,8 @@ export default function MatchDetailsPage() {
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const match = mockMatches.find((item) => item.id === matchId);
+  const { athletes, challenges, feedPosts, matches, teams } = useGoalPlaceData();
+  const match = matches.find((item) => item.id === matchId);
 
   if (!match) {
     return (
@@ -31,12 +32,12 @@ export default function MatchDetailsPage() {
     );
   }
 
-  const teamA = mockTeams.find((team) => team.id === match.teamAId);
-  const teamB = mockTeams.find((team) => team.id === match.teamBId);
-  const teamAAthletes = mockAthletes.filter((athlete) => athlete.teamId === teamA?.id);
-  const teamBAthletes = mockAthletes.filter((athlete) => athlete.teamId === teamB?.id);
-  const matchChallenges = mockChallenges.filter((challenge) => challenge.matchId === match.id);
-  const relatedFeed = mockFeed.filter((post) => post.sport === match.sport).slice(0, 3);
+  const teamA = teams.find((team) => team.id === match.teamAId);
+  const teamB = teams.find((team) => team.id === match.teamBId);
+  const teamAAthletes = athletes.filter((athlete) => athlete.teamId === teamA?.id);
+  const teamBAthletes = athletes.filter((athlete) => athlete.teamId === teamB?.id);
+  const matchChallenges = challenges.filter((challenge) => challenge.matchId === match.id);
+  const relatedFeed = feedPosts.filter((post) => post.sport === match.sport).slice(0, 3);
   const theme = getSportTheme(match.sport);
   const supportPool = (teamA?.supportPool ?? 0) + (teamB?.supportPool ?? 0);
 
@@ -113,8 +114,8 @@ export default function MatchDetailsPage() {
         <SectionHeader eyebrow="Active Challenges" title="Active challenges" />
         <div className="grid gap-4 md:grid-cols-3">
           {matchChallenges.map((challenge) => {
-            const athlete = mockAthletes.find((item) => item.id === challenge.athleteId) ?? mockAthletes[0];
-            return <ChallengeCard key={challenge.id} challenge={challenge} onSupport={() => setPledgeAthlete(athlete)} />;
+            const athlete = athletes.find((item) => item.id === challenge.athleteId);
+            return <ChallengeCard key={challenge.id} challenge={challenge} onSupport={() => setPledgeAthlete(athlete ?? null)} />;
           })}
         </div>
       </section>
@@ -138,7 +139,7 @@ export default function MatchDetailsPage() {
           <SectionHeader eyebrow="Related Feed" title="Related feed posts" />
           <div className="space-y-4">
             {relatedFeed.map((post) => (
-              <FeedCard key={post.id} post={post} onComment={() => setCommentsOpen(true)} onSupport={() => setSupportAthlete(mockAthletes[0])} />
+              <FeedCard key={post.id} post={post} onComment={() => setCommentsOpen(true)} onSupport={() => setSupportAthlete(athletes[0] ?? null)} />
             ))}
           </div>
         </div>

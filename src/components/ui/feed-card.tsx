@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FeedPost } from '@/lib/types';
+import { Athlete, FeedPost, League, Team } from '@/lib/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Award, Bookmark, HeartHandshake, MessageSquare, Share2, ShieldCheck } from 'lucide-react';
-import { Athlete, League, Team } from '@/lib/types';
 import { getInitials, getSportTheme, timeAgo } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { Button } from './button';

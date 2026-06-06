@@ -1,13 +1,12 @@
+'use client';
+
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { mockAthletes, mockChallenges, mockMatches } from '@/lib/mockData';
 import { SportSlug, getSportTheme, sports } from '@/lib/sportThemes';
 import { buttonVariants } from '@/components/ui/button';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
-
-type Props = {
-  searchParams: Promise<{ sport?: string }>;
-};
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 function normalizeSport(slug?: string) {
   if (slug === 'basketball') return 'Basketball';
@@ -15,13 +14,14 @@ function normalizeSport(slug?: string) {
   return 'Football';
 }
 
-export default async function SportsPage({ searchParams }: Props) {
-  const params = await searchParams;
-  const selectedSport = normalizeSport(params.sport);
+export default function SportsPage() {
+  const searchParams = useSearchParams();
+  const { athletes, challenges, matches } = useGoalPlaceData();
+  const selectedSport = normalizeSport(searchParams.get('sport') ?? undefined);
   const theme = getSportTheme(selectedSport);
-  const sportAthletes = mockAthletes.filter((athlete) => athlete.sport === selectedSport);
-  const sportMatches = mockMatches.filter((match) => match.sport === selectedSport);
-  const sportChallenges = mockChallenges.filter((challenge) => sportAthletes.some((athlete) => athlete.id === challenge.athleteId));
+  const sportAthletes = athletes.filter((athlete) => athlete.sport === selectedSport);
+  const sportMatches = matches.filter((match) => match.sport === selectedSport);
+  const sportChallenges = challenges.filter((challenge) => sportAthletes.some((athlete) => athlete.id === challenge.athleteId));
 
   return (
     <PageContainer compact>
