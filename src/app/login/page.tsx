@@ -1,163 +1,107 @@
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
-import { LogIn, Mail, ShieldCheck } from 'lucide-react';
+import React, { useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
-import { Button } from '@/components/ui/button';
-import { demoAccounts, login, routeForAppRole } from '@/lib/firebase/auth';
-import { isFirebaseConfigured } from '@/lib/firebase/client';
+import Link from 'next/link';
+import { canAccessRoute, getDefaultRouteForRole } from '@/lib/auth/permissions';
+import { PageContainer } from '@/components/ui/product';
+import { Shield, User, Trophy, Building2, Handshake, ShieldCheck } from 'lucide-react';
 import { AppRole } from '@/types';
-
-const demoRoles: AppRole[] = [
-  'fan',
-  'athlete',
-  'team_admin',
-  'league_admin',
-  'sponsor',
-  'platform_admin',
-  'super_admin',
-];
-
-function roleLabel(role: AppRole) {
-  return role
-    .split('_')
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(' ');
-}
+import { toast } from 'sonner';
 
 function AuthContent() {
-  const { authStatus, setDemoRole } = useAuth();
+  const { authStatus, role, setDemoRole } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const nextRoute = searchParams.get('next') || '';
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const nextRoute = searchParams.get('next');
 
   useEffect(() => {
-    if (authStatus === 'logged_in' && nextRoute) {
-      router.push(nextRoute);
+    if (authStatus === 'logged_in') {
+      if (nextRoute && canAccessRoute({ authStatus, role, userProfile: null }, nextRoute)) {
+        router.push(nextRoute);
+      } else {
+        router.push(getDefaultRouteForRole(role));
+      }
     }
-  }, [authStatus, nextRoute, router]);
+  }, [authStatus, role, router, nextRoute]);
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!isFirebaseConfigured) {
-      toast.error('Firebase is not configured yet. Use a demo role or add NEXT_PUBLIC_FIREBASE_* env vars.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await login(email, password);
-      toast.success('Logged in');
-      router.push(nextRoute || '/dashboard');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
-    } finally {
-      setSubmitting(false);
-    }
+  const handleDemoLogin = (selectedRole: AppRole) => {
+    setDemoRole(selectedRole);
+    toast.success(`Logged in as ${selectedRole.replace('_', ' ')}`);
   };
 
-  const chooseDemoRole = (role: AppRole) => {
-    setDemoRole(role);
-    const demo = demoAccounts.find((account) => account.role === role);
-    toast.success(`Demo login: ${demo?.email ?? roleLabel(role)}`);
-    router.push(routeForAppRole(role));
-  };
+  const demoRoles: { id: AppRole; label: string; icon: React.ElementType }[] = [
+    { id: 'fan', label: 'Continue as Fan', icon: User },
+    { id: 'athlete', label: 'Continue as Athlete', icon: Trophy },
+    { id: 'team_admin', label: 'Continue as Team Admin', icon: Building2 },
+    { id: 'league_admin', label: 'Continue as League Admin', icon: Shield },
+    { id: 'sponsor', label: 'Continue as Sponsor', icon: Handshake },
+    { id: 'platform_admin', label: 'Continue as Platform Admin', icon: ShieldCheck },
+  ];
 
   return (
-    <main className="flex min-h-[80vh] items-center justify-center p-4">
-      <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0A0D14] p-5 shadow-2xl md:p-8">
-        <div className="grid gap-8 lg:grid-cols-[0.92fr_1.08fr]">
-          <section>
-            <div className="mb-6 flex size-12 items-center justify-center rounded-xl border border-[var(--goal-emerald)]/30 bg-[var(--goal-emerald)]/12 text-[var(--goal-mint)]">
-              <LogIn className="size-6" />
+    <div className="w-full overflow-hidden pb-24 pt-10 md:pt-16">
+      <PageContainer>
+        <div className="mx-auto flex max-w-[440px] flex-col items-center justify-center">
+          <Link href="/" className="mb-8 flex items-center gap-2">
+            <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
+              <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
             </div>
-            <h1 className="font-heading text-3xl font-black text-white md:text-4xl">Login</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Sign in with Firebase Auth or jump into a demo role for QA.
-            </p>
+            <span className="font-heading text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
+          </Link>
 
-            <form onSubmit={submit} className="mt-6 grid gap-4">
-              <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Email</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="fan@goalplace256.com"
-                  className="h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-[var(--goal-emerald)]"
-                  required
-                />
-              </label>
-              <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Password"
-                  className="h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-[var(--goal-emerald)]"
-                  required
-                />
-              </label>
-              <Button type="submit" size="lg" disabled={submitting}>
-                <Mail className="size-4" />
-                {submitting ? 'Logging in...' : 'Login'}
-              </Button>
+          <div className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
+            <h1 className="mb-2 text-center font-heading text-3xl font-black text-white">Welcome Back</h1>
+            <p className="mb-8 text-center text-sm text-slate-400">
+              Sign in to your GoalPlace256 account
+            </p>
+            
+            <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); toast.error('Firebase Auth not yet connected. Use Demo Login.'); }}>
+              <input type="email" placeholder="Email Address" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 focus:border-[var(--goal-emerald)] focus:outline-none focus:ring-1 focus:ring-[var(--goal-emerald)]" required />
+              <input type="password" placeholder="Password" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 focus:border-[var(--goal-emerald)] focus:outline-none focus:ring-1 focus:ring-[var(--goal-emerald)]" required />
+              
+              <button type="submit" className="w-full rounded-xl bg-[var(--goal-emerald)] py-3 font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]">Login</button>
             </form>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <button
-                type="button"
-                onClick={() => toast.info('Password reset will be enabled after Firebase email templates are configured.')}
-                className="font-bold text-[var(--goal-mint)] hover:text-white"
-              >
-                Forgot password?
-              </button>
-              <Link href="/register" className="font-bold text-slate-300 hover:text-white">
-                Create account
+            <div className="mt-6 flex items-center justify-center text-sm">
+              <span className="text-slate-400">Don&apos;t have an account? </span>
+              <Link href="/register" className="ml-1 font-bold text-[var(--goal-mint)] hover:underline">
+                Create Account
               </Link>
             </div>
-          </section>
 
-          <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-            <div className="mb-5 flex items-center gap-3">
-              <ShieldCheck className="size-6 text-[var(--goal-mint)]" />
-              <div>
-                <h2 className="font-heading text-2xl font-black text-white">Demo Users</h2>
-                <p className="text-sm text-slate-400">Pick a role and route into the matching dashboard.</p>
-              </div>
+            <div className="relative my-8 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+              <div className="relative bg-[#0A0D14] px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Demo Login Mode</div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {demoRoles.map((role) => (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => chooseDemoRole(role)}
-                  className="rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:border-[var(--goal-emerald)]/35 hover:bg-[var(--goal-emerald)]/10"
-                >
-                  <p className="font-heading text-base font-black text-white">Continue as {roleLabel(role)}</p>
-                  <p className="mt-1 text-xs text-slate-400">{routeForAppRole(role)}</p>
-                </button>
-              ))}
+
+            <div className="flex flex-col gap-2">
+              {demoRoles.map((role) => {
+                const Icon = role.icon;
+                return (
+                  <button
+                    key={role.id}
+                    onClick={() => handleDemoLogin(role.id)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+                  >
+                    <Icon className="size-4 text-slate-400" />
+                    {role.label}
+                  </button>
+                );
+              })}
             </div>
-          </section>
+            
+            <p className="mt-6 text-center text-xs text-slate-500">
+              Firebase Auth is currently in mock mode. Select a role above to explore the app instantly.
+            </p>
+          </div>
         </div>
-      </div>
-    </main>
+      </PageContainer>
+    </div>
   );
 }
 
-export default function Page() {
-  return (
-    <Suspense>
-      <AuthContent />
-    </Suspense>
-  );
+export default function LoginPage() {
+  return <Suspense><AuthContent /></Suspense>;
 }

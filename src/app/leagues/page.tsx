@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import Link from 'next/link';
 import { Landmark, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -11,6 +13,8 @@ export default function LeaguesPage() {
   const { athletes, leagues, matches, teams } = useGoalPlaceData();
 
   return (
+    <ProtectedRoute>
+      
     <PageContainer compact>
       <SectionHeader
         eyebrow="Leagues"
@@ -49,7 +53,9 @@ export default function LeaguesPage() {
         <TrustNote />
       </section>
     </PageContainer>
-  );
+  
+    </ProtectedRoute>
+);
 }
 
 function Mini({ label, value }: { label: string; value: string }) {

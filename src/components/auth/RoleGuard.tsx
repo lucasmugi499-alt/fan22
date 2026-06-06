@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { ProtectedRoute } from './ProtectedRoute';
 import { AppRole } from '@/types';
 import Link from 'next/link';
-import { AuthState, hasAnyRole } from '@/lib/auth/permissions';
+import { AuthState, hasAnyRole, getDefaultRouteForRole } from '@/lib/auth/permissions';
 
 export function RoleGuard({ allowedRoles, children }: { allowedRoles: AppRole[]; children: React.ReactNode }) {
   const auth = useAuth();
@@ -23,6 +23,8 @@ function RoleGuardInner({ auth, allowedRoles, children }: { auth: AuthState; all
   if (auth.authStatus === 'loading') return null;
 
   if (!hasAnyRole(auth, allowedRoles)) {
+    const defaultRoute = getDefaultRouteForRole(auth.role);
+
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-4 text-center">
         <div className="mb-6 flex size-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-500 shadow-[0_0_30px_rgba(239,68,68,0.15)]">
@@ -30,11 +32,16 @@ function RoleGuardInner({ auth, allowedRoles, children }: { auth: AuthState; all
         </div>
         <h1 className="font-heading text-2xl font-black text-white md:text-3xl">Access Denied</h1>
         <p className="mt-3 max-w-md text-sm text-slate-400">
-          You do not have the required permissions to view this page. If you believe this is a mistake, contact support.
+          You do not have the required permissions to view this page.
         </p>
-        <Link href="/" className="mt-8 rounded-lg bg-white/10 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/20">
-          Return Home
-        </Link>
+        <div className="mt-8 flex gap-4">
+          <Link href={defaultRoute} className="rounded-lg bg-[var(--goal-emerald)] px-6 py-2.5 text-sm font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]">
+            Go to My Dashboard
+          </Link>
+          <Link href="/" className="rounded-lg bg-white/10 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/20">
+            Return Home
+          </Link>
+        </div>
       </div>
     );
   }

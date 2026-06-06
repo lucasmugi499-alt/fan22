@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,14 +17,14 @@ import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } f
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { canonicalEntityId } from '@/lib/idAliases';
 
-export default function MatchDetailsPage() {
+function MatchDetailsPageContent() {
   const router = useRouter();
   const { matchId } = useParams<{ matchId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const { athletes, challenges, feedPosts, matches, teams } = useGoalPlaceData();
-  const resolvedMatchId = canonicalEntityId(matchId, 'match', 'm');
+  const resolvedMatchId = canonicalEntityId(matchId as string, 'match', 'm');
   const match = matches.find((item) => item.id === matchId || item.id === resolvedMatchId);
 
   if (!match) {
@@ -154,6 +156,14 @@ export default function MatchDetailsPage() {
       <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
       <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
     </PageContainer>
+  );
+}
+
+export default function MatchDetailsPage() {
+  return (
+    <ProtectedRoute>
+      <MatchDetailsPageContent />
+    </ProtectedRoute>
   );
 }
 

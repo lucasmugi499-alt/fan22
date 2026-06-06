@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -14,12 +16,12 @@ import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } f
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { canonicalEntityId } from '@/lib/idAliases';
 
-export default function TeamDetailPage() {
+function TeamDetailPageContent() {
   const router = useRouter();
   const { teamId } = useParams<{ teamId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const { athletes: allAthletes, feedPosts, leagues, matches: allMatches, teams } = useGoalPlaceData();
-  const resolvedTeamId = canonicalEntityId(teamId, 'team', 't');
+  const resolvedTeamId = canonicalEntityId(teamId as string, 'team', 't');
   const team = teams.find((item) => item.id === teamId || item.id === resolvedTeamId);
 
   if (!team) {
@@ -89,5 +91,13 @@ export default function TeamDetailPage() {
 
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
     </PageContainer>
+  );
+}
+
+export default function TeamDetailPage() {
+  return (
+    <ProtectedRoute>
+      <TeamDetailPageContent />
+    </ProtectedRoute>
   );
 }

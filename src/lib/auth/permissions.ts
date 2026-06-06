@@ -88,3 +88,49 @@ export function canAccessAdmin(auth: AuthState): boolean {
 export function canAccessSuperAdmin(auth: AuthState): boolean {
   return hasRole(auth, 'super_admin');
 }
+
+export function getDefaultRouteForRole(role: AppRole | null): string {
+  switch (role) {
+    case 'fan':
+      return '/dashboard';
+    case 'athlete':
+      return '/athlete-dashboard';
+    case 'team_admin':
+      return '/team-admin';
+    case 'league_admin':
+      return '/league-admin';
+    case 'sponsor':
+      return '/sponsor-dashboard';
+    case 'platform_admin':
+    case 'super_admin':
+      return '/admin';
+    default:
+      return '/';
+  }
+}
+
+export function canAccessRoute(auth: AuthState, pathname: string): boolean {
+  if (!isLoggedIn(auth)) return false;
+
+  // Public/shared protected routes that any logged in user can access
+  // We'll define role-specific routes first:
+  if (pathname.startsWith('/athlete-dashboard')) {
+    return hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
+  }
+  if (pathname.startsWith('/team-admin')) {
+    return hasAnyRole(auth, ['team_admin', 'platform_admin', 'super_admin']);
+  }
+  if (pathname.startsWith('/league-admin')) {
+    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+  }
+  if (pathname.startsWith('/sponsor-dashboard')) {
+    return hasAnyRole(auth, ['sponsor', 'platform_admin', 'super_admin']);
+  }
+  if (pathname.startsWith('/admin')) {
+    return hasAnyRole(auth, ['platform_admin', 'super_admin']);
+  }
+
+  // All other protected routes like /dashboard, /wallet, /feed, /profile, etc. are accessible to any logged in user.
+  // (Technically, /dashboard is meant for fan, but any logged in user could theoretically view a dashboard or we redirect them)
+  return true;
+}

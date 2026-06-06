@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -13,11 +15,11 @@ import { MatchCard } from '@/components/ui/match-card';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { canonicalEntityId } from '@/lib/idAliases';
 
-export default function LeagueDetailPage() {
+function LeagueDetailPageContent() {
   const router = useRouter();
   const { leagueId } = useParams<{ leagueId: string }>();
   const data = useGoalPlaceData();
-  const resolvedLeagueId = canonicalEntityId(leagueId, 'league', 'l');
+  const resolvedLeagueId = canonicalEntityId(leagueId as string, 'league', 'l');
   const league = data.leagues.find((item) => item.id === leagueId || item.id === resolvedLeagueId);
 
   if (!league) {
@@ -100,5 +102,13 @@ export default function LeagueDetailPage() {
         <TrustNote compact />
       </section>
     </PageContainer>
+  );
+}
+
+export default function LeagueDetailPage() {
+  return (
+    <ProtectedRoute>
+      <LeagueDetailPageContent />
+    </ProtectedRoute>
   );
 }

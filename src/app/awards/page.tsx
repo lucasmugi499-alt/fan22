@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Award, Medal, ShieldCheck, Star, Trophy, Users } from 'lucide-react';
@@ -12,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { GoalPlacePointsBadge, ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { AwardCategory } from '@/types';
 
-export default function AwardsPage() {
+function AwardsPageContent() {
   const router = useRouter();
   const { userProfile } = useAuth();
   const { athletes, teams } = useGoalPlaceData();
@@ -153,5 +155,13 @@ export default function AwardsPage() {
         />
       </section>
     </PageContainer>
+  );
+}
+
+export default function AwardsPage() {
+  return (
+    <ProtectedRoute>
+      <AwardsPageContent />
+    </ProtectedRoute>
   );
 }

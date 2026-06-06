@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarClock, CheckCircle2, Radio, Trophy } from 'lucide-react';
@@ -30,6 +32,8 @@ export default function MatchesPage() {
   const completedMatches = filteredMatches.filter((match) => match.status === 'Completed');
 
   return (
+    <ProtectedRoute>
+      
     <PageContainer compact>
       <SectionHeader
         eyebrow="Match Center"
@@ -98,5 +102,7 @@ export default function MatchesPage() {
         </div>
       )}
     </PageContainer>
-  );
+  
+    </ProtectedRoute>
+);
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Radio, ShieldCheck, Sparkles } from 'lucide-react';
@@ -39,6 +41,8 @@ export default function FeedPage() {
   const findAthlete = (authorId: string) => athletes.find((athlete) => athlete.id === authorId) ?? athletes[0] ?? null;
 
   return (
+    <ProtectedRoute>
+      
     <PageContainer compact className="max-w-6xl">
       <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
         <aside className="lg:sticky lg:top-24">
@@ -117,5 +121,7 @@ export default function FeedPage() {
       <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
     </PageContainer>
-  );
+  
+    </ProtectedRoute>
+);
 }

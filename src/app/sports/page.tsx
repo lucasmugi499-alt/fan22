@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -99,8 +101,12 @@ function SportsContent() {
 
 export default function SportsPage() {
   return (
+    <ProtectedRoute>
+      
     <Suspense>
       <SportsContent />
     </Suspense>
-  );
+  
+    </ProtectedRoute>
+);
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -20,7 +22,7 @@ import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } f
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { canonicalEntityId } from '@/lib/idAliases';
 
-export default function AthleteProfilePage() {
+function AthleteProfilePageContent() {
   const { athleteId } = useParams<{ athleteId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
@@ -28,7 +30,7 @@ export default function AthleteProfilePage() {
   const [joinedFanClub, setJoinedFanClub] = useState(false);
   const { authStatus, currentUser, userProfile } = useAuth();
   const { athletes, challenges, feedPosts, leagues, matches, teams } = useGoalPlaceData();
-  const resolvedAthleteId = canonicalEntityId(athleteId, 'ath', 'a');
+  const resolvedAthleteId = canonicalEntityId(athleteId as string, 'ath', 'a');
   const athlete = athletes.find((item) => item.id === athleteId || item.id === resolvedAthleteId);
 
   if (!athlete) {
@@ -208,5 +210,13 @@ export default function AthleteProfilePage() {
       <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
       <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
     </div>
+  );
+}
+
+export default function AthleteProfilePage() {
+  return (
+    <ProtectedRoute>
+      <AthleteProfilePageContent />
+    </ProtectedRoute>
   );
 }

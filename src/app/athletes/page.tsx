@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeartHandshake, ShieldCheck, TrendingUp, Users } from 'lucide-react';
@@ -29,6 +31,8 @@ export default function AthletesPage() {
   }, [activeFilter, athletes]);
 
   return (
+    <ProtectedRoute>
+      
     <PageContainer compact>
       <SectionHeader
         eyebrow="Athlete Hub"
@@ -66,5 +70,7 @@ export default function AthletesPage() {
 
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
     </PageContainer>
-  );
+  
+    </ProtectedRoute>
+);
 }
