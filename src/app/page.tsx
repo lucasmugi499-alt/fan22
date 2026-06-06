@@ -128,8 +128,8 @@ export default function PublicLandingPage() {
               <Button size="lg" variant="secondary" onClick={() => router.push('/register?role=league-admin')}>
                 Register League
               </Button>
-              <Button size="lg" variant="gold" onClick={() => router.push('/register?role=sponsor')}>
-                Become Sponsor
+              <Button size="lg" variant="gold" onClick={() => router.push('/sponsors')}>
+                Sponsor the Platform
               </Button>
             </motion.div>
           </div>
@@ -226,7 +226,7 @@ export default function PublicLandingPage() {
               description="Sponsors can fund athlete support, team operations, league infrastructure, youth programs, and annual awards with transparent reporting."
             />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="gold" onClick={() => router.push('/register?role=sponsor')}>
+              <Button variant="gold" onClick={() => router.push('/sponsors')}>
                 Become a Sponsor
               </Button>
               <Button variant="outline" onClick={() => router.push('/sponsors')}>

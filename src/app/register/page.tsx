@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { PageContainer } from '@/components/ui/product';
-import { Shield, User, Trophy, Building2, Handshake, ChevronRight } from 'lucide-react';
+import { Shield, User, Trophy, ChevronRight } from 'lucide-react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
@@ -28,38 +28,24 @@ function RegisterContent() {
     { 
       id: 'fan', 
       title: 'Join as Fan', 
-      description: 'Follow athletes, support challenges, and earn points.', 
+      description: 'Create a fan account to follow local sport, support athletes, save posts, comment, and earn GoalPlace Points.', 
       icon: User,
       color: 'text-blue-400'
     },
     { 
       id: 'athlete', 
       title: 'Register Athlete', 
-      description: 'Claim your profile, share updates, and receive support.', 
+      description: 'Create an athlete account to build your profile, receive support, join verified challenges, and showcase your progress.', 
       icon: Trophy,
       color: 'text-[var(--goal-gold)]'
     },
     { 
-      id: 'team_admin', 
-      title: 'Team Admin', 
-      description: 'Manage rosters, schedule matches, and handle team operations.', 
-      icon: Building2,
-      color: 'text-purple-400'
-    },
-    { 
       id: 'league_admin', 
       title: 'League Admin', 
-      description: 'Run verified leagues, update standings, and approve results.', 
+      description: 'Create a league admin account to manage teams, athletes, fixtures, results, verifications, and community updates.', 
       icon: Shield,
       color: 'text-red-400'
-    },
-    { 
-      id: 'sponsor', 
-      title: 'Become a Sponsor', 
-      description: 'Fund athletes and leagues for transparent brand impact.', 
-      icon: Handshake,
-      color: 'text-[var(--goal-mint)]'
-    },
+    }
   ];
 
   return (
@@ -121,11 +107,16 @@ function RegisterContent() {
               })}
             </div>
 
-            <div className="mt-8 flex items-center justify-center text-sm">
-              <span className="text-slate-400">Already have an account? </span>
-              <Link href="/login" className="ml-1 font-bold text-[var(--goal-mint)] hover:underline">
-                Login
-              </Link>
+            <div className="mt-8 flex flex-col items-center justify-center gap-4 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-center text-xs text-slate-400">
+                Looking for Platform Admin? <span className="font-bold text-white">This role is invite-only.</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Already have an account? </span>
+                <Link href="/login" className="ml-1 font-bold text-[var(--goal-mint)] hover:underline">
+                  Login
+                </Link>
+              </div>
             </div>
             
             <p className="mt-6 text-center text-xs text-slate-500">

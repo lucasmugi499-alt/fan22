@@ -1,36 +1,18 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { Building2, HeartHandshake, LineChart } from 'lucide-react';
+import React from 'react';
+import { Handshake } from 'lucide-react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { PageContainer, SectionHeader, ImpactStatCard } from '@/components/ui/product';
-import { dataProvider } from '@/data/dataProvider';
-import { formatUGX } from '@/lib/sportThemes';
-import { Sponsor } from '@/types';
+import { PageContainer } from '@/components/ui/product';
 
 export default function SponsorDashboardPage() {
-  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    dataProvider.getSponsors().then((items) => {
-      if (!cancelled) setSponsors(items);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const total = sponsors.reduce((sum, sponsor) => sum + sponsor.amountCommitted, 0);
-
   return (
     <RoleGuard allowedRoles={['sponsor', 'platform_admin', 'super_admin']}>
       <PageContainer compact>
-        <SectionHeader eyebrow="Sponsor Dashboard" title="Impact reporting" />
-        <div className="grid gap-3 md:grid-cols-3">
-          <ImpactStatCard label="Active sponsors" value={String(sponsors.length)} icon={Building2} />
-          <ImpactStatCard label="Committed support" value={formatUGX(total)} icon={HeartHandshake} tone="gold" />
-          <ImpactStatCard label="Reports" value="Ready" icon={LineChart} tone="blue" />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <Handshake className="mb-6 size-16 text-slate-500" />
+          <h1 className="font-heading text-3xl font-black text-white">Sponsor Module</h1>
+          <p className="mt-4 max-w-md text-slate-400">
+            Sponsorship is currently managed through a direct inquiry process. This dedicated sponsor dashboard is a future module.
+          </p>
         </div>
       </PageContainer>
     </RoleGuard>

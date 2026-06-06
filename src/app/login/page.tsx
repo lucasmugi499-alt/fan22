@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { canAccessRoute, getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { PageContainer } from '@/components/ui/product';
-import { Shield, User, Trophy, Building2, Handshake, ShieldCheck } from 'lucide-react';
+import { Shield, User, Trophy, ShieldCheck } from 'lucide-react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 
@@ -31,13 +31,11 @@ function AuthContent() {
     toast.success(`Logged in as ${selectedRole.replace('_', ' ')}`);
   };
 
-  const demoRoles: { id: AppRole; label: string; icon: React.ElementType }[] = [
-    { id: 'fan', label: 'Continue as Fan', icon: User },
-    { id: 'athlete', label: 'Continue as Athlete', icon: Trophy },
-    { id: 'team_admin', label: 'Continue as Team Admin', icon: Building2 },
-    { id: 'league_admin', label: 'Continue as League Admin', icon: Shield },
-    { id: 'sponsor', label: 'Continue as Sponsor', icon: Handshake },
-    { id: 'platform_admin', label: 'Continue as Platform Admin', icon: ShieldCheck },
+  const demoRoles: { id: AppRole; label: string; description: string; icon: React.ElementType }[] = [
+    { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: User },
+    { id: 'athlete', label: 'Continue as Athlete', description: 'Manage your profile, view supporters, and post highlights.', icon: Trophy },
+    { id: 'league_admin', label: 'Continue as League Admin', description: 'Manage teams, athletes, fixtures, and verify results.', icon: Shield },
+    { id: 'platform_admin', label: 'Continue as Platform Admin', description: 'Approve leagues, moderate content, and oversee the platform.', icon: ShieldCheck },
   ];
 
   return (
@@ -83,10 +81,13 @@ function AuthContent() {
                   <button
                     key={role.id}
                     onClick={() => handleDemoLogin(role.id)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+                    className="flex w-full flex-col items-start gap-1 rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:bg-white/10"
                   >
-                    <Icon className="size-4 text-slate-400" />
-                    {role.label}
+                    <div className="flex items-center gap-2 font-bold text-white">
+                      <Icon className="size-4 text-[var(--goal-mint)]" />
+                      {role.label}
+                    </div>
+                    <p className="text-xs text-slate-400">{role.description}</p>
                   </button>
                 );
               })}

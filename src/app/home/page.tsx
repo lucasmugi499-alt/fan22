@@ -25,57 +25,8 @@ import { Athlete } from '@/types';
 import { formatUGX, sports } from '@/lib/sportThemes';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
-function roleLabel(role?: string | null) {
-  return role ? role.replace('_', ' ') : 'member';
-}
-
-function roleActions(role?: string | null) {
-  if (role === 'athlete') {
-    return [
-      ['Athlete Dashboard', '/athlete-dashboard'],
-      ['View Matches', '/matches'],
-      ['Create Post', '/feed'],
-    ];
-  }
-
-  if (role === 'team_admin') {
-    return [
-      ['Team Admin', '/team-admin'],
-      ['Teams Directory', '/teams'],
-      ['Create Fixture', '/matches'],
-    ];
-  }
-
-  if (role === 'league_admin') {
-    return [
-      ['League Admin', '/league-admin'],
-      ['Verification Queue', '/league-admin'],
-      ['League Page', '/leagues'],
-    ];
-  }
-
-  if (role === 'sponsor') {
-    return [
-      ['Sponsor Dashboard', '/sponsor-dashboard'],
-      ['Impact Feed', '/sponsors'],
-      ['Sponsor Athletes', '/athletes'],
-    ];
-  }
-
-  if (role === 'platform_admin' || role === 'super_admin') {
-    return [
-      ['Platform Admin', '/admin'],
-      ['League Verification', '/league-admin'],
-      ['Reports', '/admin'],
-    ];
-  }
-
-  return [
-    ['Find Athletes', '/athletes'],
-    ['Upcoming Matches', '/matches'],
-    ['Open Wallet', '/wallet'],
-  ];
-}
+import { RoleQuickActions } from '@/components/ui/RoleQuickActions';
+import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 
 function HomeContent() {
   const router = useRouter();
@@ -98,7 +49,8 @@ function HomeContent() {
     [matches]
   );
   const personalizedFeed = feedPosts.slice(0, 4);
-  const quickActions = roleActions(role);
+  const configRole = role === 'team_admin' ? 'league_admin' : role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
+  const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
 
   const handleLogout = async () => {
     setDemoRole(null);
@@ -120,14 +72,10 @@ function HomeContent() {
             Welcome back, {userProfile?.name?.split(' ')[0] ?? currentUser?.email?.split('@')[0] ?? 'member'}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-            Your Today Hub brings together followed sports, live and upcoming matches, active challenges, personalized feed moments, wallet activity, and awards progress.
+            {config.dashboardSubtitle}
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {quickActions.map(([label, href]) => (
-              <Button key={label} variant={label.includes('Admin') || label.includes('Dashboard') ? 'default' : 'outline'} onClick={() => router.push(href)}>
-                {label}
-              </Button>
-            ))}
+          <div className="mt-6">
+            <RoleQuickActions />
           </div>
         </div>
 
@@ -136,13 +84,19 @@ function HomeContent() {
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--goal-mint)]">Account</p>
               <h2 className="mt-2 font-heading text-2xl font-black text-white">{userProfile?.name ?? 'GoalPlace256 User'}</h2>
-              <p className="mt-1 text-sm font-bold capitalize text-slate-300">{roleLabel(role)}</p>
+              <p className="mt-1 text-sm font-bold text-slate-300">{config.label}</p>
             </div>
             <div className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--goal-mint)]">
-              {roleLabel(role)}
+              {config.label}
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {config.role === 'fan' || config.role === 'athlete' ? (
+              <Button variant="gold" onClick={() => router.push('/wallet')}>
+                <Wallet className="size-4" />
+                Wallet
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={() => router.push('/profile')}>
               <User className="size-4" />
               Profile
@@ -151,11 +105,7 @@ function HomeContent() {
               <Bell className="size-4" />
               Settings
             </Button>
-            <Button variant="gold" onClick={() => router.push('/wallet')}>
-              <Wallet className="size-4" />
-              Wallet
-            </Button>
-            <Button variant="destructive" onClick={handleLogout}>
+            <Button variant="destructive" onClick={handleLogout} className={config.role !== 'fan' && config.role !== 'athlete' ? "sm:col-span-2" : ""}>
               <LogOut className="size-4" />
               Logout
             </Button>
@@ -163,17 +113,46 @@ function HomeContent() {
         </div>
       </section>
 
+      {/* Role specific quick stats */}
       <section className="grid gap-3 md:grid-cols-4">
-        <ImpactStatCard label="Wallet" value={formatUGX(userProfile?.walletBalance ?? 0)} icon={Wallet} />
-        <ImpactStatCard label="GoalPlace Points" value={String(userProfile?.points ?? 0)} icon={Medal} tone="gold" />
-        <ImpactStatCard label="Awards progress" value="Eligible" icon={Award} tone="blue" />
-        <ImpactStatCard label="Active challenges" value={String(activeChallenges.length)} icon={Zap} tone="orange" />
+        {config.role === 'fan' && (
+          <>
+            <ImpactStatCard label="Wallet" value={formatUGX(userProfile?.walletBalance ?? 0)} icon={Wallet} />
+            <ImpactStatCard label="GoalPlace Points" value={String(userProfile?.points ?? 0)} icon={Medal} tone="gold" />
+            <ImpactStatCard label="Awards progress" value="Eligible" icon={Award} tone="blue" />
+            <ImpactStatCard label="Active challenges" value={String(activeChallenges.length)} icon={Zap} tone="orange" />
+          </>
+        )}
+        {config.role === 'athlete' && (
+          <>
+            <ImpactStatCard label="Total Support" value="1.2M UGX" icon={Wallet} />
+            <ImpactStatCard label="Supporters" value="45" icon={User} tone="gold" />
+            <ImpactStatCard label="Verification" value="Verified" icon={ShieldCheck} tone="blue" />
+            <ImpactStatCard label="Active challenges" value={String(activeChallenges.length)} icon={Zap} tone="orange" />
+          </>
+        )}
+        {config.role === 'league_admin' && (
+          <>
+            <ImpactStatCard label="Pending Verifications" value="12" icon={ShieldCheck} tone="orange" />
+            <ImpactStatCard label="Matches this week" value="8" icon={Medal} tone="blue" />
+            <ImpactStatCard label="Open Disputes" value="2" icon={Zap} tone="gold" />
+            <ImpactStatCard label="System Status" value="Healthy" icon={Bell} />
+          </>
+        )}
+        {config.role === 'platform_admin' && (
+          <>
+            <ImpactStatCard label="Pending Approvals" value="5" icon={ShieldCheck} tone="orange" />
+            <ImpactStatCard label="Active Reports" value="14" icon={Bell} tone="gold" />
+            <ImpactStatCard label="System Load" value="Normal" icon={Zap} tone="blue" />
+            <ImpactStatCard label="Total Users" value="2,405" icon={User} />
+          </>
+        )}
       </section>
 
       <section>
         <SectionHeader
-          eyebrow="Matches"
-          title="Live and upcoming matches"
+          eyebrow={config.role === 'fan' ? 'Matches' : config.role === 'league_admin' ? 'Fixtures' : 'Upcoming Matches'}
+          title={config.role === 'league_admin' ? 'Recent & Upcoming Fixtures' : 'Live and upcoming matches'}
           description="Track the next moments from your sports network."
           action={<Button variant="outline" onClick={() => router.push('/matches')}>View All</Button>}
         />
@@ -184,32 +163,34 @@ function HomeContent() {
         </div>
       </section>
 
-      <section>
-        <SectionHeader
-          eyebrow="Challenges"
-          title="Active performance challenges"
-          description="Pledge support to athlete outcomes that can be verified by officials."
-        />
-        <div className="grid gap-4 md:grid-cols-3">
-          {activeChallenges.map((challenge) => {
-            const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
-            return (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                onSupport={() => setPledgeAthlete(athlete)}
-              />
-            );
-          })}
-        </div>
-      </section>
+      {config.role !== 'platform_admin' && (
+        <section>
+          <SectionHeader
+            eyebrow="Challenges"
+            title={config.role === 'league_admin' ? 'Challenge Queue' : 'Active performance challenges'}
+            description="Pledge support to athlete outcomes that can be verified by officials."
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            {activeChallenges.map((challenge) => {
+              const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
+              return (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  onSupport={() => setPledgeAthlete(athlete)}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
         <div>
           <SectionHeader
-            eyebrow="Your Feed"
-            title="Personalized updates"
-            description="Highlights and verified activity from athletes, teams, and leagues in your orbit."
+            eyebrow={config.role === 'fan' ? 'Your Feed' : config.role === 'athlete' ? 'Athlete Feed' : config.role === 'league_admin' ? 'League Feed' : 'Platform Feed'}
+            title={config.role === 'platform_admin' ? 'System Alerts & Reports' : 'Personalized updates'}
+            description={config.role === 'platform_admin' ? 'Monitor platform activity and moderation queues.' : 'Highlights and verified activity from athletes, teams, and leagues in your orbit.'}
           />
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <ShieldCheck className="mb-4 size-6 text-[var(--goal-mint)]" />
@@ -236,15 +217,17 @@ function HomeContent() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-white/[0.045] p-5">
-        <SectionHeader
-          eyebrow="Awards"
-          title="Annual awards progress"
-          description="Recognition grows from verified sport activity, fan engagement, and transparent community support."
-          action={<Button variant="outline" onClick={() => router.push('/awards')}>View Awards</Button>}
-          className="mb-0"
-        />
-      </section>
+      {config.role === 'fan' && (
+        <section className="rounded-xl border border-white/10 bg-white/[0.045] p-5">
+          <SectionHeader
+            eyebrow="Awards"
+            title="Annual awards progress"
+            description="Recognition grows from verified sport activity, fan engagement, and transparent community support."
+            action={<Button variant="outline" onClick={() => router.push('/awards')}>View Awards</Button>}
+            className="mb-0"
+          />
+        </section>
+      )}
 
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
       <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />

@@ -95,42 +95,54 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
       return '/home';
     case 'athlete':
       return '/athlete-dashboard';
-    case 'team_admin':
-      return '/team-admin';
     case 'league_admin':
+    case 'team_admin': // MVP Mapping
       return '/league-admin';
-    case 'sponsor':
-      return '/sponsor-dashboard';
     case 'platform_admin':
-    case 'super_admin':
+    case 'super_admin': // MVP Mapping
       return '/admin';
+    case 'sponsor':
+      return '/home'; // Sponsor dashboard is a future module, send to home
     default:
       return '/';
   }
 }
 
-export function canAccessRoute(auth: AuthState, pathname: string): boolean {
-  if (!isLoggedIn(auth)) return false;
+export const PUBLIC_ROUTES = [
+  '/',
+  '/about',
+  '/how-it-works',
+  '/sponsors',
+  '/login',
+  '/register'
+];
 
-  // Public/shared protected routes that any logged in user can access
-  // We'll define role-specific routes first:
+export function canAccessRoute(auth: AuthState, pathname: string): boolean {
+  // Public routes check
+  if (PUBLIC_ROUTES.includes(pathname) || pathname === '/') {
+    return true;
+  }
+
+  if (!isLoggedIn(auth) || !auth.role) return false;
+
   if (pathname.startsWith('/athlete-dashboard')) {
     return hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
   }
-  if (pathname.startsWith('/team-admin')) {
-    return hasAnyRole(auth, ['team_admin', 'platform_admin', 'super_admin']);
-  }
   if (pathname.startsWith('/league-admin')) {
-    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
-  }
-  if (pathname.startsWith('/sponsor-dashboard')) {
-    return hasAnyRole(auth, ['sponsor', 'platform_admin', 'super_admin']);
+    return hasAnyRole(auth, ['league_admin', 'team_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/admin')) {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);
   }
+  if (pathname.startsWith('/wallet')) {
+    return hasAnyRole(auth, ['fan', 'athlete', 'platform_admin', 'super_admin']);
+  }
 
-  // All other protected routes like /dashboard, /wallet, /feed, /profile, etc. are accessible to any logged in user.
-  // (Technically, /dashboard is meant for fan, but any logged in user could theoretically view a dashboard or we redirect them)
+  // Future modules:
+  if (pathname.startsWith('/team-admin') || pathname.startsWith('/sponsor-dashboard')) {
+    return true; // We will handle showing a "Future Module" message on the page itself
+  }
+
+  // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user
   return true;
 }

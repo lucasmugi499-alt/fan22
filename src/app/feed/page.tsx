@@ -20,11 +20,24 @@ export default function FeedPage() {
   const router = useRouter();
   const { athletes, feedPosts } = useGoalPlaceData();
   const { openAuthModal } = useAuthModal();
-  const { authStatus } = useAuth();
+  const { authStatus, role } = useAuth();
   const [activeFilter, setActiveFilter] = useState('All');
   const [createOpen, setCreateOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
+
+  const getFeedHeader = () => {
+    switch (role) {
+      case 'athlete': return { eyebrow: 'Athlete Feed', title: 'Your Athlete Feed', description: 'Your posts, league updates, and match results.' };
+      case 'league_admin':
+      case 'team_admin': return { eyebrow: 'League Admin', title: 'League Operations Feed', description: 'League posts, team updates, match results, and verification updates.' };
+      case 'platform_admin':
+      case 'super_admin': return { eyebrow: 'Platform Admin', title: 'Platform Activity Feed', description: 'All platform posts, reports, and verification alerts.' };
+      case 'fan':
+      default: return { eyebrow: 'Community Feed', title: 'Your Sports Feed', description: 'Highlights, results, verified achievements, and community moments from Uganda\'s grassroots sport.' };
+    }
+  };
+  const header = getFeedHeader();
 
   const filteredFeed = useMemo(() => {
     return feedPosts.filter((post) => {
@@ -47,9 +60,9 @@ export default function FeedPage() {
       <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
         <aside className="lg:sticky lg:top-24">
           <SectionHeader
-            eyebrow="Community Feed"
-            title="The Social Heartbeat"
-            description="Highlights, results, verified achievements, and community moments from Uganda's grassroots sport."
+            eyebrow={header.eyebrow}
+            title={header.title}
+            description={header.description}
           />
           <div className="hidden gap-3 lg:grid">
             <ImpactStatCard label="Live conversations" value="326" icon={Radio} detail="Fans, teams, athletes, and leagues active today." />

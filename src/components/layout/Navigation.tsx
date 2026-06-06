@@ -27,6 +27,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
+import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -37,59 +38,17 @@ export function MobileNav() {
     return null;
   }
 
-  const getMobileItems = (role: AppRole | null) => {
-    switch(role) {
-      case 'athlete':
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Feed', href: '/feed', icon: List },
-          { name: 'Matches', href: '/matches', icon: Calendar },
-          { name: 'Dashboard', href: '/athlete-dashboard', icon: LayoutDashboard },
-          { name: 'Wallet', href: '/wallet', icon: Wallet },
-        ];
-      case 'team_admin':
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Matches', href: '/matches', icon: Calendar },
-          { name: 'Teams', href: '/teams', icon: Building2 },
-          { name: 'Admin', href: '/team-admin', icon: LayoutDashboard },
-          { name: 'Profile', href: '/profile', icon: User },
-        ];
-      case 'league_admin':
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Matches', href: '/matches', icon: Calendar },
-          { name: 'Leagues', href: '/leagues', icon: Landmark },
-          { name: 'Verify', href: '/league-admin', icon: ShieldCheck },
-          { name: 'Profile', href: '/profile', icon: User },
-        ];
-      case 'sponsor':
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Feed', href: '/feed', icon: List },
-          { name: 'Sponsors', href: '/sponsors', icon: Handshake },
-          { name: 'Dashboard', href: '/sponsor-dashboard', icon: LayoutDashboard },
-          { name: 'Profile', href: '/profile', icon: User },
-        ];
-      case 'platform_admin':
-      case 'super_admin':
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Admin', href: '/admin', icon: ShieldCheck },
-          { name: 'Verify', href: '/league-admin', icon: ShieldCheck },
-          { name: 'Reports', href: '/admin', icon: List },
-          { name: 'Profile', href: '/profile', icon: User },
-        ];
-      case 'fan':
-      default:
-        return [
-          { name: 'Home', href: '/home', icon: Home },
-          { name: 'Feed', href: '/feed', icon: List },
-          { name: 'Matches', href: '/matches', icon: Calendar },
-          { name: 'Athletes', href: '/athletes', icon: Users },
-          { name: 'Wallet', href: '/wallet', icon: Wallet },
-        ];
-    }
+  const getMobileItems = (currentRole: AppRole | null) => {
+    // If the role exists in our new ROLE_CONFIGS, use it.
+    // If it's a legacy role like team_admin, we map it to league_admin in permissions, 
+    // but here we can just use the fan config as a fallback or explicitly map it.
+    let configRole = currentRole || 'fan';
+    if (configRole === 'team_admin') configRole = 'league_admin';
+    if (configRole === 'super_admin') configRole = 'platform_admin';
+    if (configRole === 'sponsor') configRole = 'fan'; // Sponsor is just public now
+    
+    const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
+    return config.navItems;
   };
 
   const navItems = getMobileItems(role);
@@ -135,56 +94,34 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
     ];
   }
 
-  switch (role) {
-    case 'athlete':
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Matches', href: '/matches', icon: Calendar },
-        { name: 'Athletes', href: '/athletes', icon: Users },
-      ];
-    case 'team_admin':
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Matches', href: '/matches', icon: Calendar },
-        { name: 'Teams', href: '/teams', icon: Building2 },
-      ];
-    case 'league_admin':
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Matches', href: '/matches', icon: Calendar },
-        { name: 'Leagues', href: '/leagues', icon: Landmark },
-      ];
-    case 'sponsor':
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Sports', href: '/sports', icon: Trophy },
-        { name: 'Sponsors', href: '/sponsors', icon: Handshake },
-      ];
-    case 'platform_admin':
-    case 'super_admin':
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Matches', href: '/matches', icon: Calendar },
-        { name: 'Leagues', href: '/leagues', icon: Landmark },
-        { name: 'Athletes', href: '/athletes', icon: Users },
-      ];
-    case 'fan':
-    default:
-      return [
-        { name: 'Home', href: '/home', icon: Home },
-        { name: 'Feed', href: '/feed', icon: List },
-        { name: 'Sports', href: '/sports', icon: Trophy },
-        { name: 'Matches', href: '/matches', icon: Calendar },
-        { name: 'Leagues', href: '/leagues', icon: Landmark },
-        { name: 'Athletes', href: '/athletes', icon: Users },
-        { name: 'Awards', href: '/awards', icon: Award },
-      ];
+  let configRole = role || 'fan';
+  if (configRole === 'team_admin') configRole = 'league_admin';
+  if (configRole === 'super_admin') configRole = 'platform_admin';
+  if (configRole === 'sponsor') configRole = 'fan';
+
+  const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
+  
+  // Mobile nav doesn't have enough space, but desktop we can add Sports/Awards etc based on role config
+  // The role config navItems are mostly mobile focused, let's use them and add some extra items for desktop
+  const desktopItems = [...config.navItems];
+  
+  if (configRole === 'fan') {
+    desktopItems.push({ name: 'Leagues', href: '/leagues', icon: Landmark });
+    desktopItems.push({ name: 'Awards', href: '/awards', icon: Award });
+    desktopItems.push({ name: 'Profile', href: '/profile', icon: User });
+  } else if (configRole === 'athlete') {
+    desktopItems.push({ name: 'Wallet', href: '/wallet', icon: Wallet });
+    desktopItems.push({ name: 'Settings', href: '/settings', icon: Settings });
   }
+  
+  // Deduplicate by name just in case
+  const uniqueItems = desktopItems.filter((item, index, self) =>
+    index === self.findIndex((t) => (
+      t.name === item.name
+    ))
+  );
+
+  return uniqueItems;
 }
 
 function AccountMenu() {
@@ -229,7 +166,7 @@ function AccountMenu() {
               <Link onClick={() => setOpen(false)} href="/profile" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
                 <User className="size-4" /> Profile
               </Link>
-              {['fan', 'athlete', 'team_admin'].includes(role) && (
+              {['fan', 'athlete'].includes(role) && (
                 <Link onClick={() => setOpen(false)} href="/wallet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--goal-gold)] hover:bg-white/10">
                   <Wallet className="size-4" /> Wallet
                 </Link>
