@@ -104,6 +104,10 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
     return claimRole;
   }
 
+  if (profile?.role === 'platform_admin' || profile?.role === 'super_admin') {
+    return null;
+  }
+
   return profile?.role ?? null;
 }
 

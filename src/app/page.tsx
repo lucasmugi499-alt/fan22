@@ -11,12 +11,10 @@ import {
   HeartHandshake,
   ShieldCheck,
   Sparkles,
+  Wallet,
 } from 'lucide-react';
 import { Athlete } from '@/lib/types';
-import {
-  mockCurrentUser,
-  sponsorPackages,
-} from '@/lib/mockData';
+import { sponsorPackages } from '@/lib/mockData';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { sports, formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
@@ -42,9 +40,135 @@ import {
   SponsorInterestModal,
   SupportModal,
 } from '@/components/modals/app-modals';
+import { useAuth } from '@/context/AuthProvider';
+import { useAuthModal } from '@/components/auth/AuthRequiredModal';
 
 export default function Home() {
+  const { authStatus } = useAuth();
+  
+  if (authStatus === 'loading') {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[#05070A]">
+        <div className="size-8 animate-spin rounded-full border-4 border-white/10 border-t-[var(--goal-emerald)]"></div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'logged_in') {
+    return <LoggedInHome />;
+  }
+
+  return <PublicHome />;
+}
+
+function LoggedInHome() {
   const router = useRouter();
+  const { userProfile, role } = useAuth();
+  const { openAuthModal } = useAuthModal();
+  const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
+  const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const { athletes, challenges, feedPosts, matches } = useGoalPlaceData();
+
+  const activeChallenges = challenges.filter((c) => c.status === 'Active').slice(0, 3);
+  const featuredAthletes = [...athletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4);
+
+  return (
+    <div className="w-full overflow-hidden pb-20 pt-10">
+      <PageContainer className="space-y-12">
+        <section className="glass-panel rounded-2xl p-6 md:p-10">
+          <h1 className="font-heading text-3xl font-black text-white md:text-5xl">Welcome back, {userProfile?.name?.split(' ')[0] || 'Fan'}!</h1>
+          <p className="mt-3 text-slate-400">Here is your daily GoalPlace256 summary.</p>
+          
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/10 p-5">
+              <div className="mb-2 flex items-center gap-2 text-[var(--goal-gold)]">
+                <Coins className="size-5" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Points</span>
+              </div>
+              <p className="font-heading text-3xl font-black text-white">{userProfile?.points?.toLocaleString() || 0}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/10 p-5">
+              <div className="mb-2 flex items-center gap-2 text-[var(--goal-mint)]">
+                <Wallet className="size-5" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Wallet</span>
+              </div>
+              <p className="font-heading text-3xl font-black text-white">{formatUGX(userProfile?.walletBalance || 0)}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <div className="mb-2 flex items-center gap-2 text-slate-400">
+                <Users className="size-5" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Following</span>
+              </div>
+              <p className="font-heading text-3xl font-black text-white">{userProfile?.followedAthletes?.length || 0}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <div className="mb-2 flex items-center gap-2 text-slate-400">
+                <Award className="size-5" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Awards</span>
+              </div>
+              <p className="font-heading text-xl font-black text-white mt-1">Eligible to Vote</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader
+            eyebrow="For You"
+            title="Active Challenges"
+            description="Pledge support for verified performance rewards."
+          />
+          <div className="grid gap-4 md:grid-cols-3">
+            {activeChallenges.map((challenge) => {
+              const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
+              return (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  onSupport={() => setPledgeAthlete(athlete)}
+                />
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="lg:sticky lg:top-24">
+            <SectionHeader
+              eyebrow="Your Feed"
+              title="Personalized Updates"
+              description="Highlights and results from the athletes and teams you follow."
+            />
+          </div>
+          <div className="space-y-4">
+            {feedPosts.slice(0, 5).map((post) => {
+              const postAthlete = athletes.find((a) => a.id === post.authorId) ?? featuredAthletes[0];
+              return (
+                <FeedCard
+                  key={post.id}
+                  post={post}
+                  onSupport={() => setSupportAthlete(postAthlete)}
+                  onComment={() => setCommentsOpen(true)}
+                  onViewProfile={() => router.push(post.authorType === 'Athlete' ? `/athletes/${post.authorId}` : '/feed')}
+                  onViewMatch={() => router.push('/matches/m1')}
+                />
+              );
+            })}
+          </div>
+        </section>
+
+      </PageContainer>
+      
+      <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
+      <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
+      <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
+    </div>
+  );
+}
+
+function PublicHome() {
+  const router = useRouter();
+  const { openAuthModal } = useAuthModal();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -146,23 +270,23 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <div className="size-14 overflow-hidden rounded-xl border border-white/10 bg-white/8">
                   <ImageWithFallback
-                    src={featuredAthletes[0].avatarUrl}
-                    alt={featuredAthletes[0].name}
+                    src={featuredAthletes[0]?.avatarUrl}
+                    alt={featuredAthletes[0]?.name || ''}
                     fallbackType="athlete"
-                    initials={getInitials(featuredAthletes[0].name)}
-                    sport={featuredAthletes[0].sport}
+                    initials={getInitials(featuredAthletes[0]?.name || '')}
+                    sport={featuredAthletes[0]?.sport || 'Football'}
                     className="h-full w-full object-cover"
                   />
                 </div>
                 <div>
-                  <SportBadge sport={featuredAthletes[0].sport} />
-                  <h3 className="mt-2 font-heading text-lg font-black text-white">{featuredAthletes[0].name}</h3>
+                  <SportBadge sport={featuredAthletes[0]?.sport || 'Football'} />
+                  <h3 className="mt-2 font-heading text-lg font-black text-white">{featuredAthletes[0]?.name}</h3>
                   <p className="text-xs text-slate-400">Top supported athlete</p>
                 </div>
               </div>
               <div className="mt-4 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Verified Support</p>
-                <p className="mt-1 font-heading text-xl font-black text-white">{formatUGX(featuredAthletes[0].totalEarnings)}</p>
+                <p className="mt-1 font-heading text-xl font-black text-white">{formatUGX(featuredAthletes[0]?.totalEarnings || 0)}</p>
               </div>
             </div>
 
@@ -171,14 +295,14 @@ export default function Home() {
                 <Coins className="size-6" />
                 <p className="text-[11px] font-black uppercase tracking-[0.18em]">GoalPlace Points</p>
               </div>
-              <p className="mt-2 font-heading text-4xl font-black text-white">{mockCurrentUser.points.toLocaleString()}</p>
-              <p className="mt-1 text-xs text-slate-400">Annual Awards recognition race</p>
+              <p className="mt-2 font-heading text-4xl font-black text-white">0</p>
+              <p className="mt-1 text-xs text-slate-400">Join to start earning</p>
             </div>
           </motion.div>
         </PageContainer>
       </section>
 
-      <PageContainer className="space-y-14 md:space-y-24">
+      <PageContainer className="space-y-14 pb-24 md:space-y-24">
         <section>
           <SectionHeader
             eyebrow="Match Center"
@@ -235,7 +359,9 @@ export default function Home() {
             eyebrow="Support Challenges"
             title="Trending verified performance rewards"
             description="Support specific athlete achievements, then wait for official confirmation before rewards are paid."
-            action={<Button onClick={() => setPledgeAthlete(featuredAthletes[0])}>Pledge Support</Button>}
+            action={<Button onClick={() => {
+              openAuthModal();
+            }}>Pledge Support</Button>}
           />
           <div className="grid gap-4 md:grid-cols-3">
             {activeChallenges.map((challenge) => {
@@ -244,7 +370,9 @@ export default function Home() {
                 <ChallengeCard
                   key={challenge.id}
                   challenge={challenge}
-                  onSupport={() => setPledgeAthlete(athlete)}
+                  onSupport={() => {
+                    openAuthModal();
+                  }}
                 />
               );
             })}
@@ -263,7 +391,9 @@ export default function Home() {
               <AthleteCard
                 key={athlete.id}
                 athlete={athlete}
-                onSupport={() => setSupportAthlete(athlete)}
+                onSupport={() => {
+                  openAuthModal();
+                }}
                 onView={() => router.push(`/athletes/${athlete.id}`)}
               />
             ))}
@@ -290,8 +420,8 @@ export default function Home() {
               <FeedCard
                 key={post.id}
                 post={post}
-                onSupport={() => setSupportAthlete(featuredAthletes[0])}
-                onComment={() => setCommentsOpen(true)}
+                onSupport={() => openAuthModal()}
+                onComment={() => openAuthModal()}
                 onViewProfile={() => router.push(post.authorType === 'Athlete' ? `/athletes/${post.authorId}` : '/feed')}
                 onViewMatch={() => router.push('/matches/m1')}
               />
@@ -301,7 +431,7 @@ export default function Home() {
 
         <section className="grid gap-4 lg:grid-cols-2">
           <div className="glass-panel rounded-xl p-5 md:p-6">
-            <GoalPlacePointsBadge points={mockCurrentUser.points} />
+            <GoalPlacePointsBadge points={0} />
             <h2 className="mt-6 font-heading text-3xl font-black text-white">GoalPlace Points</h2>
             <p className="mt-3 text-sm leading-7 text-slate-300">
               Earn loyalty and recognition points for supporting athletes, engaging with verified moments, and participating in the Annual Awards race.
@@ -393,10 +523,6 @@ export default function Home() {
           </div>
         </section>
       </PageContainer>
-
-      <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
-      <PledgeModal athlete={pledgeAthlete} open={Boolean(pledgeAthlete)} onOpenChange={(open) => !open && setPledgeAthlete(null)} />
-      <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
       <SponsorInterestModal open={sponsorOpen} onOpenChange={setSponsorOpen} />
     </div>
   );
@@ -410,3 +536,4 @@ function ImpactMini({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

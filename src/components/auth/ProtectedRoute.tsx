@@ -1,43 +1,32 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { ShieldCheck } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
+import { isLoggedIn } from '@/lib/auth/permissions';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { authStatus, role, userProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { currentUser, firebaseReady, loading } = useAuth();
 
   useEffect(() => {
-    if (!firebaseReady || loading || currentUser) return;
-    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-  }, [currentUser, firebaseReady, loading, pathname, router]);
+    if (authStatus === 'logged_out') {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [authStatus, pathname, router]);
 
-  if (!firebaseReady) {
-    return <>{children}</>;
+  if (authStatus === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#05070A]">
+        <div className="size-8 animate-spin rounded-full border-4 border-white/10 border-t-[var(--goal-emerald)]"></div>
+      </div>
+    );
   }
 
-  if (loading) {
-    return <RouteGuardLoading label="Checking session" />;
-  }
-
-  if (!currentUser) {
-    return <RouteGuardLoading label="Redirecting to login" />;
+  if (authStatus === 'logged_out') {
+    return null; // Will redirect
   }
 
   return <>{children}</>;
-}
-
-export function RouteGuardLoading({ label }: { label: string }) {
-  return (
-    <div className="page-shell page-safe flex min-h-[60dvh] items-center justify-center">
-      <div className="glass-panel rounded-xl p-6 text-center">
-        <ShieldCheck className="mx-auto mb-3 size-7 text-[var(--goal-mint)]" />
-        <p className="font-heading text-xl font-black text-white">{label}</p>
-        <p className="mt-2 text-sm text-slate-400">GoalPlace256 is loading your secure session.</p>
-      </div>
-    </div>
-  );
 }

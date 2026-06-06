@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "seed:mock": "npx tsx --env-file=.env.local scripts/seed-mock-data.ts",
     "seed:demo": "node --experimental-strip-types scripts/seed-demo.ts",
     "set-admin-claims": "node --experimental-strip-types scripts/set-admin-claims.ts",
     "reset:demo": "node --experimental-strip-types scripts/reset-demo-data.ts"

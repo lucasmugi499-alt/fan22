@@ -12,19 +12,37 @@ import {
   Trophy,
   Users,
   Wallet,
+  LayoutDashboard,
+  User,
+  ShieldCheck,
+  Building2,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthProvider';
+import { AppRole } from '@/lib/types';
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { authStatus } = useAuth();
   
-  const navItems = [
+  const loggedOutItems = [
+    { name: 'Home', href: '/', icon: Home },
+    { name: 'Feed', href: '/feed', icon: List },
+    { name: 'Matches', href: '/matches', icon: Calendar },
+    { name: 'Athletes', href: '/athletes', icon: Users },
+    { name: 'Login', href: '/login', icon: LogIn },
+  ];
+
+  const loggedInItems = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Feed', href: '/feed', icon: List },
     { name: 'Matches', href: '/matches', icon: Calendar },
     { name: 'Athletes', href: '/athletes', icon: Users },
     { name: 'Wallet', href: '/wallet', icon: Wallet },
   ];
+
+  const navItems = authStatus === 'logged_in' ? loggedInItems : loggedOutItems;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#05070A]/82 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_60px_rgba(0,0,0,0.36)] backdrop-blur-2xl lg:hidden">
@@ -57,19 +75,77 @@ export function MobileNav() {
   );
 }
 
+function getDesktopNavItems(authStatus: string, role: AppRole | null) {
+  if (authStatus !== 'logged_in') {
+    return [
+      { name: 'Home', href: '/', icon: Home },
+      { name: 'Feed', href: '/feed', icon: List },
+      { name: 'Sports', href: '/sports', icon: Trophy },
+      { name: 'Matches', href: '/matches', icon: Calendar },
+      { name: 'Leagues', href: '/leagues', icon: Landmark },
+      { name: 'Athletes', href: '/athletes', icon: Users },
+      { name: 'Awards', href: '/awards', icon: Award },
+      { name: 'Sponsors', href: '/sponsors', icon: Handshake },
+    ];
+  }
+
+  switch (role) {
+    case 'athlete':
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Matches', href: '/matches', icon: Calendar },
+        { name: 'Athletes', href: '/athletes', icon: Users },
+      ];
+    case 'team_admin':
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Matches', href: '/matches', icon: Calendar },
+        { name: 'Teams', href: '/teams', icon: Building2 }, // Using Building2 for Teams for now
+      ];
+    case 'league_admin':
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Matches', href: '/matches', icon: Calendar },
+        { name: 'Leagues', href: '/leagues', icon: Landmark },
+      ];
+    case 'sponsor':
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Sports', href: '/sports', icon: Trophy },
+        { name: 'Sponsors', href: '/sponsors', icon: Handshake },
+      ];
+    case 'platform_admin':
+    case 'super_admin':
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Matches', href: '/matches', icon: Calendar },
+        { name: 'Leagues', href: '/leagues', icon: Landmark },
+        { name: 'Athletes', href: '/athletes', icon: Users },
+      ];
+    case 'fan':
+    default:
+      return [
+        { name: 'Home', href: '/', icon: Home },
+        { name: 'Feed', href: '/feed', icon: List },
+        { name: 'Sports', href: '/sports', icon: Trophy },
+        { name: 'Matches', href: '/matches', icon: Calendar },
+        { name: 'Leagues', href: '/leagues', icon: Landmark },
+        { name: 'Athletes', href: '/athletes', icon: Users },
+        { name: 'Awards', href: '/awards', icon: Award },
+      ];
+  }
+}
+
 export function DesktopNav() {
   const pathname = usePathname();
+  const { authStatus, role } = useAuth();
   
-  const navItems = [
-    { name: 'Home', href: '/', icon: Home },
-    { name: 'Feed', href: '/feed', icon: List },
-    { name: 'Sports', href: '/sports', icon: Trophy },
-    { name: 'Matches', href: '/matches', icon: Calendar },
-    { name: 'Leagues', href: '/leagues', icon: Landmark },
-    { name: 'Athletes', href: '/athletes', icon: Users },
-    { name: 'Awards', href: '/awards', icon: Award },
-    { name: 'Sponsors', href: '/sponsors', icon: Handshake },
-  ];
+  const navItems = getDesktopNavItems(authStatus, role);
 
   return (
     <div className="sticky top-0 z-50 hidden h-16 items-center border-b border-white/10 bg-[#05070A]/76 px-4 shadow-[0_14px_60px_rgba(0,0,0,0.26)] backdrop-blur-2xl lg:flex xl:px-8">
@@ -101,13 +177,51 @@ export function DesktopNav() {
       </nav>
       
       <div className="flex shrink-0 items-center gap-2">
-        <Link href="/wallet" className="flex items-center gap-2 rounded-lg border border-[var(--goal-gold)]/25 bg-[var(--goal-gold)]/10 px-3 py-2 text-xs font-black text-[var(--goal-gold)] transition-colors hover:bg-[var(--goal-gold)]/16 xl:text-sm">
-          <Wallet className="size-4"/> Wallet
-        </Link>
-        <Link href="/login" className="flex items-center gap-2 rounded-lg border border-[var(--goal-emerald)]/40 bg-[var(--goal-emerald)]/14 px-3 py-2 text-xs font-black text-[var(--goal-mint)] transition-colors hover:bg-[var(--goal-emerald)]/22 xl:text-sm">
-          <LogIn className="size-4" />
-          Login
-        </Link>
+        {authStatus === 'logged_in' ? (
+          <>
+            {['fan', 'athlete', 'team_admin'].includes(role || '') && (
+              <Link href="/wallet" className="flex items-center gap-2 rounded-lg border border-[var(--goal-gold)]/25 bg-[var(--goal-gold)]/10 px-3 py-2 text-xs font-black text-[var(--goal-gold)] transition-colors hover:bg-[var(--goal-gold)]/16 xl:text-sm">
+                <Wallet className="size-4"/> Wallet
+              </Link>
+            )}
+            
+            <Link 
+              href={
+                role === 'athlete' ? '/athlete-dashboard' :
+                role === 'team_admin' ? '/team-admin' :
+                role === 'league_admin' ? '/league-admin' :
+                role === 'sponsor' ? '/sponsor-dashboard' :
+                role === 'platform_admin' || role === 'super_admin' ? '/admin' :
+                '/dashboard'
+              } 
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/10 xl:text-sm"
+            >
+              {role === 'platform_admin' || role === 'super_admin' ? <ShieldCheck className="size-4"/> : <LayoutDashboard className="size-4" />}
+              {
+                role === 'athlete' ? 'Athlete Dash' :
+                role === 'team_admin' ? 'Team Admin' :
+                role === 'league_admin' ? 'League Admin' :
+                role === 'sponsor' ? 'Sponsor Dash' :
+                role === 'platform_admin' || role === 'super_admin' ? 'Admin' :
+                'Dashboard'
+              }
+            </Link>
+            
+            <Link href="/profile" className="flex size-9 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/40 bg-[var(--goal-emerald)]/10 text-[var(--goal-mint)] hover:bg-[var(--goal-emerald)]/20 transition-colors">
+              <User className="size-4" />
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href="/login" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/5 xl:text-sm">
+              <LogIn className="size-4" />
+              Login
+            </Link>
+            <Link href="/register" className="flex items-center gap-2 rounded-lg bg-[var(--goal-emerald)] px-3 py-2 text-xs font-bold text-[#05070A] transition-colors hover:bg-[#00E67A] xl:text-sm">
+              Register
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

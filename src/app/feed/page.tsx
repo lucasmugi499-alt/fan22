@@ -9,12 +9,16 @@ import { Button } from '@/components/ui/button';
 import { FeedCard } from '@/components/ui/feed-card';
 import { CommentsDrawer, CreatePostModal, SupportModal } from '@/components/modals/app-modals';
 import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterBar } from '@/components/ui/product';
+import { useAuthModal } from '@/components/auth/AuthRequiredModal';
+import { useAuth } from '@/context/AuthProvider';
 
 const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Following', 'Highlights', 'Verified', 'Awards'];
 
 export default function FeedPage() {
   const router = useRouter();
   const { athletes, feedPosts } = useGoalPlaceData();
+  const { openAuthModal } = useAuthModal();
+  const { authStatus } = useAuth();
   const [activeFilter, setActiveFilter] = useState('All');
   const [createOpen, setCreateOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -58,8 +62,20 @@ export default function FeedPage() {
               <FeedCard
                 key={post.id}
                 post={post}
-                onSupport={() => setSupportAthlete(findAthlete(post.authorId))}
-                onComment={() => setCommentsOpen(true)}
+                onSupport={() => {
+                  if (authStatus !== 'logged_in') {
+                    openAuthModal();
+                  } else {
+                    setSupportAthlete(findAthlete(post.authorId));
+                  }
+                }}
+                onComment={() => {
+                  if (authStatus !== 'logged_in') {
+                    openAuthModal();
+                  } else {
+                    setCommentsOpen(true);
+                  }
+                }}
                 onViewProfile={() => {
                   if (post.authorType === 'Athlete') router.push(`/athletes/${post.authorId}`);
                   else if (post.authorType === 'Team') router.push(`/teams/${post.authorId}`);
@@ -86,7 +102,13 @@ export default function FeedPage() {
         size="icon"
         aria-label="Create post"
         className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-40 size-14 rounded-xl shadow-[0_0_36px_rgba(0,196,106,0.42)] md:bottom-8 md:right-8"
-        onClick={() => setCreateOpen(true)}
+        onClick={() => {
+          if (authStatus !== 'logged_in') {
+            openAuthModal();
+          } else {
+            setCreateOpen(true);
+          }
+        }}
       >
         <Plus className="size-6" />
       </Button>

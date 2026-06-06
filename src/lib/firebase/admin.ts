@@ -32,5 +32,6 @@ function createAdminApp() {
 
 export const adminApp = createAdminApp();
 export const adminAuth = getAuth(adminApp);
-export const adminDb = getFirestore(adminApp);
+const dbId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID;
+export const adminDb = dbId ? getFirestore(adminApp, dbId) : getFirestore(adminApp);
 export const adminStorage = getStorage(adminApp);

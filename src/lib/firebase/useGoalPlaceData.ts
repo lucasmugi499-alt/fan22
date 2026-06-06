@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Athlete, Challenge, FeedPost, League, Match, Team } from '@/lib/types';
-import { mockAthletes, mockChallenges, mockFeed, mockLeagues, mockMatches, mockTeams } from '@/lib/mockData';
+import { Athlete, Challenge, FeedPost, League, Match, Team, WalletTransaction } from '@/lib/types';
+import { mockAthletes, mockChallenges, mockFeed, mockLeagues, mockMatches, mockTeams, walletTransactions } from '@/lib/mockData';
 import { isFirebaseConfigured } from './client';
-import { publicCollectionConstraints, subscribeToCollection } from './firestore';
+import { constraintsForOwner, publicCollectionConstraints, subscribeToCollection } from './firestore';
+
+const fallbackWalletTransactions = walletTransactions as WalletTransaction[];
 
 function usePublicCollection<T>(
   name: 'athletes' | 'teams' | 'leagues' | 'matches' | 'challenges' | 'feedPosts',
@@ -78,4 +80,35 @@ export function useGoalPlaceData() {
     }),
     [athletes, teams, leagues, matches, challenges, feedPosts]
   );
+}
+
+export function useUserWalletTransactions(userId?: string | null) {
+  const [items, setItems] = useState<WalletTransaction[]>(fallbackWalletTransactions);
+  const [loading, setLoading] = useState(Boolean(isFirebaseConfigured && userId));
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !userId) {
+      setItems(fallbackWalletTransactions);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubscribe = subscribeToCollection<WalletTransaction>(
+      'walletTransactions',
+      (nextItems) => {
+        setItems(nextItems.length ? nextItems : fallbackWalletTransactions);
+        setLoading(false);
+      },
+      constraintsForOwner('userId', userId),
+      () => {
+        setItems(fallbackWalletTransactions);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [userId]);
+
+  return { items, loading };
 }

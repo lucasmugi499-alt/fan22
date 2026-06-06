@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Building2, Eye, Medal, Shield, Trophy, User, Users } from 'lucide-react';
+import { Building2, Medal, Shield, Trophy, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league';
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
@@ -18,7 +18,6 @@ const roles = [
   { slug: 'team_admin', label: 'Team Admin', icon: Users, detail: 'Manage team presence, rosters, and support activity.' },
   { slug: 'league_admin', label: 'League Admin', icon: Shield, detail: 'Create a Draft League, verify fixtures, confirm results, and manage payouts.' },
   { slug: 'sponsor', label: 'Sponsor', icon: Building2, detail: 'Support athletes, teams, leagues, youth, and women and youth sport.' },
-  { slug: 'platform_admin', label: 'Scout/Admin', icon: Eye, detail: 'Track rising talent and verified performance history.' },
 ] satisfies Array<{ slug: AppRole; label: string; icon: React.ComponentType<{ className?: string }>; detail: string }>;
 
 function normalizeInitialRole(role: string): AppRole {

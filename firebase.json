@@ -1,5 +1,6 @@
 {
   "firestore": {
+    "database": "fg256",
     "rules": "firestore.rules"
   },
   "storage": {

@@ -160,6 +160,21 @@ export interface SupportPledge {
   createdAt: string;
 }
 
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  supportPledgeId?: string;
+  type: string;
+  label: string;
+  amount: number;
+  currency?: 'UGX';
+  status: string;
+  method?: string;
+  date?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface FeedPost {
   id: string;
   authorId: string;
@@ -182,4 +197,86 @@ export interface FeedPost {
   shares: number;
   statsRow?: string[]; // e.g., ["20 points", "120,000 UGX unlocked"]
   verified: boolean;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  authorId: string;
+  text: string;
+  status: 'published' | 'hidden' | 'flagged';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  read: boolean;
+  href?: string;
+  createdAt?: string;
+}
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  contactUserId?: string;
+  adminUserIds?: string[];
+  package?: string;
+  status: 'lead' | 'active' | 'paused';
+  focus: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Award {
+  id: string;
+  name: string;
+  season: string;
+  category: string;
+  eligibleLeagueIds: string[];
+  status: 'draft' | 'open' | 'closed' | 'awarded';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VerificationRecord {
+  id: string;
+  type: 'league' | 'team' | 'athlete' | 'match_result' | 'challenge' | 'payout';
+  leagueId?: string;
+  teamId?: string;
+  athleteId?: string;
+  matchId?: string;
+  challengeId?: string;
+  supportPledgeId?: string;
+  status: 'Pending' | 'Verified' | 'Disputed' | 'Rejected';
+  submittedBy?: string;
+  verifiedBy?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  type: 'support_issue' | 'profile_issue' | 'result_issue' | 'content_issue' | 'verification_issue';
+  status: 'open' | 'reviewing' | 'resolved' | 'dismissed';
+  summary: string;
+  targetCollection?: string;
+  targetId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminLog {
+  id: string;
+  actorId: string;
+  action: string;
+  target: string;
+  targetId?: string;
+  metadata?: Record<string, string | number | boolean>;
+  createdAt?: string;
 }

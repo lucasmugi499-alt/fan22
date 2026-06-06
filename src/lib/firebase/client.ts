@@ -12,6 +12,8 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
 };
 
 export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean);
@@ -21,10 +23,12 @@ let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 let storageInstance: FirebaseStorage | null = null;
 
+const dbId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID;
+
 if (isFirebaseConfigured) {
   appInstance = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   authInstance = getAuth(appInstance);
-  dbInstance = getFirestore(appInstance);
+  dbInstance = dbId ? getFirestore(appInstance, dbId) : getFirestore(appInstance);
   storageInstance = getStorage(appInstance);
 }
 

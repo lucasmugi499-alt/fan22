@@ -2,6 +2,7 @@
 
 import {
   DocumentData,
+  CollectionReference,
   QueryConstraint,
   addDoc,
   collection,
@@ -14,26 +15,46 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { Athlete, Challenge, FeedPost, League, Match, Team } from '@/lib/types';
+import {
+  AdminLog,
+  Athlete,
+  Award,
+  Challenge,
+  Comment,
+  FeedPost,
+  League,
+  Match,
+  Notification,
+  Report,
+  Sponsor,
+  SupportPledge,
+  Team,
+  UserProfile,
+  VerificationRecord,
+  WalletTransaction,
+} from '@/lib/types';
 import { db, requireFirebaseClient } from './client';
 
-export type FirestoreCollectionName =
-  | 'users'
-  | 'athletes'
-  | 'teams'
-  | 'leagues'
-  | 'matches'
-  | 'challenges'
-  | 'supportPledges'
-  | 'walletTransactions'
-  | 'feedPosts'
-  | 'comments'
-  | 'notifications'
-  | 'sponsors'
-  | 'awards'
-  | 'verifications'
-  | 'reports'
-  | 'adminLogs';
+export type FirestoreCollectionMap = {
+  users: UserProfile;
+  athletes: Athlete;
+  teams: Team;
+  leagues: League;
+  matches: Match;
+  challenges: Challenge;
+  supportPledges: SupportPledge;
+  walletTransactions: WalletTransaction;
+  feedPosts: FeedPost;
+  comments: Comment;
+  notifications: Notification;
+  sponsors: Sponsor;
+  awards: Award;
+  verifications: VerificationRecord;
+  reports: Report;
+  adminLogs: AdminLog;
+};
+
+export type FirestoreCollectionName = keyof FirestoreCollectionMap;
 
 export type PublicCollections = {
   athletes: Athlete;
@@ -58,6 +79,11 @@ export type SupportPledgeInput = {
 export function collectionRef(name: FirestoreCollectionName) {
   const { db } = requireFirebaseClient();
   return collection(db, name);
+}
+
+export function typedCollectionRef<Name extends FirestoreCollectionName>(name: Name) {
+  const { db } = requireFirebaseClient();
+  return collection(db, name) as CollectionReference<FirestoreCollectionMap[Name], DocumentData>;
 }
 
 export async function getCollectionDocs<T>(name: FirestoreCollectionName, constraints: QueryConstraint[] = []) {

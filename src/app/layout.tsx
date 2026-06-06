@@ -3,6 +3,8 @@ import "./globals.css";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/context/AuthProvider";
+import { AuthModalProvider } from "@/components/auth/AuthRequiredModal";
+import { DemoRoleSwitcher } from "@/components/auth/DemoRoleSwitcher";
 
 export const metadata: Metadata = {
   title: {
@@ -37,7 +39,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <AuthModalProvider>
+            <AppShell>{children}</AppShell>
+            <DemoRoleSwitcher />
+          </AuthModalProvider>
         </AuthProvider>
         <Toaster
           theme="dark"
