@@ -1,20 +1,34 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Award, Medal, ShieldCheck, Star, Trophy, Users } from 'lucide-react';
-import { awardCategories, mockCurrentUser } from '@/lib/mockData';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { dataProvider } from '@/data/dataProvider';
+import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { formatUGX } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { GoalPlacePointsBadge, ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
+import { AwardCategory } from '@/types';
 
 export default function AwardsPage() {
   const router = useRouter();
   const { userProfile } = useAuth();
   const { athletes, teams } = useGoalPlaceData();
-  const profile = userProfile ?? mockCurrentUser;
+  const [awardCategories, setAwardCategories] = useState<AwardCategory[]>([]);
+  const profile = userProfile ?? MOCK_PROFILES.fan;
+
+  useEffect(() => {
+    let cancelled = false;
+    dataProvider.getAwardCategories().then((items) => {
+      if (!cancelled) setAwardCategories(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const leaders = [
     { name: profile.name, label: 'Top Contributor', points: profile.points },
     { name: 'Mariam K.', label: 'Most Active Fan', points: 7920 },
@@ -84,10 +98,10 @@ export default function AwardsPage() {
         <div>
           <SectionHeader eyebrow="Categories" title="Award categories" />
           <div className="grid gap-3 sm:grid-cols-2">
-            {awardCategories.map((category) => (
-              <div key={category} className="glass-panel rounded-xl p-4">
+            {awardCategories.slice(0, 12).map((category) => (
+              <div key={category.id} className="glass-panel rounded-xl p-4">
                 <Star className="mb-3 size-5 text-[var(--goal-gold)]" />
-                <h3 className="font-heading text-base font-black text-white">{category}</h3>
+                <h3 className="font-heading text-base font-black text-white">{category.name}</h3>
               </div>
             ))}
           </div>
@@ -107,7 +121,7 @@ export default function AwardsPage() {
               <p className="mt-1 text-sm text-slate-400">{athlete.position}</p>
               <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Verified Support</p>
-                <p className="mt-1 font-heading text-lg font-black text-white">{formatUGX(athlete.totalEarnings)}</p>
+                <p className="mt-1 font-heading text-lg font-black text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)}</p>
               </div>
             </div>
           ))}
@@ -122,7 +136,7 @@ export default function AwardsPage() {
               <SportBadge sport={team.sport} />
               <h3 className="mt-4 font-heading text-lg font-black text-white">{team.name}</h3>
               <p className="mt-1 text-sm text-slate-400">{team.location}</p>
-              <p className="mt-4 text-sm font-black text-[var(--goal-mint)]">{formatUGX(team.supportPool)} support pool</p>
+              <p className="mt-4 text-sm font-black text-[var(--goal-mint)]">{formatUGX(team.supportPool ?? team.totalSupport ?? 0)} support pool</p>
             </div>
           ))}
         </div>

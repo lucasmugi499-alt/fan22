@@ -1,16 +1,16 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { User } from 'firebase/auth';
 import { logout as firebaseLogout, getUserProfile, getUserRole, listenToAuthState } from '@/lib/firebase/auth';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
-import { AppRole, UserProfile } from '@/lib/types';
+import { AppRole, UserProfile } from '@/types';
 import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 
 type AuthContextValue = {
   authStatus: AuthStatus;
-  currentUser: User | null; // Will be null in demo mode (unless we mock it)
+  currentUser: User | null;
   userProfile: UserProfile | null;
   role: AppRole | null;
   loading: boolean;
@@ -23,16 +23,16 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (isFirebaseConfigured ? 'loading' : 'logged_out'));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   
   // Demo Mode State
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [demoRole, setDemoRoleState] = useState<AppRole | null>(null);
+  const [, setDemoRoleState] = useState<AppRole | null>(null);
 
-  const setDemoRole = (newRole: AppRole | null) => {
+  const setDemoRole = useCallback((newRole: AppRole | null) => {
     if (newRole) {
       setIsDemoMode(true);
       setDemoRoleState(newRole);
@@ -51,29 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Trigger a re-check of firebase auth state if exiting demo mode
       if (isFirebaseConfigured) {
         setAuthStatus('loading');
-        // A simple way to trigger re-eval is to reload the window, but we rely on the listener below
-        window.location.reload(); 
+        window.location.reload();
       }
     }
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (isDemoMode) {
       setDemoRole(null);
       return;
     }
     await firebaseLogout();
-  };
+  }, [isDemoMode, setDemoRole]);
 
   useEffect(() => {
     if (isDemoMode) return;
 
     if (!isFirebaseConfigured) {
-      setAuthStatus('logged_out');
       return;
     }
 
-    setAuthStatus('loading');
     return listenToAuthState(async (user) => {
       if (isDemoMode) return; // Prevent firebase updates while in demo mode
       
@@ -111,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDemoRole,
       logout: handleLogout,
     }),
-    [authStatus, currentUser, userProfile, role, isFirebaseConfigured, isDemoMode]
+    [authStatus, currentUser, userProfile, role, isDemoMode, setDemoRole, handleLogout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Radio, ShieldCheck, Sparkles } from 'lucide-react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Button } from '@/components/ui/button';
 import { FeedCard } from '@/components/ui/feed-card';

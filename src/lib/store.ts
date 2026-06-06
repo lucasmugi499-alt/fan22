@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { User, SportType } from './types';
-import { mockCurrentUser } from './mockData';
+import { User, SportType } from '@/types';
 
 interface AppState {
   currentUser: User | null;
@@ -12,7 +11,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  currentUser: mockCurrentUser,
+  currentUser: null,
   selectedSportFilter: 'All',
   setCurrentUser: (user) => set({ currentUser: user }),
   setSelectedSportFilter: (sport) => set({ selectedSportFilter: sport }),

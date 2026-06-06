@@ -3,13 +3,12 @@
 import React from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { ProtectedRoute } from './ProtectedRoute';
-import { AppRole } from '@/lib/types';
+import { AppRole } from '@/types';
 import Link from 'next/link';
-import { hasAnyRole } from '@/lib/auth/permissions';
+import { AuthState, hasAnyRole } from '@/lib/auth/permissions';
 
 export function RoleGuard({ allowedRoles, children }: { allowedRoles: AppRole[]; children: React.ReactNode }) {
   const auth = useAuth();
-  const { authStatus, role, userProfile } = auth;
 
   return (
     <ProtectedRoute>
@@ -20,7 +19,7 @@ export function RoleGuard({ allowedRoles, children }: { allowedRoles: AppRole[];
   );
 }
 
-function RoleGuardInner({ auth, allowedRoles, children }: { auth: any, allowedRoles: AppRole[], children: React.ReactNode }) {
+function RoleGuardInner({ auth, allowedRoles, children }: { auth: AuthState; allowedRoles: AppRole[]; children: React.ReactNode }) {
   if (auth.authStatus === 'loading') return null;
 
   if (!hasAnyRole(auth, allowedRoles)) {

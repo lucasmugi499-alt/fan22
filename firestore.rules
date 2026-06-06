@@ -46,6 +46,12 @@ service cloud.firestore {
       return request.resource.data.amount is number && request.resource.data.amount > 0;
     }
 
+    match /sports/{sportId} {
+      allow read: if true;
+      allow create, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
     match /users/{uid} {
       allow create: if isOwner(uid) && request.resource.data.uid == uid;
       allow read: if isOwner(uid) || isPlatformAdmin();

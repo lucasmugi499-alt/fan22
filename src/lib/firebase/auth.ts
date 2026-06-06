@@ -9,7 +9,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { AppRole, UserProfile } from '@/lib/types';
+import { AppRole, UserProfile } from '@/types';
 import { auth, db, isFirebaseConfigured, requireFirebaseClient } from './client';
 
 export const demoAccounts: Array<{ label: string; email: string; role: AppRole }> = [
@@ -113,9 +113,9 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
 
 export function routeForAppRole(role?: AppRole | null) {
   if (role === 'athlete') return '/athlete-dashboard';
-  if (role === 'league_admin' || role === 'team_admin' || role === 'platform_admin' || role === 'super_admin') {
-    return '/league-admin';
-  }
-  if (role === 'sponsor') return '/sponsors';
+  if (role === 'team_admin') return '/team-admin';
+  if (role === 'league_admin') return '/league-admin';
+  if (role === 'sponsor') return '/sponsor-dashboard';
+  if (role === 'platform_admin' || role === 'super_admin') return '/admin';
   return '/dashboard';
 }

@@ -4,10 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:mock": "NEXT_PUBLIC_DATA_MODE=mock pnpm dev",
+    "dev:firebase": "NEXT_PUBLIC_DATA_MODE=firebase pnpm dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "seed:mock": "npx tsx --env-file=.env.local scripts/seed-mock-data.ts",
+    "seed:firebase": "tsx scripts/seed-firestore.ts",
+    "seed:emulator": "tsx scripts/seed-emulator.ts",
+    "export:mock": "tsx scripts/export-mock-json.ts",
+    "backup:firestore": "tsx scripts/backup-firestore.ts",
     "seed:demo": "node --experimental-strip-types scripts/seed-demo.ts",
     "set-admin-claims": "node --experimental-strip-types scripts/set-admin-claims.ts",
     "reset:demo": "node --experimental-strip-types scripts/reset-demo-data.ts"
@@ -43,6 +49,7 @@
     "eslint-config-next": "16.2.6",
     "firebase-tools": "^15.19.1",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

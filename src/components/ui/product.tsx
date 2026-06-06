@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from './button';
 import { getSportTheme, SportTheme, sports, trustStatements } from '@/lib/sportThemes';
-import { SportType } from '@/lib/types';
+import { SportType } from '@/types';
 import { cn } from '@/lib/utils';
 
 export function PageContainer({

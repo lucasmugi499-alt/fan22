@@ -1,4 +1,4 @@
-import { SupportPledge } from "../types";
+import { SupportPledge } from "@/types";
 
 export const supportPledges: SupportPledge[] = [
   {

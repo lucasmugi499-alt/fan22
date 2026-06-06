@@ -1,19 +1,27 @@
 'use client';
 
 import React from 'react';
-import { RoleGuard } from "@/components/auth/RoleGuard";
+import { Building2, ShieldCheck, Trophy } from 'lucide-react';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PageContainer, SectionHeader, ImpactStatCard, SportBadge } from '@/components/ui/product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
-export default function Page() {
+export default function TeamAdminPage() {
+  const { teams, athletes } = useGoalPlaceData();
+  const team = teams[0];
+  const roster = team ? athletes.filter((athlete) => athlete.teamId === team.id) : [];
+
   return (
-    <RoleGuard allowedRoles={["team_admin", "platform_admin", "super_admin"]}>
-      <main className="min-h-screen pt-24 pb-32">
-        <div className="mx-auto max-w-4xl px-4 md:px-8">
-          <div className="rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
-            <h1 className="font-heading text-3xl font-black text-white">{p.title}</h1>
-            <p className="mt-2 text-slate-400">Welcome to your team admin. Development is in progress.</p>
-          </div>
+    <RoleGuard allowedRoles={['team_admin', 'platform_admin', 'super_admin']}>
+      <PageContainer compact>
+        <SectionHeader eyebrow="Team Admin" title={team ? team.name : 'Team workspace'} />
+        <div className="grid gap-3 md:grid-cols-3">
+          <ImpactStatCard label="Roster" value={String(roster.length)} icon={Trophy} />
+          <ImpactStatCard label="Support pool" value={team?.supportPool?.toLocaleString() ?? '0'} icon={Building2} tone="gold" />
+          <ImpactStatCard label="Verified" value={team?.verified ? 'Yes' : 'No'} icon={ShieldCheck} tone="blue" />
         </div>
-      </main>
+        {team && <div className="glass-panel mt-6 rounded-xl p-5"><SportBadge sport={team.sport} /></div>}
+      </PageContainer>
     </RoleGuard>
   );
 }

@@ -1,4 +1,4 @@
-import { Sport } from "../types";
+import { Sport } from "@/types";
 
 export const sports: Sport[] = [
   {

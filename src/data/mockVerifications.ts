@@ -1,4 +1,4 @@
-import { Verification } from "../types";
+import { Verification } from "@/types";
 
 export const verifications: Verification[] = [
   {

@@ -15,12 +15,11 @@ import {
   LayoutDashboard,
   User,
   ShieldCheck,
-  Building2,
-  Settings
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
-import { AppRole } from '@/lib/types';
+import { AppRole } from '@/types';
 
 export function MobileNav() {
   const pathname = usePathname();

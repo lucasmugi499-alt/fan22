@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Athlete, FeedPost, League, Team } from '@/lib/types';
+import { Athlete, FeedPost, League, Team } from '@/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Award, Bookmark, HeartHandshake, MessageSquare, Share2, ShieldCheck } from 'lucide-react';
@@ -40,7 +40,7 @@ function getAuthor(post: FeedPost, athletes: Athlete[], teams: Team[], leagues: 
   if (post.authorType === 'Admin') {
     return { name: 'GoalPlace256 Awards', avatar: '', role: 'Annual Awards', hrefType: 'awards' };
   }
-  return { name: 'GoalPlace Fan', avatar: '', role: post.authorType, hrefType: 'profile' };
+  return { name: 'GoalPlace Fan', avatar: '', role: post.authorType ?? 'Fan', hrefType: 'profile' };
 }
 
 function prettyType(type: FeedPost['type']) {
@@ -50,8 +50,15 @@ function prettyType(type: FeedPost['type']) {
 export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatch }: FeedCardProps) {
   const [saved, setSaved] = useState(false);
   const { athletes, leagues, teams } = useGoalPlaceData();
+  const sport = post.sport ?? 'Football';
+  const timestamp = post.timestamp ?? post.createdAt;
+  const mediaUrl = post.mediaUrl ?? post.mediaURL ?? '';
+  const authorType = post.authorType ?? 'Fan';
+  const comments = post.comments ?? post.commentsCount ?? 0;
+  const shares = post.shares ?? post.sharesCount ?? 0;
+  const likes = post.likes ?? post.likesCount ?? 0;
   const author = getAuthor(post, athletes, teams, leagues);
-  const theme = getSportTheme(post.sport);
+  const theme = getSportTheme(sport);
   const showMatchAction = post.type === 'MatchResult';
 
   return (
@@ -63,9 +70,9 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
               <ImageWithFallback
                 src={author.avatar}
                 alt={author.name}
-                fallbackType={post.authorType === 'Athlete' ? 'athlete' : 'team'}
+                fallbackType={authorType === 'Athlete' ? 'athlete' : 'team'}
                 initials={getInitials(author.name)}
-                sport={post.sport}
+                sport={sport}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -76,8 +83,8 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <span className="rounded-md border border-white/8 bg-white/5 px-2 py-0.5 font-bold text-slate-300">{author.role}</span>
-                <SportBadge sport={post.sport} />
-                <span>{timeAgo(post.timestamp)}</span>
+                <SportBadge sport={sport} />
+                <span>{timeAgo(timestamp)}</span>
               </div>
             </div>
           </div>
@@ -105,10 +112,10 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
 
       <div className="relative aspect-[16/10] w-full overflow-hidden border-y border-white/8 bg-black/24 sm:aspect-video">
         <ImageWithFallback
-          src={post.mediaUrl}
+          src={mediaUrl}
           alt={`${prettyType(post.type)} media`}
           fallbackType="stadium"
-          sport={post.sport}
+          sport={sport}
           className="h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -121,14 +128,14 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
         </button>
         <button className="flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6 hover:text-white" onClick={onComment}>
           <MessageSquare className="size-4" />
-          <span>{post.comments}</span>
+          <span>{comments}</span>
         </button>
         <button
           className="flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6 hover:text-white"
           onClick={() => toast.success('Share link copied')}
         >
           <Share2 className="size-4" />
-          <span>{post.shares}</span>
+          <span>{shares}</span>
         </button>
         <button
           className={cn('flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6', saved ? 'text-[var(--goal-gold)]' : 'text-slate-300 hover:text-white')}
@@ -145,7 +152,7 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
       <div className="flex items-center justify-between gap-3 p-4">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
           <HeartHandshake className="size-4" style={{ color: theme.color }} />
-          {post.likes.toLocaleString()} community reactions
+          {likes.toLocaleString()} community reactions
         </div>
         <Button variant="outline" size="sm" onClick={showMatchAction ? onViewMatch : onViewProfile}>
           {showMatchAction ? 'View Match' : 'View Profile'}

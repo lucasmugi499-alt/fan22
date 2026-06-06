@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeartHandshake, ShieldCheck, TrendingUp, Users } from 'lucide-react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { AthleteCard } from '@/components/ui/athlete-card';
 import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterBar } from '@/components/ui/product';

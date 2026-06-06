@@ -1,19 +1,38 @@
 'use client';
 
-import React from 'react';
-import { RoleGuard } from "@/components/auth/RoleGuard";
+import React, { useEffect, useState } from 'react';
+import { Building2, HeartHandshake, LineChart } from 'lucide-react';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PageContainer, SectionHeader, ImpactStatCard } from '@/components/ui/product';
+import { dataProvider } from '@/data/dataProvider';
+import { formatUGX } from '@/lib/sportThemes';
+import { Sponsor } from '@/types';
 
-export default function Page() {
+export default function SponsorDashboardPage() {
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    dataProvider.getSponsors().then((items) => {
+      if (!cancelled) setSponsors(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const total = sponsors.reduce((sum, sponsor) => sum + sponsor.amountCommitted, 0);
+
   return (
-    <RoleGuard allowedRoles={["sponsor", "platform_admin", "super_admin"]}>
-      <main className="min-h-screen pt-24 pb-32">
-        <div className="mx-auto max-w-4xl px-4 md:px-8">
-          <div className="rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
-            <h1 className="font-heading text-3xl font-black text-white">{p.title}</h1>
-            <p className="mt-2 text-slate-400">Welcome to your sponsor dashboard. Development is in progress.</p>
-          </div>
+    <RoleGuard allowedRoles={['sponsor', 'platform_admin', 'super_admin']}>
+      <PageContainer compact>
+        <SectionHeader eyebrow="Sponsor Dashboard" title="Impact reporting" />
+        <div className="grid gap-3 md:grid-cols-3">
+          <ImpactStatCard label="Active sponsors" value={String(sponsors.length)} icon={Building2} />
+          <ImpactStatCard label="Committed support" value={formatUGX(total)} icon={HeartHandshake} tone="gold" />
+          <ImpactStatCard label="Reports" value="Ready" icon={LineChart} tone="blue" />
         </div>
-      </main>
+      </PageContainer>
     </RoleGuard>
   );
 }

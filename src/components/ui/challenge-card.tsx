@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Challenge } from '@/lib/types';
+import { Challenge } from '@/types';
 import { GlassCard } from './glass-card';
 import { Button } from './button';
 import { CheckCircle2, Coins, ShieldCheck, Users } from 'lucide-react';

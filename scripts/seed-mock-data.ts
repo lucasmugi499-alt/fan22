@@ -16,14 +16,15 @@ async function seedAuth() {
         password: "Password123!", // Dummy password for all
       });
       created++;
-    } catch (error: any) {
-      if (error.code === "auth/email-already-exists" || error.code === "auth/uid-already-exists") {
+    } catch (error: unknown) {
+      const authError = error as { code?: string; message?: string };
+      if (authError.code === "auth/email-already-exists" || authError.code === "auth/uid-already-exists") {
         await adminAuth.updateUser(user.id, {
           displayName: user.displayName,
         });
         updated++;
       } else {
-        console.error(`Failed to create user ${user.id}:`, error.message);
+        console.error(`Failed to create user ${user.id}:`, authError.message);
       }
     }
   }

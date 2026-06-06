@@ -1,4 +1,4 @@
-import { AppRole, UserProfile } from '../types';
+import { AppRole, UserProfile } from '@/types';
 
 export const DEMO_EMAILS: Record<AppRole, string> = {
   fan: 'fan@goalplace256.com',

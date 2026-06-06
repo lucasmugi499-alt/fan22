@@ -1,5 +1,5 @@
 import { Activity, CircleDot, Dumbbell, Goal, LucideIcon } from 'lucide-react';
-import { SportType } from './types';
+import { SportType } from '@/types';
 
 export type SportSlug = 'football' | 'basketball' | 'rugby';
 

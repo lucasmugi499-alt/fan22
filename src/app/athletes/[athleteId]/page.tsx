@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, HeartHandshake, MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
@@ -15,6 +15,7 @@ import { VerificationBadge } from '@/components/ui/verification-badge';
 import { CommentsDrawer, PledgeModal, SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { canonicalEntityId } from '@/lib/idAliases';
 
 export default function AthleteProfilePage() {
   const router = useRouter();
@@ -23,7 +24,8 @@ export default function AthleteProfilePage() {
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const { athletes, challenges, feedPosts, leagues, matches, teams } = useGoalPlaceData();
-  const athlete = athletes.find((item) => item.id === athleteId);
+  const resolvedAthleteId = canonicalEntityId(athleteId, 'ath', 'a');
+  const athlete = athletes.find((item) => item.id === athleteId || item.id === resolvedAthleteId);
 
   if (!athlete) {
     return (
@@ -94,7 +96,7 @@ export default function AthleteProfilePage() {
 
       <PageContainer compact>
         <div className="grid gap-3 md:grid-cols-4">
-          <ImpactStatCard label="Total support" value={formatUGX(athlete.totalEarnings)} icon={HeartHandshake} />
+          <ImpactStatCard label="Total support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)} icon={HeartHandshake} />
           <ImpactStatCard label="Supporters" value={String(athlete.supportersCount)} icon={Users} tone="gold" />
           <ImpactStatCard label="Verified" value={athlete.verified ? 'Yes' : 'Pending'} icon={ShieldCheck} tone="blue" />
           <ImpactStatCard label="Next match" value={nextMatch?.status ?? 'Upcoming'} icon={Calendar} tone="orange" />

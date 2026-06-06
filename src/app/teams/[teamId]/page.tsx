@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, HeartHandshake, ShieldCheck, Trophy, Users } from 'lucide-react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { formatUGX, getSportTheme } from '@/lib/sportThemes';
 import { AthleteCard } from '@/components/ui/athlete-card';
 import { FeedCard } from '@/components/ui/feed-card';
@@ -12,13 +12,15 @@ import { MatchCard } from '@/components/ui/match-card';
 import { SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { canonicalEntityId } from '@/lib/idAliases';
 
 export default function TeamDetailPage() {
   const router = useRouter();
   const { teamId } = useParams<{ teamId: string }>();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const { athletes: allAthletes, feedPosts, leagues, matches: allMatches, teams } = useGoalPlaceData();
-  const team = teams.find((item) => item.id === teamId);
+  const resolvedTeamId = canonicalEntityId(teamId, 'team', 't');
+  const team = teams.find((item) => item.id === teamId || item.id === resolvedTeamId);
 
   if (!team) {
     return (
@@ -49,7 +51,7 @@ export default function TeamDetailPage() {
       </section>
 
       <div className="mt-8 grid gap-3 md:grid-cols-4">
-        <ImpactStatCard label="Support pool" value={formatUGX(team.supportPool)} icon={HeartHandshake} />
+        <ImpactStatCard label="Support pool" value={formatUGX(team.supportPool ?? team.totalSupport ?? 0)} icon={HeartHandshake} />
         <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Users} tone="gold" />
         <ImpactStatCard label="Matches" value={String(matches.length)} icon={Trophy} tone="blue" />
         <ImpactStatCard label="Verified league" value={`${league?.verifiedPercentage ?? 0}%`} icon={ShieldCheck} tone="orange" />

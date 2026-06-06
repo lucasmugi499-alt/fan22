@@ -18,7 +18,7 @@ import {
 import {
   AdminLog,
   Athlete,
-  Award,
+  AwardCategory,
   Challenge,
   Comment,
   FeedPost,
@@ -26,17 +26,20 @@ import {
   Match,
   Notification,
   Report,
+  Sport,
   Sponsor,
   SupportPledge,
   Team,
+  User,
   UserProfile,
-  VerificationRecord,
+  Verification,
   WalletTransaction,
-} from '@/lib/types';
+} from '@/types';
 import { db, requireFirebaseClient } from './client';
 
 export type FirestoreCollectionMap = {
-  users: UserProfile;
+  users: User | UserProfile;
+  sports: Sport;
   athletes: Athlete;
   teams: Team;
   leagues: League;
@@ -48,8 +51,8 @@ export type FirestoreCollectionMap = {
   comments: Comment;
   notifications: Notification;
   sponsors: Sponsor;
-  awards: Award;
-  verifications: VerificationRecord;
+  awards: AwardCategory;
+  verifications: Verification;
   reports: Report;
   adminLogs: AdminLog;
 };
@@ -57,6 +60,7 @@ export type FirestoreCollectionMap = {
 export type FirestoreCollectionName = keyof FirestoreCollectionMap;
 
 export type PublicCollections = {
+  sports: Sport;
   athletes: Athlete;
   teams: Team;
   leagues: League;

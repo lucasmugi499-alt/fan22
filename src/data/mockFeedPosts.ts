@@ -1,4 +1,4 @@
-import { FeedPost } from "../types";
+import { FeedPost } from "@/types";
 
 export const feedPosts: FeedPost[] = [
   {

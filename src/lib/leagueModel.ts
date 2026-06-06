@@ -1,4 +1,4 @@
-import { League, LeagueStatus, Match, Team } from './types';
+import { League, LeagueStatus, Match, Team } from '@/types';
 
 export const leagueRankingDisclaimer =
   'League standings are based only on match results. Paid tools never affect sporting rankings.';
@@ -78,40 +78,50 @@ export function getLeagueStatusMeta(status: LeagueStatus) {
 }
 
 export function getGoalPlaceIndexSignals(league: League): GoalPlaceIndexSignal[] {
+  const signals = league.indexSignals ?? {
+    verification: league.verifiedResultsRate ?? 0,
+    matchCompletionRate: league.matchCompletionRate ?? 0,
+    athleteProfileCompletion: league.athletesCount ? 80 : 0,
+    fanEngagement: Math.min(100, Math.round((league.supportersCount ?? 0) / 8)),
+    supportActivity: Math.min(100, Math.round((league.totalSupport ?? 0) / 50000)),
+    adminReliability: league.verified ? 88 : 58,
+    mediaUploads: 70,
+  };
+
   return [
     {
       label: 'Verification',
-      value: league.indexSignals.verification,
+      value: signals.verification,
       detail: 'Identity, admin, athlete, and result checks.',
     },
     {
       label: 'Match completion',
-      value: league.indexSignals.matchCompletionRate,
+      value: signals.matchCompletionRate,
       detail: 'Published fixtures with completed results.',
     },
     {
       label: 'Athlete profiles',
-      value: league.indexSignals.athleteProfileCompletion,
+      value: signals.athleteProfileCompletion,
       detail: 'Complete athlete records, positions, teams, and bios.',
     },
     {
       label: 'Fan engagement',
-      value: league.indexSignals.fanEngagement,
+      value: signals.fanEngagement,
       detail: 'Follows, reactions, comments, and repeat participation.',
     },
     {
       label: 'Support activity',
-      value: league.indexSignals.supportActivity,
+      value: signals.supportActivity,
       detail: 'Transparent support flowing to athletes and teams.',
     },
     {
       label: 'Admin reliability',
-      value: league.indexSignals.adminReliability,
+      value: signals.adminReliability,
       detail: 'Timely approvals, result reviews, and moderation quality.',
     },
     {
       label: 'Media uploads',
-      value: league.indexSignals.mediaUploads,
+      value: signals.mediaUploads,
       detail: 'Matchday photos, highlights, and verified league posts.',
     },
   ];
@@ -156,33 +166,39 @@ export function buildLeagueStandings(teams: Team[], matches: Match[]): LeagueSta
         typeof match.teamBScore === 'number'
     )
     .forEach((match) => {
-      const teamA = standings.get(match.teamAId);
-      const teamB = standings.get(match.teamBId);
+      const teamAId = match.teamAId ?? match.homeTeamId;
+      const teamBId = match.teamBId ?? match.awayTeamId;
+      const teamAScore = match.teamAScore ?? match.score.home;
+      const teamBScore = match.teamBScore ?? match.score.away;
+      const teamA = standings.get(teamAId);
+      const teamB = standings.get(teamBId);
 
-      if (!teamA || !teamB || match.teamAScore === undefined || match.teamBScore === undefined) {
+      if (!teamA || !teamB || typeof teamAScore !== 'number' || typeof teamBScore !== 'number') {
         return;
       }
 
       teamA.played += 1;
       teamB.played += 1;
-      teamA.pointsFor += match.teamAScore;
-      teamA.pointsAgainst += match.teamBScore;
-      teamB.pointsFor += match.teamBScore;
-      teamB.pointsAgainst += match.teamAScore;
+      teamA.pointsFor += teamAScore;
+      teamA.pointsAgainst += teamBScore;
+      teamB.pointsFor += teamBScore;
+      teamB.pointsAgainst += teamAScore;
 
-      if (match.teamAScore > match.teamBScore) {
+      if (teamAScore > teamBScore) {
         teamA.wins += 1;
         teamB.losses += 1;
-        teamA.points += 3;
-      } else if (match.teamAScore < match.teamBScore) {
+        teamA.points += match.sport === 'Football' || match.sport === 'football' ? 3 : 1;
+      } else if (teamAScore < teamBScore) {
         teamB.wins += 1;
         teamA.losses += 1;
-        teamB.points += 3;
+        teamB.points += match.sport === 'Football' || match.sport === 'football' ? 3 : 1;
       } else {
         teamA.draws += 1;
         teamB.draws += 1;
-        teamA.points += 1;
-        teamB.points += 1;
+        if (match.sport === 'Football' || match.sport === 'football') {
+          teamA.points += 1;
+          teamB.points += 1;
+        }
       }
     });
 

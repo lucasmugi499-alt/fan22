@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Button } from './button';
@@ -100,7 +100,7 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
         <div className="mt-3 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 px-3 py-2">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Total Verified Support</p>
           <div className="mt-1 flex items-center justify-between gap-3">
-            <p className="font-heading text-base font-black text-white">{formatUGX(athlete.totalEarnings)}</p>
+            <p className="font-heading text-base font-black text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)}</p>
             <span className="flex items-center gap-1 text-xs font-bold text-slate-300">
               <Users className="size-3" />
               {athlete.supportersCount}

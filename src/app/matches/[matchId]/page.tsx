@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, CheckCircle2, MapPin, ShieldCheck, Trophy, Users, Zap } from 'lucide-react';
-import { Athlete } from '@/lib/types';
+import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
@@ -13,6 +13,7 @@ import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { CommentsDrawer, PledgeModal, SupportModal } from '@/components/modals/app-modals';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { canonicalEntityId } from '@/lib/idAliases';
 
 export default function MatchDetailsPage() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export default function MatchDetailsPage() {
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const { athletes, challenges, feedPosts, matches, teams } = useGoalPlaceData();
-  const match = matches.find((item) => item.id === matchId);
+  const resolvedMatchId = canonicalEntityId(matchId, 'match', 'm');
+  const match = matches.find((item) => item.id === matchId || item.id === resolvedMatchId);
 
   if (!match) {
     return (
@@ -39,7 +41,10 @@ export default function MatchDetailsPage() {
   const matchChallenges = challenges.filter((challenge) => challenge.matchId === match.id);
   const relatedFeed = feedPosts.filter((post) => post.sport === match.sport).slice(0, 3);
   const theme = getSportTheme(match.sport);
-  const supportPool = (teamA?.supportPool ?? 0) + (teamB?.supportPool ?? 0);
+  const supportPool = (teamA?.supportPool ?? teamA?.totalSupport ?? 0) + (teamB?.supportPool ?? teamB?.totalSupport ?? 0);
+  const matchDate = match.date ?? match.scheduledAt;
+  const homeScore = match.teamAScore ?? match.score.home ?? 0;
+  const awayScore = match.teamBScore ?? match.score.away ?? 0;
 
   return (
     <PageContainer compact>
@@ -65,7 +70,7 @@ export default function MatchDetailsPage() {
               {match.status === 'Upcoming' ? (
                 <p className="font-heading text-3xl font-black text-white">VS</p>
               ) : (
-                <p className="font-heading text-4xl font-black text-white md:text-6xl">{match.teamAScore} - {match.teamBScore}</p>
+                <p className="font-heading text-4xl font-black text-white md:text-6xl">{homeScore} - {awayScore}</p>
               )}
               <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Scoreboard</p>
             </div>
@@ -73,7 +78,7 @@ export default function MatchDetailsPage() {
           </div>
 
           <div className="mt-6 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-            <span className="flex items-center gap-2"><Calendar className="size-4 text-[var(--goal-mint)]" /> {new Date(match.date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            <span className="flex items-center gap-2"><Calendar className="size-4 text-[var(--goal-mint)]" /> {new Date(matchDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
             <span className="flex items-center gap-2"><MapPin className="size-4 text-[var(--goal-gold)]" /> {match.venue}</span>
             <span className="flex items-center gap-2"><ShieldCheck className="size-4 text-[var(--goal-mint)]" /> {match.verificationStatus}</span>
           </div>
@@ -97,7 +102,7 @@ export default function MatchDetailsPage() {
                 <h3 className="mt-4 font-heading text-2xl font-black text-white">{team.name}</h3>
                 <p className="mt-1 text-sm text-slate-400">{team.location}</p>
                 <div className="mt-5 grid grid-cols-3 gap-2">
-                  {team.recentResults.map((result, index) => (
+                  {(team.recentResults ?? ['W', 'D', 'L']).map((result, index) => (
                     <div key={`${team.id}-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center font-heading text-lg font-black text-white">
                       {result}
                     </div>

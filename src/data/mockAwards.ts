@@ -1,4 +1,4 @@
-import { AwardCategory } from "../types";
+import { AwardCategory } from "@/types";
 
 export const awards: AwardCategory[] = [
   {

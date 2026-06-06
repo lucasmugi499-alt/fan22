@@ -1,4 +1,4 @@
-import { Match } from "../types";
+import { Match } from "@/types";
 
 export const matches: Match[] = [
   {
@@ -7,15 +7,15 @@ export const matches: Match[] = [
     "leagueId": "league_001",
     "homeTeamId": "team_001",
     "awayTeamId": "team_002",
-    "venue": "Gulu Stadium",
-    "city": "Gulu",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 5,
+      "home": 1,
       "away": 2
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 42,
     "totalSupport": 114621,
     "events": [],
@@ -27,13 +27,13 @@ export const matches: Match[] = [
     "leagueId": "league_001",
     "homeTeamId": "team_002",
     "awayTeamId": "team_003",
-    "venue": "Gulu Stadium",
-    "city": "Gulu",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
     "status": "verified",
     "score": {
       "home": 2,
-      "away": 4
+      "away": 3
     },
     "verificationStatus": "verified",
     "supportersCount": 37,
@@ -47,8 +47,8 @@ export const matches: Match[] = [
     "leagueId": "league_001",
     "homeTeamId": "team_003",
     "awayTeamId": "team_004",
-    "venue": "Gulu Stadium",
-    "city": "Gulu",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-06-13T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -67,13 +67,13 @@ export const matches: Match[] = [
     "leagueId": "league_001",
     "homeTeamId": "team_004",
     "awayTeamId": "team_001",
-    "venue": "Gulu Stadium",
-    "city": "Gulu",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 0,
-      "away": 1
+      "home": 4,
+      "away": 0
     },
     "verificationStatus": "verified",
     "supportersCount": 22,
@@ -87,8 +87,8 @@ export const matches: Match[] = [
     "leagueId": "league_002",
     "homeTeamId": "team_005",
     "awayTeamId": "team_006",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-13T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -107,8 +107,8 @@ export const matches: Match[] = [
     "leagueId": "league_002",
     "homeTeamId": "team_006",
     "awayTeamId": "team_007",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-16T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -127,13 +127,13 @@ export const matches: Match[] = [
     "leagueId": "league_002",
     "homeTeamId": "team_007",
     "awayTeamId": "team_008",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
     "status": "verified",
     "score": {
       "home": 2,
-      "away": 5
+      "away": 3
     },
     "verificationStatus": "verified",
     "supportersCount": 38,
@@ -147,8 +147,8 @@ export const matches: Match[] = [
     "leagueId": "league_002",
     "homeTeamId": "team_008",
     "awayTeamId": "team_005",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-13T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -167,15 +167,15 @@ export const matches: Match[] = [
     "leagueId": "league_003",
     "homeTeamId": "team_009",
     "awayTeamId": "team_010",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 3,
-      "away": 2
+      "home": 4,
+      "away": 0
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 26,
     "totalSupport": 190972,
     "events": [],
@@ -187,8 +187,8 @@ export const matches: Match[] = [
     "leagueId": "league_003",
     "homeTeamId": "team_010",
     "awayTeamId": "team_011",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-12T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -207,8 +207,8 @@ export const matches: Match[] = [
     "leagueId": "league_003",
     "homeTeamId": "team_011",
     "awayTeamId": "team_012",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-08T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -227,8 +227,8 @@ export const matches: Match[] = [
     "leagueId": "league_003",
     "homeTeamId": "team_012",
     "awayTeamId": "team_009",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-08T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -247,8 +247,8 @@ export const matches: Match[] = [
     "leagueId": "league_004",
     "homeTeamId": "team_013",
     "awayTeamId": "team_014",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Masaka Community Ground",
+    "city": "Masaka",
     "scheduledAt": "2026-06-14T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -267,13 +267,13 @@ export const matches: Match[] = [
     "leagueId": "league_004",
     "homeTeamId": "team_014",
     "awayTeamId": "team_015",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Masaka Community Ground",
+    "city": "Masaka",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 0,
-      "away": 4
+      "home": 4,
+      "away": 0
     },
     "verificationStatus": "verified",
     "supportersCount": 39,
@@ -287,13 +287,13 @@ export const matches: Match[] = [
     "leagueId": "league_004",
     "homeTeamId": "team_015",
     "awayTeamId": "team_016",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Masaka Community Ground",
+    "city": "Masaka",
     "scheduledAt": "2026-06-01T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 3,
-      "away": 2
+      "home": 0,
+      "away": 1
     },
     "verificationStatus": "verified",
     "supportersCount": 50,
@@ -307,8 +307,8 @@ export const matches: Match[] = [
     "leagueId": "league_004",
     "homeTeamId": "team_016",
     "awayTeamId": "team_013",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Masaka Community Ground",
+    "city": "Masaka",
     "scheduledAt": "2026-06-07T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -327,15 +327,15 @@ export const matches: Match[] = [
     "leagueId": "league_005",
     "homeTeamId": "team_017",
     "awayTeamId": "team_018",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 2,
-      "away": 3
+      "home": 93,
+      "away": 58
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 49,
     "totalSupport": 72458,
     "events": [],
@@ -347,13 +347,13 @@ export const matches: Match[] = [
     "leagueId": "league_005",
     "homeTeamId": "team_018",
     "awayTeamId": "team_019",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 1,
-      "away": 1
+      "home": 58,
+      "away": 65
     },
     "verificationStatus": "verified",
     "supportersCount": 28,
@@ -367,8 +367,8 @@ export const matches: Match[] = [
     "leagueId": "league_005",
     "homeTeamId": "team_019",
     "awayTeamId": "team_020",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-06-07T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -387,13 +387,13 @@ export const matches: Match[] = [
     "leagueId": "league_005",
     "homeTeamId": "team_020",
     "awayTeamId": "team_017",
-    "venue": "Mbarara Stadium",
-    "city": "Mbarara",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 3,
-      "away": 5
+      "home": 72,
+      "away": 79
     },
     "verificationStatus": "verified",
     "supportersCount": 16,
@@ -407,8 +407,8 @@ export const matches: Match[] = [
     "leagueId": "league_006",
     "homeTeamId": "team_021",
     "awayTeamId": "team_022",
-    "venue": "Mbale Stadium",
-    "city": "Mbale",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-08T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -427,13 +427,13 @@ export const matches: Match[] = [
     "leagueId": "league_006",
     "homeTeamId": "team_022",
     "awayTeamId": "team_023",
-    "venue": "Mbale Stadium",
-    "city": "Mbale",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-05-29T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 2,
-      "away": 1
+      "home": 86,
+      "away": 93
     },
     "verificationStatus": "verified",
     "supportersCount": 40,
@@ -447,8 +447,8 @@ export const matches: Match[] = [
     "leagueId": "league_006",
     "homeTeamId": "team_023",
     "awayTeamId": "team_024",
-    "venue": "Mbale Stadium",
-    "city": "Mbale",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-14T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -467,13 +467,13 @@ export const matches: Match[] = [
     "leagueId": "league_006",
     "homeTeamId": "team_024",
     "awayTeamId": "team_021",
-    "venue": "Mbale Stadium",
-    "city": "Mbale",
+    "venue": "Wakiso Community Ground",
+    "city": "Wakiso",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 2,
-      "away": 2
+      "home": 58,
+      "away": 65
     },
     "verificationStatus": "verified",
     "supportersCount": 17,
@@ -487,15 +487,15 @@ export const matches: Match[] = [
     "leagueId": "league_007",
     "homeTeamId": "team_025",
     "awayTeamId": "team_026",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-05T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 2,
-      "away": 4
+      "home": 65,
+      "away": 72
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 20,
     "totalSupport": 97452,
     "events": [],
@@ -507,8 +507,8 @@ export const matches: Match[] = [
     "leagueId": "league_007",
     "homeTeamId": "team_026",
     "awayTeamId": "team_027",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-12T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -527,13 +527,13 @@ export const matches: Match[] = [
     "leagueId": "league_007",
     "homeTeamId": "team_027",
     "awayTeamId": "team_028",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 1,
-      "away": 2
+      "home": 79,
+      "away": 86
     },
     "verificationStatus": "verified",
     "supportersCount": 18,
@@ -547,8 +547,8 @@ export const matches: Match[] = [
     "leagueId": "league_007",
     "homeTeamId": "team_028",
     "awayTeamId": "team_025",
-    "venue": "Kampala Stadium",
-    "city": "Kampala",
+    "venue": "Jinja Community Ground",
+    "city": "Jinja",
     "scheduledAt": "2026-06-11T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -567,15 +567,15 @@ export const matches: Match[] = [
     "leagueId": "league_008",
     "homeTeamId": "team_029",
     "awayTeamId": "team_030",
-    "venue": "Kampala Stadium",
+    "venue": "Kampala Community Ground",
     "city": "Kampala",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 5,
-      "away": 4
+      "home": 8,
+      "away": 13
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 28,
     "totalSupport": 190826,
     "events": [],
@@ -587,13 +587,13 @@ export const matches: Match[] = [
     "leagueId": "league_008",
     "homeTeamId": "team_030",
     "awayTeamId": "team_031",
-    "venue": "Kampala Stadium",
+    "venue": "Kampala Community Ground",
     "city": "Kampala",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 5,
-      "away": 5
+      "home": 13,
+      "away": 18
     },
     "verificationStatus": "verified",
     "supportersCount": 43,
@@ -607,7 +607,7 @@ export const matches: Match[] = [
     "leagueId": "league_008",
     "homeTeamId": "team_031",
     "awayTeamId": "team_032",
-    "venue": "Kampala Stadium",
+    "venue": "Kampala Community Ground",
     "city": "Kampala",
     "scheduledAt": "2026-06-07T03:03:00.243Z",
     "status": "scheduled",
@@ -627,7 +627,7 @@ export const matches: Match[] = [
     "leagueId": "league_008",
     "homeTeamId": "team_032",
     "awayTeamId": "team_029",
-    "venue": "Kampala Stadium",
+    "venue": "Kampala Community Ground",
     "city": "Kampala",
     "scheduledAt": "2026-06-08T03:03:00.243Z",
     "status": "scheduled",
@@ -647,15 +647,15 @@ export const matches: Match[] = [
     "leagueId": "league_009",
     "homeTeamId": "team_033",
     "awayTeamId": "team_034",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 1,
-      "away": 3
+      "home": 28,
+      "away": 33
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 46,
     "totalSupport": 138933,
     "events": [],
@@ -667,13 +667,13 @@ export const matches: Match[] = [
     "leagueId": "league_009",
     "homeTeamId": "team_034",
     "awayTeamId": "team_035",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 4,
-      "away": 5
+      "home": 33,
+      "away": 38
     },
     "verificationStatus": "verified",
     "supportersCount": 22,
@@ -687,8 +687,8 @@ export const matches: Match[] = [
     "leagueId": "league_009",
     "homeTeamId": "team_035",
     "awayTeamId": "team_036",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-06-07T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -707,8 +707,8 @@ export const matches: Match[] = [
     "leagueId": "league_009",
     "homeTeamId": "team_036",
     "awayTeamId": "team_033",
-    "venue": "Fort Portal Stadium",
-    "city": "Fort Portal",
+    "venue": "Kampala Community Ground",
+    "city": "Kampala",
     "scheduledAt": "2026-06-13T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -727,15 +727,15 @@ export const matches: Match[] = [
     "leagueId": "league_010",
     "homeTeamId": "team_037",
     "awayTeamId": "team_038",
-    "venue": "Masaka Stadium",
-    "city": "Masaka",
+    "venue": "Entebbe Community Ground",
+    "city": "Entebbe",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 0,
-      "away": 1
+      "home": 12,
+      "away": 17
     },
-    "verificationStatus": "verified",
+    "verificationStatus": "pending",
     "supportersCount": 48,
     "totalSupport": 133861,
     "events": [],
@@ -747,8 +747,8 @@ export const matches: Match[] = [
     "leagueId": "league_010",
     "homeTeamId": "team_038",
     "awayTeamId": "team_039",
-    "venue": "Masaka Stadium",
-    "city": "Masaka",
+    "venue": "Entebbe Community Ground",
+    "city": "Entebbe",
     "scheduledAt": "2026-06-09T03:03:00.243Z",
     "status": "scheduled",
     "score": {
@@ -767,13 +767,13 @@ export const matches: Match[] = [
     "leagueId": "league_010",
     "homeTeamId": "team_039",
     "awayTeamId": "team_040",
-    "venue": "Masaka Stadium",
-    "city": "Masaka",
+    "venue": "Entebbe Community Ground",
+    "city": "Entebbe",
     "scheduledAt": "2026-06-02T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 4,
-      "away": 4
+      "home": 22,
+      "away": 27
     },
     "verificationStatus": "verified",
     "supportersCount": 30,
@@ -787,13 +787,13 @@ export const matches: Match[] = [
     "leagueId": "league_010",
     "homeTeamId": "team_040",
     "awayTeamId": "team_037",
-    "venue": "Masaka Stadium",
-    "city": "Masaka",
+    "venue": "Entebbe Community Ground",
+    "city": "Entebbe",
     "scheduledAt": "2026-06-05T03:03:00.243Z",
     "status": "verified",
     "score": {
-      "home": 1,
-      "away": 3
+      "home": 27,
+      "away": 32
     },
     "verificationStatus": "verified",
     "supportersCount": 16,

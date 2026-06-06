@@ -9,7 +9,7 @@ import {
   leagueStatuses,
   LeagueStanding,
 } from '@/lib/leagueModel';
-import { League, LeagueStatus } from '@/lib/types';
+import { League, LeagueStatus } from '@/types';
 import { cn } from '@/lib/utils';
 
 export function LeagueStatusBadge({

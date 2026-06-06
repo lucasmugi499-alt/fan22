@@ -11,10 +11,11 @@ import {
   HeartHandshake,
   ShieldCheck,
   Sparkles,
+  Users,
   Wallet,
 } from 'lucide-react';
-import { Athlete } from '@/lib/types';
-import { sponsorPackages } from '@/lib/mockData';
+import { Athlete } from '@/types';
+import { sponsorPackages } from '@/data/sponsorPackages';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { sports, formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
@@ -63,12 +64,11 @@ export default function Home() {
 
 function LoggedInHome() {
   const router = useRouter();
-  const { userProfile, role } = useAuth();
-  const { openAuthModal } = useAuthModal();
+  const { userProfile } = useAuth();
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const { athletes, challenges, feedPosts, matches } = useGoalPlaceData();
+  const { athletes, challenges, feedPosts } = useGoalPlaceData();
 
   const activeChallenges = challenges.filter((c) => c.status === 'Active').slice(0, 3);
   const featuredAthletes = [...athletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4);
@@ -169,9 +169,6 @@ function LoggedInHome() {
 function PublicHome() {
   const router = useRouter();
   const { openAuthModal } = useAuthModal();
-  const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
-  const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const [sponsorOpen, setSponsorOpen] = useState(false);
   const { athletes, challenges, feedPosts, leagues, matches } = useGoalPlaceData();
 
@@ -365,7 +362,6 @@ function PublicHome() {
           />
           <div className="grid gap-4 md:grid-cols-3">
             {activeChallenges.map((challenge) => {
-              const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
               return (
                 <ChallengeCard
                   key={challenge.id}
@@ -536,4 +532,3 @@ function ImpactMini({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

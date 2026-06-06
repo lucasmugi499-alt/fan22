@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Match } from '@/lib/types';
+import { Match } from '@/types';
 import { GlassCard } from './glass-card';
 import { Badge } from './badge';
 import { Button } from './button';
@@ -39,12 +39,14 @@ export function MatchCard({ match, onView }: MatchCardProps) {
   if (!teamA || !teamB) return null;
 
   const theme = getSportTheme(match.sport);
-  const date = new Date(match.date);
+  const date = new Date(match.date ?? match.scheduledAt);
   const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const formattedTime = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const activeChallenges = challenges.filter((challenge) => challenge.matchId === match.id && challenge.status === 'Active');
   const supporterCount = activeChallenges.reduce((sum, challenge) => sum + challenge.supportersCount, 0);
   const statusTone = match.status === 'Live' ? 'destructive' : match.status === 'Completed' ? 'secondary' : 'outline';
+  const homeScore = match.teamAScore ?? match.score.home ?? 0;
+  const awayScore = match.teamBScore ?? match.score.away ?? 0;
 
   return (
     <GlassCard
@@ -63,14 +65,14 @@ export function MatchCard({ match, onView }: MatchCardProps) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex min-w-0 flex-col items-center gap-2">
-          <TeamLogo name={teamA.name} logoUrl={teamA.logoUrl} sport={teamA.sport} />
+          <TeamLogo name={teamA.name} logoUrl={teamA.logoUrl ?? teamA.logoURL ?? ''} sport={teamA.sport} />
           <span className="line-clamp-2 text-center text-xs font-black leading-tight text-white sm:text-sm">{teamA.name}</span>
         </div>
 
         <div className="flex min-w-[76px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/24 px-3 py-2">
           {match.status !== 'Upcoming' ? (
             <div className="font-heading text-2xl font-black tracking-tight text-white">
-              {match.teamAScore} <span style={{ color: theme.color }}>-</span> {match.teamBScore}
+              {homeScore} <span style={{ color: theme.color }}>-</span> {awayScore}
             </div>
           ) : (
             <div className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">VS</div>
@@ -79,7 +81,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
         </div>
 
         <div className="flex min-w-0 flex-col items-center gap-2">
-          <TeamLogo name={teamB.name} logoUrl={teamB.logoUrl} sport={teamB.sport} />
+          <TeamLogo name={teamB.name} logoUrl={teamB.logoUrl ?? teamB.logoURL ?? ''} sport={teamB.sport} />
           <span className="line-clamp-2 text-center text-xs font-black leading-tight text-white sm:text-sm">{teamB.name}</span>
         </div>
       </div>
@@ -107,7 +109,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Supporters</p>
           <p className="mt-1 flex items-center gap-1 font-heading text-lg font-black text-white">
             <Users className="size-4 text-[var(--goal-gold)]" />
-            {formatCompact(supporterCount || teamA.supportPool / 10000)}
+            {formatCompact(supporterCount || (teamA.supportPool ?? teamA.totalSupport ?? 0) / 10000)}
           </p>
         </div>
       </div>

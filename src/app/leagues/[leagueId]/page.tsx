@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { GoalPlaceIndexPanel, LeagueIntegrityNote, LeagueStandingsTable, LeagueStatusBadge } from '@/components/ui/league';
 import { MatchCard } from '@/components/ui/match-card';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
+import { canonicalEntityId } from '@/lib/idAliases';
 
 export default function LeagueDetailPage() {
   const router = useRouter();
   const { leagueId } = useParams<{ leagueId: string }>();
   const data = useGoalPlaceData();
-  const league = data.leagues.find((item) => item.id === leagueId);
+  const resolvedLeagueId = canonicalEntityId(leagueId, 'league', 'l');
+  const league = data.leagues.find((item) => item.id === leagueId || item.id === resolvedLeagueId);
 
   if (!league) {
     return (

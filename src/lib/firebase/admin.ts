@@ -14,6 +14,14 @@ function createAdminApp() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
   const privateKey = getPrivateKey();
+  const emulatorProjectId = projectId || process.env.GCLOUD_PROJECT || 'goalplace256-demo';
+
+  if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    return initializeApp({
+      projectId: emulatorProjectId,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+  }
 
   if (projectId && clientEmail && privateKey) {
     return initializeApp({

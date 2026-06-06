@@ -1,19 +1,28 @@
 'use client';
 
 import React from 'react';
-import { RoleGuard } from "@/components/auth/RoleGuard";
+import { HeartHandshake, ShieldCheck, Trophy } from 'lucide-react';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PageContainer, SectionHeader, ImpactStatCard, SportBadge } from '@/components/ui/product';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { formatUGX } from '@/lib/sportThemes';
 
-export default function Page() {
+export default function AthleteDashboardPage() {
+  const { athletes, challenges } = useGoalPlaceData();
+  const athlete = athletes[0];
+  const athleteChallenges = athlete ? challenges.filter((challenge) => challenge.athleteId === athlete.id) : [];
+
   return (
-    <RoleGuard allowedRoles={["athlete", "platform_admin", "super_admin"]}>
-      <main className="min-h-screen pt-24 pb-32">
-        <div className="mx-auto max-w-4xl px-4 md:px-8">
-          <div className="rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
-            <h1 className="font-heading text-3xl font-black text-white">{p.title}</h1>
-            <p className="mt-2 text-slate-400">Welcome to your athlete dashboard. Development is in progress.</p>
-          </div>
+    <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>
+      <PageContainer compact>
+        <SectionHeader eyebrow="Athlete Dashboard" title={athlete ? athlete.name : 'Athlete profile'} />
+        <div className="grid gap-3 md:grid-cols-3">
+          <ImpactStatCard label="Support" value={formatUGX(athlete?.totalEarnings ?? athlete?.totalSupport ?? 0)} icon={HeartHandshake} />
+          <ImpactStatCard label="Challenges" value={String(athleteChallenges.length)} icon={Trophy} tone="gold" />
+          <ImpactStatCard label="Verified" value={athlete?.verified ? 'Yes' : 'No'} icon={ShieldCheck} tone="blue" />
         </div>
-      </main>
+        {athlete && <div className="glass-panel mt-6 rounded-xl p-5"><SportBadge sport={athlete.sport} /></div>}
+      </PageContainer>
     </RoleGuard>
   );
 }

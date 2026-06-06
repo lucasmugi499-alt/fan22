@@ -9,7 +9,7 @@ import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
 import { registerAccount, routeForAppRole } from '@/lib/firebase/auth';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
-import { AppRole } from '@/lib/types';
+import { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 
 const roles = [

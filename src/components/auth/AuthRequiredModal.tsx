@@ -63,7 +63,7 @@ function AuthRequiredModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
         <h2 className="mb-2 font-heading text-2xl font-black text-white">Join GoalPlace256</h2>
         <p className="mb-8 text-sm text-slate-400">
-          Create an account to support athletes, follow teams, earn GoalPlace Points, and join Uganda's grassroots sports community.
+          Create an account to support athletes, follow teams, earn GoalPlace Points, and join Uganda&apos;s grassroots sports community.
         </p>
 
         <div className="flex flex-col gap-3">

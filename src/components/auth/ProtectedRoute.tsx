@@ -3,10 +3,9 @@
 import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
-import { isLoggedIn } from '@/lib/auth/permissions';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { authStatus, role, userProfile } = useAuth();
+  const { authStatus } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 

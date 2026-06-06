@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthProvider';
-import { AppRole } from '@/lib/types';
+import { AppRole } from '@/types';
 import { Shield, ChevronUp, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

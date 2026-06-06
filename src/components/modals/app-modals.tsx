@@ -2,10 +2,9 @@
 
 import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Athlete, SportType } from '@/lib/types';
+import { Athlete, SportType } from '@/types';
 import { useAuth } from '@/context/AuthProvider';
-import { isFirebaseConfigured } from '@/lib/firebase/client';
-import { createFeedPost, createSupportPledge } from '@/lib/firebase/firestore';
+import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX, getInitials, getSportTheme, trustStatements } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
@@ -67,7 +66,7 @@ export function SupportModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [amount, setAmount] = useState(25000);
-  const { currentUser } = useAuth();
+  const { authStatus, currentUser, userProfile } = useAuth();
   const { athletes } = useGoalPlaceData();
   const deductWalletBalance = useAppStore((state) => state.deductWalletBalance);
   const addPoints = useAppStore((state) => state.addPoints);
@@ -77,21 +76,30 @@ export function SupportModal({
   const quickAmounts = [5000, 10000, 25000, 50000, 100000];
 
   const submit = async () => {
-    if (isFirebaseConfigured && !currentUser) {
+    if (authStatus !== 'logged_in') {
       toast.error('Please log in to support an athlete.');
       return;
     }
 
     try {
-      if (isFirebaseConfigured && currentUser) {
-        await createSupportPledge({
-          fanId: currentUser.uid,
-          athleteId: selectedAthlete.id,
-          amount,
-          type: 'direct_support',
-          status: 'pending',
-        });
-      }
+      const fanId = currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid';
+      const pledge = await dataProvider.createSupportPledge({
+        fanId,
+        athleteId: selectedAthlete.id,
+        amount,
+        currency: 'UGX',
+        type: 'direct_support',
+        status: 'pending',
+      });
+      await dataProvider.createWalletTransaction({
+        userId: fanId,
+        supportPledgeId: pledge.id,
+        type: 'support',
+        amount: -amount,
+        currency: 'UGX',
+        status: 'pending',
+        description: `Direct support for ${selectedAthlete.name}`,
+      });
 
       deductWalletBalance(amount);
       addPoints(Math.max(50, Math.round(amount / 100)));
@@ -189,7 +197,7 @@ export function PledgeModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [amount, setAmount] = useState(10000);
-  const { currentUser } = useAuth();
+  const { authStatus, currentUser, userProfile } = useAuth();
   const { athletes, challenges: allChallenges } = useGoalPlaceData();
   const selectedAthlete = athlete ?? athletes[0];
   const activeChallenges = useMemo(
@@ -206,23 +214,32 @@ export function PledgeModal({
   if (!selectedAthlete || !selectedChallenge) return null;
 
   const submit = async () => {
-    if (isFirebaseConfigured && !currentUser) {
+    if (authStatus !== 'logged_in') {
       toast.error('Please log in to pledge support.');
       return;
     }
 
     try {
-      if (isFirebaseConfigured && currentUser) {
-        await createSupportPledge({
-          fanId: currentUser.uid,
-          athleteId: selectedAthlete.id,
-          challengeId: selectedChallenge.id,
-          leagueId: selectedAthlete.leagueId,
-          amount,
-          type: 'performance_pledge',
-          status: 'held',
-        });
-      }
+      const fanId = currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid';
+      const pledge = await dataProvider.createSupportPledge({
+        fanId,
+        athleteId: selectedAthlete.id,
+        challengeId: selectedChallenge.id,
+        leagueId: selectedAthlete.leagueId,
+        amount,
+        currency: 'UGX',
+        type: 'performance_pledge',
+        status: 'held',
+      });
+      await dataProvider.createWalletTransaction({
+        userId: fanId,
+        supportPledgeId: pledge.id,
+        type: 'pledge',
+        amount: -amount,
+        currency: 'UGX',
+        status: 'pending',
+        description: `Performance pledge for ${selectedChallenge.targetDescription ?? selectedChallenge.description}`,
+      });
 
       addPoints(Math.max(25, Math.round(amount / 200)));
       toast.success('Demo support recorded. Real payments are not enabled yet.');
@@ -285,23 +302,27 @@ export function CreatePostModal({
 }) {
   const [sport, setSport] = useState<SportType>('Football');
   const [caption, setCaption] = useState('');
-  const { currentUser, role } = useAuth();
+  const { authStatus, currentUser, role, userProfile } = useAuth();
   const { athletes } = useGoalPlaceData();
 
   const submit = async () => {
+    if (authStatus !== 'logged_in') {
+      toast.error('Please log in to create a post.');
+      return;
+    }
+
     try {
-      if (isFirebaseConfigured && currentUser) {
-        await createFeedPost({
-          authorId: currentUser.uid,
-          authorRole: role ?? 'fan',
-          sport,
-          type: 'AthleteHighlight',
-          caption: caption || 'GoalPlace256 community update',
-        });
-      }
+      await dataProvider.createFeedPost({
+        authorId: currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid',
+        authorName: userProfile?.name ?? 'GoalPlace256 Fan',
+        authorRole: role ?? 'fan',
+        sport,
+        type: 'athlete_highlight',
+        caption: caption || 'GoalPlace256 community update',
+      });
 
       setCaption('');
-      toast.success('Post created in demo mode.');
+      toast.success('Post created.');
       onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Post could not be created');
@@ -380,15 +401,29 @@ export function CommentsDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const [comment, setComment] = useState('');
+  const { authStatus, currentUser, userProfile } = useAuth();
   const comments = [
     { name: 'Mariam K.', text: 'Love seeing local athletes get visible support.' },
     { name: 'Coach Ivan', text: 'Verification updates make the whole flow feel trustworthy.' },
     { name: 'Lule S.', text: 'This is the kind of community energy Ugandan sport needs.' },
   ];
 
-  const submit = () => {
+  const submit = async () => {
+    if (authStatus !== 'logged_in') {
+      toast.error('Please log in to comment.');
+      return;
+    }
+
+    if (!comment.trim()) return;
+
+    await dataProvider.createComment({
+      postId: 'demo_post',
+      authorId: currentUser?.uid ?? userProfile?.uid ?? 'demo_fan_uid',
+      authorName: userProfile?.name ?? 'GoalPlace256 Fan',
+      text: comment.trim(),
+    });
     setComment('');
-    toast.success('Comment added in demo mode');
+    toast.success('Comment added');
   };
 
   return (

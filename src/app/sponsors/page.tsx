@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, HeartHandshake, LineChart, Medal, ShieldCheck, Users } from 'lucide-react';
-import { sponsorPackages } from '@/lib/mockData';
+import { sponsorPackages } from '@/data/sponsorPackages';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { SponsorInterestModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
@@ -83,7 +83,7 @@ export default function SponsorsPage() {
                 </div>
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-400">{athlete.bio}</p>
-              <p className="mt-3 text-sm font-black text-[var(--goal-mint)]">{formatUGX(athlete.totalEarnings)} verified support</p>
+              <p className="mt-3 text-sm font-black text-[var(--goal-mint)]">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)} verified support</p>
             </button>
           ))}
         </div>

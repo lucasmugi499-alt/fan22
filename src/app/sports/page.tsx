@@ -1,5 +1,8 @@
 'use client';
 
+'use client';
+
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
@@ -14,7 +17,7 @@ function normalizeSport(slug?: string) {
   return 'Football';
 }
 
-export default function SportsPage() {
+function SportsContent() {
   const searchParams = useSearchParams();
   const { athletes, challenges, matches } = useGoalPlaceData();
   const selectedSport = normalizeSport(searchParams.get('sport') ?? undefined);
@@ -62,7 +65,7 @@ export default function SportsPage() {
         <ImpactStatCard label="Athletes" value={String(sportAthletes.length)} />
         <ImpactStatCard label="Matches" value={String(sportMatches.length)} tone="gold" />
         <ImpactStatCard label="Active challenges" value={String(sportChallenges.filter((challenge) => challenge.status === 'Active').length)} tone="blue" />
-        <ImpactStatCard label="Verified support" value={`${sportAthletes.reduce((sum, athlete) => sum + athlete.totalEarnings, 0).toLocaleString()} UGX`} tone="orange" />
+        <ImpactStatCard label="Verified support" value={`${sportAthletes.reduce((sum, athlete) => sum + (athlete.totalEarnings ?? athlete.totalSupport ?? 0), 0).toLocaleString()} UGX`} tone="orange" />
       </section>
 
       <section className="mt-10 grid gap-8 lg:grid-cols-2">
@@ -93,5 +96,13 @@ export default function SportsPage() {
         <TrustNote />
       </section>
     </PageContainer>
+  );
+}
+
+export default function SportsPage() {
+  return (
+    <Suspense>
+      <SportsContent />
+    </Suspense>
   );
 }

@@ -1,4 +1,4 @@
-import { AppRole, UserProfile } from '../types';
+import { AppRole, UserProfile } from '@/types';
 
 export type AuthStatus = 'loading' | 'logged_out' | 'logged_in';
 
@@ -51,13 +51,15 @@ export function canCreateFanPost(auth: AuthState): boolean {
 }
 
 // Admin / Management
-export function canManageTeam(auth: AuthState, teamId?: string): boolean {
+export function canManageTeam(auth: AuthState, _teamId?: string): boolean {
+  void _teamId;
   // Real implementation would check if teamId is in auth.userProfile.assignedTeams
   // For now, any team_admin, platform_admin, super_admin can
   return hasAnyRole(auth, ['team_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canManageLeague(auth: AuthState, leagueId?: string): boolean {
+export function canManageLeague(auth: AuthState, _leagueId?: string): boolean {
+  void _leagueId;
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
