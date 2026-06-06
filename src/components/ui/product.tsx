@@ -2,15 +2,7 @@
 
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import {
-  ArrowRight,
-  CheckCircle2,
-  Coins,
-  LucideIcon,
-  Search,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight01Icon, CheckmarkCircle01Icon, Coins01Icon, Search01Icon, SecurityCheckIcon, SparklesIcon } from 'hugeicons-react';
 import { Button } from './button';
 import { getSportTheme, SportTheme, sports, trustStatements } from '@/lib/sportThemes';
 import { SportType } from '@/types';
@@ -53,7 +45,7 @@ export function SectionHeader({
             {eyebrow}
           </p>
         )}
-        <h2 className="font-heading text-2xl font-black tracking-tight text-white md:text-4xl">
+        <h2 className="font-display text-2xl font-black tracking-tight text-white md:text-4xl">
           {title}
         </h2>
         {description && <p className="mt-2 text-sm leading-6 text-slate-300 md:text-base">{description}</p>}
@@ -108,9 +100,9 @@ export function EmptyState({
   return (
     <div className="glass-panel flex min-h-[260px] flex-col items-center justify-center rounded-xl px-5 py-10 text-center">
       <div className="mb-4 flex size-14 items-center justify-center rounded-lg border border-white/10 bg-white/6 text-[var(--goal-mint)]">
-        <Search className="size-6" />
+        <Search01Icon className="size-6" />
       </div>
-      <h3 className="font-heading text-xl font-black text-white">{title}</h3>
+      <h3 className="font-display text-xl font-black text-white">{title}</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-slate-300">{description}</p>
       {onReset && (
         <Button className="mt-5" onClick={onReset}>
@@ -169,9 +161,9 @@ export function GoalPlacePointsBadge({
 }) {
   return (
     <div className={cn('inline-flex items-center gap-2 rounded-lg border border-[var(--goal-gold)]/30 bg-[var(--goal-gold)]/12 px-3 py-2 text-[var(--goal-gold)]', className)}>
-      <Coins className="size-4" />
+      <Coins01Icon className="size-4" />
       <span className="text-xs font-black uppercase tracking-[0.16em]">GoalPlace Points</span>
-      <span className="font-heading text-sm font-black text-white">{points.toLocaleString()}</span>
+      <span className="font-display text-sm font-black text-white">{points.toLocaleString()}</span>
     </div>
   );
 }
@@ -186,13 +178,13 @@ export function TrustNote({
   return (
     <div className={cn('rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-4', !compact && 'md:p-6')}>
       <div className="mb-3 flex items-center gap-2 text-[var(--goal-mint)]">
-        <ShieldCheck className="size-5" />
-        <h3 className="font-heading text-base font-black text-white">Trust Built In</h3>
+        <SecurityCheckIcon className="size-5" />
+        <h3 className="font-display text-base font-black text-white">Trust Built In</h3>
       </div>
       <div className={cn('grid gap-2', compact ? 'text-xs' : 'md:grid-cols-2')}>
         {items.map((item) => (
           <div key={item} className="flex items-start gap-2 text-sm leading-5 text-slate-300">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--goal-mint)]" />
+            <CheckmarkCircle01Icon className="mt-0.5 size-4 shrink-0 text-[var(--goal-mint)]" />
             <span>{item}</span>
           </div>
         ))}
@@ -205,13 +197,13 @@ export function ImpactStatCard({
   label,
   value,
   detail,
-  icon: Icon = Sparkles,
+  icon: Icon = SparklesIcon,
   tone = 'emerald',
 }: {
   label: string;
   value: string;
   detail?: string;
-  icon?: LucideIcon;
+  icon?: any;
   tone?: 'emerald' | 'gold' | 'orange' | 'blue';
 }) {
   const tones = {
@@ -226,7 +218,7 @@ export function ImpactStatCard({
         <Icon className="size-5" />
       </div>
       <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-1 font-heading text-2xl font-black text-white">{value}</p>
+      <p className="mt-1 font-display text-2xl font-black text-white">{value}</p>
       {detail && <p className="mt-2 text-sm leading-5 text-slate-300">{detail}</p>}
     </div>
   );
@@ -280,7 +272,7 @@ function StoryVisual({ theme, title, detail }: { theme: SportTheme; title: strin
             <Icon className="size-5" />
           </div>
         </div>
-        <h3 className="font-heading text-3xl font-black text-white">{title}</h3>
+        <h3 className="font-display text-3xl font-black text-white">{title}</h3>
         <p className="mt-3 text-sm leading-6 text-slate-200">{detail}</p>
         <div className="mt-8 grid grid-cols-2 gap-3">
           {theme.challengeExamples.slice(0, 2).map((challenge) => (
@@ -349,20 +341,78 @@ export function StickyStorySection() {
               className="glass-panel rounded-xl p-6"
             >
               <div className="mb-5 flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-white/8 font-heading text-sm font-black text-[var(--goal-mint)]">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-white/8 font-display text-sm font-black text-[var(--goal-mint)]">
                   {index + 1}
                 </span>
                 <SportBadge sport={step.theme.name} />
               </div>
-              <h3 className="font-heading text-2xl font-black text-white">{step.title}</h3>
+              <h3 className="font-display text-2xl font-black text-white">{step.title}</h3>
               <p className="mt-3 text-base leading-7 text-slate-300">{step.detail}</p>
               <Button variant="ghost" size="sm" className="mt-4">
-                See the flow <ArrowRight className="size-4" />
+                See the flow <ArrowRight01Icon className="size-4" />
               </Button>
             </motion.div>
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+export function DataCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-xl border border-white/10 bg-white/5 p-4 md:p-5 transition-colors hover:border-white/15', className)}>
+      {children}
+    </div>
+  );
+}
+
+export function TableCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-xl border border-white/10 bg-white/5 overflow-hidden', className)}>
+      <div className="overflow-x-auto hide-scrollbar">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function TabStrip({
+  tabs,
+  activeTab,
+  onTabChange,
+}: {
+  tabs: string[];
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}) {
+  return (
+    <div className="mx-auto mt-6 flex max-w-7xl overflow-x-auto hide-scrollbar border-b border-white/5">
+      {tabs.map(tab => (
+        <button
+          key={tab}
+          onClick={() => onTabChange(tab)}
+          className={`whitespace-nowrap px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeTab === tab 
+              ? 'border-[var(--goal-emerald)] text-[var(--goal-mint)]' 
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
   );
 }

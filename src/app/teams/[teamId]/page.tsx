@@ -5,7 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, HeartHandshake, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { ArrowLeft01Icon, UserGroupIcon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { Athlete } from '@/types';
 import { formatUGX, getSportTheme } from '@/lib/sportThemes';
 import { AthleteCard } from '@/components/ui/athlete-card';
@@ -42,21 +43,21 @@ function TeamDetailPageContent() {
   return (
     <PageContainer compact>
       <Link href="/matches" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
-        <ArrowLeft className="size-4" />
+        <ArrowLeft01Icon className="size-4" />
         Back
       </Link>
 
       <section className={`glass-panel rounded-xl p-5 md:p-8 ${theme.edgeClass}`}>
         <SportBadge sport={team.sport} />
-        <h1 className="mt-4 font-heading text-4xl font-black text-white md:text-6xl">{team.name}</h1>
+        <h1 className="mt-4 font-display text-4xl font-black text-white md:text-6xl">{team.name}</h1>
         <p className="mt-3 text-sm text-slate-400">{team.location} - {league?.name}</p>
       </section>
 
       <div className="mt-8 grid gap-3 md:grid-cols-4">
-        <ImpactStatCard label="Support pool" value={formatUGX(team.supportPool ?? team.totalSupport ?? 0)} icon={HeartHandshake} />
+        <ImpactStatCard label="Support pool" value={formatUGX(team.supportPool ?? team.totalSupport ?? 0)} icon={UserGroupIcon} />
         <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Users} tone="gold" />
         <ImpactStatCard label="Matches" value={String(matches.length)} icon={Trophy} tone="blue" />
-        <ImpactStatCard label="Verified league" value={`${league?.verifiedPercentage ?? 0}%`} icon={ShieldCheck} tone="orange" />
+        <ImpactStatCard label="Verified league" value={`${league?.verifiedPercentage ?? 0}%`} icon={SecurityCheckIcon} tone="orange" />
       </div>
 
       <section className="mt-8">

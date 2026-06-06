@@ -4,7 +4,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Radio, ShieldCheck, Sparkles } from 'lucide-react';
+import { PlusSignIcon, SignalIcon, SecurityCheckIcon, SparklesIcon } from 'hugeicons-react';
 import { Athlete } from '@/types';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Button } from '@/components/ui/button';
@@ -42,11 +42,11 @@ export default function FeedPage() {
   const filteredFeed = useMemo(() => {
     return feedPosts.filter((post) => {
       if (activeFilter === 'All') return true;
-      if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return post.sport === activeFilter;
-      if (activeFilter === 'Following') return ['a1', 'a3', 'a5', 't1', 't4'].includes(post.authorId);
-      if (activeFilter === 'Highlights') return post.type === 'AthleteHighlight';
-      if (activeFilter === 'Verified') return post.verified || post.type === 'VerifiedAchievement';
-      if (activeFilter === 'Awards') return post.type === 'AnnualAwards';
+      if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return post.sport === activeFilter.toLowerCase();
+      if (activeFilter === 'Following') return ['fan', 'athlete'].includes(post.authorRole);
+      if (activeFilter === 'Highlights') return post.type === 'athlete_highlight';
+      if (activeFilter === 'Verified') return post.type === 'verified_achievement';
+      if (activeFilter === 'Awards') return post.type === 'annual_awards';
       return true;
     });
   }, [activeFilter, feedPosts]);
@@ -65,9 +65,9 @@ export default function FeedPage() {
             description={header.description}
           />
           <div className="hidden gap-3 lg:grid">
-            <ImpactStatCard label="Live conversations" value="326" icon={Radio} detail="Fans, teams, athletes, and leagues active today." />
-            <ImpactStatCard label="Verified moments" value="41" icon={ShieldCheck} tone="gold" detail="Confirmed achievements and match updates." />
-            <ImpactStatCard label="Community reach" value="24k" icon={Sparkles} tone="blue" detail="Daily GoalPlace256 demo impressions." />
+            <ImpactStatCard label="Live conversations" value="326" icon={SignalIcon} detail="Fans, teams, athletes, and leagues active today." />
+            <ImpactStatCard label="Verified moments" value="41" icon={SecurityCheckIcon} tone="gold" detail="Confirmed achievements and match updates." />
+            <ImpactStatCard label="Community reach" value="24k" icon={SparklesIcon} tone="blue" detail="Daily GoalPlace256 demo impressions." />
           </div>
         </aside>
 
@@ -94,13 +94,12 @@ export default function FeedPage() {
                   }
                 }}
                 onViewProfile={() => {
-                  if (post.authorType === 'Athlete') router.push(`/athletes/${post.authorId}`);
-                  else if (post.authorType === 'Team') router.push(`/teams/${post.authorId}`);
-                  else if (post.authorType === 'League') router.push(`/leagues/${post.authorId}`);
-                  else if (post.authorType === 'Admin') router.push('/awards');
-                  else router.push('/sponsors');
+                  if (post.authorRole === 'athlete') router.push(`/athletes`);
+                  else if (post.authorRole === 'team_admin') router.push(`/teams`);
+                  else if (post.authorRole === 'league_admin') router.push(`/leagues`);
+                  else router.push('/feed');
                 }}
-                onViewMatch={() => router.push('/matches/m1')}
+                onViewMatch={() => router.push('/matches')}
               />
             ))}
 
@@ -127,7 +126,7 @@ export default function FeedPage() {
           }
         }}
       >
-        <Plus className="size-6" />
+        <PlusSignIcon className="size-6" />
       </Button>
 
       <CreatePostModal open={createOpen} onOpenChange={setCreateOpen} />

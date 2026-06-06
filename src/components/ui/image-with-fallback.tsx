@@ -3,7 +3,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState } from 'react';
-import { ImageIcon, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { Image01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { getSportTheme } from '@/lib/sportThemes';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +25,7 @@ export function ImageWithFallback({
 }: ImageWithFallbackProps) {
   const [error, setError] = useState(false);
   const theme = getSportTheme(sport);
-  const Icon = fallbackType === 'team' ? Users : fallbackType === 'athlete' ? Trophy : fallbackType === 'sport' ? theme.icon : ShieldCheck;
+  const Icon = fallbackType === 'team' ? Users : fallbackType === 'athlete' ? Trophy : fallbackType === 'sport' ? theme.icon : SecurityCheckIcon;
 
   if (error || !src) {
     return (
@@ -45,7 +46,7 @@ export function ImageWithFallback({
           </span>
         ) : (
           <div className="relative z-10 flex flex-col items-center gap-2 text-white/70">
-            {fallbackType === 'stadium' ? <ImageIcon className="size-8" /> : <Icon className="size-8" />}
+            {fallbackType === 'stadium' ? <Image01Icon className="size-8" /> : <Icon className="size-8" />}
             <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">{theme.name}</span>
           </div>
         )}

@@ -139,8 +139,13 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
   }
 
   // Future modules:
-  if (pathname.startsWith('/team-admin') || pathname.startsWith('/sponsor-dashboard')) {
-    return true; // We will handle showing a "Future Module" message on the page itself
+  if (pathname.startsWith('/team-admin')) {
+    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+  }
+  if (pathname.startsWith('/sponsor-dashboard')) {
+    // We handle the future module message on the page itself.
+    // Restricting to platform_admin or fan just to prevent random roles, though anyone logged in could technically see the "future module" placeholder.
+    return true; 
   }
 
   // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user

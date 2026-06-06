@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { PageContainer } from '@/components/ui/product';
-import { Shield, User, Trophy, ChevronRight } from 'lucide-react';
+import { Shield01Icon, UserIcon, ArrowRight01Icon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
@@ -29,7 +30,7 @@ function RegisterContent() {
       id: 'fan', 
       title: 'Join as Fan', 
       description: 'Create a fan account to follow local sport, support athletes, save posts, comment, and earn GoalPlace Points.', 
-      icon: User,
+      icon: UserIcon,
       color: 'text-blue-400'
     },
     { 
@@ -43,7 +44,7 @@ function RegisterContent() {
       id: 'league_admin', 
       title: 'League Admin', 
       description: 'Create a league admin account to manage teams, athletes, fixtures, results, verifications, and community updates.', 
-      icon: Shield,
+      icon: Shield01Icon,
       color: 'text-red-400'
     }
   ];
@@ -56,11 +57,11 @@ function RegisterContent() {
             <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
               <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
             </div>
-            <span className="font-heading text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
+            <span className="font-display text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
           </Link>
 
           <div className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
-            <h1 className="mb-2 text-center font-heading text-3xl font-black text-white">Create your account</h1>
+            <h1 className="mb-2 text-center font-display text-3xl font-black text-white">Create your account</h1>
             <p className="mb-8 text-center text-sm text-slate-400">
               Select how you want to use GoalPlace256
             </p>
@@ -83,7 +84,7 @@ function RegisterContent() {
                         <div className={`rounded-lg bg-black/30 p-2 ${role.color}`}>
                           <Icon className="size-5" />
                         </div>
-                        <h3 className="font-heading text-lg font-black text-white">{role.title}</h3>
+                        <h3 className="font-display text-lg font-black text-white">{role.title}</h3>
                       </div>
                       <p className="text-sm text-slate-400">{role.description}</p>
                     </div>
@@ -99,7 +100,7 @@ function RegisterContent() {
                         onClick={() => handleDemoPreview(role.id)}
                         className="flex items-center justify-center gap-1 rounded-lg border border-[var(--goal-emerald)]/30 bg-[var(--goal-emerald)]/10 py-2.5 px-3 text-xs font-bold text-[var(--goal-mint)] transition-colors hover:bg-[var(--goal-emerald)]/20"
                       >
-                        Preview <ChevronRight className="size-3" />
+                        Preview <ArrowRight01Icon className="size-3" />
                       </button>
                     </div>
                   </div>

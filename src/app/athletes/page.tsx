@@ -4,7 +4,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { HeartHandshake, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { UserGroupIcon, SecurityCheckIcon, ArrowUpRight01Icon } from 'hugeicons-react';
+import { Users } from '@phosphor-icons/react';
 import { Athlete } from '@/types';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { AthleteCard } from '@/components/ui/athlete-card';
@@ -42,9 +43,9 @@ export default function AthletesPage() {
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Users} />
-        <ImpactStatCard label="Verified" value={String(athletes.filter((athlete) => athlete.verified).length)} icon={ShieldCheck} tone="gold" />
-        <ImpactStatCard label="Supporters" value={athletes.reduce((sum, athlete) => sum + athlete.supportersCount, 0).toLocaleString()} icon={HeartHandshake} tone="blue" />
-        <ImpactStatCard label="Rising" value={String(athletes.filter((athlete) => athlete.supportersCount < 100).length)} icon={TrendingUp} tone="orange" />
+        <ImpactStatCard label="Verified" value={String(athletes.filter((athlete) => athlete.verified).length)} icon={SecurityCheckIcon} tone="gold" />
+        <ImpactStatCard label="Supporters" value={athletes.reduce((sum, athlete) => sum + athlete.supportersCount, 0).toLocaleString()} icon={UserGroupIcon} tone="blue" />
+        <ImpactStatCard label="Rising" value={String(athletes.filter((athlete) => athlete.supportersCount < 100).length)} icon={ArrowUpRight01Icon} tone="orange" />
       </div>
 
       <StickyFilterBar filters={filters} active={activeFilter} onChange={setActiveFilter} />

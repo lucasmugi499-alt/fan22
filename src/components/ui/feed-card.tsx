@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { Athlete, FeedPost, League, Team } from '@/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
-import { Award, Bookmark, HeartHandshake, MessageSquare, Share2, ShieldCheck } from 'lucide-react';
+import { Bookmark01Icon, UserGroupIcon, Comment01Icon, Share01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import { getInitials, getSportTheme, timeAgo } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { Button } from './button';
@@ -81,7 +82,7 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
             </div>
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
-                <h4 className="truncate font-heading text-base font-black text-white">{author.name}</h4>
+                <h4 className="truncate font-display text-base font-black text-white">{author.name}</h4>
                 {post.verified && <VerificationBadge className="hidden sm:inline-flex" />}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -93,14 +94,14 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
           </div>
           {post.verified && (
             <div className="shrink-0 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/10 p-2 text-[var(--goal-mint)]">
-              <ShieldCheck className="size-5" />
+              <SecurityCheckIcon className="size-5" />
             </div>
           )}
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
           <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/6 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-            <Award className="size-3" />
+            <Trophy className="size-3" />
             {prettyType(post.type)}
           </span>
           {post.statsRow?.map((stat) => (
@@ -126,18 +127,18 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
 
       <div className="grid grid-cols-4 border-b border-white/8 bg-white/[0.025] text-xs text-slate-300">
         <button className="flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6 hover:text-[var(--goal-mint)]" onClick={onSupport}>
-          <HeartHandshake className="size-4" />
+          <UserGroupIcon className="size-4" />
           <span className="hidden sm:inline">Support</span>
         </button>
         <button className="flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6 hover:text-white" onClick={onComment}>
-          <MessageSquare className="size-4" />
+          <Comment01Icon className="size-4" />
           <span>{comments}</span>
         </button>
         <button
           className="flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 font-bold transition-colors hover:bg-white/6 hover:text-white"
           onClick={() => toast.success('Share link copied')}
         >
-          <Share2 className="size-4" />
+          <Share01Icon className="size-4" />
           <span>{shares}</span>
         </button>
         <button
@@ -162,14 +163,14 @@ export function FeedCard({ post, onSupport, onComment, onViewProfile, onViewMatc
             }
           }}
         >
-          <Bookmark className={cn('size-4', saved && 'fill-current')} />
+          <Bookmark01Icon className={cn('size-4', saved && 'fill-current')} />
           <span>Save</span>
         </button>
       </div>
 
       <div className="flex items-center justify-between gap-3 p-4">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-          <HeartHandshake className="size-4" style={{ color: theme.color }} />
+          <UserGroupIcon className="size-4" style={{ color: theme.color }} />
           {likes.toLocaleString()} community reactions
         </div>
         <Button variant="outline" size="sm" onClick={showMatchAction ? onViewMatch : onViewProfile}>

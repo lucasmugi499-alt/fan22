@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { ChevronRight } from 'lucide-react';
+import { ArrowRight01Icon } from 'hugeicons-react';
 import { useRouter } from 'next/navigation';
 
 export function RoleQuickActions() {
@@ -63,7 +63,7 @@ export function RoleQuickActions() {
           onClick={() => handleAction(action)}
         >
           {action}
-          <ChevronRight className="size-4 opacity-50" />
+          <ArrowRight01Icon className="size-4 opacity-50" />
         </Button>
       ))}
     </div>

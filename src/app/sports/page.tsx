@@ -5,7 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight01Icon } from 'hugeicons-react';
 import { SportSlug, getSportTheme, sports } from '@/lib/sportThemes';
 import { buttonVariants } from '@/components/ui/button';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
@@ -46,7 +46,7 @@ function SportsContent() {
         <div className={`absolute inset-0 bg-gradient-to-br ${theme.mutedGradient} opacity-70`} />
         <div className="relative z-10">
           <SportBadge sport={selectedSport} />
-          <h1 className="mt-4 font-heading text-4xl font-black text-white md:text-6xl">{selectedSport}</h1>
+          <h1 className="mt-4 font-display text-4xl font-black text-white md:text-6xl">{selectedSport}</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
             Track athletes, fixtures, verified challenges, and community activity across Uganda&apos;s {selectedSport.toLowerCase()} scene.
           </p>
@@ -74,7 +74,7 @@ function SportsContent() {
           <div className="grid gap-3 sm:grid-cols-2">
             {theme.statLabels.map((label) => (
               <div key={label} className="glass-panel rounded-xl p-4">
-                <p className="font-heading text-lg font-black text-white">{label}</p>
+                <p className="font-display text-lg font-black text-white">{label}</p>
               </div>
             ))}
           </div>
@@ -84,8 +84,8 @@ function SportsContent() {
           <div className="grid gap-3">
             {theme.challengeExamples.map((challenge) => (
               <div key={challenge} className="glass-panel flex items-center justify-between rounded-xl p-4">
-                <p className="font-heading text-lg font-black text-white">{challenge}</p>
-                <ArrowRight className="size-4" style={{ color: theme.color }} />
+                <p className="font-display text-lg font-black text-white">{challenge}</p>
+                <ArrowRight01Icon className="size-4" style={{ color: theme.color }} />
               </div>
             ))}
           </div>

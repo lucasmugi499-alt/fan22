@@ -5,7 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { ArrowLeft01Icon, Calendar01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { getSportTheme } from '@/lib/sportThemes';
@@ -40,7 +41,7 @@ function LeagueDetailPageContent() {
   return (
     <PageContainer compact>
       <Link href="/leagues" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
-        <ArrowLeft className="size-4" />
+        <ArrowLeft01Icon className="size-4" />
         Back to Leagues
       </Link>
       <section className={`glass-panel rounded-xl p-5 md:p-8 ${theme.edgeClass}`}>
@@ -48,7 +49,7 @@ function LeagueDetailPageContent() {
           <SportBadge sport={league.sport} />
           <LeagueStatusBadge status={league.status} />
         </div>
-        <h1 className="mt-4 font-heading text-4xl font-black text-white md:text-6xl">{league.name}</h1>
+        <h1 className="mt-4 font-display text-4xl font-black text-white md:text-6xl">{league.name}</h1>
         <p className="mt-3 text-sm text-slate-400">{league.city}, {league.country}</p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Button onClick={() => router.push('/matches')}>View Fixtures</Button>
@@ -59,8 +60,8 @@ function LeagueDetailPageContent() {
       <div className="mt-8 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Teams" value={String(teams.length)} icon={Users} />
         <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Trophy} tone="gold" />
-        <ImpactStatCard label="Matches" value={String(matches.length)} icon={Calendar} tone="blue" />
-        <ImpactStatCard label="Verified" value={`${league.verifiedPercentage}%`} icon={ShieldCheck} tone="orange" />
+        <ImpactStatCard label="Matches" value={String(matches.length)} icon={Calendar01Icon} tone="blue" />
+        <ImpactStatCard label="Verified" value={`${league.verifiedPercentage}%`} icon={SecurityCheckIcon} tone="orange" />
       </div>
 
       <section className="mt-8 grid gap-8 xl:grid-cols-[1.08fr_0.92fr]">
@@ -82,7 +83,7 @@ function LeagueDetailPageContent() {
           {teams.map((team) => (
             <button key={team.id} className="glass-panel rounded-xl p-5 text-left" onClick={() => router.push(`/teams/${team.id}`)}>
               <SportBadge sport={team.sport} />
-              <h2 className="mt-4 font-heading text-xl font-black text-white">{team.name}</h2>
+              <h2 className="mt-4 font-display text-xl font-black text-white">{team.name}</h2>
               <p className="mt-2 text-sm text-slate-400">{team.location}</p>
             </button>
           ))}

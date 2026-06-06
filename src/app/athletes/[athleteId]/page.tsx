@@ -5,7 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, HeartHandshake, MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { ArrowLeft01Icon, Calendar01Icon, UserGroupIcon, Location01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
@@ -84,7 +85,7 @@ function AthleteProfilePageContent() {
         </div>
         <PageContainer compact className="relative z-10">
           <Link href="/athletes" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
-            <ArrowLeft className="size-4" />
+            <ArrowLeft01Icon className="size-4" />
             Back to Athletes
           </Link>
           <div className="grid gap-6 lg:grid-cols-[auto_1fr_auto] lg:items-end">
@@ -103,12 +104,12 @@ function AthleteProfilePageContent() {
                 <SportBadge sport={athlete.sport} />
                 {athlete.verified && <VerificationBadge />}
               </div>
-              <h1 className="font-heading text-4xl font-black tracking-tight text-white md:text-6xl">{athlete.name}</h1>
+              <h1 className="font-display text-4xl font-black tracking-tight text-white md:text-6xl">{athlete.name}</h1>
               <p className="mt-3 text-base font-bold text-slate-300">{athlete.position} - {team?.name}</p>
               <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-300">
-                <span className="flex items-center gap-1"><MapPin className="size-4" /> {athlete.city}, {athlete.country}</span>
+                <span className="flex items-center gap-1"><Location01Icon className="size-4" /> {athlete.city}, {athlete.country}</span>
                 <span className="flex items-center gap-1"><Trophy className="size-4 text-[var(--goal-gold)]" /> {league?.name}</span>
-                <span className="flex items-center gap-1"><Calendar className="size-4 text-[var(--goal-mint)]" /> Next: {nextMatch?.venue}</span>
+                <span className="flex items-center gap-1"><Calendar01Icon className="size-4 text-[var(--goal-mint)]" /> Next: {nextMatch?.venue}</span>
               </div>
             </div>
             <div className="grid gap-2 sm:grid-cols-3 lg:w-64 lg:grid-cols-1">
@@ -122,10 +123,10 @@ function AthleteProfilePageContent() {
 
       <PageContainer compact>
         <div className="grid gap-3 md:grid-cols-4">
-          <ImpactStatCard label="Total support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)} icon={HeartHandshake} />
+          <ImpactStatCard label="Total support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)} icon={UserGroupIcon} />
           <ImpactStatCard label="Supporters" value={String(athlete.supportersCount)} icon={Users} tone="gold" />
-          <ImpactStatCard label="Verified" value={athlete.verified ? 'Yes' : 'Pending'} icon={ShieldCheck} tone="blue" />
-          <ImpactStatCard label="Next match" value={nextMatch?.status ?? 'Upcoming'} icon={Calendar} tone="orange" />
+          <ImpactStatCard label="Verified" value={athlete.verified ? 'Yes' : 'Pending'} icon={SecurityCheckIcon} tone="blue" />
+          <ImpactStatCard label="Next match" value={nextMatch?.status ?? 'Upcoming'} icon={Calendar01Icon} tone="orange" />
         </div>
 
         <Tabs defaultValue="overview" className="mt-8 w-full">
@@ -145,7 +146,7 @@ function AthleteProfilePageContent() {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   {['Transport support', 'Meals and recovery', 'Training access'].map((item) => (
                     <div key={item} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="font-heading text-base font-black text-white">{item}</p>
+                      <p className="font-display text-base font-black text-white">{item}</p>
                     </div>
                   ))}
                 </div>

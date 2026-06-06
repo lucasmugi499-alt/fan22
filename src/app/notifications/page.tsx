@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Notification01Icon } from 'hugeicons-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PageContainer, SectionHeader } from '@/components/ui/product';
 import { useAuth } from '@/context/AuthProvider';
@@ -32,9 +32,9 @@ export default function NotificationsPage() {
           {notifications.map((notification) => (
             <div key={notification.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-start gap-3">
-                <Bell className="mt-1 size-4 text-[var(--goal-mint)]" />
+                <Notification01Icon className="mt-1 size-4 text-[var(--goal-mint)]" />
                 <div>
-                  <p className="font-heading text-lg font-black text-white">{notification.title}</p>
+                  <p className="font-display text-lg font-black text-white">{notification.title}</p>
                   <p className="mt-1 text-sm leading-6 text-slate-300">{notification.body}</p>
                 </div>
               </div>

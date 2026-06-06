@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { Location01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { VerificationBadge } from '@/components/ui/verification-badge';
@@ -46,7 +47,7 @@ function TeamsDirectory() {
 
       <section className="grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Teams shown" value={String(filteredTeams.length)} icon={Users} />
-        <ImpactStatCard label="Verified" value={String(filteredTeams.filter((team) => team.verified).length)} icon={ShieldCheck} tone="blue" />
+        <ImpactStatCard label="Verified" value={String(filteredTeams.filter((team) => team.verified).length)} icon={SecurityCheckIcon} tone="blue" />
         <ImpactStatCard label="Support total" value={formatUGX(totalSupport)} icon={Trophy} tone="gold" />
         <ImpactStatCard label="Supporters" value={String(totalSupporters)} icon={Users} tone="orange" />
       </section>
@@ -69,7 +70,7 @@ function TeamsDirectory() {
             variant={verifiedOnly ? 'secondary' : 'outline'}
             onClick={() => setVerifiedOnly((value) => !value)}
           >
-            <ShieldCheck className="size-4" />
+            <SecurityCheckIcon className="size-4" />
             Verified only
           </Button>
         </div>
@@ -86,9 +87,9 @@ function TeamsDirectory() {
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <SportBadge sport={team.sport} />
-                  <h2 className="mt-3 font-heading text-2xl font-black text-white">{team.name}</h2>
+                  <h2 className="mt-3 font-display text-2xl font-black text-white">{team.name}</h2>
                   <p className="mt-1 flex items-center gap-1 text-sm text-slate-400">
-                    <MapPin className="size-4" />
+                    <Location01Icon className="size-4" />
                     {team.city}
                   </p>
                 </div>
@@ -103,11 +104,11 @@ function TeamsDirectory() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--goal-mint)]">Support</p>
-                  <p className="mt-1 font-heading text-lg font-black text-white">{formatUGX(team.supportPool ?? team.totalSupport ?? 0)}</p>
+                  <p className="mt-1 font-display text-lg font-black text-white">{formatUGX(team.supportPool ?? team.totalSupport ?? 0)}</p>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Supporters</p>
-                  <p className="mt-1 font-heading text-lg font-black text-white">{team.supportersCount}</p>
+                  <p className="mt-1 font-display text-lg font-black text-white">{team.supportersCount}</p>
                 </div>
               </div>
 

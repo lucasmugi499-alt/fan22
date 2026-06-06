@@ -4,7 +4,8 @@ import React from 'react';
 import { Challenge } from '@/types';
 import { GlassCard } from './glass-card';
 import { Button } from './button';
-import { CheckCircle2, Coins, ShieldCheck, Users } from 'lucide-react';
+import { CheckmarkCircle01Icon, Coins01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { Users } from '@phosphor-icons/react';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
 import { SportBadge } from './product';
@@ -41,7 +42,7 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
             <SportBadge sport={athlete.sport} />
             {challenge.verificationStatus === 'Verified' && (
               <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--goal-mint)]">
-                <ShieldCheck className="size-3" />
+                <SecurityCheckIcon className="size-3" />
                 Verified
               </span>
             )}
@@ -55,7 +56,7 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
         <div className="rounded-lg border border-white/8 bg-black/20 p-3">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Pledged</p>
           <div className="mt-1 flex items-center gap-1 text-sm font-black text-white">
-            <Coins className="size-3.5" style={{ color: theme.color }} />
+            <Coins01Icon className="size-3.5" style={{ color: theme.color }} />
             {formatUGX(challenge.totalPledged)}
           </div>
         </div>
@@ -74,7 +75,7 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
         </Button>
       ) : (
         <Button disabled variant="outline" className="mt-4 w-full">
-          <CheckCircle2 className="size-4" />
+          <CheckmarkCircle01Icon className="size-4" />
           {achieved ? 'Challenge Achieved' : 'Challenge Closed'}
         </Button>
       )}

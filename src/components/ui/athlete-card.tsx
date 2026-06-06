@@ -5,7 +5,8 @@ import { Athlete } from '@/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Button } from './button';
-import { ArrowUpRight, MapPin, Users } from 'lucide-react';
+import { ArrowUpRight01Icon, Location01Icon } from 'hugeicons-react';
+import { Users } from '@phosphor-icons/react';
 import { ImageWithFallback } from './image-with-fallback';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { SportBadge } from './product';
@@ -78,11 +79,11 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
         </div>
 
         <div className="min-w-0">
-          <h3 className="truncate font-heading text-lg font-black leading-tight text-white transition-colors group-hover:text-[var(--goal-mint)]">
+          <h3 className="truncate font-display text-lg font-black leading-tight text-white transition-colors group-hover:text-[var(--goal-mint)]">
             {athlete.name}
           </h3>
           <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-300">
-            <MapPin className="size-3 text-slate-500" />
+            <Location01Icon className="size-3 text-slate-500" />
             {athlete.position} - {athlete.city}
           </p>
           <p className="mt-1 truncate text-xs text-slate-400">{team?.name}</p>
@@ -92,7 +93,7 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
           {keyStats.map((stat) => (
             <div key={stat.label} className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-2">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{stat.label}</p>
-              <p className="mt-0.5 font-heading text-lg font-black text-white">{stat.value}</p>
+              <p className="mt-0.5 font-display text-lg font-black text-white">{stat.value}</p>
             </div>
           ))}
         </div>
@@ -100,7 +101,7 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
         <div className="mt-3 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 px-3 py-2">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Total Verified Support</p>
           <div className="mt-1 flex items-center justify-between gap-3">
-            <p className="font-heading text-base font-black text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)}</p>
+            <p className="font-display text-base font-black text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)}</p>
             <span className="flex items-center gap-1 text-xs font-bold text-slate-300">
               <Users className="size-3" />
               {athlete.supportersCount}
@@ -127,7 +128,7 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
               onView?.();
             }}
           >
-            <ArrowUpRight className="size-4" />
+            <ArrowUpRight01Icon className="size-4" />
           </Button>
         </div>
       </div>

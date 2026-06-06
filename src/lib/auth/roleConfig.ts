@@ -1,5 +1,6 @@
 import { AppRole } from '@/types';
-import { Home, List, Calendar, LayoutDashboard, Users, Landmark, ShieldCheck, User, Wallet } from 'lucide-react';
+import { Home01Icon, ListViewIcon, Calendar01Icon, DashboardSquare01Icon, Building01Icon, SecurityCheckIcon, UserIcon, Wallet01Icon } from 'hugeicons-react';
+import { Users } from '@phosphor-icons/react';
 import React from 'react';
 
 export interface RoleConfig {
@@ -25,11 +26,11 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     dashboardSubtitle: 'Follow the game and make an impact.',
     primaryActions: ['Support Athlete', 'Explore Matches', 'Open Wallet', 'View Awards'],
     navItems: [
-      { name: 'Home', href: '/home', icon: Home },
-      { name: 'Feed', href: '/feed', icon: List },
-      { name: 'Matches', href: '/matches', icon: Calendar },
+      { name: 'Home', href: '/home', icon: Home01Icon },
+      { name: 'Feed', href: '/feed', icon: ListViewIcon },
+      { name: 'Matches', href: '/matches', icon: Calendar01Icon },
       { name: 'Athletes', href: '/athletes', icon: Users },
-      { name: 'Wallet', href: '/wallet', icon: Wallet },
+      { name: 'Wallet', href: '/wallet', icon: Wallet01Icon },
     ],
     quickStats: ['walletBalance', 'followedAthletes', 'awardsProgress'],
     allowedRoutes: ['/home', '/dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
@@ -43,11 +44,11 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     dashboardSubtitle: 'Manage your profile and track your impact.',
     primaryActions: ['Upload Highlight', 'Create Post', 'View Supporters', 'Request Verification'],
     navItems: [
-      { name: 'Home', href: '/home', icon: Home },
-      { name: 'Feed', href: '/feed', icon: List },
-      { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'Dashboard', href: '/athlete-dashboard', icon: LayoutDashboard },
-      { name: 'Profile', href: '/profile', icon: User },
+      { name: 'Home', href: '/home', icon: Home01Icon },
+      { name: 'Feed', href: '/feed', icon: ListViewIcon },
+      { name: 'Matches', href: '/matches', icon: Calendar01Icon },
+      { name: 'Dashboard', href: '/athlete-dashboard', icon: DashboardSquare01Icon },
+      { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['totalSupport', 'supportersCount', 'activeChallenges'],
     allowedRoutes: ['/home', '/athlete-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
@@ -61,11 +62,11 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     dashboardSubtitle: 'Manage your league, verify results, and oversee challenges.',
     primaryActions: ['Create Fixture', 'Add Team', 'Add Athlete', 'Submit Result', 'Verify Result', 'Create Challenge'],
     navItems: [
-      { name: 'Home', href: '/home', icon: Home },
-      { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'Verify', href: '/league-admin', icon: ShieldCheck },
-      { name: 'League', href: '/leagues', icon: Landmark },
-      { name: 'Profile', href: '/profile', icon: User },
+      { name: 'Home', href: '/home', icon: Home01Icon },
+      { name: 'Matches', href: '/matches', icon: Calendar01Icon },
+      { name: 'Verify', href: '/league-admin', icon: SecurityCheckIcon },
+      { name: 'League', href: '/leagues', icon: Building01Icon },
+      { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingVerifications', 'fixtures', 'disputes'],
     allowedRoutes: ['/home', '/league-admin', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/notifications', '/profile', '/settings']
@@ -79,10 +80,10 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     dashboardSubtitle: 'Oversee verifications, users, and platform health.',
     primaryActions: ['Review Reports', 'Approve League', 'Moderate Feed', 'Review Payouts'],
     navItems: [
-      { name: 'Home', href: '/home', icon: Home },
-      { name: 'Admin', href: '/admin', icon: ShieldCheck },
-      { name: 'Reports', href: '/admin', icon: List },
-      { name: 'Profile', href: '/profile', icon: User },
+      { name: 'Home', href: '/home', icon: Home01Icon },
+      { name: 'Admin', href: '/admin', icon: SecurityCheckIcon },
+      { name: 'Reports', href: '/admin', icon: ListViewIcon },
+      { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingApprovals', 'activeReports', 'systemHealth'],
     allowedRoutes: ['/home', '/admin', '/league-admin', '/athlete-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']

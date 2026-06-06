@@ -12,14 +12,14 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { AppRole, UserProfile } from '@/types';
 import { auth, db, isFirebaseConfigured, requireFirebaseClient } from './client';
 
-export const demoAccounts: Array<{ label: string; email: string; role: AppRole }> = [
+export const demoAccounts: Array<{ label: string; email: string; role: AppRole; internal?: boolean }> = [
   { label: 'Fan Demo', email: 'fan@goalplace256.com', role: 'fan' },
   { label: 'Athlete Demo', email: 'athlete@goalplace256.com', role: 'athlete' },
-  { label: 'Team Admin Demo', email: 'team@goalplace256.com', role: 'team_admin' },
   { label: 'League Admin Demo', email: 'league@goalplace256.com', role: 'league_admin' },
-  { label: 'Sponsor Demo', email: 'sponsor@goalplace256.com', role: 'sponsor' },
   { label: 'Platform Admin Demo', email: 'admin@goalplace256.com', role: 'platform_admin' },
-  { label: 'Super Admin Demo', email: 'superadmin@goalplace256.com', role: 'super_admin' },
+  { label: 'Team Admin Demo', email: 'team@goalplace256.com', role: 'team_admin', internal: true },
+  { label: 'Sponsor Demo', email: 'sponsor@goalplace256.com', role: 'sponsor', internal: true },
+  { label: 'Super Admin Demo', email: 'superadmin@goalplace256.com', role: 'super_admin', internal: true },
 ];
 
 export function isAuthAvailable() {
@@ -113,9 +113,9 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
 
 export function routeForAppRole(role?: AppRole | null) {
   if (role === 'athlete') return '/athlete-dashboard';
-  if (role === 'team_admin') return '/team-admin';
+  if (role === 'team_admin') return '/league-admin';
   if (role === 'league_admin') return '/league-admin';
-  if (role === 'sponsor') return '/sponsor-dashboard';
+  if (role === 'sponsor') return '/home';
   if (role === 'platform_admin' || role === 'super_admin') return '/admin';
   return '/home';
 }

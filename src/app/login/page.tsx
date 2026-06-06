@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { canAccessRoute, getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { PageContainer } from '@/components/ui/product';
-import { Shield, User, Trophy, ShieldCheck } from 'lucide-react';
+import { Shield01Icon, UserIcon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 
@@ -32,10 +33,10 @@ function AuthContent() {
   };
 
   const demoRoles: { id: AppRole; label: string; description: string; icon: React.ElementType }[] = [
-    { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: User },
+    { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: UserIcon },
     { id: 'athlete', label: 'Continue as Athlete', description: 'Manage your profile, view supporters, and post highlights.', icon: Trophy },
-    { id: 'league_admin', label: 'Continue as League Admin', description: 'Manage teams, athletes, fixtures, and verify results.', icon: Shield },
-    { id: 'platform_admin', label: 'Continue as Platform Admin', description: 'Approve leagues, moderate content, and oversee the platform.', icon: ShieldCheck },
+    { id: 'league_admin', label: 'Continue as League Admin', description: 'Manage teams, athletes, fixtures, and verify results.', icon: Shield01Icon },
+    { id: 'platform_admin', label: 'Continue as Platform Admin', description: 'Approve leagues, moderate content, and oversee the platform.', icon: SecurityCheckIcon },
   ];
 
   return (
@@ -46,11 +47,11 @@ function AuthContent() {
             <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
               <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
             </div>
-            <span className="font-heading text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
+            <span className="font-display text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
           </Link>
 
           <div className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] p-8 shadow-2xl">
-            <h1 className="mb-2 text-center font-heading text-3xl font-black text-white">Welcome Back</h1>
+            <h1 className="mb-2 text-center font-display text-3xl font-black text-white">Welcome Back</h1>
             <p className="mb-8 text-center text-sm text-slate-400">
               Sign in to your GoalPlace256 account
             </p>

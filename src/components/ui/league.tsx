@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Lock, ShieldCheck, Trophy } from 'lucide-react';
+import { Alert01Icon, CheckmarkCircle01Icon, Task01Icon, LockKeyIcon, SecurityCheckIcon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import {
   getGoalPlaceIndexSignals,
   getLeagueStatusMeta,
@@ -29,11 +30,11 @@ export function LeagueStatusBadge({
         className
       )}
     >
-      {status === 'draft' && <Lock className="size-3" />}
-      {status === 'community' && <ClipboardCheck className="size-3" />}
-      {status === 'verified' && <ShieldCheck className="size-3" />}
-      {status === 'partner' && <CheckCircle2 className="size-3" />}
-      {status === 'suspended' && <AlertTriangle className="size-3" />}
+      {status === 'draft' && <LockKeyIcon className="size-3" />}
+      {status === 'community' && <Task01Icon className="size-3" />}
+      {status === 'verified' && <SecurityCheckIcon className="size-3" />}
+      {status === 'partner' && <CheckmarkCircle01Icon className="size-3" />}
+      {status === 'suspended' && <Alert01Icon className="size-3" />}
       {meta.shortLabel}
     </span>
   );
@@ -49,7 +50,7 @@ export function LeagueIntegrityNote({ className }: { className?: string }) {
     >
       <div className="mb-2 flex items-center gap-2 text-[var(--goal-mint)]">
         <Trophy className="size-4" />
-        <p className="font-heading text-base font-black text-white">Sporting Integrity</p>
+        <p className="font-display text-base font-black text-white">Sporting Integrity</p>
       </div>
       <p>{leagueRankingDisclaimer}</p>
     </div>
@@ -79,12 +80,12 @@ export function LeagueStatusRoadmap({
             )}
           >
             <LeagueStatusBadge status={status} />
-            <h3 className="mt-3 font-heading text-lg font-black text-white">{meta.label}</h3>
+            <h3 className="mt-3 font-display text-lg font-black text-white">{meta.label}</h3>
             <p className="mt-2 text-sm leading-6 text-slate-300">{meta.description}</p>
             <div className="mt-4 space-y-2">
               {meta.capabilities.map((capability) => (
                 <div key={capability} className="flex items-start gap-2 text-xs leading-5 text-slate-300">
-                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[var(--goal-mint)]" />
+                  <CheckmarkCircle01Icon className="mt-0.5 size-3.5 shrink-0 text-[var(--goal-mint)]" />
                   <span>{capability}</span>
                 </div>
               ))}
@@ -124,7 +125,7 @@ export function LeagueStandingsTable({
           <tbody className="divide-y divide-white/8 bg-white/[0.03]">
             {standings.map((standing, index) => (
               <tr key={standing.teamId}>
-                <td className="px-4 py-4 font-heading text-lg font-black text-white">{index + 1}</td>
+                <td className="px-4 py-4 font-display text-lg font-black text-white">{index + 1}</td>
                 <td className="px-4 py-4 font-bold text-white">{standing.teamName}</td>
                 <td className="px-4 py-4 text-center text-slate-300">{standing.played}</td>
                 <td className="px-4 py-4 text-center text-slate-300">{standing.wins}</td>
@@ -133,7 +134,7 @@ export function LeagueStandingsTable({
                 <td className="px-4 py-4 text-center text-slate-300">{standing.pointsFor}</td>
                 <td className="px-4 py-4 text-center text-slate-300">{standing.pointsAgainst}</td>
                 <td className="px-4 py-4 text-center text-slate-300">{standing.difference}</td>
-                <td className="px-4 py-4 text-center font-heading text-lg font-black text-[var(--goal-mint)]">
+                <td className="px-4 py-4 text-center font-display text-lg font-black text-[var(--goal-mint)]">
                   {standing.points}
                 </td>
               </tr>
@@ -161,7 +162,7 @@ export function GoalPlaceIndexPanel({
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--goal-mint)]">
             GoalPlace Index
           </p>
-          <h3 className="mt-2 font-heading text-2xl font-black text-white">Platform quality signals</h3>
+          <h3 className="mt-2 font-display text-2xl font-black text-white">Platform quality signals</h3>
           <p className="mt-2 text-sm leading-6 text-slate-300">
             Separate from league standings and based on verification, match completion rate, athlete profile
             completion, fan engagement, support activity, admin reliability, and media uploads.
@@ -169,7 +170,7 @@ export function GoalPlaceIndexPanel({
         </div>
         <div className="shrink-0 rounded-xl border border-[var(--goal-gold)]/25 bg-[var(--goal-gold)]/10 px-4 py-3 text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-gold)]">Index</p>
-          <p className="font-heading text-3xl font-black text-white">{league.goalPlaceIndex}</p>
+          <p className="font-display text-3xl font-black text-white">{league.goalPlaceIndex}</p>
         </div>
       </div>
 
@@ -178,7 +179,7 @@ export function GoalPlaceIndexPanel({
           <div key={signal.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-black text-white">{signal.label}</p>
-              <p className="font-heading text-sm font-black text-[var(--goal-mint)]">{signal.value}%</p>
+              <p className="font-display text-sm font-black text-[var(--goal-mint)]">{signal.value}%</p>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
               <div

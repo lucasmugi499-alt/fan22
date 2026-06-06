@@ -1,4 +1,5 @@
-import { Activity, CircleDot, Dumbbell, Goal, LucideIcon } from 'lucide-react';
+import { Activity01Icon, RecordIcon, Dumbbell01Icon } from 'hugeicons-react';
+import { SoccerBall } from '@phosphor-icons/react';
 import { SportType } from '@/types';
 
 export type SportSlug = 'football' | 'basketball' | 'rugby';
@@ -12,7 +13,7 @@ export interface SportTheme {
   gradient: string;
   mutedGradient: string;
   edgeClass: string;
-  icon: LucideIcon;
+  icon: any;
   statLabels: string[];
   challengeExamples: string[];
   image: string;
@@ -28,7 +29,7 @@ export const sportThemes: Record<SportType, SportTheme> = {
     gradient: 'from-[var(--football)] via-[var(--goal-emerald)] to-[var(--goal-mint)]',
     mutedGradient: 'from-emerald-500/24 via-green-500/10 to-slate-950',
     edgeClass: 'sport-edge-football',
-    icon: Goal,
+    icon: SoccerBall,
     statLabels: ['Goals', 'Assists', 'Clean sheets', 'Matches'],
     challengeExamples: ['score 1 goal', 'provide 1 assist', 'keep a clean sheet'],
     image: '/placeholders/football-gradient.svg',
@@ -42,7 +43,7 @@ export const sportThemes: Record<SportType, SportTheme> = {
     gradient: 'from-[var(--basketball)] via-[var(--goal-gold)] to-orange-200',
     mutedGradient: 'from-orange-500/24 via-amber-500/12 to-slate-950',
     edgeClass: 'sport-edge-basketball',
-    icon: CircleDot,
+    icon: RecordIcon,
     statLabels: ['Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'],
     challengeExamples: ['reach 20 points', 'get 10 rebounds', 'make 5 assists'],
     image: '/placeholders/basketball-gradient.svg',
@@ -56,7 +57,7 @@ export const sportThemes: Record<SportType, SportTheme> = {
     gradient: 'from-[var(--rugby)] via-cyan-400 to-[var(--goal-mint)]',
     mutedGradient: 'from-blue-500/24 via-cyan-500/10 to-slate-950',
     edgeClass: 'sport-edge-rugby',
-    icon: Dumbbell,
+    icon: Dumbbell01Icon,
     statLabels: ['Tries', 'Tackles', 'Carries', 'Conversions'],
     challengeExamples: ['score a try', 'make 8 tackles', 'complete the match'],
     image: '/placeholders/rugby-gradient.svg',
@@ -111,4 +112,4 @@ export const trustStatements = [
   'GoalPlace256 is built for athlete support, not games of chance.',
 ];
 
-export const activityIcon = Activity;
+export const activityIcon = Activity01Icon;

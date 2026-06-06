@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Building2, Medal, Shield, Trophy, User, Users } from 'lucide-react';
+import { Shield01Icon, UserIcon } from 'hugeicons-react';
+import { Medal, Trophy } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league';
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
@@ -13,11 +14,9 @@ import { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 
 const roles = [
-  { slug: 'fan', label: 'Fan', icon: User, detail: 'Follow sport, support athletes, earn GoalPlace Points.' },
-  { slug: 'athlete', label: 'Athlete', icon: Trophy, detail: 'Build your profile, challenges, highlights, and support base.' },
-  { slug: 'team_admin', label: 'Team Admin', icon: Users, detail: 'Manage team presence, rosters, and support activity.' },
-  { slug: 'league_admin', label: 'League Admin', icon: Shield, detail: 'Create a Draft League, verify fixtures, confirm results, and manage payouts.' },
-  { slug: 'sponsor', label: 'Sponsor', icon: Building2, detail: 'Support athletes, teams, leagues, youth, and women and youth sport.' },
+  { slug: 'fan', label: 'Fan', icon: UserIcon, detail: 'Create a fan account to follow matches, support athletes, earn GoalPlace Points, and track your community impact.' },
+  { slug: 'athlete', label: 'Athlete', icon: Trophy, detail: 'Create an athlete account to build your profile, receive support, post highlights, and track verified challenges.' },
+  { slug: 'league_admin', label: 'League Admin', icon: Shield01Icon, detail: 'Create a league admin account to manage teams, athletes, fixtures, results, verifications, challenges, and league operations.' },
 ] satisfies Array<{ slug: AppRole; label: string; icon: React.ComponentType<{ className?: string }>; detail: string }>;
 
 function normalizeInitialRole(role: string): AppRole {
@@ -54,12 +53,27 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
     }
   };
 
+  if (initialRole === 'platform-admin' || initialRole === 'platform_admin' || initialRole === 'super-admin' || initialRole === 'super_admin') {
+    return (
+      <PageContainer compact>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <Shield01Icon className="mb-6 size-16 text-slate-500" />
+          <h1 className="font-display text-3xl font-black text-white">Platform Admin Access</h1>
+          <p className="mt-4 max-w-md text-slate-400">
+            Platform Admin accounts are invite-only. Please contact GoalPlace256 support for administrative access.
+          </p>
+          <Button className="mt-6" onClick={() => router.push('/login')}>Go to Login</Button>
+        </div>
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer compact>
       <SectionHeader
         eyebrow="Register"
         title="Join GoalPlace256"
-        description="Choose the role that fits how you want to support, play, organize, sponsor, or discover Ugandan sport."
+        description="Choose the role that fits how you want to support, play, organize, or discover Ugandan sport."
       />
 
       <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -81,7 +95,7 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
                   <div className={cn('mb-5 flex size-11 items-center justify-center rounded-xl border', active ? 'border-[var(--goal-emerald)]/35 bg-[var(--goal-emerald)]/14 text-[var(--goal-mint)]' : 'border-white/10 bg-white/6 text-slate-300')}>
                     <Icon className="size-5" />
                   </div>
-                  <h3 className="font-heading text-xl font-black text-white">{item.label}</h3>
+                  <h3 className="font-display text-xl font-black text-white">{item.label}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-400">{item.detail}</p>
                 </button>
               );
@@ -99,7 +113,7 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
           <div className="mb-6 flex items-center gap-3">
             <Medal className="size-7 text-[var(--goal-gold)]" />
             <div>
-              <h2 className="font-heading text-2xl font-black text-white">Create Demo Account</h2>
+              <h2 className="font-display text-2xl font-black text-white">Create Demo Account</h2>
               <p className="text-sm text-slate-400">Creates Firebase Auth user and Firestore profile.</p>
             </div>
           </div>

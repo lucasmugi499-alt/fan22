@@ -1,27 +1,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  Award,
-  Calendar,
-  Home,
-  Landmark,
-  List,
-  LogIn,
-  Handshake,
-  Trophy,
-  Users,
-  Wallet,
-  LayoutDashboard,
-  User,
-  ShieldCheck,
-  Building2,
-  Info,
-  HelpCircle,
-  Settings,
-  LogOut,
-  ChevronDown
-} from 'lucide-react';
+import { Calendar01Icon, Home01Icon, Building01Icon, ListViewIcon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, SecurityCheckIcon, Building03Icon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
 import { AppRole } from '@/types';
@@ -87,10 +68,10 @@ export function MobileNav() {
 function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   if (authStatus !== 'logged_in') {
     return [
-      { name: 'Home', href: '/', icon: Home },
-      { name: 'About', href: '/about', icon: Info },
-      { name: 'How It Works', href: '/how-it-works', icon: HelpCircle },
-      { name: 'Sponsors', href: '/sponsors', icon: Handshake },
+      { name: 'Home', href: '/', icon: Home01Icon },
+      { name: 'About', href: '/about', icon: InformationCircleIcon },
+      { name: 'How It Works', href: '/how-it-works', icon: HelpCircleIcon },
+      { name: 'Sponsors', href: '/sponsors', icon: UserGroupIcon },
     ];
   }
 
@@ -106,12 +87,12 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   const desktopItems = [...config.navItems];
   
   if (configRole === 'fan') {
-    desktopItems.push({ name: 'Leagues', href: '/leagues', icon: Landmark });
-    desktopItems.push({ name: 'Awards', href: '/awards', icon: Award });
-    desktopItems.push({ name: 'Profile', href: '/profile', icon: User });
+    desktopItems.push({ name: 'Leagues', href: '/leagues', icon: Building01Icon });
+    desktopItems.push({ name: 'Awards', href: '/awards', icon: Trophy });
+    desktopItems.push({ name: 'Profile', href: '/profile', icon: UserIcon });
   } else if (configRole === 'athlete') {
-    desktopItems.push({ name: 'Wallet', href: '/wallet', icon: Wallet });
-    desktopItems.push({ name: 'Settings', href: '/settings', icon: Settings });
+    desktopItems.push({ name: 'Wallet', href: '/wallet', icon: Wallet01Icon });
+    desktopItems.push({ name: 'Settings', href: '/settings', icon: Settings01Icon });
   }
   
   // Deduplicate by name just in case
@@ -148,7 +129,7 @@ function AccountMenu() {
         className="flex items-center gap-2 rounded-lg border border-[var(--goal-emerald)]/40 bg-[var(--goal-emerald)]/10 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-[var(--goal-emerald)]/20"
       >
         <span className="truncate max-w-[100px]">{userProfile.name.split(' ')[0]}</span>
-        <ChevronDown className="size-4 text-[var(--goal-mint)]" />
+        <ArrowDown01Icon className="size-4 text-[var(--goal-mint)]" />
       </button>
 
       {open && (
@@ -161,22 +142,22 @@ function AccountMenu() {
             </div>
             <div className="p-2 flex flex-col gap-1">
               <Link onClick={() => setOpen(false)} href={dashboardRoute} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
-                <LayoutDashboard className="size-4" /> Dashboard
+                <DashboardSquare01Icon className="size-4" /> Dashboard
               </Link>
               <Link onClick={() => setOpen(false)} href="/profile" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
-                <User className="size-4" /> Profile
+                <UserIcon className="size-4" /> Profile
               </Link>
               {['fan', 'athlete'].includes(role) && (
                 <Link onClick={() => setOpen(false)} href="/wallet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--goal-gold)] hover:bg-white/10">
-                  <Wallet className="size-4" /> Wallet
+                  <Wallet01Icon className="size-4" /> Wallet
                 </Link>
               )}
               <Link onClick={() => setOpen(false)} href="/settings" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
-                <Settings className="size-4" /> Settings
+                <Settings01Icon className="size-4" /> Settings
               </Link>
               <div className="my-1 border-t border-white/10" />
               <button onClick={handleLogout} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10">
-                <LogOut className="size-4" /> Logout
+                <Logout01Icon className="size-4" /> Logout
               </button>
             </div>
           </div>
@@ -199,7 +180,7 @@ export function DesktopNav() {
         <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
           <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
         </div>
-        <span className="hidden font-heading text-lg font-black tracking-tight text-white md:block xl:text-xl">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
+        <span className="hidden font-display text-lg font-black tracking-tight text-white md:block xl:text-xl">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
       </Link>
       
       <nav className="hidden flex-1 items-center gap-1 lg:flex lg:gap-2">
@@ -228,7 +209,7 @@ export function DesktopNav() {
         ) : (
           <>
             <Link href="/login" className="hidden lg:flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/5 xl:text-sm">
-              <LogIn className="size-4" />
+              <Login01Icon className="size-4" />
               Login
             </Link>
             <Link href="/register" className="flex items-center gap-2 rounded-lg bg-[var(--goal-emerald)] px-4 py-2 text-sm font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]">

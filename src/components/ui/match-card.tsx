@@ -5,7 +5,8 @@ import { Match } from '@/types';
 import { GlassCard } from './glass-card';
 import { Badge } from './badge';
 import { Button } from './button';
-import { Calendar, MapPin, ShieldCheck, Users, Zap } from 'lucide-react';
+import { Calendar01Icon, Location01Icon, SecurityCheckIcon, ZapIcon } from 'hugeicons-react';
+import { Users } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatCompact, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
@@ -71,7 +72,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
 
         <div className="flex min-w-[76px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/24 px-3 py-2">
           {match.status !== 'Upcoming' ? (
-            <div className="font-heading text-2xl font-black tracking-tight text-white">
+            <div className="font-display text-2xl font-black tracking-tight text-white">
               {homeScore} <span style={{ color: theme.color }}>-</span> {awayScore}
             </div>
           ) : (
@@ -88,11 +89,11 @@ export function MatchCard({ match, onView }: MatchCardProps) {
 
       <div className="mt-4 grid gap-2 text-xs text-slate-300">
         <div className="flex items-center gap-2">
-          <Calendar className="size-3.5 text-slate-500" />
+          <Calendar01Icon className="size-3.5 text-slate-500" />
           <span>{formattedDate} at {formattedTime}</span>
         </div>
         <div className="flex items-center gap-2">
-          <MapPin className="size-3.5 text-slate-500" />
+          <Location01Icon className="size-3.5 text-slate-500" />
           <span className="truncate">{match.venue}</span>
         </div>
       </div>
@@ -100,14 +101,14 @@ export function MatchCard({ match, onView }: MatchCardProps) {
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-white/8 bg-white/5 p-2">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Challenges</p>
-          <p className="mt-1 flex items-center gap-1 font-heading text-lg font-black text-white">
-            <Zap className="size-4" style={{ color: theme.color }} />
+          <p className="mt-1 flex items-center gap-1 font-display text-lg font-black text-white">
+            <ZapIcon className="size-4" style={{ color: theme.color }} />
             {activeChallenges.length}
           </p>
         </div>
         <div className="rounded-lg border border-white/8 bg-white/5 p-2">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Supporters</p>
-          <p className="mt-1 flex items-center gap-1 font-heading text-lg font-black text-white">
+          <p className="mt-1 flex items-center gap-1 font-display text-lg font-black text-white">
             <Users className="size-4 text-[var(--goal-gold)]" />
             {formatCompact(supporterCount || (teamA.supportPool ?? teamA.totalSupport ?? 0) / 10000)}
           </p>
@@ -116,7 +117,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-          <ShieldCheck className="size-4 text-[var(--goal-mint)]" />
+          <SecurityCheckIcon className="size-4 text-[var(--goal-mint)]" />
           {match.verificationStatus}
         </div>
         <Button size="sm" variant={match.status === 'Live' ? 'default' : 'outline'} onClick={(event) => { event.stopPropagation(); onView?.(); }}>

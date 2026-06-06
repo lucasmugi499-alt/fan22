@@ -3,25 +3,21 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { AppRole } from '@/types';
-import { Shield, ChevronUp, User, LogOut } from 'lucide-react';
+import { Shield01Icon, ArrowUp01Icon, UserIcon, Logout01Icon } from 'hugeicons-react';
 import { cn } from '@/lib/utils';
 
 const ROLES: { id: AppRole; label: string }[] = [
   { id: 'fan', label: 'Fan' },
   { id: 'athlete', label: 'Athlete' },
-  { id: 'team_admin', label: 'Team Admin' },
   { id: 'league_admin', label: 'League Admin' },
-  { id: 'sponsor', label: 'Sponsor' },
-  { id: 'platform_admin', label: 'Admin' },
-  { id: 'super_admin', label: 'Super Admin' },
+  { id: 'platform_admin', label: 'Platform Admin' },
 ];
 
 export function DemoRoleSwitcher() {
   const { setDemoRole, role, isDemoMode, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  // In production, we would probably hide this entirely
-  if (process.env.NODE_ENV === 'production' && !isDemoMode) {
+  if (process.env.NODE_ENV !== 'development') {
     return null;
   }
 
@@ -49,7 +45,7 @@ export function DemoRoleSwitcher() {
                   : "text-slate-300 hover:bg-white/5"
               )}
             >
-              <User className="size-4" />
+              <UserIcon className="size-4" />
               {r.label}
             </button>
           ))}
@@ -65,7 +61,7 @@ export function DemoRoleSwitcher() {
             }}
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
           >
-            <LogOut className="size-4" />
+            <Logout01Icon className="size-4" />
             Sign Out
           </button>
         </div>
@@ -80,9 +76,9 @@ export function DemoRoleSwitcher() {
             : "border-white/10 bg-[#0A0D14]/80 text-white hover:bg-white/10"
         )}
       >
-        <Shield className="size-4" />
+        <Shield01Icon className="size-4" />
         {isDemoMode ? `Demo: ${role}` : "Demo Roles"}
-        <ChevronUp className={cn("size-4 transition-transform duration-200", isOpen && "rotate-180")} />
+        <ArrowUp01Icon className={cn("size-4 transition-transform duration-200", isOpen && "rotate-180")} />
       </button>
     </div>
   );

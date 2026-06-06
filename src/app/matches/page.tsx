@@ -4,7 +4,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarClock, CheckCircle2, Radio, Trophy } from 'lucide-react';
+import { Calendar01Icon, CheckmarkCircle01Icon, SignalIcon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterBar } from '@/components/ui/product';
 import { MatchCard } from '@/components/ui/match-card';
@@ -43,9 +44,9 @@ export default function MatchesPage() {
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
-        <ImpactStatCard label="Live now" value={String(matches.filter((match) => match.status === 'Live').length)} icon={Radio} />
-        <ImpactStatCard label="Upcoming" value={String(matches.filter((match) => match.status === 'Upcoming').length)} icon={CalendarClock} tone="gold" />
-        <ImpactStatCard label="Verified results" value={String(matches.filter((match) => match.verificationStatus === 'Verified').length)} icon={CheckCircle2} tone="blue" />
+        <ImpactStatCard label="Live now" value={String(matches.filter((match) => match.status === 'Live').length)} icon={SignalIcon} />
+        <ImpactStatCard label="Upcoming" value={String(matches.filter((match) => match.status === 'Upcoming').length)} icon={Calendar01Icon} tone="gold" />
+        <ImpactStatCard label="Verified results" value={String(matches.filter((match) => match.verificationStatus === 'Verified').length)} icon={CheckmarkCircle01Icon} tone="blue" />
       </div>
 
       <StickyFilterBar filters={filters} active={activeFilter} onChange={setActiveFilter} />

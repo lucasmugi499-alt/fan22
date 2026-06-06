@@ -5,7 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, CheckCircle2, MapPin, ShieldCheck, Trophy, Users, Zap } from 'lucide-react';
+import { ArrowLeft01Icon, Calendar01Icon, CheckmarkCircle01Icon, Location01Icon, SecurityCheckIcon, ZapIcon } from 'hugeicons-react';
+import { Trophy, Users } from '@phosphor-icons/react';
 import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
@@ -51,7 +52,7 @@ function MatchDetailsPageContent() {
   return (
     <PageContainer compact>
       <Link href="/matches" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
-        <ArrowLeft className="size-4" />
+        <ArrowLeft01Icon className="size-4" />
         Back to Matches
       </Link>
 
@@ -70,9 +71,9 @@ function MatchDetailsPageContent() {
             <TeamBlock name={teamA?.name ?? 'Team A'} logoUrl={teamA?.logoUrl ?? ''} sport={match.sport} onClick={() => teamA && router.push(`/teams/${teamA.id}`)} />
             <div className="rounded-xl border border-white/12 bg-black/30 px-4 py-4 text-center">
               {match.status === 'Upcoming' ? (
-                <p className="font-heading text-3xl font-black text-white">VS</p>
+                <p className="font-display text-3xl font-black text-white">VS</p>
               ) : (
-                <p className="font-heading text-4xl font-black text-white md:text-6xl">{homeScore} - {awayScore}</p>
+                <p className="font-display text-4xl font-black text-white md:text-6xl">{homeScore} - {awayScore}</p>
               )}
               <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Scoreboard</p>
             </div>
@@ -80,18 +81,18 @@ function MatchDetailsPageContent() {
           </div>
 
           <div className="mt-6 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-            <span className="flex items-center gap-2"><Calendar className="size-4 text-[var(--goal-mint)]" /> {new Date(matchDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-            <span className="flex items-center gap-2"><MapPin className="size-4 text-[var(--goal-gold)]" /> {match.venue}</span>
-            <span className="flex items-center gap-2"><ShieldCheck className="size-4 text-[var(--goal-mint)]" /> {match.verificationStatus}</span>
+            <span className="flex items-center gap-2"><Calendar01Icon className="size-4 text-[var(--goal-mint)]" /> {new Date(matchDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            <span className="flex items-center gap-2"><Location01Icon className="size-4 text-[var(--goal-gold)]" /> {match.venue}</span>
+            <span className="flex items-center gap-2"><SecurityCheckIcon className="size-4 text-[var(--goal-mint)]" /> {match.verificationStatus}</span>
           </div>
         </div>
       </section>
 
       <section className="mt-8 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Support pool" value={formatUGX(supportPool)} icon={Trophy} />
-        <ImpactStatCard label="Active challenges" value={String(matchChallenges.filter((challenge) => challenge.status === 'Active').length)} icon={Zap} tone="gold" />
+        <ImpactStatCard label="Active challenges" value={String(matchChallenges.filter((challenge) => challenge.status === 'Active').length)} icon={ZapIcon} tone="gold" />
         <ImpactStatCard label="Rosters" value={String(teamAAthletes.length + teamBAthletes.length)} icon={Users} tone="blue" />
-        <ImpactStatCard label="Verification" value={match.verificationStatus} icon={CheckCircle2} tone="orange" />
+        <ImpactStatCard label="Verification" value={match.verificationStatus} icon={CheckmarkCircle01Icon} tone="orange" />
       </section>
 
       <section className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr]">
@@ -101,11 +102,11 @@ function MatchDetailsPageContent() {
             {[teamA, teamB].map((team) => team && (
               <div key={team.id} className="glass-panel rounded-xl p-5">
                 <SportBadge sport={team.sport} />
-                <h3 className="mt-4 font-heading text-2xl font-black text-white">{team.name}</h3>
+                <h3 className="mt-4 font-display text-2xl font-black text-white">{team.name}</h3>
                 <p className="mt-1 text-sm text-slate-400">{team.location}</p>
                 <div className="mt-5 grid grid-cols-3 gap-2">
                   {(team.recentResults ?? ['W', 'D', 'L']).map((result, index) => (
-                    <div key={`${team.id}-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center font-heading text-lg font-black text-white">
+                    <div key={`${team.id}-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center font-display text-lg font-black text-white">
                       {result}
                     </div>
                   ))}
@@ -137,7 +138,7 @@ function MatchDetailsPageContent() {
           <SectionHeader eyebrow="Timeline" title="Match timeline" className="mb-4" />
           {['Kickoff confirmed', 'Challenge window open', 'Halftime review', 'Official verification after full time'].map((item, index) => (
             <div key={item} className="flex gap-3 border-b border-white/8 py-3 last:border-0">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/8 font-heading text-xs font-black text-[var(--goal-mint)]">{index + 1}</span>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/8 font-display text-xs font-black text-[var(--goal-mint)]">{index + 1}</span>
               <p className="text-sm font-semibold text-slate-300">{item}</p>
             </div>
           ))}
@@ -173,7 +174,7 @@ function TeamBlock({ name, logoUrl, sport, onClick }: { name: string; logoUrl: s
       <div className="size-16 overflow-hidden rounded-xl border border-white/12 bg-white/8 p-0.5 md:size-20">
         <ImageWithFallback src={logoUrl} alt={name} fallbackType="team" initials={getInitials(name)} sport={sport} className="h-full w-full rounded-lg object-cover" />
       </div>
-      <p className="line-clamp-2 text-center font-heading text-base font-black text-white md:text-xl">{name}</p>
+      <p className="line-clamp-2 text-center font-display text-base font-black text-white md:text-xl">{name}</p>
     </button>
   );
 }
@@ -181,7 +182,7 @@ function TeamBlock({ name, logoUrl, sport, onClick }: { name: string; logoUrl: s
 function Roster({ title, athletes, onSupport }: { title: string; athletes: Athlete[]; onSupport: (athlete: Athlete) => void }) {
   return (
     <div className="glass-panel rounded-xl p-5">
-      <h3 className="font-heading text-2xl font-black text-white">{title}</h3>
+      <h3 className="font-display text-2xl font-black text-white">{title}</h3>
       <div className="mt-5 space-y-3">
         {athletes.map((athlete) => (
           <div key={athlete.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
@@ -189,7 +190,7 @@ function Roster({ title, athletes, onSupport }: { title: string; athletes: Athle
               <ImageWithFallback src={athlete.avatarUrl} alt={athlete.name} fallbackType="athlete" initials={getInitials(athlete.name)} sport={athlete.sport} className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-heading text-base font-black text-white">{athlete.name}</p>
+              <p className="truncate font-display text-base font-black text-white">{athlete.name}</p>
               <p className="text-xs text-slate-400">{athlete.position}</p>
             </div>
             <Button size="sm" variant="outline" onClick={() => onSupport(athlete)}>Support</Button>

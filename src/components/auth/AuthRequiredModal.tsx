@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { X } from 'lucide-react';
+import { Cancel01Icon } from 'hugeicons-react';
 import { useAuth } from '@/context/AuthProvider';
 
 type AuthModalContextValue = {
@@ -54,14 +54,14 @@ function AuthRequiredModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           onClick={onClose}
           className="absolute right-4 top-4 text-slate-400 hover:text-white"
         >
-          <X className="size-5" />
+          <Cancel01Icon className="size-5" />
         </button>
 
         <div className="mb-6 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_24px_rgba(0,196,106,0.3)]">
-          <span className="font-heading font-black text-white">GP</span>
+          <span className="font-display font-black text-white">GP</span>
         </div>
 
-        <h2 className="mb-2 font-heading text-2xl font-black text-white">Join GoalPlace256</h2>
+        <h2 className="mb-2 font-display text-2xl font-black text-white">Join GoalPlace256</h2>
         <p className="mb-8 text-sm text-slate-400">
           Create an account to support athletes, follow teams, earn GoalPlace Points, and join Uganda&apos;s grassroots sports community.
         </p>

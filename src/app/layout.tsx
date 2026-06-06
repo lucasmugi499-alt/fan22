@@ -1,5 +1,25 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Plus_Jakarta_Sans, Space_Mono } from "next/font/google";
 import "./globals.css";
+
+const displayFont = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const sansFont = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const monoFont = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/context/AuthProvider";
@@ -37,7 +57,7 @@ export default function RootLayout({
       lang="en"
       className="h-full antialiased dark"
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className={`min-h-full flex flex-col bg-background text-foreground ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}>
         <AuthProvider>
           <AuthModalProvider>
             <AppShell>{children}</AppShell>

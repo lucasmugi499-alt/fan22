@@ -19,7 +19,7 @@ import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { SportBadge, TrustNote } from '@/components/ui/product';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { ImageIcon, MessageSquare, Send, ShieldCheck, Upload } from 'lucide-react';
+import { Image01Icon, Comment01Icon, SentIcon, SecurityCheckIcon, Upload01Icon } from 'hugeicons-react';
 
 const drawerClass =
   'border-white/10 bg-[#0B1117]/96 p-0 text-white shadow-2xl backdrop-blur-2xl sm:max-w-lg max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none';
@@ -115,7 +115,7 @@ export function SupportModal({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="font-heading text-2xl font-black">Support Athlete</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-black">Support Athlete</DialogTitle>
             <DialogDescription>Demo mode only. Fans support athletes directly.</DialogDescription>
           </DialogHeader>
 
@@ -133,7 +133,7 @@ export function SupportModal({
               </div>
               <div>
                 <SportBadge sport={selectedAthlete.sport} />
-                <h3 className="mt-2 font-heading text-lg font-black text-white">{selectedAthlete.name}</h3>
+                <h3 className="mt-2 font-display text-lg font-black text-white">{selectedAthlete.name}</h3>
                 <p className="text-xs text-slate-400">{selectedAthlete.position} - {selectedAthlete.city}</p>
               </div>
             </div>
@@ -254,7 +254,7 @@ export function PledgeModal({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="font-heading text-2xl font-black">Pledge Performance Reward</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-black">Pledge Performance Reward</DialogTitle>
             <DialogDescription>Funds are released only after verified performance.</DialogDescription>
           </DialogHeader>
 
@@ -275,7 +275,7 @@ export function PledgeModal({
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 flex items-center gap-2 text-[var(--goal-mint)]">
-                <ShieldCheck className="size-5" />
+                <SecurityCheckIcon className="size-5" />
                 <span className="text-xs font-black uppercase tracking-[0.16em]">Verified Performance</span>
               </div>
               <p className="text-sm leading-6 text-slate-300">
@@ -334,7 +334,7 @@ export function CreatePostModal({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="font-heading text-2xl font-black">Create Post</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-black">Create Post</DialogTitle>
             <DialogDescription>Share a highlight, verified achievement, or community update.</DialogDescription>
           </DialogHeader>
 
@@ -379,7 +379,7 @@ export function CreatePostModal({
               />
             </div>
             <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-white/16 bg-white/5 p-4 text-center">
-              <Upload className="mb-2 size-6 text-[var(--goal-mint)]" />
+              <Upload01Icon className="mb-2 size-6 text-[var(--goal-mint)]" />
               <p className="text-sm font-bold text-white">Mock media upload</p>
               <p className="text-xs text-slate-400">Images are represented by sport-specific fallbacks in demo mode.</p>
             </div>
@@ -431,8 +431,8 @@ export function CommentsDrawer({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="flex items-center gap-2 font-heading text-2xl font-black">
-              <MessageSquare className="size-5 text-[var(--goal-mint)]" />
+            <DialogTitle className="flex items-center gap-2 font-display text-2xl font-black">
+              <Comment01Icon className="size-5 text-[var(--goal-mint)]" />
               Comments
             </DialogTitle>
           </DialogHeader>
@@ -446,7 +446,7 @@ export function CommentsDrawer({
             <div className="flex gap-2 pt-2">
               <DemoInput value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment..." />
               <Button size="icon" aria-label="Submit comment" onClick={submit}>
-                <Send className="size-4" />
+                <SentIcon className="size-4" />
               </Button>
             </div>
           </div>
@@ -473,7 +473,7 @@ export function SponsorInterestModal({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="font-heading text-2xl font-black">Sponsor Interest</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-black">Sponsor Interest</DialogTitle>
             <DialogDescription>Tell the GoalPlace256 team what impact you want to create.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -519,7 +519,7 @@ export function AddFundsModal({
       <DialogContent className={drawerClass}>
         <ModalBody>
           <DialogHeader className="mb-5 pr-8">
-            <DialogTitle className="font-heading text-2xl font-black">Add Money</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-black">Add Money</DialogTitle>
             <DialogDescription>Mock wallet top up for the product demo.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -538,7 +538,7 @@ export function AddFundsModal({
               </DemoSelect>
             </div>
             <div className="flex min-h-24 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-              <ImageIcon className="mb-2 size-6 text-[var(--goal-gold)]" />
+              <Image01Icon className="mb-2 size-6 text-[var(--goal-gold)]" />
               <p className="text-sm leading-6 text-slate-300">No real payments are processed in this demo.</p>
             </div>
             <Button className="w-full" size="lg" onClick={submit}>
