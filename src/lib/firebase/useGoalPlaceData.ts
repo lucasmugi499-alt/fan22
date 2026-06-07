@@ -17,6 +17,7 @@ import {
   VerificationStatus,
   WalletTransaction,
 } from '@/types';
+import { useAppStore } from '@/lib/store';
 
 function toSportName(sport?: SportSlug | SportType): SportType {
   if (sport === 'basketball' || sport === 'Basketball') return 'Basketball';
@@ -217,14 +218,32 @@ export function useGoalPlaceData() {
     };
   }, []);
 
-  return useMemo(
-    () => ({
-      ...items,
+  const store = useAppStore();
+
+  return useMemo(() => {
+    // Merge standard mock data with any local demo session data created by the user
+    const mergedMatches = [...store.demoMatches, ...items.matches].map(m => {
+      // Find if this match was updated in demo state
+      const updatedMatch = store.demoMatches.find(dm => dm.id === m.id);
+      return updatedMatch ? { ...m, ...updatedMatch } : m;
+    });
+
+    // Remove duplicates by ID (preferring demo items if they share IDs)
+    const uniqueMatches = Array.from(new Map(mergedMatches.map(m => [m.id, m])).values());
+
+    return {
+      athletes: [...store.demoAthletes, ...items.athletes],
+      teams: [...store.demoTeams, ...items.teams],
+      leagues: [...store.demoLeagues, ...items.leagues],
+      matches: uniqueMatches,
+      challenges: [...store.demoChallenges, ...items.challenges],
+      feedPosts: items.feedPosts,
+      reports: items.reports,
+      verifications: items.verifications,
       loading,
       source: dataProvider.mode,
-    }),
-    [items, loading]
-  );
+    };
+  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoChallenges]);
 }
 
 export function useUserWalletTransactions(userId?: string | null) {

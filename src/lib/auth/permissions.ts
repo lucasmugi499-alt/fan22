@@ -25,6 +25,8 @@ export function canSupport(auth: AuthState): boolean {
   return isLoggedIn(auth); // Only logged in fans/users can support (technically admins/athletes can too as fans)
 }
 
+export const canSupportAthlete = canSupport;
+
 export function canPledge(auth: AuthState): boolean {
   return isLoggedIn(auth);
 }
@@ -62,10 +64,32 @@ export function canManageLeague(auth: AuthState, _leagueId?: string): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
+export function canViewAdminDashboard(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canAccessSponsorDashboard(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['platform_admin', 'super_admin']);
+}
+
+export function canCreateFixture(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canCreateChallenge(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canRegisterAsRole(role: AppRole): boolean {
+  return ['fan', 'athlete', 'league_admin'].includes(role);
+}
+
 // Verifications
 export function canVerifyMatch(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
+
+export const canVerifyResult = canVerifyMatch;
 
 export function canVerifyChallenge(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
@@ -148,4 +172,23 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
 
   // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user
   return true;
+}
+
+export function routeForAppRole(role: AppRole): string {
+  switch (role) {
+    case 'athlete':
+      return '/athletes';
+    case 'team_admin':
+      return '/teams';
+    case 'league_admin':
+      return '/league-admin';
+    case 'sponsor':
+      return '/sponsor-dashboard';
+    case 'platform_admin':
+    case 'super_admin':
+      return '/admin';
+    case 'fan':
+    default:
+      return '/feed';
+  }
 }

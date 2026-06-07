@@ -24,6 +24,16 @@ import {
   LeagueStatusBadge,
 } from '@/components/ui/league';
 import {
+  AddTeamModal,
+  AddAthleteModal,
+  CreateFixtureModal,
+  SubmitResultModal,
+  VerifyResultModal,
+  CreateChallengeModal,
+  ReviewDisputeDrawer,
+  ReviewPayoutDrawer,
+} from '@/components/modals/demo-modals';
+import {
   ActionToolbar,
   AppPageHeader,
   DashboardSection,
@@ -91,6 +101,7 @@ function LeagueAdminDashboard() {
   const { leagues, teams, athletes, matches, challenges, feedPosts, reports } = useGoalPlaceData();
   const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id ?? '');
   const [activeTab, setActiveTab] = useState('Overview');
+  const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [matchOverrides, setMatchOverrides] = useState<Record<string, VerificationStatus>>({});
   const [challengeOverrides, setChallengeOverrides] = useState<Record<string, VerificationStatus>>({});
 
@@ -124,28 +135,13 @@ function LeagueAdminDashboard() {
   ];
 
   const quickActions = {
-    createFixture: () => {
-      toast.success('Create Fixture draft opened in demo mode.');
-    },
-    addTeam: () => {
-      toast.success('Add Team form opened in demo mode.');
-    },
-    addAthlete: () => {
-      toast.success('Add Athlete form opened in demo mode.');
-    },
-    verifyResult: () => {
-      setActiveTab('Verification');
-      toast.success('Switched to Verification group.');
-    },
-    submitResult: () => {
-      toast.success('Submit Result form opened in demo mode.');
-    },
-    createChallenge: () => {
-      toast.success('Create Challenge form opened in demo mode.');
-    },
-    createPost: () => {
-      toast.success('Create Post form opened in demo mode.');
-    },
+    createFixture: () => setModalOpen('createFixture'),
+    addTeam: () => setModalOpen('addTeam'),
+    addAthlete: () => setModalOpen('addAthlete'),
+    verifyResult: () => setModalOpen('verifyResult'),
+    submitResult: () => setModalOpen('submitResult'),
+    createChallenge: () => setModalOpen('createChallenge'),
+    createPost: () => toast.success('Create Post form opened in demo mode.'),
   };
 
   const updateMatch = async (match: Match, status: VerificationStatus) => {
@@ -530,6 +526,13 @@ function LeagueAdminDashboard() {
           </DashboardSection>
         </div>
       )}
+
+      <AddTeamModal open={modalOpen === 'addTeam'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <AddAthleteModal open={modalOpen === 'addAthlete'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <CreateFixtureModal open={modalOpen === 'createFixture'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <SubmitResultModal open={modalOpen === 'submitResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <VerifyResultModal open={modalOpen === 'verifyResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <CreateChallengeModal open={modalOpen === 'createChallenge'} onOpenChange={(open) => !open && setModalOpen(null)} />
     </PageContainer>
   );
 }

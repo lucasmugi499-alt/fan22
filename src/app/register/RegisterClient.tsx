@@ -8,10 +8,10 @@ import { Medal, Trophy } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { LeagueIntegrityNote, LeagueStatusRoadmap } from '@/components/ui/league';
 import { PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
-import { registerAccount, routeForAppRole } from '@/lib/firebase/auth';
-import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthProvider';
+import { routeForAppRole } from '@/lib/auth/permissions';
 
 const roles = [
   { slug: 'fan', label: 'Fan', icon: UserIcon, detail: 'Create a fan account to follow matches, support athletes, earn GoalPlace Points, and track your community impact.' },
@@ -27,30 +27,46 @@ function normalizeInitialRole(role: string): AppRole {
 
 export default function RegisterClient({ initialRole }: { initialRole: string }) {
   const router = useRouter();
+  const { setDemoRole } = useAuth();
   const [role, setRole] = useState<AppRole>(normalizeInitialRole(initialRole));
+  
+  // Shared fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [city, setCity] = useState('');
+  const [sport, setSport] = useState('Football');
+
+  // Fan
+  const [favoriteLeague, setFavoriteLeague] = useState('');
+
+  // Athlete
+  const [position, setPosition] = useState('');
+  const [athleteStory, setAthleteStory] = useState('');
+
+  // League Admin
+  const [leagueName, setLeagueName] = useState('');
+  const [numTeams, setNumTeams] = useState('8');
+  const [pilotInterest, setPilotInterest] = useState(true);
+
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isFirebaseConfigured) {
-      toast.error('Firebase is not configured yet. Add NEXT_PUBLIC_FIREBASE_* env vars.');
-      return;
-    }
-
     setSubmitting(true);
-    try {
-      await registerAccount({ email, password, name, role });
-      toast.success(role === 'fan' ? 'Account created' : 'Account created and marked pending review');
-      router.push(routeForAppRole(role));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Registration failed');
-    } finally {
-      setSubmitting(false);
-    }
+    
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    setDemoRole(role);
+    toast.success('Demo account created. Real authentication is not enabled yet.');
+    router.push(routeForAppRole(role));
+    setSubmitting(false);
+  };
+
+  const previewDemo = () => {
+    setDemoRole(role);
+    toast.success(`Previewing ${role} dashboard.`);
+    router.push(routeForAppRole(role));
   };
 
   if (initialRole === 'platform-admin' || initialRole === 'platform_admin' || initialRole === 'super-admin' || initialRole === 'super_admin') {
@@ -76,7 +92,7 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
         description="Choose the role that fits how you want to support, play, organize, or discover Ugandan sport."
       />
 
-      <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {roles.map((item) => {
@@ -114,22 +130,61 @@ export default function RegisterClient({ initialRole }: { initialRole: string })
             <Medal className="size-7 text-[var(--goal-gold)]" />
             <div>
               <h2 className="font-display text-2xl font-black text-white">Create Demo Account</h2>
-              <p className="text-sm text-slate-400">Creates Firebase Auth user and Firestore profile.</p>
+              <p className="text-sm text-slate-400">Complete the form below to simulate registration.</p>
             </div>
           </div>
-          <div className="grid gap-4">
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Full name" value={name} onChange={(event) => setName(event.target.value)} required />
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Email address" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Phone or organization contact" value={phone} onChange={(event) => setPhone(event.target.value)} />
-            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} required />
-            <Button size="lg" type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Submit Registration'}</Button>
-            <Button variant="outline" type="button" onClick={() => router.push('/login')}>Already Have Account</Button>
-          </div>
+          <form onSubmit={submit} className="grid gap-4">
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} required />
+
+            {role === 'fan' && (
+              <>
+                <select className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none" value={sport} onChange={(e) => setSport(e.target.value)} required>
+                  <option value="Football">Favorite Sport: Football</option>
+                  <option value="Basketball">Favorite Sport: Basketball</option>
+                  <option value="Rugby">Favorite Sport: Rugby</option>
+                </select>
+                <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Favorite League or Team (Optional)" value={favoriteLeague} onChange={(e) => setFavoriteLeague(e.target.value)} />
+              </>
+            )}
+
+            {role === 'athlete' && (
+              <>
+                <select className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none" value={sport} onChange={(e) => setSport(e.target.value)} required>
+                  <option value="Football">Sport: Football</option>
+                  <option value="Basketball">Sport: Basketball</option>
+                  <option value="Rugby">Sport: Rugby</option>
+                </select>
+                <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Position" value={position} onChange={(e) => setPosition(e.target.value)} required />
+                <textarea className="h-24 resize-none rounded-lg border border-white/10 bg-white/6 p-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Short athlete story (Why do you play?)" value={athleteStory} onChange={(e) => setAthleteStory(e.target.value)} />
+              </>
+            )}
+
+            {role === 'league_admin' && (
+              <>
+                <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="League Name" value={leagueName} onChange={(e) => setLeagueName(e.target.value)} required />
+                <select className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none" value={sport} onChange={(e) => setSport(e.target.value)} required>
+                  <option value="Football">Sport: Football</option>
+                  <option value="Basketball">Sport: Basketball</option>
+                  <option value="Rugby">Sport: Rugby</option>
+                </select>
+                <input className="h-12 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500" placeholder="Number of Teams" type="number" min="2" max="100" value={numTeams} onChange={(e) => setNumTeams(e.target.value)} required />
+                <label className="flex items-center gap-3 text-sm font-semibold text-white">
+                  <input type="checkbox" className="size-4" checked={pilotInterest} onChange={(e) => setPilotInterest(e.target.checked)} />
+                  Interested in official Pilot Program?
+                </label>
+              </>
+            )}
+
+            <Button size="lg" type="submit" disabled={submitting} className="mt-2">{submitting ? 'Creating...' : 'Submit Registration'}</Button>
+            <Button variant="outline" type="button" onClick={previewDemo}>Preview Demo Role Fast</Button>
+          </form>
           <div className="mt-6">
             <TrustNote compact />
           </div>
         </div>
-      </form>
+      </div>
     </PageContainer>
   );
 }

@@ -28,7 +28,7 @@ function TeamDetailPageContent() {
   if (!team) {
     return (
       <PageContainer compact>
-        <Link href="/matches" className="text-sm font-bold text-[var(--goal-mint)]">Back to matches</Link>
+        <Link href="/teams" className="text-sm font-bold text-[var(--goal-mint)]">Back to teams</Link>
         <div className="glass-panel mt-6 rounded-xl p-8 text-center text-slate-300">Team not found.</div>
       </PageContainer>
     );
@@ -42,7 +42,7 @@ function TeamDetailPageContent() {
 
   return (
     <PageContainer compact>
-      <Link href="/matches" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
+      <Link href="/teams" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
         <ArrowLeft01Icon className="size-4" />
         Back
       </Link>

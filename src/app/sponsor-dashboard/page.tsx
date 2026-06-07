@@ -31,6 +31,7 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
 import { sponsorPackages } from '@/data/sponsorPackages';
 import { toast } from 'sonner';
+import { SponsorReportModal } from '@/components/modals/demo-modals';
 
 function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -51,6 +52,7 @@ export default function SponsorDashboardPage() {
 
 function SponsorDashboard() {
   const [activeTab, setActiveTab] = useState('Overview');
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const { athletes, teams, leagues, challenges, feedPosts } = useGoalPlaceData();
 
   const tabs = ['Overview', 'Supported Entities', 'Impact Feed', 'Brand Visibility', 'Monthly Report', 'Packages'];
@@ -99,11 +101,17 @@ function SponsorDashboard() {
       <TabStrip tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <ActionToolbar>
-        <Button size="sm" onClick={() => handleDemoAction('Opening campaign overview in demo mode...')}>
+        <Button size="sm" onClick={() => setReportModalOpen(true)}>
+          <Download01Icon className="size-4" /> Download Monthly Impact Report
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => handleDemoAction('Opening campaign overview in demo mode...')}>
           <ChartLineData01Icon className="size-4" /> View Campaign
         </Button>
         <Button size="sm" variant="outline" onClick={() => handleDemoAction('Opening sponsor note modal in demo mode...')}>
           <ListViewIcon className="size-4" /> Add Sponsor Note
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => handleDemoAction('Renew or Upgrade Package modal opened')}>
+          <ZapIcon className="size-4" /> Renew or Upgrade Package
         </Button>
       </ActionToolbar>
 
@@ -314,6 +322,8 @@ function SponsorDashboard() {
           </div>
         </DashboardSection>
       )}
+
+      <SponsorReportModal open={reportModalOpen} onOpenChange={setReportModalOpen} />
     </PageContainer>
   );
 }

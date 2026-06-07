@@ -2,8 +2,8 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-import React, { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { UserGroupIcon, SecurityCheckIcon, ArrowUpRight01Icon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
 import { Athlete } from '@/types';
@@ -14,14 +14,17 @@ import { SupportModal } from '@/components/modals/app-modals';
 
 const filters = ['All Sports', 'Football', 'Basketball', 'Rugby', 'Top Supported', 'Verified Only', 'Rising'];
 
-export default function AthletesPage() {
+function AthletesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const leagueId = searchParams?.get('league');
   const { athletes } = useGoalPlaceData();
   const [activeFilter, setActiveFilter] = useState('All Sports');
   const [supportAthlete, setSupportAthlete] = useState<Athlete | null>(null);
 
   const filteredAthletes = useMemo(() => {
     return athletes.filter((athlete) => {
+      if (leagueId && athlete.leagueId !== leagueId) return false;
       if (activeFilter === 'All Sports') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return athlete.sport === activeFilter;
       if (activeFilter === 'Verified Only') return athlete.verified;
@@ -32,8 +35,6 @@ export default function AthletesPage() {
   }, [activeFilter, athletes]);
 
   return (
-    <ProtectedRoute>
-      
     <PageContainer compact>
       <SectionHeader
         eyebrow="Athlete Hub"
@@ -71,7 +72,15 @@ export default function AthletesPage() {
 
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
     </PageContainer>
-  
+  );
+}
+
+export default function AthletesPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading athletes...</div>}>
+        <AthletesPageContent />
+      </Suspense>
     </ProtectedRoute>
-);
+  );
 }

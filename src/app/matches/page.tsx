@@ -2,8 +2,8 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-import React, { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Calendar01Icon, CheckmarkCircle01Icon, SignalIcon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -13,13 +13,16 @@ import { Button } from '@/components/ui/button';
 
 const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Live', 'Upcoming', 'Completed', 'Following'];
 
-export default function MatchesPage() {
+function MatchesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const leagueId = searchParams?.get('league');
   const { matches } = useGoalPlaceData();
   const [activeFilter, setActiveFilter] = useState('All');
 
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
+      if (leagueId && match.leagueId !== leagueId) return false;
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return match.sport === activeFilter;
       if (['Live', 'Upcoming', 'Completed'].includes(activeFilter)) return match.status === activeFilter;
@@ -33,8 +36,6 @@ export default function MatchesPage() {
   const completedMatches = filteredMatches.filter((match) => match.status === 'Completed');
 
   return (
-    <ProtectedRoute>
-      
     <PageContainer compact>
       <SectionHeader
         eyebrow="Match Center"
@@ -103,7 +104,15 @@ export default function MatchesPage() {
         </div>
       )}
     </PageContainer>
-  
+  );
+}
+
+export default function MatchesPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading matches...</div>}>
+        <MatchesPageContent />
+      </Suspense>
     </ProtectedRoute>
-);
+  );
 }

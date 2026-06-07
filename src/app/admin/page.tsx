@@ -37,6 +37,7 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatUGX } from '@/lib/sportThemes';
 import { AwardCategory, Report, Sponsor, User } from '@/types';
+import { ReviewDisputeDrawer, ReviewPayoutDrawer } from '@/components/modals/demo-modals';
 
 type DrawerState = {
   title: string;
@@ -87,6 +88,7 @@ function AdminDashboard() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [awards, setAwards] = useState<AwardCategory[]>([]);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
+  const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [approvedLeagueIds, setApprovedLeagueIds] = useState<Set<string>>(new Set());
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
 
@@ -220,9 +222,9 @@ function AdminDashboard() {
 
       <ActionToolbar>
         <Button size="sm" onClick={() => { setActiveTab('Leagues'); toast.success('League approvals opened.'); }}><CheckmarkCircle01Icon className="size-4" /> Approve League</Button>
-        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Reports'); toast.success('Reports queue opened.'); }}><Flag01Icon className="size-4" /> Review Reports</Button>
+        <Button size="sm" variant="outline" onClick={() => setModalOpen('reviewDispute')}><Flag01Icon className="size-4" /> Review Reports</Button>
         <Button size="sm" variant="outline" onClick={() => { setActiveTab('Feed Moderation'); toast.success('Feed moderation opened.'); }}><Comment01Icon className="size-4" /> Moderate Feed</Button>
-        <Button size="sm" variant="gold" onClick={() => { setActiveTab('Support/Payout Review'); toast.success('Demo payout review opened.'); }}><Coins01Icon className="size-4" /> Review Support</Button>
+        <Button size="sm" variant="gold" onClick={() => setModalOpen('reviewPayout')}><Coins01Icon className="size-4" /> Review Support</Button>
       </ActionToolbar>
 
       {activeTab === 'Overview' && (
@@ -553,6 +555,9 @@ function AdminDashboard() {
       <DetailDrawer open={Boolean(drawer)} onOpenChange={(open) => !open && setDrawer(null)} title={drawer?.title ?? ''} description={drawer?.description}>
         {drawer?.body}
       </DetailDrawer>
+
+      <ReviewDisputeDrawer open={modalOpen === 'reviewDispute'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <ReviewPayoutDrawer open={modalOpen === 'reviewPayout'} onOpenChange={(open) => !open && setModalOpen(null)} />
     </PageContainer>
   );
 }

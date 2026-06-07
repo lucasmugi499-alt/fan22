@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Location01Icon, SecurityCheckIcon } from 'hugeicons-react';
 import { Trophy, Users } from '@phosphor-icons/react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -14,8 +14,10 @@ import { formatUGX, getSportTheme } from '@/lib/sportThemes';
 
 const sportFilters = ['All', 'Football', 'Basketball', 'Rugby'];
 
-function TeamsDirectory() {
+function TeamsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const leagueId = searchParams?.get('league');
   const { leagues, teams } = useGoalPlaceData();
   const [sportFilter, setSportFilter] = useState('All');
   const [cityFilter, setCityFilter] = useState('All');
@@ -26,6 +28,7 @@ function TeamsDirectory() {
   const filteredTeams = useMemo(
     () =>
       teams.filter((team) => {
+        if (leagueId && team.leagueId !== leagueId) return false;
         if (sportFilter !== 'All' && team.sport !== sportFilter) return false;
         if (cityFilter !== 'All' && team.city !== cityFilter) return false;
         if (verifiedOnly && !team.verified) return false;
@@ -154,7 +157,9 @@ function TeamsDirectory() {
 export default function TeamsPage() {
   return (
     <ProtectedRoute>
-      <TeamsDirectory />
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading teams...</div>}>
+        <TeamsPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }
