@@ -11,6 +11,9 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthProvider';
+import { hasRole, canViewLeagueAdminDashboard, canViewPlatformAdminDashboard, canManageLeague } from '@/lib/auth/permissions';
+import { toast } from 'sonner';
 import { GoalPlaceIndexPanel, LeagueIntegrityNote, LeagueStandingsTable, LeagueStatusBadge } from '@/components/ui/league';
 import { MatchCard } from '@/components/ui/match-card';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
@@ -20,6 +23,8 @@ function LeagueDetailPageContent() {
   const router = useRouter();
   const { leagueId } = useParams<{ leagueId: string }>();
   const data = useGoalPlaceData();
+  const auth = useAuth();
+  const authState = { authStatus: auth.authStatus, role: auth.role, userProfile: auth.userProfile };
   const resolvedLeagueId = canonicalEntityId(leagueId as string, 'league', 'l');
   const league = data.leagues.find((item) => item.id === leagueId || item.id === resolvedLeagueId);
 
@@ -52,8 +57,34 @@ function LeagueDetailPageContent() {
         <h1 className="mt-4 font-display text-4xl font-black text-white md:text-6xl">{league.name}</h1>
         <p className="mt-3 text-sm text-slate-400">{league.city}, {league.country}</p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => router.push('/matches')}>View Fixtures</Button>
-          <Button variant="outline" onClick={() => router.push('/league-admin')}>Admin Dashboard</Button>
+          <Button onClick={() => router.push(`/matches?league=${league.id}`)}>View Fixtures</Button>
+          {hasRole(authState, 'fan') && (
+            <>
+              <Button variant="outline" onClick={() => toast.success('Followed league in demo mode.')}>Follow League</Button>
+              <Button variant="outline" onClick={() => router.push(`/athletes?league=${league.id}`)}>Support Athletes</Button>
+            </>
+          )}
+          {hasRole(authState, 'athlete') && (
+            <>
+              <Button variant="outline" onClick={() => router.push(`/athletes?league=${league.id}`)}>View Athletes</Button>
+              <Button variant="outline" onClick={() => toast.success('Followed league in demo mode.')}>Follow League</Button>
+            </>
+          )}
+          {canViewLeagueAdminDashboard(authState) && (
+            <>
+              <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Admin Dashboard</Button>
+            </>
+          )}
+          {canManageLeague(authState, league.id) && !hasRole(authState, 'platform_admin') && !hasRole(authState, 'super_admin') && (
+            <>
+              <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Manage League</Button>
+            </>
+          )}
+          {canViewPlatformAdminDashboard(authState) && (
+            <>
+              <Button variant="outline" onClick={() => router.push(`/admin?tab=Leagues&league=${league.id}`)}>Review League</Button>
+            </>
+          )}
         </div>
       </section>
 

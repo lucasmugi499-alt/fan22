@@ -68,8 +68,16 @@ export function canViewAdminDashboard(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canAccessSponsorDashboard(auth: AuthState): boolean {
+export function canViewLeagueAdminDashboard(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canViewPlatformAdminDashboard(auth: AuthState): boolean {
   return hasAnyRole(auth, ['platform_admin', 'super_admin']);
+}
+
+export function canAccessSponsorDashboard(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['platform_admin', 'super_admin', 'sponsor']);
 }
 
 export function canCreateFixture(auth: AuthState): boolean {
@@ -119,13 +127,13 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
     case 'athlete':
       return '/athlete-dashboard';
     case 'league_admin':
-    case 'team_admin': // MVP Mapping
+    case 'team_admin':
       return '/league-admin';
     case 'platform_admin':
-    case 'super_admin': // MVP Mapping
+    case 'super_admin':
       return '/admin';
     case 'sponsor':
-      return '/home'; // Sponsor dashboard is a future module, send to home
+      return '/sponsor-dashboard';
     default:
       return '/';
   }
@@ -175,20 +183,5 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
 }
 
 export function routeForAppRole(role: AppRole): string {
-  switch (role) {
-    case 'athlete':
-      return '/athletes';
-    case 'team_admin':
-      return '/teams';
-    case 'league_admin':
-      return '/league-admin';
-    case 'sponsor':
-      return '/sponsor-dashboard';
-    case 'platform_admin':
-    case 'super_admin':
-      return '/admin';
-    case 'fan':
-    default:
-      return '/feed';
-  }
+  return getDefaultRouteForRole(role);
 }

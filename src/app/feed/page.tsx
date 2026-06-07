@@ -2,8 +2,8 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-import React, { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PlusSignIcon, SignalIcon, SecurityCheckIcon, SparklesIcon } from 'hugeicons-react';
 import { Athlete } from '@/types';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -16,9 +16,11 @@ import { useAuth } from '@/context/AuthProvider';
 
 const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Following', 'Highlights', 'Verified', 'Awards'];
 
-export default function FeedPage() {
+function FeedPageContent() {
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { athletes, feedPosts } = useGoalPlaceData();
+  const leagueId = searchParams?.get('league');
   const { openAuthModal } = useAuthModal();
   const { authStatus, role } = useAuth();
   const [activeFilter, setActiveFilter] = useState('All');
@@ -41,6 +43,7 @@ export default function FeedPage() {
 
   const filteredFeed = useMemo(() => {
     return feedPosts.filter((post) => {
+      if (leagueId && post.relatedLeagueId !== leagueId) return false;
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return post.sport === activeFilter.toLowerCase();
       if (activeFilter === 'Following') return ['fan', 'athlete'].includes(post.authorRole);
@@ -54,8 +57,6 @@ export default function FeedPage() {
   const findAthlete = (authorId: string) => athletes.find((athlete) => athlete.id === authorId) ?? athletes[0] ?? null;
 
   return (
-    <ProtectedRoute>
-      
     <PageContainer compact className="max-w-6xl">
       <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
         <aside className="lg:sticky lg:top-24">
@@ -133,7 +134,15 @@ export default function FeedPage() {
       <CommentsDrawer open={commentsOpen} onOpenChange={setCommentsOpen} />
       <SupportModal athlete={supportAthlete} open={Boolean(supportAthlete)} onOpenChange={(open) => !open && setSupportAthlete(null)} />
     </PageContainer>
-  
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading feed...</div>}>
+        <FeedPageContent />
+      </Suspense>
     </ProtectedRoute>
-);
+  );
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Wallet01Icon } from 'hugeicons-react';
+import Link from 'next/link';
+import { Wallet01Icon, ArrowLeft01Icon } from 'hugeicons-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AddFundsModal } from '@/components/modals/app-modals';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,10 @@ export default function WalletPage() {
   return (
     <ProtectedRoute>
       <PageContainer compact>
+        <Link href="/" className="mb-6 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
+          <ArrowLeft01Icon className="size-4" />
+          Back
+        </Link>
         <SectionHeader eyebrow="Wallet" title="Support wallet" />
         <div className="glass-panel rounded-xl p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

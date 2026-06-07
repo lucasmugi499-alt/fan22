@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity01Icon,
@@ -92,14 +93,19 @@ function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
 export default function LeagueAdminPage() {
   return (
     <RoleGuard allowedRoles={['league_admin', 'platform_admin', 'super_admin']}>
-      <LeagueAdminDashboard />
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading league admin...</div>}>
+        <LeagueAdminDashboard />
+      </Suspense>
     </RoleGuard>
   );
 }
 
 function LeagueAdminDashboard() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { leagues, teams, athletes, matches, challenges, feedPosts, reports } = useGoalPlaceData();
-  const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id ?? '');
+  const initialLeague = searchParams?.get('league') || leagues[0]?.id || '';
+  const [selectedLeagueId, setSelectedLeagueId] = useState(initialLeague);
   const [activeTab, setActiveTab] = useState('Overview');
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [matchOverrides, setMatchOverrides] = useState<Record<string, VerificationStatus>>({});

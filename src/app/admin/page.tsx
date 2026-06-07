@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity01Icon,
@@ -76,14 +77,20 @@ function actionHistoryText(history?: string[]) {
 export default function AdminPage() {
   return (
     <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
-      <AdminDashboard />
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading admin...</div>}>
+        <AdminDashboard />
+      </Suspense>
     </RoleGuard>
   );
 }
 
 function AdminDashboard() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { leagues, matches, athletes, teams, feedPosts, challenges, reports, verifications, source } = useGoalPlaceData();
-  const [activeTab, setActiveTab] = useState('Overview');
+  const initialTab = searchParams?.get('tab') || 'Overview';
+  const initialLeague = searchParams?.get('league') || '';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [users, setUsers] = useState<User[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [awards, setAwards] = useState<AwardCategory[]>([]);

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Building03Icon,
   CheckmarkCircle01Icon,
@@ -11,6 +12,7 @@ import {
   ListViewIcon,
   Download01Icon,
   LockKeyIcon,
+  ArrowLeft01Icon,
 } from 'hugeicons-react';
 import { Trophy, Users } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
@@ -76,6 +78,10 @@ function SponsorDashboard() {
 
   return (
     <PageContainer compact className="space-y-6">
+      <Link href="/admin" className="mb-2 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
+        <ArrowLeft01Icon className="size-4" />
+        Back to Admin
+      </Link>
       <AppPageHeader
         eyebrow="Sponsor impact reporting"
         title="Sponsor Impact Dashboard"
