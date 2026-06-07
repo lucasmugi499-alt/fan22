@@ -205,6 +205,15 @@ export interface Team {
   pointsAgainst: number;
   leaguePoints: number;
   recentResults?: string[];
+  teamAdminName?: string;
+  teamAdminEmail?: string;
+  rosterCompleteness?: number;
+  verificationStatus?: VerificationStatus;
+  pendingSubmissions?: number;
+  lastUpdated?: string;
+  record?: string;
+  publicProfileCompleteness?: number;
+  sponsorVisibility?: string;
   createdAt: string;
 }
 

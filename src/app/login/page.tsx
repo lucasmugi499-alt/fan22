@@ -92,6 +92,12 @@ function AuthContent() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => handleDemoLogin('team_admin')}
+                className="mt-2 text-center text-xs font-bold text-slate-500 hover:text-[var(--goal-mint)] hover:underline"
+              >
+                Preview Team Admin Console
+              </button>
             </div>
             
             <p className="mt-6 text-center text-xs text-slate-500">

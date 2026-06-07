@@ -69,7 +69,25 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
       { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingVerifications', 'fixtures', 'disputes'],
-    allowedRoutes: ['/home', '/league-admin', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/notifications', '/profile', '/settings']
+    allowedRoutes: ['/home', '/league-admin', '/team-admin', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/notifications', '/profile', '/settings']
+  },
+  team_admin: {
+    role: 'team_admin',
+    label: 'Team Admin',
+    description: 'Keep your team roster current, submit match results, request athlete verification, and manage team updates.',
+    defaultRoute: '/team-admin',
+    dashboardTitle: 'Team Console',
+    dashboardSubtitle: 'Manage your roster and submit team data.',
+    primaryActions: ['Add Athlete', 'Update Roster', 'Submit Result', 'Upload Team Update'],
+    navItems: [
+      { name: 'Home', href: '/home', icon: Home01Icon },
+      { name: 'Team Admin', href: '/team-admin', icon: DashboardSquare01Icon },
+      { name: 'Matches', href: '/matches', icon: Calendar01Icon },
+      { name: 'Roster', href: '/team-admin', icon: Users },
+      { name: 'Profile', href: '/profile', icon: UserIcon },
+    ],
+    quickStats: ['rosterCompleteness', 'pendingSubmissions', 'supportPool'],
+    allowedRoutes: ['/home', '/team-admin', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/notifications', '/profile', '/settings']
   },
   platform_admin: {
     role: 'platform_admin',
@@ -86,6 +104,6 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
       { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingApprovals', 'activeReports', 'systemHealth'],
-    allowedRoutes: ['/home', '/admin', '/league-admin', '/athlete-dashboard', '/sponsor-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
+    allowedRoutes: ['/home', '/admin', '/league-admin', '/team-admin', '/athlete-dashboard', '/sponsor-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
   }
 };

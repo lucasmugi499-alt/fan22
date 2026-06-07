@@ -22,7 +22,16 @@ export const teams: Team[] = [
     "pointsAgainst": 8,
     "leaguePoints": 6,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 62,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.572Z",
+    "record": "2-0-1",
+    "publicProfileCompleteness": 59,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_002",
@@ -45,7 +54,16 @@ export const teams: Team[] = [
     "pointsAgainst": 10,
     "leaguePoints": 14,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 2
+    "draws": 2,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 60,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "4-2-4",
+    "publicProfileCompleteness": 68,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_003",
@@ -68,7 +86,16 @@ export const teams: Team[] = [
     "pointsAgainst": 12,
     "leaguePoints": 22,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 4
+    "draws": 4,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 62,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "6-4-7",
+    "publicProfileCompleteness": 62,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_004",
@@ -91,7 +118,16 @@ export const teams: Team[] = [
     "pointsAgainst": 14,
     "leaguePoints": 25,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 1
+    "draws": 1,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 60,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "8-1-3",
+    "publicProfileCompleteness": 56,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_005",
@@ -114,7 +150,16 @@ export const teams: Team[] = [
     "pointsAgainst": 16,
     "leaguePoints": 22,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 4
+    "draws": 4,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 77,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "6-4-2",
+    "publicProfileCompleteness": 85,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_006",
@@ -137,7 +182,16 @@ export const teams: Team[] = [
     "pointsAgainst": 18,
     "leaguePoints": 25,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 1
+    "draws": 1,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 77,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "8-1-5",
+    "publicProfileCompleteness": 65,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_007",
@@ -160,7 +214,16 @@ export const teams: Team[] = [
     "pointsAgainst": 20,
     "leaguePoints": 33,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 3
+    "draws": 3,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 69,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "10-3-1",
+    "publicProfileCompleteness": 62,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_008",
@@ -183,7 +246,16 @@ export const teams: Team[] = [
     "pointsAgainst": 22,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 84,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "3-0-4",
+    "publicProfileCompleteness": 75,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_009",
@@ -206,7 +278,16 @@ export const teams: Team[] = [
     "pointsAgainst": 24,
     "leaguePoints": 33,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 3
+    "draws": 3,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 89,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "10-3-3",
+    "publicProfileCompleteness": 50,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_010",
@@ -229,7 +310,16 @@ export const teams: Team[] = [
     "pointsAgainst": 26,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 63,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "3-0-6",
+    "publicProfileCompleteness": 65,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_011",
@@ -252,7 +342,16 @@ export const teams: Team[] = [
     "pointsAgainst": 28,
     "leaguePoints": 17,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 2
+    "draws": 2,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 92,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "5-2-2",
+    "publicProfileCompleteness": 79,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_012",
@@ -275,7 +374,16 @@ export const teams: Team[] = [
     "pointsAgainst": 30,
     "leaguePoints": 25,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 4
+    "draws": 4,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 67,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "7-4-5",
+    "publicProfileCompleteness": 97,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_013",
@@ -298,7 +406,16 @@ export const teams: Team[] = [
     "pointsAgainst": 8,
     "leaguePoints": 17,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 2
+    "draws": 2,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 72,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "5-2-4",
+    "publicProfileCompleteness": 71,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_014",
@@ -321,7 +438,16 @@ export const teams: Team[] = [
     "pointsAgainst": 10,
     "leaguePoints": 25,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 4
+    "draws": 4,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 96,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "7-4-7",
+    "publicProfileCompleteness": 55,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_015",
@@ -344,7 +470,16 @@ export const teams: Team[] = [
     "pointsAgainst": 12,
     "leaguePoints": 28,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 1
+    "draws": 1,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 72,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "9-1-3",
+    "publicProfileCompleteness": 80,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_016",
@@ -367,7 +502,16 @@ export const teams: Team[] = [
     "pointsAgainst": 14,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 3
+    "draws": 3,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 91,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "2-3-6",
+    "publicProfileCompleteness": 86,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_017",
@@ -390,7 +534,16 @@ export const teams: Team[] = [
     "pointsAgainst": 702,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 69,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "9-0-5",
+    "publicProfileCompleteness": 73,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_018",
@@ -413,7 +566,16 @@ export const teams: Team[] = [
     "pointsAgainst": 739,
     "leaguePoints": 2,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 86,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "2-0-1",
+    "publicProfileCompleteness": 76,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_019",
@@ -436,7 +598,16 @@ export const teams: Team[] = [
     "pointsAgainst": 776,
     "leaguePoints": 4,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 85,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "4-0-4",
+    "publicProfileCompleteness": 86,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_020",
@@ -459,7 +630,16 @@ export const teams: Team[] = [
     "pointsAgainst": 813,
     "leaguePoints": 6,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 74,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "6-0-7",
+    "publicProfileCompleteness": 62,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_021",
@@ -482,7 +662,16 @@ export const teams: Team[] = [
     "pointsAgainst": 850,
     "leaguePoints": 4,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 63,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "4-0-6",
+    "publicProfileCompleteness": 56,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_022",
@@ -505,7 +694,16 @@ export const teams: Team[] = [
     "pointsAgainst": 887,
     "leaguePoints": 6,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 95,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "6-0-2",
+    "publicProfileCompleteness": 70,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_023",
@@ -528,7 +726,16 @@ export const teams: Team[] = [
     "pointsAgainst": 534,
     "leaguePoints": 8,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 81,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "8-0-5",
+    "publicProfileCompleteness": 88,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_024",
@@ -551,7 +758,16 @@ export const teams: Team[] = [
     "pointsAgainst": 571,
     "leaguePoints": 10,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 69,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "10-0-1",
+    "publicProfileCompleteness": 91,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_025",
@@ -574,7 +790,16 @@ export const teams: Team[] = [
     "pointsAgainst": 608,
     "leaguePoints": 8,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 90,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "8-0-7",
+    "publicProfileCompleteness": 94,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_026",
@@ -597,7 +822,16 @@ export const teams: Team[] = [
     "pointsAgainst": 645,
     "leaguePoints": 10,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 60,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "10-0-3",
+    "publicProfileCompleteness": 82,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_027",
@@ -620,7 +854,16 @@ export const teams: Team[] = [
     "pointsAgainst": 682,
     "leaguePoints": 3,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 83,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "3-0-6",
+    "publicProfileCompleteness": 50,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_028",
@@ -643,7 +886,16 @@ export const teams: Team[] = [
     "pointsAgainst": 719,
     "leaguePoints": 5,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 81,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "5-0-2",
+    "publicProfileCompleteness": 63,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_029",
@@ -666,7 +918,16 @@ export const teams: Team[] = [
     "pointsAgainst": 284,
     "leaguePoints": 3,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 97,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "3-0-1",
+    "publicProfileCompleteness": 71,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_030",
@@ -689,7 +950,16 @@ export const teams: Team[] = [
     "pointsAgainst": 297,
     "leaguePoints": 5,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 69,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "5-0-4",
+    "publicProfileCompleteness": 97,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_031",
@@ -712,7 +982,16 @@ export const teams: Team[] = [
     "pointsAgainst": 120,
     "leaguePoints": 7,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 84,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "7-0-7",
+    "publicProfileCompleteness": 56,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_032",
@@ -735,7 +1014,16 @@ export const teams: Team[] = [
     "pointsAgainst": 133,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 97,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 2,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "9-0-3",
+    "publicProfileCompleteness": 57,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_033",
@@ -758,7 +1046,16 @@ export const teams: Team[] = [
     "pointsAgainst": 146,
     "leaguePoints": 7,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 66,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "7-0-2",
+    "publicProfileCompleteness": 89,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_034",
@@ -781,7 +1078,16 @@ export const teams: Team[] = [
     "pointsAgainst": 159,
     "leaguePoints": 9,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 65,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "9-0-5",
+    "publicProfileCompleteness": 97,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_035",
@@ -804,7 +1110,16 @@ export const teams: Team[] = [
     "pointsAgainst": 172,
     "leaguePoints": 2,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 79,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "2-0-1",
+    "publicProfileCompleteness": 51,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_036",
@@ -827,7 +1142,16 @@ export const teams: Team[] = [
     "pointsAgainst": 185,
     "leaguePoints": 4,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach David Kato",
+    "teamAdminEmail": "coach.david.kato@example.com",
+    "rosterCompleteness": 77,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 0,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "4-0-4",
+    "publicProfileCompleteness": 83,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_037",
@@ -850,7 +1174,16 @@ export const teams: Team[] = [
     "pointsAgainst": 198,
     "leaguePoints": 2,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Manager Sarah Namuli",
+    "teamAdminEmail": "manager.sarah.namuli@example.com",
+    "rosterCompleteness": 87,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "2-0-3",
+    "publicProfileCompleteness": 86,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_038",
@@ -873,7 +1206,16 @@ export const teams: Team[] = [
     "pointsAgainst": 211,
     "leaguePoints": 4,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Coach Brian Okello",
+    "teamAdminEmail": "coach.brian.okello@example.com",
+    "rosterCompleteness": 99,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "4-0-6",
+    "publicProfileCompleteness": 71,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_039",
@@ -896,7 +1238,16 @@ export const teams: Team[] = [
     "pointsAgainst": 224,
     "leaguePoints": 6,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Academy Director Grace Atim",
+    "teamAdminEmail": "academy.director.grace.atim@example.com",
+    "rosterCompleteness": 76,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "6-0-2",
+    "publicProfileCompleteness": 69,
+    "sponsorVisibility": "Active"
   },
   {
     "id": "team_040",
@@ -919,6 +1270,15 @@ export const teams: Team[] = [
     "pointsAgainst": 237,
     "leaguePoints": 8,
     "createdAt": "2026-06-06T03:03:00.243Z",
-    "draws": 0
+    "draws": 0,
+    "teamAdminName": "Team Manager Moses Ssekandi",
+    "teamAdminEmail": "team.manager.moses.ssekandi@example.com",
+    "rosterCompleteness": 99,
+    "verificationStatus": "Verified",
+    "pendingSubmissions": 1,
+    "lastUpdated": "2026-06-07T16:57:31.577Z",
+    "record": "8-0-5",
+    "publicProfileCompleteness": 87,
+    "sponsorVisibility": "Active"
   }
 ];

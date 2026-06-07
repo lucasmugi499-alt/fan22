@@ -12,22 +12,24 @@ export default function PilotProgramPage() {
   const router = useRouter();
 
   const pilotStructure = [
-    'Onboard 1–3 local leagues',
-    'Verify participating teams and athletes',
-    'Publish fixtures and official results',
-    'Run test support challenges',
-    'Generate sponsor impact reports',
-    'Measure engagement and operational reliability',
+    'Onboard League Admin',
+    'Add Teams',
+    'Invite Team Admins',
+    'Complete Rosters',
+    'Publish Fixtures',
+    'Submit Results',
+    'Verify Results',
+    'Generate Sponsor Report',
   ];
 
   const successMetrics = [
-    { label: 'Athlete profile completion rate', icon: CheckmarkCircle01Icon },
-    { label: 'Fixture reporting rate', icon: CheckmarkCircle01Icon },
-    { label: 'Result verification time', icon: CheckmarkCircle01Icon },
-    { label: 'Challenge completion rate', icon: CheckmarkCircle01Icon },
-    { label: 'Sponsor report delivery', icon: CheckmarkCircle01Icon },
+    { label: 'Teams onboarded', icon: CheckmarkCircle01Icon },
+    { label: 'Team admins activated', icon: CheckmarkCircle01Icon },
+    { label: 'Athlete profiles completed', icon: CheckmarkCircle01Icon },
+    { label: 'Fixtures published', icon: CheckmarkCircle01Icon },
+    { label: 'Results verified', icon: CheckmarkCircle01Icon },
+    { label: 'Sponsor report delivered', icon: CheckmarkCircle01Icon },
     { label: 'Fan support activity', icon: CheckmarkCircle01Icon },
-    { label: 'Repeat engagement', icon: CheckmarkCircle01Icon },
     { label: 'Dispute resolution time', icon: CheckmarkCircle01Icon },
   ];
 
@@ -67,7 +69,7 @@ export default function PilotProgramPage() {
             transition={{ duration: 0.45, delay: 0.1 }}
             className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-300 md:text-xl md:leading-9"
           >
-            <strong>Goal:</strong> Validate verified league operations, athlete profile creation, fan support behavior, and sponsor impact reporting.
+            <strong>Goal:</strong> Prove one league can use GoalPlace256 to onboard teams, invite team admins, create athlete profiles, publish fixtures, verify results, and generate sponsor reports.
           </motion.p>
         </div>
 

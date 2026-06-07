@@ -55,7 +55,28 @@ export function canCreateFanPost(auth: AuthState): boolean {
 // Admin / Management
 export function canManageTeam(auth: AuthState, _teamId?: string): boolean {
   void _teamId;
-  // Dedicated team admin is a future module in the MVP.
+  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canAccessTeamAdminDashboard(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canSubmitResult(auth: AuthState, _teamId?: string): boolean {
+  void _teamId;
+  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canRequestAthleteVerification(auth: AuthState, _athleteId?: string): boolean {
+  void _athleteId;
+  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canVerifyFinalResult(auth: AuthState): boolean {
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canApproveTeamSubmission(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
@@ -122,9 +143,9 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
       return '/home';
     case 'athlete':
       return '/athlete-dashboard';
-    case 'league_admin':
     case 'team_admin':
-      return '/league-admin';
+      return '/team-admin';
+    case 'league_admin':
     case 'platform_admin':
     case 'super_admin':
       return '/admin';
@@ -166,9 +187,8 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['fan', 'athlete', 'platform_admin', 'super_admin']);
   }
 
-  // Future modules:
   if (pathname.startsWith('/team-admin')) {
-    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+    return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/sponsor-dashboard')) {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);

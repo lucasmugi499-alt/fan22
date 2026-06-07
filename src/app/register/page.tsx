@@ -17,6 +17,29 @@ function RegisterContent() {
   const router = useRouter();
   const preselectedRole = searchParams.get('role') as AppRole | null;
 
+  if (preselectedRole === 'team_admin') {
+    return (
+      <div className="w-full overflow-hidden pb-24 pt-10 md:pt-16">
+        <PageContainer>
+          <div className="mx-auto flex max-w-3xl flex-col items-center">
+            <Link href="/" className="mb-8 flex items-center gap-2">
+              <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/50 bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_28px_rgba(0,196,106,0.32)]">
+                <span className="text-sm font-black tracking-tighter text-white">GP<span className="text-emerald-100">256</span></span>
+              </div>
+              <span className="font-display text-xl font-black tracking-tight text-white">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
+            </Link>
+
+            <div className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] p-8 text-center shadow-2xl">
+              <h1 className="mb-2 font-display text-3xl font-black text-white">Team Admin Access</h1>
+              <p className="mb-8 text-sm text-slate-400">Team Admin access is invitation-based. Ask your league admin to invite your team.</p>
+              <Link href="/register" className="font-bold text-[var(--goal-mint)] hover:underline">Return to registration</Link>
+            </div>
+          </div>
+        </PageContainer>
+      </div>
+    );
+  }
+
   const handleDemoPreview = (selectedRole: AppRole) => {
     setDemoRole(selectedRole);
     toast.success(`Previewing as ${selectedRole.replace('_', ' ')}`);
@@ -109,6 +132,9 @@ function RegisterContent() {
             </div>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-4 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-center text-xs text-slate-400">
+                <span className="font-bold text-white">Note:</span> Team Admin accounts are invited by League Admins during pilot onboarding.
+              </div>
               <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-center text-xs text-slate-400">
                 Looking for Platform Admin? <span className="font-bold text-white">This role is invite-only.</span>
               </div>

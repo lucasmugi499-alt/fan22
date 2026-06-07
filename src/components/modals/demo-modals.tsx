@@ -155,6 +155,57 @@ export function AddTeamModal({ open, onOpenChange }: { open: boolean; onOpenChan
   );
 }
 
+export function InviteTeamAdminModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const data = useGoalPlaceData();
+  const [teamId, setTeamId] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('Coach');
+  const [note, setNote] = useState('');
+
+  const submit = () => {
+    if (!teamId || !contactName || !email) { toast.error('Team, Name, and Email are required'); return; }
+    toast.success(`Invitation sent to ${contactName} as ${role}`);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={drawerClass}>
+        <ModalBody>
+          <DialogHeader className="mb-5">
+            <DialogTitle>Invite Team Admin</DialogTitle>
+            <DialogDescription>Invite a coach or manager to take over this team&apos;s operations.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <FieldLabel>Team</FieldLabel>
+              <DemoSelect value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+                <option value="">Select a team...</option>
+                {data.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </DemoSelect>
+            </div>
+            <div><FieldLabel>Contact Name</FieldLabel><DemoInput value={contactName} onChange={(e) => setContactName(e.target.value)} /></div>
+            <div><FieldLabel>Email</FieldLabel><DemoInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div><FieldLabel>Phone (Optional)</FieldLabel><DemoInput value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div>
+              <FieldLabel>Role</FieldLabel>
+              <DemoSelect value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="Coach">Coach</option>
+                <option value="Team Manager">Team Manager</option>
+                <option value="Academy Owner">Academy Owner</option>
+              </DemoSelect>
+            </div>
+            <div><FieldLabel>Invite Note (Optional)</FieldLabel><DemoInput value={note} onChange={(e) => setNote(e.target.value)} /></div>
+            <Button className="w-full" onClick={submit}>Send Invitation</Button>
+          </div>
+        </ModalBody>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AddAthleteModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const addDemoAthlete = useAppStore((state) => state.addDemoAthlete);
   const data = useGoalPlaceData();

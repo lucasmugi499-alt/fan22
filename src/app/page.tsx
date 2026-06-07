@@ -22,9 +22,9 @@ const proofMetrics = [
 
 const roleValues = [
   {
-    role: 'For Leagues',
-    title: 'Run a credible league.',
-    points: ['manage teams and athletes', 'publish fixtures and results', 'verify match outcomes', 'resolve disputes', 'build sponsor-ready records', 'track GoalPlace Index'],
+    role: 'For Leagues & Teams',
+    title: 'Run a credible league. Keep team data current.',
+    points: ['leagues run verified competitions', 'teams keep athlete data current', 'publish fixtures and results', 'build sponsor-ready records', 'track GoalPlace Index'],
     ctaLabel: 'Pilot with Your League',
     ctaLink: '/register?role=league-admin',
     icon: Building03Icon,
@@ -32,7 +32,7 @@ const roleValues = [
   {
     role: 'For Athletes',
     title: 'Build a verified sports profile.',
-    points: ['showcase stats and highlights', 'receive fan support', 'track verified challenges', 'show progress and needs', 'build a credible athlete portfolio'],
+    points: ['athletes gain visibility and support', 'showcase stats and highlights', 'receive fan support', 'track verified challenges', 'build a credible athlete portfolio'],
     ctaLabel: 'Register as Athlete',
     ctaLink: '/register?role=athlete',
     icon: Trophy,
@@ -40,7 +40,7 @@ const roleValues = [
   {
     role: 'For Fans',
     title: 'Support real athletes with visible impact.',
-    points: ['follow local matches', 'support athletes', 'unlock GoalPlace Points', 'appear on supporter leaderboards', 'see how support helps with transport, boots, meals, training, and recovery'],
+    points: ['fans follow and support real athletes', 'follow local matches', 'unlock GoalPlace Points', 'appear on supporter leaderboards', 'see how support helps with transport, boots, meals, training, and recovery'],
     ctaLabel: 'Join as Fan',
     ctaLink: '/register?role=fan',
     icon: UserGroupIcon,
@@ -48,7 +48,7 @@ const roleValues = [
   {
     role: 'For Sponsors',
     title: 'Turn sponsorship into measurable community impact.',
-    points: ['sponsor athletes, teams, or leagues', 'see what your funds supported', 'view engagement and reach', 'download monthly impact reports', 'support women and youth sport'],
+    points: ['sponsors receive transparent impact reporting', 'sponsor athletes, teams, or leagues', 'see what your funds supported', 'view engagement and reach', 'download monthly impact reports'],
     ctaLabel: 'Sponsor a League',
     ctaLink: '/sponsors',
     icon: ChartLineData01Icon,
@@ -92,7 +92,7 @@ export default function PublicLandingPage() {
               className="mb-5 inline-flex items-center gap-2 rounded-lg border border-white/12 bg-black/35 px-3 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-[var(--goal-mint)] backdrop-blur-xl"
             >
               <ZapIcon className="size-4" />
-              The trusted operating layer for grassroots sport in Uganda.
+              The operating system for grassroots sports leagues in Uganda.
             </motion.div>
 
             <motion.h1
@@ -110,7 +110,7 @@ export default function PublicLandingPage() {
               transition={{ duration: 0.45, delay: 0.1 }}
               className="mt-6 max-w-2xl text-base leading-7 text-slate-200 md:text-xl md:leading-9"
             >
-              GoalPlace256 helps grassroots leagues run verified competitions, showcase athletes, and turn fan and sponsor support into transparent community impact.
+              GoalPlace256 helps grassroots sports leagues in Uganda run verified competitions, showcase athletes, attract sponsors, and provide transparent reporting on community impact.
             </motion.p>
 
             <motion.div

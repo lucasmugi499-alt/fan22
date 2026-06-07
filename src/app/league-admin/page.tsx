@@ -33,6 +33,7 @@ import {
   CreateChallengeModal,
   ReviewDisputeDrawer,
   ReviewPayoutDrawer,
+  InviteTeamAdminModal,
 } from '@/components/modals/demo-modals';
 import {
   ActionToolbar,
@@ -147,7 +148,9 @@ function LeagueAdminDashboard() {
     verifyResult: () => setModalOpen('verifyResult'),
     submitResult: () => setModalOpen('submitResult'),
     createChallenge: () => setModalOpen('createChallenge'),
+    verifyChallenge: () => toast.success('Verify Challenge modal opened in demo mode.'),
     createPost: () => toast.success('Create Post form opened in demo mode.'),
+    inviteTeamAdmin: () => setModalOpen('inviteTeamAdmin'),
   };
 
   const updateMatch = async (match: Match, status: VerificationStatus) => {
@@ -279,28 +282,47 @@ function LeagueAdminDashboard() {
 
       {activeTab === 'Teams & Athletes' && (
         <div className="space-y-8">
-          <DashboardSection eyebrow="Rosters" title="Teams">
+          <DashboardSection eyebrow="Rosters" title="Teams" action={<Button size="sm" onClick={quickActions.inviteTeamAdmin}><UserAdd01Icon className="size-4 mr-2" /> Invite Team Admin</Button>}>
             <DataTableCard>
-              <table className="w-full min-w-[600px] text-left text-sm">
-                <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Team Name</th>
-                    <th className="px-4 py-3">City</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Roster Size</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/8 bg-white/[0.03]">
-                  {leagueTeams.map((team) => (
-                    <tr key={team.id} className="transition-colors hover:bg-white/[0.04]">
-                      <td className="whitespace-nowrap p-4 font-bold text-white">{team.name}</td>
-                      <td className="whitespace-nowrap p-4 text-slate-300">{team.city}</td>
-                      <td className="whitespace-nowrap p-4"><StatusBadge tone="success">Operational</StatusBadge></td>
-                      <td className="whitespace-nowrap p-4 text-slate-300">{athletes.filter((a) => a.teamId === team.id).length} Athletes</td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] text-left text-sm">
+                  <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Team Name</th>
+                      <th className="px-4 py-3">Coach / Contact</th>
+                      <th className="px-4 py-3">Roster</th>
+                      <th className="px-4 py-3">Pending</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/8 bg-white/[0.03]">
+                    {leagueTeams.map((team) => (
+                      <tr key={team.id} className="transition-colors hover:bg-white/[0.04]">
+                        <td className="whitespace-nowrap p-4 font-bold text-white">
+                          <div>{team.name}</div>
+                          <div className="text-xs text-slate-500 font-normal">{team.city}</div>
+                        </td>
+                        <td className="whitespace-nowrap p-4">
+                          <div className="text-slate-300">{team.teamAdminName || 'No Admin'}</div>
+                          {team.teamAdminEmail && <div className="text-xs text-slate-500">Invited</div>}
+                        </td>
+                        <td className="whitespace-nowrap p-4 text-slate-300">
+                          {team.rosterCompleteness || 0}% Complete
+                        </td>
+                        <td className="whitespace-nowrap p-4 text-slate-300">
+                          {team.pendingSubmissions ? <span className="text-orange-400 font-bold">{team.pendingSubmissions} items</span> : '0 items'}
+                        </td>
+                        <td className="whitespace-nowrap p-4"><StatusBadge tone="success">Operational</StatusBadge></td>
+                        <td className="whitespace-nowrap p-4 text-right space-x-2">
+                          <Button variant="ghost" size="sm" onClick={() => router.push(`/team-admin?team=${team.id}`)}>Open Console</Button>
+                          <Button variant="outline" size="sm" onClick={() => toast.success('Review drawer opened (Demo)')}>Review</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </DataTableCard>
           </DashboardSection>
 
@@ -539,6 +561,7 @@ function LeagueAdminDashboard() {
       <SubmitResultModal open={modalOpen === 'submitResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
       <VerifyResultModal open={modalOpen === 'verifyResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
       <CreateChallengeModal open={modalOpen === 'createChallenge'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <InviteTeamAdminModal open={modalOpen === 'inviteTeamAdmin'} onOpenChange={(open) => !open && setModalOpen(null)} />
     </PageContainer>
   );
 }
