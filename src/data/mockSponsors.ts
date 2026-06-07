@@ -3,8 +3,8 @@ import { Sponsor } from "@/types";
 export const sponsors: Sponsor[] = [
   {
     "id": "sponsor_001",
-    "name": "Sponsor Company 1",
-    "category": "Sports Gear",
+    "name": "Kampala Sports Hub",
+    "category": "youth foundation",
     "city": "Fort Portal",
     "packageType": "league_builder",
     "amountCommitted": 4332058,
@@ -18,13 +18,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_004"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored youth sport",
     "active": true
   },
   {
     "id": "sponsor_002",
-    "name": "Sponsor Company 2",
-    "category": "Sports Gear",
+    "name": "Pearl Sportswear Uganda",
+    "category": "health clinic",
     "city": "Jinja",
     "packageType": "league_builder",
     "amountCommitted": 4021843,
@@ -38,13 +38,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_002"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded matchday water",
     "active": true
   },
   {
     "id": "sponsor_003",
-    "name": "Sponsor Company 3",
-    "category": "Sports Gear",
+    "name": "Nile Gear Uganda",
+    "category": "transport",
     "city": "Mbale",
     "packageType": "league_builder",
     "amountCommitted": 1180071,
@@ -58,13 +58,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_010"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded transport",
     "active": true
   },
   {
     "id": "sponsor_004",
-    "name": "Sponsor Company 4",
-    "category": "Sports Gear",
+    "name": "Lugogo Fitness Centre",
+    "category": "transport",
     "city": "Jinja",
     "packageType": "league_builder",
     "amountCommitted": 4611247,
@@ -78,13 +78,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_009"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored league media coverage",
     "active": true
   },
   {
     "id": "sponsor_005",
-    "name": "Sponsor Company 5",
-    "category": "Sports Gear",
+    "name": "Jinja Community Bank",
+    "category": "health clinic",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 2935087,
@@ -98,13 +98,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_003"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "supported annual awards",
     "active": true
   },
   {
     "id": "sponsor_006",
-    "name": "Sponsor Company 6",
-    "category": "Sports Gear",
+    "name": "Wakiso Youth Sports Fund",
+    "category": "education partner",
     "city": "Kampala",
     "packageType": "league_builder",
     "amountCommitted": 1410351,
@@ -118,13 +118,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_002"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded transport",
     "active": true
   },
   {
     "id": "sponsor_007",
-    "name": "Sponsor Company 7",
-    "category": "Sports Gear",
+    "name": "Mbarara Motors",
+    "category": "community business",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 1330864,
@@ -138,13 +138,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_001"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored youth sport",
     "active": true
   },
   {
     "id": "sponsor_008",
-    "name": "Sponsor Company 8",
-    "category": "Sports Gear",
+    "name": "Entebbe Health Clinic",
+    "category": "telecom/data partner",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 1927943,
@@ -158,13 +158,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_004"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded transport",
     "active": true
   },
   {
     "id": "sponsor_009",
-    "name": "Sponsor Company 9",
-    "category": "Sports Gear",
+    "name": "Kyadondo Wellness Centre",
+    "category": "sportswear",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 3228656,
@@ -178,13 +178,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_007"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored league media coverage",
     "active": true
   },
   {
     "id": "sponsor_010",
-    "name": "Sponsor Company 10",
-    "category": "Sports Gear",
+    "name": "Gulu Youth Foundation",
+    "category": "education partner",
     "city": "Mbale",
     "packageType": "league_builder",
     "amountCommitted": 2886744,
@@ -198,13 +198,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_008"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored league media coverage",
     "active": true
   },
   {
     "id": "sponsor_011",
-    "name": "Sponsor Company 11",
-    "category": "Sports Gear",
+    "name": "Masaka Sportswear",
+    "category": "gym/fitness",
     "city": "Masaka",
     "packageType": "league_builder",
     "amountCommitted": 2414294,
@@ -218,13 +218,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_005"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded boots",
     "active": true
   },
   {
     "id": "sponsor_012",
-    "name": "Sponsor Company 12",
-    "category": "Sports Gear",
+    "name": "Mbale Community Bank",
+    "category": "education partner",
     "city": "Masaka",
     "packageType": "league_builder",
     "amountCommitted": 1465107,
@@ -238,13 +238,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_006"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded matchday water",
     "active": true
   },
   {
     "id": "sponsor_013",
-    "name": "Sponsor Company 13",
-    "category": "Sports Gear",
+    "name": "Old Kampala Pharmacy",
+    "category": "youth foundation",
     "city": "Kampala",
     "packageType": "league_builder",
     "amountCommitted": 2297565,
@@ -258,13 +258,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_008"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "supported women and youth athletes",
     "active": true
   },
   {
     "id": "sponsor_014",
-    "name": "Sponsor Company 14",
-    "category": "Sports Gear",
+    "name": "Mukono Training Centre",
+    "category": "youth foundation",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 4283905,
@@ -278,13 +278,13 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_006"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "funded matchday water",
     "active": true
   },
   {
     "id": "sponsor_015",
-    "name": "Sponsor Company 15",
-    "category": "Sports Gear",
+    "name": "KCCA Youth Sports Initiative",
+    "category": "sportswear",
     "city": "Entebbe",
     "packageType": "league_builder",
     "amountCommitted": 3219815,
@@ -298,7 +298,7 @@ export const sponsors: Sponsor[] = [
     "supportedLeagueIds": [
       "league_005"
     ],
-    "impactSummary": "Providing boots and jerseys for grassroots talent.",
+    "impactSummary": "sponsored youth sport",
     "active": true
   }
 ];

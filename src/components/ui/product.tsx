@@ -25,7 +25,7 @@ export function PageContainer({
   compact?: boolean;
 }) {
   return (
-    <div className={cn('page-shell page-safe w-full', compact ? 'py-5 md:py-8' : 'py-7 md:py-12', className)}>
+    <div className={cn('page-shell page-safe w-full pb-24 md:pb-12', compact ? 'pt-5 md:pt-8' : 'pt-7 md:pt-12', className)}>
       {children}
     </div>
   );
@@ -154,7 +154,7 @@ export function ActionToolbar({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] p-3', className)}>
+    <div className={cn('flex items-center gap-2 overflow-x-auto hide-scrollbar rounded-xl border border-white/10 bg-white/[0.045] p-3 md:flex-wrap', className)}>
       {children}
     </div>
   );

@@ -142,7 +142,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/sponsor-dashboard')) {
-    return isLoggedIn(auth);
+    return hasAnyRole(auth, ['platform_admin', 'super_admin']);
   }
 
   // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user
