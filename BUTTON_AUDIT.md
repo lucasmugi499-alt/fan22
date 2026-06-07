@@ -1,13 +1,21 @@
 # Button Audit
 
-| Page | Button | Action / Route | Verified Working? | Role Constraints |
-|------|--------|---------------|------------------|-----------------|
-| `/leagues/[leagueId]` | Support Athletes | `/athletes?league=leagueId` | Yes | `fan` |
-| `/leagues/[leagueId]` | View Athletes | `/athletes?league=leagueId` | Yes | `athlete` |
-| `/leagues/[leagueId]` | Follow League | Local state update toast | Yes | `fan`, `athlete` |
-| `/leagues/[leagueId]` | Admin Dashboard | `/league-admin?league=leagueId` | Yes | `league_admin` |
-| `/leagues/[leagueId]` | Manage League | `/league-admin?league=leagueId` | Yes | `league_admin` |
-| `/leagues/[leagueId]` | Review League | `/admin?tab=Leagues&league=leagueId` | Yes | `platform_admin` |
-| `/league-admin` | Demo Modals (Create Fixture, etc) | Opens Modal | Yes | `league_admin`, `platform_admin` |
-| `/admin` | Download Report | Toast/Modal | Yes | `platform_admin` |
-| `demo-modals.tsx` | All submit buttons | Zustand update + UI Toast | Yes | Data correctly mapped via `useGoalPlaceData` `<select>`s. |
+| Label | Page | Visible to Roles | Expected Behavior | Actual Behavior | Status |
+|-------|------|------------------|-------------------|-----------------|--------|
+| Support Athletes | `/leagues/[leagueId]` | `fan` | Navigate to `/athletes?league=leagueId` | Navigates correctly to filtered athletes page | Verified |
+| View Athletes | `/leagues/[leagueId]` | `athlete` | Navigate to `/athletes?league=leagueId` | Navigates correctly to filtered athletes page | Verified |
+| Follow League | `/leagues/[leagueId]` | `fan`, `athlete` | Trigger local toast notification | Triggers local toast correctly | Verified |
+| Manage League | `/leagues/[leagueId]` | `league_admin` | Navigate to `/league-admin?league=leagueId` | Navigates to league admin dashboard pre-selecting league | Verified |
+| Open League Ops | `/leagues/[leagueId]` | `platform_admin` | Navigate to `/league-admin?league=leagueId` | Navigates to league admin ops for that league | Verified |
+| Review League | `/leagues/[leagueId]` | `platform_admin` | Navigate to `/admin?tab=Leagues&league=leagueId` | Navigates to platform admin with tab and league selected | Verified |
+| Create Fixture | `/league-admin` | `league_admin`, `platform_admin` | Open Create Fixture Modal | Opens modal with league default pre-selected | Verified |
+| Submit Result | `/league-admin` | `league_admin`, `platform_admin` | Open Submit Result Modal | Opens modal with league matches pre-selected | Verified |
+| Add Team | `/league-admin` | `league_admin`, `platform_admin` | Open Add Team Modal | Opens modal with league default pre-selected | Verified |
+| Add Athlete | `/league-admin` | `league_admin`, `platform_admin` | Open Add Athlete Modal | Opens modal with league teams pre-selected | Verified |
+| Create Challenge | `/league-admin` | `league_admin`, `platform_admin` | Open Create Challenge Modal | Opens modal with league athletes pre-selected | Verified |
+| Verify Result | `/league-admin`, `/admin` | `league_admin`, `platform_admin` | Open Verify Result Modal | Opens modal, updating local match persistence overrides on submit | Verified |
+
+## Summary
+- Duplicate/ambiguous "Admin Dashboard" button has been removed from league detail view.
+- No buttons trigger Access Denied for standard roles.
+- All demo modals update `demoMatchOverrides` or `demoChallengeOverrides` ensuring visible persistence across views.

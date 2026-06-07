@@ -104,7 +104,13 @@ export function AddTeamModal({ open, onOpenChange }: { open: boolean; onOpenChan
   const data = useGoalPlaceData();
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
-  const [leagueId, setLeagueId] = useState('');
+  const [leagueId, setLeagueId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('league') || '';
+    }
+    return '';
+  });
   const [contactPerson, setContactPerson] = useState('');
   const [rosterSize, setRosterSize] = useState('20');
 
@@ -159,6 +165,10 @@ export function AddAthleteModal({ open, onOpenChange }: { open: boolean; onOpenC
   const [story, setStory] = useState('');
   const [status, setStatus] = useState('Active');
 
+  const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const defaultLeagueId = sp.get('league');
+  const availableTeams = defaultLeagueId ? data.teams.filter(t => t.leagueId === defaultLeagueId || t.id.includes(defaultLeagueId)) : data.teams;
+
   const submit = () => {
     if (!name) { toast.error('Athlete name is required'); return; }
     addDemoAthlete({
@@ -197,7 +207,7 @@ export function AddAthleteModal({ open, onOpenChange }: { open: boolean; onOpenC
               <FieldLabel>Team</FieldLabel>
               <DemoSelect value={teamId} onChange={(e) => setTeamId(e.target.value)}>
                 <option value="">Select a team...</option>
-                {data.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {availableTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </DemoSelect>
             </div>
             <div><FieldLabel>Short Story</FieldLabel><DemoInput value={story} onChange={(e) => setStory(e.target.value)} /></div>
@@ -225,6 +235,10 @@ export function CreateFixtureModal({ open, onOpenChange }: { open: boolean; onOp
   const [time, setTime] = useState('');
   const [venue, setVenue] = useState('');
   const [allowChallenges, setAllowChallenges] = useState('yes');
+
+  const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const defaultLeagueId = sp.get('league');
+  const availableTeams = defaultLeagueId ? data.teams.filter(t => t.leagueId === defaultLeagueId || t.id.includes(defaultLeagueId)) : data.teams;
 
   const submit = () => {
     if (!home || !away) { toast.error('Teams are required'); return; }
@@ -254,14 +268,14 @@ export function CreateFixtureModal({ open, onOpenChange }: { open: boolean; onOp
               <FieldLabel>Home Team</FieldLabel>
               <DemoSelect value={home} onChange={(e) => setHome(e.target.value)}>
                 <option value="">Select Home Team...</option>
-                {data.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {availableTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </DemoSelect>
             </div>
             <div>
               <FieldLabel>Away Team</FieldLabel>
               <DemoSelect value={away} onChange={(e) => setAway(e.target.value)}>
                 <option value="">Select Away Team...</option>
-                {data.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {availableTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </DemoSelect>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -293,7 +307,9 @@ export function SubmitResultModal({ open, onOpenChange }: { open: boolean; onOpe
   const [evidenceNote, setEvidenceNote] = useState('');
   const [submittedBy, setSubmittedBy] = useState('');
 
-  const upcomingMatches = data.matches.filter((m) => m.status === 'Upcoming');
+  const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const defaultLeagueId = sp.get('league');
+  const upcomingMatches = data.matches.filter((m) => m.status === 'Upcoming' && (!defaultLeagueId || m.leagueId === defaultLeagueId));
 
   const submit = () => {
     if (!matchId) { toast.error('Match is required'); return; }
@@ -344,7 +360,9 @@ export function VerifyResultModal({ open, onOpenChange }: { open: boolean; onOpe
   const [matchId, setMatchId] = useState('');
   const [decision, setDecision] = useState('Verify');
 
-  const pendingMatches = data.matches.filter((m) => m.verificationStatus === 'Pending' && m.status === 'Completed');
+  const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const defaultLeagueId = sp.get('league');
+  const pendingMatches = data.matches.filter((m) => m.verificationStatus === 'Pending' && m.status === 'Completed' && (!defaultLeagueId || m.leagueId === defaultLeagueId));
 
   const submit = () => {
     if (!matchId) { toast.error('Match is required'); return; }
@@ -409,6 +427,11 @@ export function CreateChallengeModal({ open, onOpenChange }: { open: boolean; on
   const [target, setTarget] = useState('Score 2 Goals');
   const [releaseRule, setReleaseRule] = useState('Automatic on Verification');
 
+  const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const defaultLeagueId = sp.get('league');
+  const availableAthletes = defaultLeagueId ? data.athletes.filter(a => a.leagueId === defaultLeagueId) : data.athletes;
+  const availableMatches = defaultLeagueId ? data.matches.filter(m => m.leagueId === defaultLeagueId) : data.matches;
+
   const submit = () => {
     if (!athlete) { toast.error('Athlete required'); return; }
     addDemoChallenge({
@@ -434,14 +457,14 @@ export function CreateChallengeModal({ open, onOpenChange }: { open: boolean; on
               <FieldLabel>Athlete</FieldLabel>
               <DemoSelect value={athlete} onChange={(e) => setAthlete(e.target.value)}>
                 <option value="">Select an athlete...</option>
-                {data.athletes.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                {availableAthletes.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </DemoSelect>
             </div>
             <div>
               <FieldLabel>Match Context</FieldLabel>
               <DemoSelect value={matchId} onChange={(e) => setMatchId(e.target.value)}>
                 <option value="">Any Match</option>
-                {data.matches.map((m) => {
+                {availableMatches.map((m) => {
                   const h = data.teams.find((t) => t.id === m.teamAId)?.name || 'Home';
                   const a = data.teams.find((t) => t.id === m.teamBId)?.name || 'Away';
                   return <option key={m.id} value={m.id}>{h} vs {a}</option>;

@@ -12,7 +12,7 @@ import { buildLeagueStandings } from '@/lib/leagueModel';
 import { getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthProvider';
-import { hasRole, canViewLeagueAdminDashboard, canViewPlatformAdminDashboard, canManageLeague } from '@/lib/auth/permissions';
+import { hasRole, hasAnyRole } from '@/lib/auth/permissions';
 import { toast } from 'sonner';
 import { GoalPlaceIndexPanel, LeagueIntegrityNote, LeagueStandingsTable, LeagueStatusBadge } from '@/components/ui/league';
 import { MatchCard } from '@/components/ui/match-card';
@@ -70,19 +70,13 @@ function LeagueDetailPageContent() {
               <Button variant="outline" onClick={() => toast.success('Followed league in demo mode.')}>Follow League</Button>
             </>
           )}
-          {canViewLeagueAdminDashboard(authState) && (
-            <>
-              <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Admin Dashboard</Button>
-            </>
+          {hasAnyRole(authState, ['league_admin', 'team_admin']) && (
+            <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Manage League</Button>
           )}
-          {canManageLeague(authState, league.id) && !hasRole(authState, 'platform_admin') && !hasRole(authState, 'super_admin') && (
-            <>
-              <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Manage League</Button>
-            </>
-          )}
-          {canViewPlatformAdminDashboard(authState) && (
+          {hasAnyRole(authState, ['platform_admin', 'super_admin']) && (
             <>
               <Button variant="outline" onClick={() => router.push(`/admin?tab=Leagues&league=${league.id}`)}>Review League</Button>
+              <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Open League Ops</Button>
             </>
           )}
         </div>

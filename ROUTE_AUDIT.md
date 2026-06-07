@@ -1,23 +1,24 @@
 # Route Audit
 
-| Route | Expected Role(s) | Verified working? | Notes |
-|-------|-----------------|------------------|-------|
-| `/` | Public/All | Yes | Landing page |
-| `/home` | fan, athlete, league_admin, platform_admin | Yes | Main hub |
-| `/feed` | fan, athlete, league_admin, platform_admin | Yes | Contextual feed filtering |
-| `/matches` | fan, athlete, league_admin, platform_admin | Yes | Match listing |
-| `/athletes` | fan, athlete, league_admin, platform_admin | Yes | Athlete listing |
-| `/teams` | fan, athlete, league_admin, platform_admin | Yes | Team listing |
-| `/leagues` | fan, athlete, league_admin, platform_admin | Yes | League listing |
-| `/awards` | fan, athlete, league_admin, platform_admin | Yes | Awards page |
-| `/wallet` | fan, athlete, platform_admin | Yes | Added back link to `/` |
-| `/athlete-dashboard` | athlete, platform_admin | Yes | Athlete-specific management |
-| `/league-admin` | league_admin, platform_admin | Yes | League operations with `?league=` query param support |
-| `/admin` | platform_admin | Yes | Platform oversight with `?tab=` and `?league=` support |
-| `/sponsor-dashboard`| platform_admin | Yes | Sponsor dashboard for platform admins |
-| `/register` | Public | Yes | Role preview/registration with `?role=` query support |
+| Path | Access Level | Allowed Roles | Visible in Nav | Direct URL Behavior | Status |
+|------|-------------|---------------|----------------|---------------------|--------|
+| `/` | Public | All | No | Renders Landing Page | Secure |
+| `/home` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Hub | Secure |
+| `/feed` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Feed (Filtered if ?league=) | Secure |
+| `/matches` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Matches (Filtered if ?league=) | Secure |
+| `/athletes` | Protected | fan, athlete, league_admin, platform_admin | Yes (Role specific) | Renders Athletes (Filtered if ?league=) | Secure |
+| `/teams` | Protected | fan, athlete, league_admin, platform_admin | No | Renders Teams (Filtered if ?league=) | Secure |
+| `/leagues` | Protected | fan, athlete, league_admin, platform_admin | Yes (Role specific) | Renders Leagues | Secure |
+| `/awards` | Protected | fan, athlete, league_admin, platform_admin | Yes (Fan) | Renders Awards | Secure |
+| `/wallet` | Protected | fan, athlete, platform_admin | Yes (Fan, Athlete) | Renders Wallet | Secure |
+| `/athlete-dashboard` | Protected | athlete, platform_admin | Yes (Athlete) | Renders Athlete Dashboard | Secure |
+| `/league-admin` | Protected | league_admin, platform_admin | Yes (League Admin) | Renders League Admin Ops | Secure |
+| `/admin` | Protected | platform_admin | Yes (Platform Admin) | Renders Platform Admin Console | Secure |
+| `/sponsor-dashboard`| Protected | platform_admin | Yes (Platform Admin) | Renders Sponsor Reporting | Secure |
+| `/sponsors` | Public | All | Yes (Logged Out) | Renders Public Sponsor Inquiry | Secure |
+| `/register` | Public | All | No | Renders Registration/Role Switcher | Secure |
 
 ## Permission Integrity
 - `RoleGuard.tsx` correctly denies access to unauthorized roles.
-- Restricted Area UX improved to specify allowed roles vs current role.
-- `getDefaultRouteForRole` handles dynamic redirect after role change.
+- `canAccessSponsorDashboard` updated to restrict access exclusively to platform admins.
+- No visible buttons lead unauthorized users to Restricted Area pages.

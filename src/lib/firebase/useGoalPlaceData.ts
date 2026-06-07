@@ -221,29 +221,36 @@ export function useGoalPlaceData() {
   const store = useAppStore();
 
   return useMemo(() => {
-    // Merge standard mock data with any local demo session data created by the user
-    const mergedMatches = [...store.demoMatches, ...items.matches].map(m => {
-      // Find if this match was updated in demo state
-      const updatedMatch = store.demoMatches.find(dm => dm.id === m.id);
-      return updatedMatch ? { ...m, ...updatedMatch } : m;
+    // Merge standard mock data with any local demo session overrides
+    const providerMatchesWithOverrides = items.matches.map(m => {
+      const override = store.demoMatchOverrides[m.id];
+      return override ? { ...m, ...override } as Match : m;
     });
 
-    // Remove duplicates by ID (preferring demo items if they share IDs)
+    const providerChallengesWithOverrides = items.challenges.map(c => {
+      const override = store.demoChallengeOverrides[c.id];
+      return override ? { ...c, ...override } as Challenge : c;
+    });
+
+    const mergedMatches = [...store.demoMatches, ...providerMatchesWithOverrides];
     const uniqueMatches = Array.from(new Map(mergedMatches.map(m => [m.id, m])).values());
+
+    const mergedChallenges = [...store.demoChallenges, ...providerChallengesWithOverrides];
+    const uniqueChallenges = Array.from(new Map(mergedChallenges.map(c => [c.id, c])).values());
 
     return {
       athletes: [...store.demoAthletes, ...items.athletes],
       teams: [...store.demoTeams, ...items.teams],
       leagues: [...store.demoLeagues, ...items.leagues],
       matches: uniqueMatches,
-      challenges: [...store.demoChallenges, ...items.challenges],
+      challenges: uniqueChallenges,
       feedPosts: items.feedPosts,
       reports: items.reports,
       verifications: items.verifications,
       loading,
       source: dataProvider.mode,
     };
-  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoChallenges]);
+  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides]);
 }
 
 export function useUserWalletTransactions(userId?: string | null) {

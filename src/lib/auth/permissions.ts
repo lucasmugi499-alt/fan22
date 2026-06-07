@@ -64,10 +64,6 @@ export function canManageLeague(auth: AuthState, _leagueId?: string): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canViewAdminDashboard(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
-}
-
 export function canViewLeagueAdminDashboard(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
@@ -77,7 +73,7 @@ export function canViewPlatformAdminDashboard(auth: AuthState): boolean {
 }
 
 export function canAccessSponsorDashboard(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['platform_admin', 'super_admin', 'sponsor']);
+  return hasAnyRole(auth, ['platform_admin', 'super_admin']);
 }
 
 export function canCreateFixture(auth: AuthState): boolean {
@@ -133,7 +129,7 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
     case 'super_admin':
       return '/admin';
     case 'sponsor':
-      return '/sponsor-dashboard';
+      return '/sponsors';
     default:
       return '/';
   }

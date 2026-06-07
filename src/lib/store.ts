@@ -9,6 +9,8 @@ interface AppState {
   demoAthletes: Athlete[];
   demoMatches: Match[];
   demoChallenges: Challenge[];
+  demoMatchOverrides: Record<string, Partial<Match>>;
+  demoChallengeOverrides: Record<string, Partial<Challenge>>;
   setCurrentUser: (user: User | null) => void;
   setSelectedSportFilter: (sport: SportType | 'All') => void;
   addPoints: (points: number) => void;
@@ -19,6 +21,7 @@ interface AppState {
   addDemoMatch: (match: Match) => void;
   updateDemoMatch: (matchId: string, updates: Partial<Match>) => void;
   addDemoChallenge: (challenge: Challenge) => void;
+  updateDemoChallenge: (challengeId: string, updates: Partial<Challenge>) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -29,6 +32,8 @@ export const useAppStore = create<AppState>((set) => ({
   demoAthletes: [],
   demoMatches: [],
   demoChallenges: [],
+  demoMatchOverrides: {},
+  demoChallengeOverrides: {},
   setCurrentUser: (user) => set({ currentUser: user }),
   setSelectedSportFilter: (sport) => set({ selectedSportFilter: sport }),
   addPoints: (points) => set((state) => ({
@@ -41,8 +46,19 @@ export const useAppStore = create<AppState>((set) => ({
   addDemoTeam: (team) => set((state) => ({ demoTeams: [team, ...state.demoTeams] })),
   addDemoAthlete: (athlete) => set((state) => ({ demoAthletes: [athlete, ...state.demoAthletes] })),
   addDemoMatch: (match) => set((state) => ({ demoMatches: [match, ...state.demoMatches] })),
-  updateDemoMatch: (matchId, updates) => set((state) => ({
-    demoMatches: state.demoMatches.map(m => m.id === matchId ? { ...m, ...updates } : m)
-  })),
+  updateDemoMatch: (matchId, updates) => set((state) => {
+    const isDemo = state.demoMatches.some(m => m.id === matchId);
+    if (isDemo) {
+      return { demoMatches: state.demoMatches.map(m => m.id === matchId ? { ...m, ...updates } : m) };
+    }
+    return { demoMatchOverrides: { ...state.demoMatchOverrides, [matchId]: { ...state.demoMatchOverrides[matchId], ...updates } } };
+  }),
   addDemoChallenge: (challenge) => set((state) => ({ demoChallenges: [challenge, ...state.demoChallenges] })),
+  updateDemoChallenge: (challengeId, updates) => set((state) => {
+    const isDemo = state.demoChallenges.some(c => c.id === challengeId);
+    if (isDemo) {
+      return { demoChallenges: state.demoChallenges.map(c => c.id === challengeId ? { ...c, ...updates } : c) };
+    }
+    return { demoChallengeOverrides: { ...state.demoChallengeOverrides, [challengeId]: { ...state.demoChallengeOverrides[challengeId], ...updates } } };
+  }),
 }));
