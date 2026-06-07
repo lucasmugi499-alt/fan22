@@ -42,7 +42,7 @@ function HomeContent() {
   const todayMatches = useMemo(() => matches.filter((m) => m.status === 'Live' || m.status === 'Upcoming').slice(0, 4), [matches]);
   const personalizedFeed = feedPosts.slice(0, 4);
 
-  const configRole = role === 'team_admin' ? 'league_admin' : role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
+  const configRole = role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
 
   const handleLogout = async () => {

@@ -20,8 +20,8 @@
 | Review Submissions | `/league-admin` | `league_admin`, `platform_admin` | Open Review Drawer | Shows success toast | Verified |
 | Add Athlete | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Add Athlete Modal | Opens modal | Verified |
 | Submit Result | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Submit Result Modal | Opens modal | Verified |
-| Upload Team Update | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger upload action | Shows success toast | Verified |
-| Request Verification | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger request action | Shows success toast | Verified |
+| Upload Team Update | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Upload Team Update Modal | Opens modal | Verified |
+| Request Verification | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger request action | Updates UI to show pending badge | Verified |
 | View Public Team Page | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Navigate to `/teams/[teamId]` | Navigates correctly to public profile | Verified |
 
 ## Summary

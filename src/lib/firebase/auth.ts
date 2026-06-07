@@ -113,7 +113,7 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
 
 export function routeForAppRole(role?: AppRole | null) {
   if (role === 'athlete') return '/athlete-dashboard';
-  if (role === 'team_admin') return '/league-admin';
+  if (role === 'team_admin') return '/team-admin';
   if (role === 'league_admin') return '/league-admin';
   if (role === 'sponsor') return '/home';
   if (role === 'platform_admin' || role === 'super_admin') return '/admin';

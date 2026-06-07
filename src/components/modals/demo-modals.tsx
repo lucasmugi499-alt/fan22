@@ -155,6 +155,44 @@ export function AddTeamModal({ open, onOpenChange }: { open: boolean; onOpenChan
   );
 }
 
+export function UploadTeamUpdateModal({ 
+  open, 
+  onOpenChange,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  currentTeamId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  currentLeagueId
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  currentTeamId?: string;
+  currentLeagueId?: string;
+}) {
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+
+  const submit = () => {
+    if (!title || !message) { toast.error('Title and message are required'); return; }
+    toast.success('Team update published to feed');
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={drawerClass}>
+        <ModalBody>
+          <DialogHeader className="mb-5"><DialogTitle>Upload Team Update</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><FieldLabel>Update Title</FieldLabel><DemoInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Training Schedule Change" /></div>
+            <div><FieldLabel>Message</FieldLabel><DemoInput value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Detail your team update here..." /></div>
+            <Button className="w-full" onClick={submit}>Publish Update</Button>
+          </div>
+        </ModalBody>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function InviteTeamAdminModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const data = useGoalPlaceData();
   const [teamId, setTeamId] = useState('');
@@ -206,18 +244,28 @@ export function InviteTeamAdminModal({ open, onOpenChange }: { open: boolean; on
   );
 }
 
-export function AddAthleteModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AddAthleteModal({ 
+  open, 
+  onOpenChange,
+  currentTeamId,
+  currentLeagueId
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  currentTeamId?: string;
+  currentLeagueId?: string;
+}) {
   const addDemoAthlete = useAppStore((state) => state.addDemoAthlete);
   const data = useGoalPlaceData();
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
-  const [teamId, setTeamId] = useState('');
+  const [teamId, setTeamId] = useState(currentTeamId || '');
   const [sport, setSport] = useState('Football');
   const [story, setStory] = useState('');
   const [status, setStatus] = useState('Active');
 
   const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const defaultLeagueId = sp.get('league');
+  const defaultLeagueId = currentLeagueId || sp.get('league');
   const availableTeams = defaultLeagueId ? data.teams.filter(t => t.leagueId === defaultLeagueId || t.id.includes(defaultLeagueId)) : data.teams;
 
   const submit = () => {
@@ -351,7 +399,17 @@ export function CreateFixtureModal({ open, onOpenChange }: { open: boolean; onOp
   );
 }
 
-export function SubmitResultModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function SubmitResultModal({ 
+  open, 
+  onOpenChange,
+  currentTeamId,
+  currentLeagueId
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  currentTeamId?: string;
+  currentLeagueId?: string;
+}) {
   const updateDemoMatch = useAppStore((state) => state.updateDemoMatch);
   const data = useGoalPlaceData();
   const [matchId, setMatchId] = useState('');
@@ -361,8 +419,13 @@ export function SubmitResultModal({ open, onOpenChange }: { open: boolean; onOpe
   const [submittedBy, setSubmittedBy] = useState('');
 
   const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const defaultLeagueId = sp.get('league');
-  const upcomingMatches = data.matches.filter((m) => m.status === 'Upcoming' && (!defaultLeagueId || m.leagueId === defaultLeagueId));
+  const defaultLeagueId = currentLeagueId || sp.get('league');
+  const upcomingMatches = data.matches.filter((m) => {
+    if (m.status !== 'Upcoming') return false;
+    if (defaultLeagueId && m.leagueId !== defaultLeagueId) return false;
+    if (currentTeamId && m.teamAId !== currentTeamId && m.teamBId !== currentTeamId) return false;
+    return true;
+  });
 
   const submit = () => {
     if (!matchId) { toast.error('Match is required'); return; }
@@ -390,6 +453,7 @@ export function SubmitResultModal({ open, onOpenChange }: { open: boolean; onOpe
               <FieldLabel>Select Match</FieldLabel>
               <DemoSelect value={matchId} onChange={(e) => setMatchId(e.target.value)}>
                 <option value="">Select a match...</option>
+                {upcomingMatches.length === 0 && <option value="">No pending matches found.</option>}
                 {upcomingMatches.map((m) => {
                   const home = data.teams.find((t) => t.id === m.teamAId)?.name || 'Home';
                   const away = data.teams.find((t) => t.id === m.teamBId)?.name || 'Away';

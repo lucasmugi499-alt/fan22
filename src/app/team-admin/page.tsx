@@ -19,7 +19,7 @@ import {
 } from 'hugeicons-react';
 import { Users, Trophy } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { AddAthleteModal, SubmitResultModal } from '@/components/modals/demo-modals';
+import { AddAthleteModal, SubmitResultModal, UploadTeamUpdateModal } from '@/components/modals/demo-modals';
 
 type Tab = 'Overview' | 'Roster' | 'Fixtures & Results' | 'Athlete Updates' | 'Team Profile';
 const TABS: { id: Tab; icon: React.ElementType }[] = [
@@ -39,6 +39,7 @@ function TeamAdminContent() {
 
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [modalOpen, setModalOpen] = useState<string | null>(null);
+  const [verificationRequested, setVerificationRequested] = useState(false);
   const { teams, matches, athletes } = useGoalPlaceData();
 
   const availableTeams = queryLeagueId ? teams.filter(t => t.leagueId === queryLeagueId) : teams;
@@ -55,12 +56,28 @@ function TeamAdminContent() {
   };
 
   const handleRequestVerification = () => {
+    setVerificationRequested(true);
     toast.success('Verification requested successfully.');
   };
 
-  const handleUploadUpdate = () => {
-    toast.success('Team update published to feed.');
-  };
+  if (!team) {
+    return (
+      <RoleGuard allowedRoles={['team_admin', 'league_admin', 'platform_admin', 'super_admin']}>
+        <PageContainer compact className="pb-24 pt-6 md:pt-10">
+          <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-xl border border-white/10 bg-[#0A0D14] p-8 text-center">
+            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-white/5 text-slate-400">
+              <Building03Icon className="size-8" />
+            </div>
+            <h2 className="mb-2 font-display text-2xl font-black text-white">No Team Assigned</h2>
+            <p className="mb-6 max-w-md text-slate-400">
+              You do not currently have administrative access to any teams. Ask your League Admin to invite you to a team.
+            </p>
+            <Button onClick={() => router.push('/leagues')}>Explore Leagues</Button>
+          </div>
+        </PageContainer>
+      </RoleGuard>
+    );
+  }
 
   return (
     <RoleGuard allowedRoles={['team_admin', 'league_admin', 'platform_admin', 'super_admin']}>
@@ -169,7 +186,7 @@ function TeamAdminContent() {
                   <div className="flex flex-wrap gap-3">
                     <Button variant="outline" onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete</Button>
                     <Button variant="outline" onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Result</Button>
-                    <Button variant="outline" onClick={handleUploadUpdate}><ListViewIcon className="mr-2 size-4" /> Upload Update</Button>
+                    <Button variant="outline" onClick={() => setModalOpen('uploadUpdate')}><ListViewIcon className="mr-2 size-4" /> Upload Update</Button>
                   </div>
                 </div>
 
@@ -178,11 +195,15 @@ function TeamAdminContent() {
                   <ul className="space-y-3">
                     <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
                       <span className="text-slate-300">Submit result for recent match</span>
-                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]">Submit</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setModalOpen('submitResult')}>Submit</Button>
                     </li>
                     <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
                       <span className="text-slate-300">3 athletes missing profile photos</span>
-                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]">Update</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Athlete Updates')}>Update</Button>
+                    </li>
+                    <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
+                      <span className="text-slate-300">Roster incomplete</span>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Roster')}>Complete</Button>
                     </li>
                   </ul>
                 </div>
@@ -274,12 +295,18 @@ function TeamAdminContent() {
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Highlight Upload Placeholders</h3>
                   <p className="mt-2 text-sm text-slate-400">Ensure athletes have match footage linked to their profile.</p>
-                  <Button variant="outline" className="mt-4 w-full" onClick={handleUploadUpdate}>Upload Highlight</Button>
+                  <Button variant="outline" className="mt-4 w-full" onClick={() => mockAction('Upload Highlight')}>Upload Highlight</Button>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Verification Requests</h3>
                   <p className="mt-2 text-sm text-slate-400">Request league admin verification for athlete achievements.</p>
-                  <Button variant="outline" className="mt-4 w-full" onClick={handleRequestVerification}>Request Verification</Button>
+                  {verificationRequested ? (
+                    <div className="mt-4 flex items-center justify-center rounded-lg bg-orange-500/20 py-2 px-4 text-sm font-bold text-orange-400">
+                      Pending League Review
+                    </div>
+                  ) : (
+                    <Button variant="outline" className="mt-4 w-full" onClick={handleRequestVerification}>Request Verification</Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -317,8 +344,24 @@ function TeamAdminContent() {
           )}
 
         </div>
-        <AddAthleteModal open={modalOpen === 'addAthlete'} onOpenChange={(open) => !open && setModalOpen(null)} />
-        <SubmitResultModal open={modalOpen === 'submitResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
+        <AddAthleteModal 
+          open={modalOpen === 'addAthlete'} 
+          onOpenChange={(open) => !open && setModalOpen(null)} 
+          currentTeamId={team.id}
+          currentLeagueId={team.leagueId}
+        />
+        <SubmitResultModal 
+          open={modalOpen === 'submitResult'} 
+          onOpenChange={(open) => !open && setModalOpen(null)} 
+          currentTeamId={team.id}
+          currentLeagueId={team.leagueId}
+        />
+        <UploadTeamUpdateModal
+          open={modalOpen === 'uploadUpdate'}
+          onOpenChange={(open) => !open && setModalOpen(null)}
+          currentTeamId={team.id}
+          currentLeagueId={team.leagueId}
+        />
       </PageContainer>
     </RoleGuard>
   );

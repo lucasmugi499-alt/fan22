@@ -3,10 +3,10 @@
 | Path | Access Level | Allowed Roles | Visible in Nav | Direct URL Behavior | Status |
 |------|-------------|---------------|----------------|---------------------|--------|
 | `/` | Public | All | No | Renders Landing Page | Secure |
-| `/home` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Hub | Secure |
-| `/feed` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Feed (Filtered if ?league=) | Secure |
-| `/matches` | Protected | fan, athlete, league_admin, platform_admin | Yes | Renders Matches (Filtered if ?league=) | Secure |
-| `/athletes` | Protected | fan, athlete, league_admin, platform_admin | Yes (Role specific) | Renders Athletes (Filtered if ?league=) | Secure |
+| `/home` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes | Renders Hub | Secure |
+| `/feed` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes | Renders Feed (Filtered if ?league=) | Secure |
+| `/matches` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes | Renders Matches (Filtered if ?league=) | Secure |
+| `/athletes` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes (Role specific) | Renders Athletes (Filtered if ?league=) | Secure |
 | `/teams` | Protected | fan, athlete, team_admin, league_admin, platform_admin | No | Renders Teams (Filtered if ?league=) | Secure |
 | `/leagues` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes (Role specific) | Renders Leagues | Secure |
 | `/awards` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes (Fan) | Renders Awards | Secure |
@@ -22,4 +22,5 @@
 ## Permission Integrity
 - `RoleGuard.tsx` correctly denies access to unauthorized roles.
 - `canAccessSponsorDashboard` updated to restrict access exclusively to platform admins.
+- `team_admin` is accurately mapped to its own isolated console with `Team Admin` specific UI tools.
 - No visible buttons lead unauthorized users to Restricted Area pages.

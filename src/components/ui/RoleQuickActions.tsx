@@ -15,7 +15,6 @@ export function RoleQuickActions() {
   if (!role) return null;
   
   let configRole = role;
-  if (role === 'team_admin') configRole = 'league_admin';
   if (role === 'super_admin') configRole = 'platform_admin';
   if (role === 'sponsor') configRole = 'fan';
   
@@ -48,6 +47,10 @@ export function RoleQuickActions() {
       case 'Approve League': toast.info('Approve league workflow opened'); break;
       case 'Moderate Feed': router.push('/feed'); break;
       case 'Review Payouts': toast.info('Payout review opened'); break;
+
+      // Team Admin Actions
+      case 'Update Roster': router.push('/team-admin'); break;
+      case 'Upload Team Update': toast.info('Upload team update modal opened'); break;
       
       default: toast.info(`Action ${action} triggered`);
     }

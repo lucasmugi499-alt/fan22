@@ -31,8 +31,8 @@ function FeedPageContent() {
   const getFeedHeader = () => {
     switch (role) {
       case 'athlete': return { eyebrow: 'Athlete Feed', title: 'Your Athlete Feed', description: 'Your posts, league updates, and match results.' };
-      case 'league_admin':
-      case 'team_admin': return { eyebrow: 'League Admin', title: 'League Operations Feed', description: 'League posts, team updates, match results, and verification updates.' };
+      case 'team_admin': return { eyebrow: 'Team Admin', title: 'Team Activity Feed', description: 'Team updates, match results, and athlete highlights.' };
+      case 'league_admin': return { eyebrow: 'League Admin', title: 'League Operations Feed', description: 'League posts, team updates, match results, and verification updates.' };
       case 'platform_admin':
       case 'super_admin': return { eyebrow: 'Platform Admin', title: 'Platform Activity Feed', description: 'All platform posts, reports, and verification alerts.' };
       case 'fan':
@@ -52,7 +52,7 @@ function FeedPageContent() {
       if (activeFilter === 'Awards') return post.type === 'annual_awards';
       return true;
     });
-  }, [activeFilter, feedPosts]);
+  }, [activeFilter, feedPosts, leagueId]);
 
   const findAthlete = (authorId: string) => athletes.find((athlete) => athlete.id === authorId) ?? athletes[0] ?? null;
 
