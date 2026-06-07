@@ -12,7 +12,7 @@
 | `/awards` | Protected | fan, athlete, team_admin, league_admin, platform_admin | Yes (Fan) | Renders Awards | Secure |
 | `/wallet` | Protected | fan, athlete, team_admin, platform_admin | Yes (Fan, Athlete) | Renders Wallet | Secure |
 | `/athlete-dashboard` | Protected | athlete, platform_admin | Yes (Athlete) | Renders Athlete Dashboard | Secure |
-| `/league-admin` | Protected | team_admin, league_admin, platform_admin | Yes (League Admin) | Renders League Admin Ops | Secure |
+| `/league-admin` | Protected | league_admin, platform_admin | Yes (League Admin) | Renders League Admin Ops | Secure |
 | `/team-admin` | Protected | team_admin, league_admin, platform_admin | Yes (Team Admin) | Renders Team Admin Console | Secure |
 | `/admin` | Protected | platform_admin | Yes (Platform Admin) | Renders Platform Admin Console | Secure |
 | `/sponsor-dashboard`| Protected | platform_admin | Yes (Platform Admin) | Renders Sponsor Reporting | Secure |

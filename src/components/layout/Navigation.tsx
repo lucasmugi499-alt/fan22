@@ -21,10 +21,7 @@ export function MobileNav() {
 
   const getMobileItems = (currentRole: AppRole | null) => {
     // If the role exists in our new ROLE_CONFIGS, use it.
-    // If it's a legacy role like team_admin, we map it to league_admin in permissions, 
-    // but here we can just use the fan config as a fallback or explicitly map it.
     let configRole = currentRole || 'fan';
-    if (configRole === 'team_admin') configRole = 'league_admin';
     if (configRole === 'super_admin') configRole = 'platform_admin';
     if (configRole === 'sponsor') configRole = 'fan'; // Sponsor is just public now
     
@@ -76,7 +73,6 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   }
 
   let configRole = role || 'fan';
-  if (configRole === 'team_admin') configRole = 'league_admin';
   if (configRole === 'super_admin') configRole = 'platform_admin';
   if (configRole === 'sponsor') configRole = 'fan';
 

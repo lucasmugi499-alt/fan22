@@ -70,7 +70,13 @@ function LeagueDetailPageContent() {
               <Button variant="outline" onClick={() => toast.success('Followed league in demo mode.')}>Follow League</Button>
             </>
           )}
-          {hasAnyRole(authState, ['league_admin', 'team_admin']) && (
+          {hasRole(authState, 'team_admin') && (
+            <>
+              <Button variant="outline" onClick={() => router.push(`/team-admin?league=${league.id}`)}>Open Team Console</Button>
+              <Button variant="outline" onClick={() => router.push(`/athletes?league=${league.id}`)}>View Athletes</Button>
+            </>
+          )}
+          {hasRole(authState, 'league_admin') && (
             <Button variant="outline" onClick={() => router.push(`/league-admin?league=${league.id}`)}>Manage League</Button>
           )}
           {hasAnyRole(authState, ['platform_admin', 'super_admin']) && (

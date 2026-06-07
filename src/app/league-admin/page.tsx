@@ -316,7 +316,10 @@ function LeagueAdminDashboard() {
                         <td className="whitespace-nowrap p-4"><StatusBadge tone="success">Operational</StatusBadge></td>
                         <td className="whitespace-nowrap p-4 text-right space-x-2">
                           <Button variant="ghost" size="sm" onClick={() => router.push(`/team-admin?team=${team.id}`)}>Open Console</Button>
-                          <Button variant="outline" size="sm" onClick={() => toast.success('Review drawer opened (Demo)')}>Review</Button>
+                          {!team.teamAdminEmail && (
+                            <Button variant="ghost" size="sm" onClick={quickActions.inviteTeamAdmin}>Invite Admin</Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => toast.success('Review Team Submission drawer opened (Demo)')}>Review Submissions</Button>
                         </td>
                       </tr>
                     ))}

@@ -222,11 +222,13 @@ export function AddAthleteModal({ open, onOpenChange }: { open: boolean; onOpenC
 
   const submit = () => {
     if (!name) { toast.error('Athlete name is required'); return; }
+    const selectedTeam = availableTeams.find(t => t.id === teamId);
     addDemoAthlete({
       id: `athlete_demo_${Date.now()}`,
       name,
       sport,
       teamId,
+      leagueId: selectedTeam?.leagueId || defaultLeagueId || 'l1',
       country: 'Uganda',
       city: 'Kampala',
       position,
@@ -367,6 +369,10 @@ export function SubmitResultModal({ open, onOpenChange }: { open: boolean; onOpe
     updateDemoMatch(matchId, {
       status: 'Completed',
       verificationStatus: 'Pending',
+      score: {
+        home: parseInt(homeScore),
+        away: parseInt(awayScore),
+      },
       teamAScore: parseInt(homeScore),
       teamBScore: parseInt(awayScore),
     });
@@ -485,14 +491,25 @@ export function CreateChallengeModal({ open, onOpenChange }: { open: boolean; on
 
   const submit = () => {
     if (!athlete) { toast.error('Athlete required'); return; }
+    
+    const selectedAthlete = availableAthletes.find(a => a.id === athlete);
+    const selectedMatch = matchId ? data.matches.find(m => m.id === matchId) : null;
+    const leagueId = selectedAthlete?.leagueId || selectedMatch?.leagueId || defaultLeagueId || 'l1';
+    const sport = selectedAthlete?.sport || data.leagues.find(l => l.id === leagueId)?.sport || 'Football';
+
     addDemoChallenge({
       id: `challenge_demo_${Date.now()}`,
       athleteId: athlete,
-      sport: 'Football',
+      matchId: matchId || undefined,
+      leagueId: leagueId,
+      sport: sport,
       type: challengeType,
       targetDescription: target,
       status: 'Active',
       verificationStatus: 'Pending',
+      totalPledged: 0,
+      supportersCount: 0,
+      createdAt: new Date().toISOString()
     } as unknown as Challenge);
     toast.success('Challenge created');
     onOpenChange(false);

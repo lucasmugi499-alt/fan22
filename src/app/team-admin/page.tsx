@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer, SectionHeader } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
@@ -29,13 +30,21 @@ const TABS: { id: Tab; icon: React.ElementType }[] = [
   { id: 'Team Profile', icon: Settings01Icon },
 ];
 
-export default function TeamAdminPage() {
+function TeamAdminContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const queryTeamId = searchParams?.get('team');
+  const queryLeagueId = searchParams?.get('league');
+
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const { teams, matches, athletes } = useGoalPlaceData();
 
-  // For demo, just grab the first team (or simulate context)
-  const team = teams[0] || null;
+  const availableTeams = queryLeagueId ? teams.filter(t => t.leagueId === queryLeagueId) : teams;
+  const selectedTeamId = queryTeamId || availableTeams[0]?.id || '';
+
+  const team = teams.find(t => t.id === selectedTeamId) || null;
   const teamMatches = matches.filter(m => m.homeTeamId === team?.id || m.awayTeamId === team?.id);
   const teamAthletes = athletes.filter(a => a.teamId === team?.id);
 
@@ -45,29 +54,67 @@ export default function TeamAdminPage() {
     toast.success(`${actionName} modal opened (Demo)`);
   };
 
+  const handleRequestVerification = () => {
+    toast.success('Verification requested successfully.');
+  };
+
+  const handleUploadUpdate = () => {
+    toast.success('Team update published to feed.');
+  };
+
   return (
     <RoleGuard allowedRoles={['team_admin', 'league_admin', 'platform_admin', 'super_admin']}>
       <PageContainer compact className="pb-24 pt-6 md:pt-10">
         
         {/* Header */}
         <div className="mb-8">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-slate-800 text-white">
-              <Building03Icon className="size-6" />
-            </div>
-            <div>
-              <h1 className="font-display text-2xl font-black text-white md:text-3xl">
-                {team ? team.name : 'Team Console'}
-              </h1>
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <span>{team?.city || 'Kampala'}, Uganda</span>
-                <span className="text-slate-600">•</span>
-                <span className="flex items-center gap-1 text-[var(--goal-mint)]">
-                  <CheckmarkBadge01Icon className="size-4" /> Verified
-                </span>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-slate-800 text-white">
+                <Building03Icon className="size-6" />
+              </div>
+              <div>
+                <h1 className="font-display text-2xl font-black text-white md:text-3xl">
+                  {team ? team.name : 'Team Console'}
+                </h1>
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <span>{team?.city || 'Kampala'}, Uganda</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="flex items-center gap-1 text-[var(--goal-mint)]">
+                    <CheckmarkBadge01Icon className="size-4" /> Verified
+                  </span>
+                </div>
               </div>
             </div>
+            
+            {availableTeams.length > 1 && (
+              <label className="hidden md:block">
+                <span className="sr-only">Select Team</span>
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => {
+                    router.push(`/team-admin?team=${e.target.value}`);
+                  }}
+                  className="h-11 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-bold text-white outline-none focus:border-[var(--goal-emerald)]"
+                >
+                  {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </label>
+            )}
           </div>
+          {availableTeams.length > 1 && (
+            <div className="md:hidden mt-4">
+              <select
+                value={selectedTeamId}
+                onChange={(e) => {
+                  router.push(`/team-admin?team=${e.target.value}`);
+                }}
+                className="w-full h-11 rounded-lg border border-white/10 bg-white/6 px-3 text-sm font-bold text-white outline-none focus:border-[var(--goal-emerald)]"
+              >
+                {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -122,7 +169,7 @@ export default function TeamAdminPage() {
                   <div className="flex flex-wrap gap-3">
                     <Button variant="outline" onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete</Button>
                     <Button variant="outline" onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Result</Button>
-                    <Button variant="outline" onClick={() => mockAction('Upload Team Update')}><ListViewIcon className="mr-2 size-4" /> Upload Update</Button>
+                    <Button variant="outline" onClick={handleUploadUpdate}><ListViewIcon className="mr-2 size-4" /> Upload Update</Button>
                   </div>
                 </div>
 
@@ -227,12 +274,12 @@ export default function TeamAdminPage() {
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Highlight Upload Placeholders</h3>
                   <p className="mt-2 text-sm text-slate-400">Ensure athletes have match footage linked to their profile.</p>
-                  <Button variant="outline" className="mt-4 w-full" onClick={() => mockAction('Upload Highlight')}>Upload Highlight</Button>
+                  <Button variant="outline" className="mt-4 w-full" onClick={handleUploadUpdate}>Upload Highlight</Button>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Verification Requests</h3>
                   <p className="mt-2 text-sm text-slate-400">Request league admin verification for athlete achievements.</p>
-                  <Button variant="outline" className="mt-4 w-full" onClick={() => mockAction('Request Verification')}>Request Verification</Button>
+                  <Button variant="outline" className="mt-4 w-full" onClick={handleRequestVerification}>Request Verification</Button>
                 </div>
               </div>
             </div>
@@ -261,8 +308,9 @@ export default function TeamAdminPage() {
                     <div className="mt-1 text-white font-medium">{team?.publicProfileCompleteness || 0}%</div>
                   </div>
                 </div>
-                <div className="mt-8">
+                <div className="mt-8 flex gap-4">
                   <Button onClick={() => mockAction('Edit Team Profile')}>Edit Profile</Button>
+                  <Button variant="outline" onClick={() => router.push(`/teams/${team?.id}`)}>View Public Team Page</Button>
                 </div>
               </div>
             </div>
@@ -274,4 +322,8 @@ export default function TeamAdminPage() {
       </PageContainer>
     </RoleGuard>
   );
+}
+
+export default function TeamAdminPage() {
+  return <Suspense><TeamAdminContent /></Suspense>;
 }

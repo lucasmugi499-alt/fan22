@@ -146,6 +146,7 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
     case 'team_admin':
       return '/team-admin';
     case 'league_admin':
+      return '/league-admin';
     case 'platform_admin':
     case 'super_admin':
       return '/admin';
@@ -178,7 +179,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/league-admin')) {
-    return hasAnyRole(auth, ['league_admin', 'team_admin', 'platform_admin', 'super_admin']);
+    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/admin')) {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);

@@ -5,6 +5,7 @@
 | Support Athletes | `/leagues/[leagueId]` | `fan` | Navigate to `/athletes?league=leagueId` | Navigates correctly to filtered athletes page | Verified |
 | View Athletes | `/leagues/[leagueId]` | `athlete` | Navigate to `/athletes?league=leagueId` | Navigates correctly to filtered athletes page | Verified |
 | Follow League | `/leagues/[leagueId]` | `fan`, `athlete` | Trigger local toast notification | Triggers local toast correctly | Verified |
+| Open Team Console | `/leagues/[leagueId]` | `team_admin` | Navigate to `/team-admin?league=leagueId` | Navigates to team admin dashboard pre-selecting league | Verified |
 | Manage League | `/leagues/[leagueId]` | `league_admin` | Navigate to `/league-admin?league=leagueId` | Navigates to league admin dashboard pre-selecting league | Verified |
 | Open League Ops | `/leagues/[leagueId]` | `platform_admin` | Navigate to `/league-admin?league=leagueId` | Navigates to league admin ops for that league | Verified |
 | Review League | `/leagues/[leagueId]` | `platform_admin` | Navigate to `/admin?tab=Leagues&league=leagueId` | Navigates to platform admin with tab and league selected | Verified |
@@ -16,8 +17,12 @@
 | Verify Result | `/league-admin`, `/admin` | `league_admin`, `platform_admin` | Open Verify Result Modal | Opens modal, updating local match persistence overrides on submit | Verified |
 | Invite Team Admin | `/league-admin` | `league_admin`, `platform_admin` | Open Invite Team Admin Modal | Opens modal | Verified |
 | Open Console | `/league-admin` | `league_admin`, `platform_admin` | Navigate to `/team-admin?team=teamId` | Navigates correctly to Team Admin console | Verified |
+| Review Submissions | `/league-admin` | `league_admin`, `platform_admin` | Open Review Drawer | Shows success toast | Verified |
 | Add Athlete | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Add Athlete Modal | Opens modal | Verified |
 | Submit Result | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Submit Result Modal | Opens modal | Verified |
+| Upload Team Update | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger upload action | Shows success toast | Verified |
+| Request Verification | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger request action | Shows success toast | Verified |
+| View Public Team Page | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Navigate to `/teams/[teamId]` | Navigates correctly to public profile | Verified |
 
 ## Summary
 - Duplicate/ambiguous "Admin Dashboard" button has been removed from league detail view.
