@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Calendar01Icon, Home01Icon, Building01Icon, ListViewIcon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, SecurityCheckIcon, Building03Icon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon } from 'hugeicons-react';
-import { Trophy, Users } from '@phosphor-icons/react';
+import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon } from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
 import { AppRole } from '@/types';

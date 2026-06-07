@@ -1,372 +1,494 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Task01Icon, Download01Icon, Alert01Icon, UserRemove01Icon, CheckmarkCircle01Icon, Coins01Icon, Building03Icon, Building01Icon, SecurityCheckIcon, Flag01Icon, ZapIcon, Activity01Icon, LockKeyIcon, Notification01Icon, Comment01Icon, Briefcase01Icon } from 'hugeicons-react';
-import { Trophy, Users } from '@phosphor-icons/react';
-import { RoleGuard } from '@/components/auth/RoleGuard';
-import { DataCard, ImpactStatCard, TabStrip, SectionHeader } from '@/components/ui/product';
-import { Button } from '@/components/ui/button';
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  Activity01Icon,
+  Alert01Icon,
+  Building01Icon,
+  CheckmarkCircle01Icon,
+  Coins01Icon,
+  Comment01Icon,
+  Download01Icon,
+  Flag01Icon,
+  Settings01Icon,
+} from 'hugeicons-react';
+import { Trophy } from '@phosphor-icons/react';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { Button } from '@/components/ui/button';
+import {
+  ActionToolbar,
+  AdminTabBar,
+  AppPageHeader,
+  DashboardSection,
+  DashboardStatGrid,
+  DataCard,
+  DataTableCard,
+  DetailDrawer,
+  ImpactStatCard,
+  MobileDataCard,
+  PageContainer,
+  SportBadge,
+  StatusBadge,
+} from '@/components/ui/product';
+import { LeagueStatusBadge } from '@/components/ui/league';
+import { dataProvider } from '@/data/dataProvider';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { isFirebaseConfigured } from '@/lib/firebase/client';
+import { formatUGX } from '@/lib/sportThemes';
+import { AwardCategory, Sponsor, User } from '@/types';
+
+type DrawerState = {
+  title: string;
+  description: string;
+  body: React.ReactNode;
+};
+
+function statusTone(status?: string): 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'gold' {
+  const value = status?.toLowerCase() ?? '';
+  if (value.includes('active') || value.includes('verified') || value.includes('resolved') || value.includes('operational')) return 'success';
+  if (value.includes('pending') || value.includes('review') || value.includes('open')) return 'warning';
+  if (value.includes('high') || value.includes('critical') || value.includes('suspended') || value.includes('hidden')) return 'danger';
+  if (value.includes('partner') || value.includes('sponsor')) return 'gold';
+  if (value.includes('configured') || value.includes('normal')) return 'info';
+  return 'neutral';
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Date pending';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+}
+
+function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-200">{value}</p>
+    </div>
+  );
+}
 
 export default function AdminPage() {
-  const { leagues, matches, athletes, teams } = useGoalPlaceData();
-  const pendingMatches = matches.filter((match) => match.verificationStatus === 'Pending' || match.verificationStatus === 'pending').length;
-  
+  return (
+    <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
+      <AdminDashboard />
+    </RoleGuard>
+  );
+}
+
+function AdminDashboard() {
+  const { leagues, matches, athletes, teams, feedPosts, challenges, source } = useGoalPlaceData();
   const [activeTab, setActiveTab] = useState('Overview');
+  const [users, setUsers] = useState<User[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [awards, setAwards] = useState<AwardCategory[]>([]);
+  const [drawer, setDrawer] = useState<DrawerState | null>(null);
+  const [approvedLeagueIds, setApprovedLeagueIds] = useState<Set<string>>(new Set());
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      dataProvider.getUsers(),
+      dataProvider.getSponsors(),
+      dataProvider.getAwardCategories(),
+    ]).then(([nextUsers, nextSponsors, nextAwards]) => {
+      if (cancelled) return;
+      setUsers(nextUsers);
+      setSponsors(nextSponsors);
+      setAwards(nextAwards);
+    }).catch(() => {
+      toast.error('Demo admin metadata could not load.');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const pendingMatches = matches.filter((match) => String(match.verificationStatus).toLowerCase().includes('pending'));
+  const pendingLeagues = leagues.filter((league) => league.status !== 'partner').slice(0, 5);
+  const platformReports = useMemo(() => [
+    { id: 'report_001', type: 'Reported post', target: feedPosts[0]?.caption.slice(0, 52) ?? 'Feed post', severity: 'Medium', status: 'Reviewing', owner: 'Moderation desk', updated: '18m ago' },
+    { id: 'report_002', type: 'Disputed result', target: matches[1] ? `${matches[1].homeTeamId} / ${matches[1].awayTeamId}` : 'Match result', severity: 'High', status: 'Open', owner: 'League operations', updated: '42m ago' },
+    { id: 'report_003', type: 'Account issue', target: users[4]?.displayName ?? 'User account', severity: 'Low', status: 'Open', owner: 'Support desk', updated: '2h ago' },
+    { id: 'report_004', type: 'Support review', target: challenges[0]?.description ?? 'Challenge support', severity: 'Medium', status: 'Reviewing', owner: 'Finance review', updated: '4h ago' },
+  ], [challenges, feedPosts, matches, users]);
+
+  const payoutRows = challenges.slice(0, 5).map((challenge, index) => {
+    const athlete = athletes.find((item) => item.id === challenge.athleteId);
+    const team = teams.find((item) => item.id === athlete?.teamId);
+    const fee = Math.round(challenge.totalPledged * 0.03);
+    return {
+      id: `platform_payout_${challenge.id}`,
+      athlete,
+      team,
+      amount: challenge.totalPledged,
+      fee,
+      net: challenge.totalPledged - fee,
+      status: index === 0 ? 'Ready for approval' : 'Evidence review',
+      type: challenge.description,
+    };
+  });
+
   const tabs = [
-    'Overview', 'Users', 'Leagues', 'Athletes', 'Teams', 'Verifications', 
-    'Reports', 'Feed Moderation', 'Support/Payout Review', 'Sponsors', 
-    'Awards', 'System Health', 'Settings'
+    'Overview',
+    'Users',
+    'Leagues',
+    'Athletes',
+    'Teams',
+    'Verifications',
+    'Reports',
+    'Feed Moderation',
+    'Support/Payout Review',
+    'Sponsors',
+    'Awards',
+    'System Health',
+    'Settings',
+  ];
+  const tabGroups = [
+    { label: 'Control', tabs: ['Overview', 'Users', 'Leagues', 'Athletes', 'Teams'] },
+    { label: 'Trust', tabs: ['Verifications', 'Reports', 'Feed Moderation', 'Support/Payout Review'] },
+    { label: 'Growth', tabs: ['Sponsors', 'Awards'] },
+    { label: 'System', tabs: ['System Health', 'Settings'] },
   ];
 
-  const demoAction = (action: string) => {
-    toast.success(`${action} action triggered in demo mode.`);
+  const openDetail = (title: string, description: string, details: [string, React.ReactNode][]) => {
+    setDrawer({
+      title,
+      description,
+      body: (
+        <div className="space-y-4">
+          {details.map(([label, value]) => <MiniMeta key={label} label={label} value={value} />)}
+          <Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${title} action recorded in demo mode.`); }}>Record Demo Action</Button>
+        </div>
+      ),
+    });
+  };
+
+  const approveLeague = (leagueId: string) => {
+    setApprovedLeagueIds((items) => new Set([...items, leagueId]));
+    toast.success('League approval recorded in demo mode.');
   };
 
   return (
-    <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
-      <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
-        <div className="border-b border-white/10 bg-[#0A0D14] px-4 py-6 md:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-5 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <div className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-bold text-red-400">
-                  System Health: Operational
+    <PageContainer compact className="space-y-6">
+      <AppPageHeader
+        eyebrow="Company control center"
+        title="Platform Control Center"
+        description="Operate GoalPlace256 across approvals, moderation, verification, support review, sponsors, awards, and system readiness."
+        meta={
+          <>
+            <StatusBadge tone="success">Platform Health: Operational</StatusBadge>
+            <StatusBadge tone="info">Data mode: {source}</StatusBadge>
+            <StatusBadge tone="warning">{pendingMatches.length + pendingLeagues.length} pending approvals</StatusBadge>
+          </>
+        }
+        actions={
+          <Button onClick={() => toast.success('Demo export prepared. No production data was downloaded.')}>
+            <Download01Icon className="size-4" />
+            Export Data
+          </Button>
+        }
+      />
+
+      <AdminTabBar tabs={tabs} groups={tabGroups} activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <DashboardStatGrid>
+        <ImpactStatCard label="Leagues" value={String(leagues.length)} detail={`${pendingLeagues.length} need review`} icon={Building01Icon} />
+        <ImpactStatCard label="Athletes" value={String(athletes.length)} detail={`${athletes.filter((item) => item.verified).length} verified`} icon={Trophy} tone="gold" />
+        <ImpactStatCard label="Reports" value={String(platformReports.length)} detail="Moderation and support issues" icon={Alert01Icon} tone="orange" />
+        <ImpactStatCard label="Payout reviews" value={String(payoutRows.length)} detail="Demo support releases" icon={Coins01Icon} tone="blue" />
+      </DashboardStatGrid>
+
+      <ActionToolbar>
+        <Button size="sm" onClick={() => { setActiveTab('Leagues'); toast.success('League approvals opened.'); }}><CheckmarkCircle01Icon className="size-4" /> Approve League</Button>
+        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Reports'); toast.success('Reports queue opened.'); }}><Flag01Icon className="size-4" /> Review Reports</Button>
+        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Feed Moderation'); toast.success('Feed moderation opened.'); }}><Comment01Icon className="size-4" /> Moderate Feed</Button>
+        <Button size="sm" variant="gold" onClick={() => { setActiveTab('Support/Payout Review'); toast.success('Demo payout review opened.'); }}><Coins01Icon className="size-4" /> Review Support</Button>
+      </ActionToolbar>
+
+      {activeTab === 'Overview' && (
+        <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+          <DashboardSection eyebrow="Urgent" title="Admin priorities">
+            <div className="grid gap-3">
+              {[
+                ['League verification', `${pendingLeagues.length} league records need status review`, 'Leagues'],
+                ['Moderation queue', `${platformReports.length} reports are open or reviewing`, 'Reports'],
+                ['Support review', `${payoutRows.length} demo support releases await sign-off`, 'Support/Payout Review'],
+              ].map(([title, detail, tab]) => (
+                <button key={title} className="rounded-xl border border-white/10 bg-white/[0.045] p-4 text-left transition-colors hover:border-[var(--goal-emerald)]/35" onClick={() => setActiveTab(tab)}>
+                  <p className="font-display text-lg font-black text-white">{title}</p>
+                  <p className="mt-1 text-sm text-slate-400">{detail}</p>
+                </button>
+              ))}
+            </div>
+          </DashboardSection>
+          <DashboardSection eyebrow="Activity" title="Recent admin activity">
+            <div className="space-y-3">
+              {['Verification rules synced for football leagues.', 'Flagged post restored after review.', 'Sponsor package metrics refreshed.', 'Demo payout review exported for finance.'].map((item, index) => (
+                <DataCard key={item} className="flex items-start gap-3">
+                  <Activity01Icon className="mt-1 size-5 text-[var(--goal-mint)]" />
+                  <div>
+                    <p className="font-bold text-white">{item}</p>
+                    <p className="mt-1 text-xs text-slate-500">{index + 1}h ago</p>
+                  </div>
+                </DataCard>
+              ))}
+            </div>
+          </DashboardSection>
+        </div>
+      )}
+
+      {activeTab === 'Users' && (
+        <DashboardSection eyebrow="Users" title="Registered accounts" action={<Button variant="outline" onClick={() => toast.success('Demo user export prepared.')}><Download01Icon className="size-4" /> Export Users</Button>}>
+          <DataTableCard className="hidden lg:block">
+            <table className="w-full min-w-[920px] text-left text-sm">
+              <thead className="bg-white/6 text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                <tr><th className="px-4 py-3">Name</th><th>Email</th><th>Role</th><th>Status</th><th>City</th><th>Joined</th><th className="px-4">Actions</th></tr>
+              </thead>
+              <tbody className="divide-y divide-white/8">
+                {users.slice(0, 12).map((user) => (
+                  <tr key={user.id}>
+                    <td className="px-4 py-4 font-bold text-white">{user.displayName}</td>
+                    <td className="text-slate-300">{user.email}</td>
+                    <td className="text-slate-300">{user.role.replace('_', ' ')}</td>
+                    <td><StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge></td>
+                    <td className="text-slate-300">{user.city}</td>
+                    <td className="text-slate-300">{formatDate(user.createdAt)}</td>
+                    <td className="px-4"><Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['Wallet', formatUGX(user.walletBalance)]])}>Inspect</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DataTableCard>
+          <div className="grid gap-3 lg:hidden">
+            {users.slice(0, 8).map((user) => (
+              <MobileDataCard key={user.id} title={user.displayName} eyebrow={user.email} meta={<StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['City', user.city]])}>Inspect</Button>}>
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniMeta label="Role" value={user.role.replace('_', ' ')} />
+                  <MiniMeta label="Joined" value={formatDate(user.createdAt)} />
                 </div>
+              </MobileDataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Leagues' && (
+        <DashboardSection eyebrow="Leagues" title="League verification and plans">
+          <div className="grid gap-3">
+            {leagues.map((league) => {
+              const approved = approvedLeagueIds.has(league.id);
+              return (
+                <MobileDataCard key={league.id} title={league.name} eyebrow={`${league.city} • ${league.sport}`} meta={<LeagueStatusBadge status={approved ? 'verified' : league.status} />} actions={<><Button size="sm" onClick={() => approveLeague(league.id)}>Approve League</Button><Button size="sm" variant="outline" onClick={() => openDetail(league.name, 'League verification detail.', [['Plan', league.plan], ['Teams', league.teamsCount], ['Athletes', league.athletesCount], ['Support', formatUGX(league.totalSupport)]])}>Inspect</Button></>}>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <MiniMeta label="Plan" value={league.plan} />
+                    <MiniMeta label="Teams" value={league.teamsCount} />
+                    <MiniMeta label="Athletes" value={league.athletesCount} />
+                    <MiniMeta label="Support" value={formatUGX(league.totalSupport)} />
+                  </div>
+                </MobileDataCard>
+              );
+            })}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Athletes' && (
+        <DashboardSection eyebrow="Athletes" title="Athlete verification and support">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {athletes.slice(0, 12).map((athlete) => (
+              <DataCard key={athlete.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <SportBadge sport={athlete.sport} />
+                    <h3 className="mt-3 font-display text-lg font-black text-white">{athlete.name}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{athlete.position} • {teams.find((team) => team.id === athlete.teamId)?.name ?? 'Team pending'}</p>
+                  </div>
+                  <StatusBadge tone={statusTone(athlete.verificationStatus)}>{athlete.verificationStatus}</StatusBadge>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <MiniMeta label="Profile" value={`${athlete.verified ? 94 : 67}%`} />
+                  <MiniMeta label="Support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport)} />
+                  <MiniMeta label="Actions" value={<button className="text-[var(--goal-mint)]" onClick={() => toast.success(`${athlete.name} verified in demo mode.`)}>Verify</button>} />
+                </div>
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Teams' && (
+        <DashboardSection eyebrow="Teams" title="Platform teams">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {teams.slice(0, 12).map((team) => (
+              <MobileDataCard key={team.id} title={team.name} eyebrow={`${team.city} • ${team.sport}`} meta={<StatusBadge tone={team.verified ? 'success' : 'warning'}>{team.verified ? 'Verified' : 'Review'}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(team.name, 'Team profile controls.', [['League', leagues.find((league) => league.id === team.leagueId)?.name ?? 'League pending'], ['Athletes', athletes.filter((athlete) => athlete.teamId === team.id).length], ['Support', formatUGX(team.supportPool ?? team.totalSupport)]])}>Manage</Button>}>
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniMeta label="Athletes" value={athletes.filter((athlete) => athlete.teamId === team.id).length} />
+                  <MiniMeta label="Support" value={formatUGX(team.supportPool ?? team.totalSupport)} />
+                </div>
+              </MobileDataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Verifications' && (
+        <div className="grid gap-8 xl:grid-cols-2">
+          {[
+            ['League verification', pendingLeagues.map((league) => ({ id: league.id, title: league.name, detail: `${league.city} • ${league.status}`, action: () => approveLeague(league.id) }))],
+            ['Athlete verification', athletes.slice(0, 4).map((athlete) => ({ id: athlete.id, title: athlete.name, detail: `${athlete.position} • ${athlete.verificationStatus}`, action: () => toast.success(`${athlete.name} verification recorded.`) }))],
+            ['Match verification', pendingMatches.slice(0, 4).map((match) => ({ id: match.id, title: `${match.homeTeamId} vs ${match.awayTeamId}`, detail: `${match.venue} • ${match.verificationStatus}`, action: () => toast.success('Match verification recorded.') }))],
+            ['Challenge verification', challenges.slice(0, 4).map((challenge) => ({ id: challenge.id, title: challenge.description, detail: `${formatUGX(challenge.totalPledged)} • ${challenge.verificationStatus}`, action: () => toast.success('Challenge verification recorded.') }))],
+            ['Payout review', payoutRows.slice(0, 4).map((payout) => ({ id: payout.id, title: payout.athlete?.name ?? 'Athlete support', detail: `${formatUGX(payout.net)} net • ${payout.status}`, action: () => toast.success('Demo payout review recorded.') }))],
+          ].map(([title, items]) => (
+            <DashboardSection key={title as string} eyebrow="Queue" title={title as string}>
+              <div className="space-y-3">
+                {(items as { id: string; title: string; detail: string; action: () => void }[]).map((item) => (
+                  <MobileDataCard key={item.id} title={item.title} eyebrow={item.detail} actions={<Button size="sm" variant="outline" onClick={item.action}>Review</Button>} />
+                ))}
               </div>
-              <h1 className="font-display text-3xl font-black text-white md:text-4xl">Platform Control Center</h1>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => demoAction('Export Data')}>
-                <Download01Icon className="size-4" /> Export Data
-              </Button>
-            </div>
-          </div>
-          
-          <TabStrip tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+            </DashboardSection>
+          ))}
         </div>
+      )}
 
-        <div className="flex-1 overflow-y-auto bg-[#05070A] p-4 md:p-8">
-          <div className="mx-auto max-w-7xl space-y-8">
-            
-            {activeTab === 'Overview' && (
-              <>
-                <section className="grid gap-3 md:grid-cols-4">
-                  <ImpactStatCard label="Leagues" value={String(leagues.length)} icon={Building01Icon} />
-                  <ImpactStatCard label="Teams" value={String(teams.length)} icon={Building03Icon} tone="blue" />
-                  <ImpactStatCard label="Athletes" value={String(athletes.length)} icon={Trophy} tone="gold" />
-                  <ImpactStatCard label="Pending Verifications" value={String(pendingMatches)} icon={Task01Icon} tone="orange" />
-                </section>
-
-                <section className="grid gap-4 lg:grid-cols-3">
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-                    <CheckmarkCircle01Icon className="mb-4 size-6 text-[var(--goal-mint)]" />
-                    <h3 className="font-display text-xl font-black text-white">Pending Approvals</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">Review leagues, teams, and athletes requesting platform access.</p>
-                    <div className="mt-4 flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Approve League')}>League</Button>
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Approve Team')}>Team</Button>
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Approve Athlete')}>Athlete</Button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-                    <Alert01Icon className="mb-4 size-6 text-orange-400" />
-                    <h3 className="font-display text-xl font-black text-white">Moderation Queue</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">Handle reported content, feed moderation, and account suspensions.</p>
-                    <div className="mt-4 flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Review Report')}>Reports</Button>
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Moderate Feed Post')}>Feed</Button>
-                      <Button size="sm" variant="destructive" onClick={() => demoAction('Suspend Account')}><UserRemove01Icon className="size-4 mr-1"/>Suspend</Button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-                    <Coins01Icon className="mb-4 size-6 text-[var(--goal-gold)]" />
-                    <h3 className="font-display text-xl font-black text-white">Platform Operations</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">Manage support payouts, verify matches, and configure sponsor packages.</p>
-                    <div className="mt-4 flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Verify Match')}>Matches</Button>
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Review Payout')}>Payouts</Button>
-                      <Button size="sm" variant="outline" onClick={() => demoAction('Manage Sponsor Package')}>Sponsors</Button>
-                    </div>
-                  </div>
-                </section>
-              </>
-            )}
-            
-            {activeTab === 'Users' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="User Management" title="Registered Accounts" action={<Button onClick={() => demoAction('Export Users')}><Download01Icon className="size-4" /> Export</Button>} />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3, 4, 5, 6].map(i => (
-                    <DataCard key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-white">U{i}</div>
-                        <div>
-                          <p className="font-bold text-white">User {i}</p>
-                          <p className="text-sm text-slate-400">Fan • Joined 2 days ago</p>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => demoAction(`Suspended User ${i}`)}><UserRemove01Icon className="size-4 mr-1"/>Suspend</Button>
-                    </DataCard>
-                  ))}
+      {activeTab === 'Reports' && (
+        <DashboardSection eyebrow="Reports" title="Moderation and dispute reports">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {platformReports.map((report) => (
+              <MobileDataCard key={report.id} title={report.type} eyebrow={`${report.target} • ${report.owner}`} meta={<StatusBadge tone={statusTone(report.severity)}>{report.severity}</StatusBadge>} actions={<><Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Target', report.target], ['Status', report.status], ['Updated', report.updated]])}>View</Button><Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve</Button></>}>
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniMeta label="Status" value={report.status} />
+                  <MiniMeta label="Updated" value={report.updated} />
                 </div>
-              </section>
-            )}
-
-            {activeTab === 'Leagues' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Leagues" title="Platform Leagues" action={<Button onClick={() => demoAction('Create League')}>Create League</Button>} />
-                <div className="grid gap-4 md:grid-cols-2">
-                  {leagues.map(league => (
-                    <DataCard key={league.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <p className="font-bold text-lg text-white">{league.name}</p>
-                        <p className="text-sm text-slate-400">{league.city} • <span className="capitalize">{league.status}</span></p>
-                      </div>
-                      <Button size="sm" onClick={() => demoAction(`Reviewed League ${league.name}`)}>Review</Button>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Athletes' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Athletes" title="Platform Athletes" />
-                <div className="grid gap-4 md:grid-cols-3">
-                  {athletes.slice(0, 9).map(athlete => (
-                    <DataCard key={athlete.id} className="flex flex-col gap-3">
-                      <div>
-                        <p className="font-bold text-lg text-white">{athlete.name}</p>
-                        <p className="text-sm text-slate-400">{athlete.sport} • {athlete.city}</p>
-                      </div>
-                      <div className="flex justify-between items-center mt-2 border-t border-white/10 pt-2">
-                        <span className={`text-xs font-bold uppercase tracking-widest ${athlete.verified ? 'text-[var(--goal-mint)]' : 'text-orange-400'}`}>{athlete.verificationStatus}</span>
-                        {!athlete.verified && <Button size="sm" onClick={() => demoAction(`Verified Athlete ${athlete.name}`)}>Verify</Button>}
-                      </div>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Teams' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Teams" title="Platform Teams" />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {teams.slice(0, 6).map(team => (
-                    <DataCard key={team.id}>
-                      <Building03Icon className="mb-3 size-5 text-blue-400" />
-                      <p className="font-bold text-lg text-white">{team.name}</p>
-                      <p className="text-sm text-slate-400 mb-4">{team.city} • <span className="capitalize">{team.sport}</span></p>
-                      <Button className="w-full" variant="outline" size="sm" onClick={() => demoAction(`Managed Team ${team.name}`)}>Manage Team</Button>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Verifications' && (
-              <section className="grid gap-8 lg:grid-cols-2">
-                <div>
-                  <SectionHeader eyebrow="Queue" title="Match Escalations" description="Match disputes escalated from League Admins." />
-                  <div className="space-y-3">
-                    {[1, 2].map(i => (
-                      <DataCard key={i} className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 text-orange-400"><Alert01Icon className="size-4" /><span className="text-sm font-bold uppercase tracking-widest">Disputed Result</span></div>
-                        <p className="font-bold text-white">Match #{i}00 - Escalated</p>
-                        <p className="text-sm text-slate-400">Score mismatch reported by away team.</p>
-                        <Button size="sm" variant="outline" className="self-start mt-2" onClick={() => demoAction(`Resolved Match Dispute ${i}`)}>Resolve Dispute</Button>
-                      </DataCard>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <SectionHeader eyebrow="Queue" title="Challenge Escalations" description="Performance challenges requiring platform review." />
-                  <div className="space-y-3">
-                    {[1, 2, 3].map(i => (
-                      <DataCard key={i} className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 text-[var(--goal-gold)]"><SecurityCheckIcon className="size-4" /><span className="text-sm font-bold uppercase tracking-widest">Verification Review</span></div>
-                        <p className="font-bold text-white">Challenge #{i}50 - High Value</p>
-                        <p className="text-sm text-slate-400">1.5M UGX target achieved, pending final sign-off.</p>
-                        <Button size="sm" variant="outline" className="self-start mt-2" onClick={() => demoAction(`Approved Challenge ${i}`)}>Approve Verification</Button>
-                      </DataCard>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Reports' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Moderation" title="User Reports" />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    { id: 1, type: 'Harassment', status: 'Pending Review', target: 'User #4092' },
-                    { id: 2, type: 'Spam', status: 'Pending Review', target: 'Post #992' },
-                    { id: 3, type: 'Inappropriate Media', status: 'Under Investigation', target: 'Athlete #12' },
-                  ].map(report => (
-                    <DataCard key={report.id} className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold px-2 py-1 bg-red-500/20 text-red-400 rounded uppercase">{report.type}</span>
-                        <Flag01Icon className="size-4 text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-white">Target: {report.target}</p>
-                        <p className="text-sm text-slate-400">{report.status}</p>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" className="flex-1" onClick={() => demoAction(`Dismissed Report ${report.id}`)}>Dismiss</Button>
-                        <Button size="sm" variant="destructive" className="flex-1" onClick={() => demoAction(`Took Action on Report ${report.id}`)}>Take Action</Button>
-                      </div>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Feed Moderation' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Content" title="Global Feed Moderation" description="Review flagged posts from the global community feed." />
-                <div className="space-y-4">
-                  {[1, 2].map(i => (
-                    <DataCard key={i} className="flex flex-col sm:flex-row gap-4 items-start justify-between">
-                      <div className="flex gap-4 items-start">
-                        <Comment01Icon className="size-5 text-slate-500 mt-1" />
-                        <div>
-                          <p className="font-bold text-white">Flagged Post #{i}</p>
-                          <p className="text-sm text-slate-300 italic mt-1">&quot;This referee is totally bought off, terrible officiating...&quot;</p>
-                          <p className="text-xs text-slate-500 mt-2">Flagged 4 times by users.</p>
-                        </div>
-                      </div>
-                      <div className="flex sm:flex-col gap-2">
-                        <Button size="sm" variant="destructive" onClick={() => demoAction(`Removed Post ${i}`)}>Remove Post</Button>
-                        <Button size="sm" variant="outline" onClick={() => demoAction(`Approved Post ${i}`)}>Keep Post</Button>
-                      </div>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Support/Payout Review' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Finance" title="Payout Authorizations" description="Final approval step for payouts to athletes and leagues." />
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {[
-                    { id: 1, amount: '450,000 UGX', recipient: 'Athlete #12', type: 'Challenge Completion' },
-                    { id: 2, amount: '1,200,000 UGX', recipient: 'League #3', type: 'Sponsorship Milestone' },
-                    { id: 3, amount: '25,000 UGX', recipient: 'Athlete #88', type: 'Direct Support' },
-                  ].map(payout => (
-                    <DataCard key={payout.id}>
-                      <Coins01Icon className="size-6 text-[var(--goal-mint)] mb-3" />
-                      <p className="font-display text-xl font-black text-white">{payout.amount}</p>
-                      <p className="text-sm text-slate-400">{payout.type}</p>
-                      <p className="text-sm font-bold text-white mt-3 mb-4">To: {payout.recipient}</p>
-                      <Button className="w-full" onClick={() => demoAction(`Authorized Payout ${payout.id}`)}>Authorize Release</Button>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Sponsors' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Partnerships" title="Sponsor Directory" description="Manage corporate partners and ad packages." action={<Button onClick={() => demoAction('Invite Sponsor')}>Invite Partner</Button>} />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3].map(i => (
-                    <DataCard key={i}>
-                      <Briefcase01Icon className="size-5 text-[var(--goal-gold)] mb-3" />
-                      <p className="font-bold text-lg text-white">Corporate Partner {i}</p>
-                      <p className="text-sm text-slate-400 mb-4">Tier: {i === 1 ? 'Platinum' : 'Gold'} • Status: Active</p>
-                      <Button className="w-full" variant="outline" size="sm" onClick={() => demoAction(`Managed Partner ${i}`)}>Manage Package</Button>
-                    </DataCard>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Awards' && (
-              <section className="grid gap-6 md:grid-cols-2">
-                <DataCard>
-                  <Trophy className="size-6 text-[var(--goal-gold)] mb-4" />
-                  <h3 className="font-display text-xl font-black text-white">Annual Awards Configuration</h3>
-                  <p className="text-sm text-slate-400 mt-2 mb-6">Manage award categories, voting windows, and nominees for the GoalPlace256 Annual Awards.</p>
-                  <Button onClick={() => demoAction('Awards Config Opened')}>Configure Season</Button>
-                </DataCard>
-                <DataCard>
-                  <Activity01Icon className="size-6 text-blue-400 mb-4" />
-                  <h3 className="font-display text-xl font-black text-white">Voting Analytics</h3>
-                  <p className="text-sm text-slate-400 mt-2 mb-6">Monitor community voting integrity and engagement metrics for the current awards cycle.</p>
-                  <Button variant="outline" onClick={() => demoAction('Voting Analytics Opened')}>View Analytics</Button>
-                </DataCard>
-              </section>
-            )}
-
-            {activeTab === 'System Health' && (
-              <section className="space-y-6">
-                <SectionHeader eyebrow="Infrastructure" title="System Status" />
-                <div className="grid gap-4 md:grid-cols-3">
-                  <DataCard className="text-center">
-                    <Activity01Icon className="size-8 mx-auto text-[var(--goal-mint)] mb-3" />
-                    <p className="text-sm uppercase tracking-widest text-slate-500 font-bold">API Uptime</p>
-                    <p className="font-display text-3xl font-black text-white mt-1">99.99%</p>
-                  </DataCard>
-                  <DataCard className="text-center">
-                    <ZapIcon className="size-8 mx-auto text-[var(--goal-gold)] mb-3" />
-                    <p className="text-sm uppercase tracking-widest text-slate-500 font-bold">Avg Latency</p>
-                    <p className="font-display text-3xl font-black text-white mt-1">124ms</p>
-                  </DataCard>
-                  <DataCard className="text-center">
-                    <Users className="size-8 mx-auto text-blue-400 mb-3" />
-                    <p className="text-sm uppercase tracking-widest text-slate-500 font-bold">Active Sessions</p>
-                    <p className="font-display text-3xl font-black text-white mt-1">4,092</p>
-                  </DataCard>
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'Settings' && (
-              <section className="grid gap-6 md:grid-cols-2">
-                <DataCard>
-                  <div className="flex items-center gap-3 mb-4">
-                    <LockKeyIcon className="size-5 text-slate-400" />
-                    <h3 className="font-display text-xl font-black text-white">Security</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="flex items-center justify-between text-sm text-slate-300">
-                      <span>Require 2FA for Admins</span>
-                      <input type="checkbox" defaultChecked className="toggle" />
-                    </label>
-                    <label className="flex items-center justify-between text-sm text-slate-300">
-                      <span>Log all moderation actions</span>
-                      <input type="checkbox" defaultChecked className="toggle" />
-                    </label>
-                    <Button variant="outline" className="w-full mt-4" onClick={() => demoAction('Security updated')}>Save Security</Button>
-                  </div>
-                </DataCard>
-                <DataCard>
-                  <div className="flex items-center gap-3 mb-4">
-                    <Notification01Icon className="size-5 text-slate-400" />
-                    <h3 className="font-display text-xl font-black text-white">Global Alerts</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="flex items-center justify-between text-sm text-slate-300">
-                      <span>Enable platform maintenance banner</span>
-                      <input type="checkbox" className="toggle" />
-                    </label>
-                    <Button variant="outline" className="w-full mt-4" onClick={() => demoAction('Alerts updated')}>Update Banner</Button>
-                  </div>
-                </DataCard>
-              </section>
-            )}
-
+              </MobileDataCard>
+            ))}
           </div>
-        </div>
-      </div>
-    </RoleGuard>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Feed Moderation' && (
+        <DashboardSection eyebrow="Content" title="Flagged and high-engagement posts">
+          <div className="space-y-3">
+            {feedPosts.slice(0, 6).map((post, index) => {
+              const hidden = hiddenPostIds.has(post.id);
+              return (
+                <MobileDataCard key={post.id} title={post.caption.slice(0, 84)} eyebrow={`${post.authorName} • ${post.likesCount} likes • ${post.commentsCount} comments`} meta={<StatusBadge tone={hidden ? 'danger' : index < 2 ? 'warning' : 'success'}>{hidden ? 'Hidden' : index < 2 ? 'Flagged' : 'Active'}</StatusBadge>} actions={<><Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>View</Button><Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore' : 'Hide'}</Button><Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate</Button></>} />
+              );
+            })}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Support/Payout Review' && (
+        <DashboardSection eyebrow="Support/Payout Review" title="Demo support release ledger" description="Demo payout review only. Real payment processing is not enabled yet.">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {payoutRows.map((payout) => (
+              <DataCard key={payout.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-display text-lg font-black text-white">{payout.athlete?.name ?? 'Athlete support'}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.type}</p>
+                  </div>
+                  <StatusBadge tone="warning">{payout.status}</StatusBadge>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <MiniMeta label="Amount" value={formatUGX(payout.amount)} />
+                  <MiniMeta label="Platform fee" value={formatUGX(payout.fee)} />
+                  <MiniMeta label="Net" value={formatUGX(payout.net)} />
+                </div>
+                <Button className="mt-4" size="sm" variant="gold" onClick={() => toast.success('Demo support release approved. Real payments are not enabled yet.')}>Approve Demo Review</Button>
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Sponsors' && (
+        <DashboardSection eyebrow="Sponsors" title="Sponsor packages and impact">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sponsors.slice(0, 6).map((sponsor) => (
+              <DataCard key={sponsor.id}>
+                <h3 className="font-display text-lg font-black text-white">{sponsor.name}</h3>
+                <p className="mt-1 text-sm text-slate-400">{sponsor.category} • {sponsor.city}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <MiniMeta label="Package" value={sponsor.packageType.replaceAll('_', ' ')} />
+                  <MiniMeta label="Commitment" value={formatUGX(sponsor.amountCommitted)} />
+                </div>
+                <p className="mt-4 text-sm leading-6 text-slate-300">{sponsor.impactSummary}</p>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${sponsor.name} package opened.`)}>Manage Package</Button>
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Awards' && (
+        <DashboardSection eyebrow="Awards" title="Award categories and current leaders">
+          <div className="grid gap-3 md:grid-cols-2">
+            {awards.map((award) => (
+              <DataCard key={award.id}>
+                <Trophy className="mb-4 size-6 text-[var(--goal-gold)]" />
+                <h3 className="font-display text-xl font-black text-white">{award.name}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{award.description}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <MiniMeta label="Type" value={award.categoryType} />
+                  <MiniMeta label="Leaders" value={award.currentLeaderIds.length} />
+                </div>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${award.name} configured in demo mode.`)}>Configure</Button>
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'System Health' && (
+        <DashboardSection eyebrow="System Health" title="Data and infrastructure readiness">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              ['Data mode', source, 'info'],
+              ['Firebase configured', isFirebaseConfigured ? 'Yes' : 'No', isFirebaseConfigured ? 'success' : 'warning'],
+              ['Mock mode status', source === 'mock' ? 'Active' : 'Fallback ready', 'success'],
+              ['Seed data status', `${leagues.length} leagues loaded`, 'success'],
+              ['Storage status', 'Rules prepared', 'info'],
+              ['Build status', 'Last local build passed before sandbox block', 'warning'],
+              ['Admin logs', 'Demo visible', 'success'],
+              ['Alerts', platformReports.length ? 'Reports open' : 'Clear', platformReports.length ? 'warning' : 'success'],
+            ].map(([label, value, tone]) => (
+              <DataCard key={label as string}>
+                <Activity01Icon className="mb-4 size-5 text-[var(--goal-mint)]" />
+                <MiniMeta label={label as string} value={<StatusBadge tone={tone as 'neutral'}>{value as string}</StatusBadge>} />
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Settings' && (
+        <DashboardSection eyebrow="Settings" title="Platform controls">
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              ['Role access controls', 'Visible MVP roles are fan, athlete, league admin, and platform admin.'],
+              ['Demo mode settings', 'Mock writes show toasts and never process real payments.'],
+              ['Future payment settings', 'Reserved for a later release and disabled in demo mode.'],
+              ['Maintenance banner', 'Configure platform-wide notices for support and verification windows.'],
+            ].map(([title, detail]) => (
+              <DataCard key={title}>
+                <Settings01Icon className="mb-4 size-5 text-[var(--goal-mint)]" />
+                <h3 className="font-display text-xl font-black text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${title} saved in demo mode.`)}>Save</Button>
+              </DataCard>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      <DetailDrawer open={Boolean(drawer)} onOpenChange={(open) => !open && setDrawer(null)} title={drawer?.title ?? ''} description={drawer?.description}>
+        {drawer?.body}
+      </DetailDrawer>
+    </PageContainer>
   );
 }

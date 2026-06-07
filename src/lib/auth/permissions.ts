@@ -53,9 +53,8 @@ export function canCreateFanPost(auth: AuthState): boolean {
 // Admin / Management
 export function canManageTeam(auth: AuthState, _teamId?: string): boolean {
   void _teamId;
-  // Real implementation would check if teamId is in auth.userProfile.assignedTeams
-  // For now, any team_admin, platform_admin, super_admin can
-  return hasAnyRole(auth, ['team_admin', 'platform_admin', 'super_admin']);
+  // Dedicated team admin is a future module in the MVP.
+  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
 export function canManageLeague(auth: AuthState, _leagueId?: string): boolean {
@@ -143,9 +142,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/sponsor-dashboard')) {
-    // We handle the future module message on the page itself.
-    // Restricting to platform_admin or fan just to prevent random roles, though anyone logged in could technically see the "future module" placeholder.
-    return true; 
+    return isLoggedIn(auth);
   }
 
   // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user

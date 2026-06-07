@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserGroupIcon, SecurityCheckIcon, UserIcon, Upload01Icon, Calendar01Icon, Video01Icon, Activity01Icon, PencilEdit01Icon, LockKeyIcon, Notification01Icon, CheckmarkCircle01Icon } from 'hugeicons-react';
+import { UserGroupIcon, SecurityCheckIcon, UserIcon, Upload01Icon, Calendar01Icon, Video01Icon, Activity01Icon, PencilEdit01Icon, LockKeyIcon, Notification01Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { DataCard, ImpactStatCard, SportBadge, TabStrip } from '@/components/ui/product';
+import { CreatePostModal } from '@/components/modals/app-modals';
+import { DataCard, DetailDrawer, ImpactStatCard, SportBadge, TabStrip } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
@@ -17,10 +18,31 @@ export default function AthleteDashboardPage() {
   const upcomingMatches = matches.filter(match => match.status === 'scheduled' || match.status === 'Upcoming').slice(0, 3);
   
   const [activeTab, setActiveTab] = useState('Overview');
+  const [postOpen, setPostOpen] = useState(false);
+  const [drawer, setDrawer] = useState<{ title: string; description: string; body: React.ReactNode } | null>(null);
   const tabs = ['Overview', 'Profile', 'Challenges', 'Matches', 'Media', 'Supporters', 'Settings'];
 
-  const demoAction = (action: string) => {
+  const demoAction = (action: string, nextTab?: string) => {
+    if (nextTab) setActiveTab(nextTab);
     toast.success(`${action} successful in demo mode.`);
+  };
+
+  const openDrawer = (title: string, description: string, fields: [string, React.ReactNode][]) => {
+    setDrawer({
+      title,
+      description,
+      body: (
+        <div className="space-y-4">
+          {fields.map(([label, value]) => (
+            <div key={label}>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+              <p className="mt-1 text-sm font-bold text-slate-200">{value}</p>
+            </div>
+          ))}
+          <Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${title} recorded in demo mode.`); }}>Confirm Demo Action</Button>
+        </div>
+      ),
+    });
   };
 
   return (
@@ -37,12 +59,24 @@ export default function AthleteDashboardPage() {
               </div>
               <h1 className="font-display text-3xl font-black text-white md:text-4xl">{athlete?.name ?? 'Athlete Command Center'}</h1>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={() => demoAction('Highlight upload opened')}>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => openDrawer('Upload Highlight', 'Upload placeholder for match clips and scouting media.', [['Media type', 'Video highlight'], ['Match', upcomingMatches[0]?.venue ?? 'Next fixture'], ['Visibility', 'Public after moderation']])}>
                 <Upload01Icon className="size-4" /> Upload Highlight
               </Button>
               <Button variant="outline" onClick={() => demoAction('Verification request submitted')}>
                 <SecurityCheckIcon className="size-4" /> Request Verification
+              </Button>
+              <Button variant="outline" onClick={() => setPostOpen(true)}>
+                <Video01Icon className="size-4" /> Create Post
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab('Supporters')}>
+                <UserGroupIcon className="size-4" /> View Supporters
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab('Challenges')}>
+                <Trophy className="size-4" /> View Challenges
+              </Button>
+              <Button variant="gold" onClick={() => athlete ? window.location.assign(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>
+                View Public Profile
               </Button>
             </div>
           </div>
@@ -92,7 +126,7 @@ export default function AthleteDashboardPage() {
                 <DataCard>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-display text-xl font-black text-white">Personal Information</h3>
-                    <Button variant="outline" size="sm"><PencilEdit01Icon className="size-4" /> Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Profile', 'Update public athlete identity and contact information.', [['Name', athlete?.name ?? 'Athlete'], ['Location', `${athlete?.city}, ${athlete?.country}`], ['Bio', athlete?.bio ?? 'Profile bio']])}><PencilEdit01Icon className="size-4" /> Edit</Button>
                   </div>
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-slate-400">Full Name</span><span className="text-white font-medium">{athlete?.name}</span></div>
@@ -104,7 +138,7 @@ export default function AthleteDashboardPage() {
                 <DataCard>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-display text-xl font-black text-white">Athletic Profile</h3>
-                    <Button variant="outline" size="sm"><PencilEdit01Icon className="size-4" /> Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Athletic Profile', 'Update measurable sport profile details.', [['Position', athlete?.position ?? 'Forward'], ['Height', '180 cm'], ['Strong foot/hand', 'Right']])}><PencilEdit01Icon className="size-4" /> Edit</Button>
                   </div>
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-slate-400">Position</span><span className="text-white font-medium">{athlete?.position ?? 'Forward'}</span></div>
@@ -120,7 +154,7 @@ export default function AthleteDashboardPage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-display text-xl font-black text-white">Your Challenges</h3>
-                  <Button onClick={() => demoAction('New challenge proposed')}><Trophy className="size-4" /> Propose Challenge</Button>
+                  <Button onClick={() => openDrawer('Propose Challenge', 'Draft a verified performance challenge for supporters.', [['Athlete', athlete?.name ?? 'Athlete'], ['Target', 'Score or assist in next match'], ['Review', 'League admin approval required']])}><Trophy className="size-4" /> Propose Challenge</Button>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {athleteChallenges.length > 0 ? athleteChallenges.map(c => (
@@ -162,7 +196,7 @@ export default function AthleteDashboardPage() {
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <span className={`text-xs font-bold px-2 py-1 rounded bg-white/10 uppercase tracking-widest ${match.status === 'verified' ? 'text-[var(--goal-mint)]' : 'text-slate-300'}`}>{match.status}</span>
-                        {match.status === 'scheduled' && <Button size="sm" variant="outline" onClick={() => demoAction('Match details viewed')}>View</Button>}
+                        {match.status === 'scheduled' && <Button size="sm" variant="outline" onClick={() => openDrawer('Match Details', 'Upcoming fixture context and preparation notes.', [['Venue', match.venue], ['Date', new Date(match.scheduledAt).toLocaleDateString()], ['Status', match.status]])}>View</Button>}
                       </div>
                     </DataCard>
                   ))}
@@ -174,7 +208,7 @@ export default function AthleteDashboardPage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-display text-xl font-black text-white">Highlights & Media</h3>
-                  <Button onClick={() => demoAction('Media upload opened')}><Upload01Icon className="size-4" /> Upload</Button>
+                  <Button onClick={() => openDrawer('Upload Media', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}><Upload01Icon className="size-4" /> Upload</Button>
                 </div>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
                   {[1, 2, 3].map(i => (
@@ -243,8 +277,30 @@ export default function AthleteDashboardPage() {
               </div>
             )}
 
+            <section className="rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/8 p-5">
+              <h3 className="font-display text-xl font-black text-white">Support/Payout History</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Demo payout review only. Real payment processing is not enabled yet.</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {[
+                  ['Direct support', formatUGX(125000), 'Pending review'],
+                  ['Challenge release', formatUGX(athleteChallenges[0]?.totalPledged ?? 45000), 'Evidence pending'],
+                  ['Monthly support', formatUGX(86000), 'Demo only'],
+                ].map(([type, amount, status]) => (
+                  <div key={type} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{type}</p>
+                    <p className="mt-1 font-display text-xl font-black text-white">{amount}</p>
+                    <p className="mt-1 text-xs font-bold text-[var(--goal-gold)]">{status}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
           </div>
         </div>
+        <CreatePostModal open={postOpen} onOpenChange={setPostOpen} />
+        <DetailDrawer open={Boolean(drawer)} onOpenChange={(open) => !open && setDrawer(null)} title={drawer?.title ?? ''} description={drawer?.description}>
+          {drawer?.body}
+        </DetailDrawer>
       </div>
     </RoleGuard>
   );

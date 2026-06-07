@@ -31,6 +31,14 @@ function HomeContent() {
 
   const activeChallenges = useMemo(() => challenges.filter((c) => c.status === 'Active').slice(0, 3), [challenges]);
   const featuredAthletes = useMemo(() => [...athletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4), [athletes]);
+  const followedAthletes = useMemo(
+    () => athletes.filter((athlete) => userProfile?.followedAthletes?.includes(athlete.id)).slice(0, 3),
+    [athletes, userProfile?.followedAthletes]
+  );
+  const recommendedAthletes = useMemo(
+    () => featuredAthletes.filter((athlete) => !userProfile?.followedAthletes?.includes(athlete.id)).slice(0, 3),
+    [featuredAthletes, userProfile?.followedAthletes]
+  );
   const todayMatches = useMemo(() => matches.filter((m) => m.status === 'Live' || m.status === 'Upcoming').slice(0, 4), [matches]);
   const personalizedFeed = feedPosts.slice(0, 4);
 
@@ -107,6 +115,63 @@ function HomeContent() {
             <ImpactStatCard label="GoalPlace Points" value={String(userProfile?.points ?? 0)} icon={Medal} tone="gold" />
             <ImpactStatCard label="Awards progress" value="Eligible" icon={Trophy} tone="blue" />
             <ImpactStatCard label="Active challenges" value={String(activeChallenges.length)} icon={ZapIcon} tone="orange" />
+          </section>
+
+          <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <SectionHeader eyebrow="Your athletes" title="Followed and recommended athletes" description="Keep your daily hub close to the players and teams you care about." />
+              <div className="grid gap-3 md:grid-cols-2">
+                {(followedAthletes.length ? followedAthletes : featuredAthletes.slice(0, 2)).map((athlete) => (
+                  <DataCard key={athlete.id} className="flex flex-col justify-between gap-4">
+                    <div>
+                      <SportBadge sport={athlete.sport} />
+                      <h3 className="mt-3 font-display text-xl font-black text-white">{athlete.name}</h3>
+                      <p className="mt-1 text-sm text-slate-400">{athlete.position} • {athlete.city}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Supporters</p>
+                        <p className="mt-1 font-bold text-white">{athlete.supportersCount}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Support</p>
+                        <p className="mt-1 font-bold text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport)}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setSupportAthlete(athlete)}>Support</Button>
+                      <Button size="sm" variant="outline" onClick={() => router.push(`/athletes/${athlete.id}`)}>View Profile</Button>
+                    </div>
+                  </DataCard>
+                ))}
+                {recommendedAthletes.slice(0, 1).map((athlete) => (
+                  <DataCard key={`recommended-${athlete.id}`} className="border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/8">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-gold)]">Recommended</p>
+                    <h3 className="mt-3 font-display text-xl font-black text-white">{athlete.name}</h3>
+                    <p className="mt-1 text-sm text-slate-300">{athlete.position} from {athlete.city}, trending in verified challenges.</p>
+                    <Button className="mt-4" size="sm" variant="gold" onClick={() => setPledgeAthlete(athlete)}>Pledge Support</Button>
+                  </DataCard>
+                ))}
+              </div>
+            </div>
+            <div>
+              <SectionHeader eyebrow="Account" title="Support history and notifications" description="Recent demo activity and account signals." />
+              <div className="space-y-3">
+                {[
+                  { title: 'Direct support recorded', detail: `${formatUGX(25000)} for ${featuredAthletes[0]?.name ?? 'a verified athlete'}`, tone: 'gold' },
+                  { title: 'Challenge followed', detail: activeChallenges[0]?.targetDescription ?? activeChallenges[0]?.description ?? 'Performance challenge update', tone: 'emerald' },
+                  { title: 'Awards progress updated', detail: 'You are eligible for community supporter recognition.', tone: 'blue' },
+                ].map((item) => (
+                  <DataCard key={item.title} className="flex items-start gap-3">
+                    <Notification01Icon className={`mt-1 size-5 ${item.tone === 'gold' ? 'text-[var(--goal-gold)]' : item.tone === 'blue' ? 'text-blue-300' : 'text-[var(--goal-mint)]'}`} />
+                    <div>
+                      <p className="font-bold text-white">{item.title}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-400">{item.detail}</p>
+                    </div>
+                  </DataCard>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section>

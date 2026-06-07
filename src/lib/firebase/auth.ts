@@ -17,9 +17,9 @@ export const demoAccounts: Array<{ label: string; email: string; role: AppRole; 
   { label: 'Athlete Demo', email: 'athlete@goalplace256.com', role: 'athlete' },
   { label: 'League Admin Demo', email: 'league@goalplace256.com', role: 'league_admin' },
   { label: 'Platform Admin Demo', email: 'admin@goalplace256.com', role: 'platform_admin' },
-  { label: 'Team Admin Demo', email: 'team@goalplace256.com', role: 'team_admin', internal: true },
+  { label: 'Internal Team Demo', email: 'team@goalplace256.com', role: 'team_admin', internal: true },
   { label: 'Sponsor Demo', email: 'sponsor@goalplace256.com', role: 'sponsor', internal: true },
-  { label: 'Super Admin Demo', email: 'superadmin@goalplace256.com', role: 'super_admin', internal: true },
+  { label: 'Internal Platform Owner Demo', email: 'superadmin@goalplace256.com', role: 'super_admin', internal: true },
 ];
 
 export function isAuthAvailable() {

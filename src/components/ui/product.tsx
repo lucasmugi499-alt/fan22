@@ -4,6 +4,13 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { ArrowRight01Icon, CheckmarkCircle01Icon, Coins01Icon, Search01Icon, SecurityCheckIcon, SparklesIcon } from 'hugeicons-react';
 import { Button } from './button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { getSportTheme, SportTheme, sports, trustStatements } from '@/lib/sportThemes';
 import { SportType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -51,6 +58,104 @@ export function SectionHeader({
         {description && <p className="mt-2 text-sm leading-6 text-slate-300 md:text-base">{description}</p>}
       </div>
       {action}
+    </div>
+  );
+}
+
+export function AppPageHeader({
+  eyebrow,
+  title,
+  description,
+  meta,
+  actions,
+  className,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  meta?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn('rounded-xl border border-white/10 bg-white/[0.045] p-5 md:p-7', className)}>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          {eyebrow && (
+            <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-[var(--goal-mint)]">
+              {eyebrow}
+            </p>
+          )}
+          <h1 className="font-display text-3xl font-black tracking-tight text-white md:text-5xl">
+            {title}
+          </h1>
+          {description && <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{description}</p>}
+          {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
+        </div>
+        {actions && <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">{actions}</div>}
+      </div>
+    </section>
+  );
+}
+
+export function DashboardHero({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn('relative overflow-hidden rounded-xl border border-white/10 bg-[#0A0D14] p-5 md:p-7', className)}>
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(0,196,106,0.14),transparent_38%),linear-gradient(45deg,rgba(245,185,66,0.11),transparent_42%)]" />
+      <div className="relative z-10">{children}</div>
+    </section>
+  );
+}
+
+export function DashboardSection({
+  eyebrow,
+  title,
+  description,
+  action,
+  children,
+  className,
+}: {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn('space-y-4', className)}>
+      {title && <SectionHeader eyebrow={eyebrow} title={title} description={description} action={action} className="mb-0" />}
+      {children}
+    </section>
+  );
+}
+
+export function DashboardStatGrid({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <section className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-4', className)}>{children}</section>;
+}
+
+export function ActionToolbar({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] p-3', className)}>
+      {children}
     </div>
   );
 }
@@ -203,7 +308,7 @@ export function ImpactStatCard({
   label: string;
   value: string;
   detail?: string;
-  icon?: any;
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   tone?: 'emerald' | 'gold' | 'orange' | 'blue';
 }) {
   const tones = {
@@ -373,7 +478,7 @@ export function DataCard({
   );
 }
 
-export function TableCard({
+export function DataTableCard({
   children,
   className,
 }: {
@@ -389,30 +494,133 @@ export function TableCard({
   );
 }
 
+export const TableCard = DataTableCard;
+
+export function MobileDataCard({
+  title,
+  eyebrow,
+  meta,
+  children,
+  actions,
+  className,
+}: {
+  title: string;
+  eyebrow?: string;
+  meta?: React.ReactNode;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <article className={cn('rounded-xl border border-white/10 bg-white/[0.045] p-4', className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {eyebrow && <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>}
+          <h3 className="mt-1 font-display text-lg font-black text-white">{title}</h3>
+        </div>
+        {meta}
+      </div>
+      {children && <div className="mt-4 space-y-3 text-sm text-slate-300">{children}</div>}
+      {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
+    </article>
+  );
+}
+
+export function StatusBadge({
+  children,
+  tone = 'neutral',
+  className,
+}: {
+  children: React.ReactNode;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'gold';
+  className?: string;
+}) {
+  const tones = {
+    neutral: 'border-white/10 bg-white/7 text-slate-200',
+    success: 'border-[var(--goal-emerald)]/30 bg-[var(--goal-emerald)]/12 text-[var(--goal-mint)]',
+    warning: 'border-orange-400/30 bg-orange-500/12 text-orange-300',
+    danger: 'border-red-400/30 bg-red-500/12 text-red-300',
+    info: 'border-blue-400/30 bg-blue-500/12 text-blue-300',
+    gold: 'border-[var(--goal-gold)]/30 bg-[var(--goal-gold)]/12 text-[var(--goal-gold)]',
+  };
+
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]', tones[tone], className)}>
+      {children}
+    </span>
+  );
+}
+
+export function DetailDrawer({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="border-white/10 bg-[#0B1117]/96 p-0 text-white shadow-2xl backdrop-blur-2xl sm:max-w-xl max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none">
+        <div className="max-h-[82dvh] overflow-y-auto p-5">
+          <DialogHeader className="mb-5 pr-8">
+            <DialogTitle className="font-display text-2xl font-black">{title}</DialogTitle>
+            {description && <DialogDescription>{description}</DialogDescription>}
+          </DialogHeader>
+          {children}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function TabStrip({
   tabs,
   activeTab,
   onTabChange,
+  groups,
 }: {
   tabs: string[];
   activeTab: string;
   onTabChange: (tab: string) => void;
+  groups?: { label: string; tabs: string[] }[];
 }) {
+  const groupedTabs = groups?.length ? groups : [{ label: '', tabs }];
+
   return (
-    <div className="mx-auto mt-6 flex max-w-7xl overflow-x-auto hide-scrollbar border-b border-white/5">
-      {tabs.map(tab => (
-        <button
-          key={tab}
-          onClick={() => onTabChange(tab)}
-          className={`whitespace-nowrap px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === tab 
-              ? 'border-[var(--goal-emerald)] text-[var(--goal-mint)]' 
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          {tab}
-        </button>
-      ))}
+    <div className="mx-auto mt-6 max-w-7xl pb-2">
+      <div className="hide-scrollbar flex snap-x gap-3 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.035] p-2">
+        {groupedTabs.map((group) => (
+          <div key={group.label || 'tabs'} className="flex shrink-0 snap-start items-center gap-1 rounded-lg bg-black/10 p-1">
+            {group.label && (
+              <span className="hidden px-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 md:inline">
+                {group.label}
+              </span>
+            )}
+            {group.tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => onTabChange(tab)}
+                className={cn(
+                  'whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition-colors sm:px-4',
+                  activeTab === tab
+                    ? 'bg-[var(--goal-emerald)] text-[#031008] shadow-[0_10px_26px_rgba(0,196,106,0.22)]'
+                    : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+export const AdminTabBar = TabStrip;

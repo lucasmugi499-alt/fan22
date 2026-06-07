@@ -1,3 +1,4 @@
+import type { ComponentType, CSSProperties } from 'react';
 import { Activity01Icon, RecordIcon, Dumbbell01Icon } from 'hugeicons-react';
 import { SoccerBall } from '@phosphor-icons/react';
 import { SportType } from '@/types';
@@ -13,7 +14,7 @@ export interface SportTheme {
   gradient: string;
   mutedGradient: string;
   edgeClass: string;
-  icon: any;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
   statLabels: string[];
   challengeExamples: string[];
   image: string;

@@ -1,6 +1,7 @@
 # Route Audit
 
-## Public Routes Only
+## Public Routes
+
 - `/`
 - `/about`
 - `/how-it-works`
@@ -8,7 +9,10 @@
 - `/login`
 - `/register`
 
-## Protected App Routes (Logged-in access required)
+## Logged-In App Routes
+
+These require authentication and are available to the visible MVP roles unless a role guard below applies.
+
 - `/home`
 - `/feed`
 - `/sports`
@@ -27,10 +31,21 @@
 - `/settings`
 
 ## Role-Protected Routes
-- `/athlete-dashboard` -> `athlete`, `platform_admin`
-- `/league-admin` -> `league_admin`, `platform_admin`
-- `/admin` -> `platform_admin`
 
-## Future / Internal Routes
-- `/team-admin` -> future module or redirect to `/league-admin`
-- `/sponsor-dashboard` -> future module or redirect to `/sponsors`
+- `/athlete-dashboard` -> `athlete`, `platform_admin`, `super_admin`
+- `/league-admin` -> `league_admin`, `platform_admin`, `super_admin`
+- `/admin` -> `platform_admin`, `super_admin`
+
+## Future Modules
+
+- `/team-admin` -> visible only to `league_admin`, `platform_admin`, `super_admin`; polished placeholder with CTA to `/league-admin`
+- `/sponsor-dashboard` -> logged-in placeholder with CTA to `/sponsors`
+
+## Visible MVP Roles
+
+- `fan`
+- `athlete`
+- `league_admin`
+- `platform_admin`
+
+Internal legacy roles may remain in types/mock records for compatibility, but they are hidden from login, registration, and primary navigation.
