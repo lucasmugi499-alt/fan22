@@ -1,7 +1,7 @@
 import { League, LeagueStatus, Match, Team } from '@/types';
 
 export const leagueRankingDisclaimer =
-  'League standings are based only on match results. Paid tools never affect sporting rankings.';
+  'GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.';
 
 export const leagueStatuses: LeagueStatus[] = [
   'draft',

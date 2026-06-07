@@ -1,50 +1,47 @@
-# Button Audit
+# Interactive Button Audit
 
-| Button label | Page/location | Expected action | Actual action | Status |
-|---|---|---|---|---|
-| Login | `/` | Route to `/login` | Routes to `/login` | fixed |
-| Sign Up | `/` | Route to `/register` | Routes to `/register` | fixed |
-| Join as Fan | `/` | Register fan | Routes to `/register` with fan default | fixed |
-| Register Athlete | `/` | Register athlete | Routes to `/register?role=athlete` | fixed |
-| Register League | `/` | Register league admin | Routes to `/register?role=league-admin` | fixed |
-| Become Sponsor | `/` | Sponsor inquiry | Routes to `/sponsors` | fixed |
-| Support Athlete | `/home`, athlete cards | Open support flow | Opens Support modal | fixed |
-| Pledge Support | `/home`, challenge cards | Open pledge flow | Opens Pledge modal | fixed |
-| Create Post | `/home`, `/athlete-dashboard`, `/league-admin` | Open post composer | Opens `CreatePostModal` | fixed |
-| Comment | Feed cards | Open comments | Opens Comments drawer | fixed |
-| View Match/Profile/Team/League | Cards and lists | Navigate to detail route | Routes to matching detail route | fixed |
-| Logout | Nav and `/home` | Clear auth and return public | Runs logout and routes to `/` | fixed |
-| Upload Highlight | `/athlete-dashboard` | Open upload placeholder | Opens DetailDrawer | fixed |
-| Request Verification | `/athlete-dashboard` | Confirm request | Shows success toast | fixed |
-| Upload Media | `/athlete-dashboard` | Open media upload placeholder | Opens DetailDrawer | fixed |
-| View Supporters | `/athlete-dashboard` | Show supporters tab | Switches to Supporters tab | fixed |
-| View Challenges | `/athlete-dashboard` | Show challenges tab | Switches to Challenges tab | fixed |
-| View Public Profile | `/athlete-dashboard` | Open athlete profile | Routes to `/athletes/[id]` | fixed |
-| Edit Profile | `/athlete-dashboard` | Edit profile | Opens DetailDrawer | fixed |
-| Create Fixture | `/league-admin` | Compose fixture | Opens DetailDrawer and switches to Fixtures on submit | fixed |
-| Add Team | `/league-admin` | Add/invite team | Opens DetailDrawer and switches to Teams on submit | fixed |
-| Add Athlete | `/league-admin` | Add athlete profile | Opens DetailDrawer and switches to Athletes on submit | fixed |
-| View Details | `/league-admin` verification/dispute/support rows | Inspect operational record | Opens DetailDrawer with submitter, evidence, amount, and action history | fixed |
-| Verify Result | `/league-admin` | Review result | Opens Verification Queue or updates status | fixed |
-| Reject | `/league-admin` verification rows | Reject match/challenge evidence | Updates demo status and shows toast | fixed |
-| Dispute | `/league-admin` verification/challenge rows | Mark review disputed | Updates demo status or records dispute action | fixed |
-| Submit Result | `/league-admin` | Enter result | Opens Verification Queue action path | fixed |
-| Create Challenge | `/league-admin` | Draft challenge | Opens DetailDrawer and switches to Challenges on submit | fixed |
-| Verify Challenge | `/league-admin` | Update challenge review | Updates visible verification status and shows toast | fixed |
-| Create League Post | `/league-admin` | Publish update | Opens `CreatePostModal` | fixed |
-| Review/Resolve/Escalate Dispute | `/league-admin` | Review dispute detail | Opens DetailDrawer, records demo resolution, or records escalation | fixed |
-| Approve Demo Review | `/league-admin` | Review support release | Shows demo approval toast; real payments disabled | fixed |
-| Request Partner Status | `/league-admin` | Request partner review | Switches to Sponsor Visibility and shows toast | fixed |
-| Export Data | `/admin` | Export platform data | Shows demo export toast | fixed |
-| Approve League | `/admin` | Approve league | Updates visible league status in local state and shows toast | fixed |
-| Review Reports | `/admin` | Open reports | Switches to Reports tab | fixed |
-| Moderate Feed | `/admin` | Open moderation | Switches to Feed Moderation tab | fixed |
-| Hide/Restore Post | `/admin` | Moderate feed post | Updates visible post status and shows toast | fixed |
-| Review Support | `/admin` | Open support review | Switches to Support/Payout Review tab | fixed |
-| Inspect/Manage | `/admin` tables/cards | View details | Opens DetailDrawer | fixed |
-| View/Resolve/Escalate Report | `/admin` | Work report queue | Opens DetailDrawer, records resolution, or records escalation | fixed |
-| View/Verify/Reject Verification | `/admin` | Work verification queue | Opens DetailDrawer or records demo verification decision | fixed |
-| Review/Approve Support | `/admin` | Work support release review | Opens support DetailDrawer or shows demo approval toast; real payments disabled | fixed |
-| Configure Awards | `/admin` | Configure award | Shows demo configuration toast | fixed |
-| Save Settings | `/admin`, `/league-admin`, `/athlete-dashboard` | Save demo settings | Shows success toast | fixed |
-| Future module CTA | `/team-admin`, `/sponsor-dashboard` | Route to active MVP page | Routes to `/league-admin` or `/sponsors` | fixed |
+**Generated For:** Investor Demo QA
+**Status:** ALL SECURE ✅
+
+This document verifies that all critical interactive elements in the main demo workflows are active and provide a robust response (either routing or toast notification).
+
+## Public / Marketing Flow
+- **Start a Pilot (Hero):** Routes to `/pilot`
+- **Sponsor a League (Hero):** Routes to `/sponsors`
+- **Join as Fan (Hero):** Routes to `/register?role=fan`
+- **Register as Athlete (Hero):** Routes to `/register?role=athlete`
+- **Register League Admin (Hero):** Routes to `/register?role=league-admin`
+- **Discuss Pilot Partnership (`/pilot`):** Fires Success Toast "Pilot partnership inquiry initiated in demo mode."
+
+## Authentication Flow (`/login`, `/register`)
+- **Demo Login Buttons:** Properly configure local session state, toast confirmation, and router push to correct default dashboard.
+- **Register Button:** Successfully tests Firebase auth configuration status, or triggers a toast warning if `.env` keys are missing.
+
+## League Admin Dashboard (`/league-admin`)
+- **Create Fixture (Action Toolbar):** Fires Demo Toast
+- **Add Team (Action Toolbar):** Fires Demo Toast
+- **Add Athlete (Action Toolbar):** Fires Demo Toast
+- **Submit Result (Action Toolbar):** Fires Demo Toast
+- **Verify Result (Action Toolbar):** Routes internally to 'Verification' Tab + Toast
+- **Create Challenge (Action Toolbar):** Fires Demo Toast
+- **Post to Feed (Action Toolbar):** Fires Demo Toast
+- **Review (Top Pending Actions):** Routes to active verification tabs
+- **Approve / Dispute (Verification Queue):** Locally mutates state to reflect action taken + Toast
+- **Review History (Disputes & Payouts):** Fires Demo Toast
+- **Download PDF Report (Sponsor Report):** Fires Demo Toast
+- **Save Profile (Settings):** Fires Demo Toast
+- **Request Partner Status (Settings):** Fires Demo Toast
+
+## Sponsor Dashboard (`/sponsor-dashboard`)
+- **View Campaign (Action Toolbar):** Fires Demo Toast
+- **Add Sponsor Note (Action Toolbar):** Fires Demo Toast
+- **Download PDF Report (Monthly Report):** Fires Demo Toast
+- **Select Package (Packages):** Fires Demo Toast noting the package selected
+
+## Athlete Profile & Fan Support (`/athletes/[id]`)
+- **Join Fan Club:** Triggers follow logic if authenticated, warns if not logged in.
+- **Share Athlete Profile:** Fires Demo Toast ("Athlete card URL copied...")
+- **Support Athlete:** Opens `SupportModal`
+- **Pledge Support (on Challenge Cards):** Opens `PledgeModal`
+- **Support Modal "Confirm Support":** Validates auth status, deducts mock wallet balance, adds points, and fires a Demo Toast.
+- **Pledge Modal "Confirm Pledge":** Validates auth status, creates a held wallet transaction, and fires a Demo Toast.

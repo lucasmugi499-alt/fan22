@@ -137,6 +137,15 @@ function LeagueAdminDashboard() {
       setActiveTab('Verification');
       toast.success('Switched to Verification group.');
     },
+    submitResult: () => {
+      toast.success('Submit Result form opened in demo mode.');
+    },
+    createChallenge: () => {
+      toast.success('Create Challenge form opened in demo mode.');
+    },
+    createPost: () => {
+      toast.success('Create Post form opened in demo mode.');
+    },
   };
 
   const updateMatch = async (match: Match, status: VerificationStatus) => {
@@ -228,7 +237,10 @@ function LeagueAdminDashboard() {
         <Button size="sm" onClick={quickActions.createFixture}><Calendar01Icon className="size-4" /> Create Fixture</Button>
         <Button size="sm" variant="outline" onClick={quickActions.addTeam}><Building03Icon className="size-4" /> Add Team</Button>
         <Button size="sm" variant="outline" onClick={quickActions.addAthlete}><UserAdd01Icon className="size-4" /> Add Athlete</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.submitResult}><Task01Icon className="size-4" /> Submit Result</Button>
         <Button size="sm" variant="outline" onClick={quickActions.verifyResult}><CheckmarkCircle01Icon className="size-4" /> Verify Result</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.createChallenge}><Trophy className="size-4" /> Create Challenge</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.createPost}><Comment01Icon className="size-4" /> Post to Feed</Button>
       </ActionToolbar>
 
       {activeTab === 'Overview' && (
@@ -325,7 +337,7 @@ function LeagueAdminDashboard() {
         <div className="space-y-8">
           <DashboardSection eyebrow="Standings" title="Current Standings">
             <div className="mb-4 rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/5 p-4 text-sm leading-6 text-[var(--goal-gold)]">
-              <strong>Important:</strong> Standings are based <em>only</em> on verified match results. The GoalPlace Index does not affect points or rankings.
+              <strong>Important:</strong> GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.
             </div>
             <LeagueStandingsTable standings={standings} />
           </DashboardSection>
@@ -461,6 +473,7 @@ function LeagueAdminDashboard() {
               <CheckmarkCircle01Icon className="mb-4 size-8 text-[var(--goal-mint)]" />
               <h3 className="font-bold text-white">All Clear</h3>
               <p className="mt-2 text-sm text-slate-400">No active disputes or payouts currently require your review.</p>
+              <Button variant="outline" className="mt-6" onClick={() => toast.success('Viewing resolution history...')}>Review History</Button>
             </DataCard>
           </DashboardSection>
         </div>
@@ -509,7 +522,10 @@ function LeagueAdminDashboard() {
                   />
                 </label>
               </div>
-              <Button className="mt-6" onClick={() => toast.success('Settings saved.')}>Save Profile</Button>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Button onClick={() => toast.success('Settings saved.')}>Save Profile</Button>
+                <Button variant="outline" onClick={() => toast.success('Partner status request submitted.')}>Request Partner Status</Button>
+              </div>
             </DataCard>
           </DashboardSection>
         </div>

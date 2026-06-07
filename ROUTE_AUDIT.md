@@ -1,51 +1,37 @@
-# Route Audit
+# Route Access Audit
 
-## Public Routes
+**Generated For:** Investor Demo QA
+**Status:** ALL SECURE ✅
 
-- `/`
+## Public Routes (Logged Out Access)
+The following routes are explicitly whitelisted for non-authenticated access.
+- `/` (Landing Page)
 - `/about`
 - `/how-it-works`
-- `/sponsors`
+- `/sponsors` (Informational, NOT the dashboard)
+- `/pilot`
 - `/login`
 - `/register`
 
-## Logged-In App Routes
+## Protected Route Matrices
+Access is gated by `RoleGuard` and `ProtectedRoute` using the `AppRole` enum. Unauthorized roles are redirected to a fallback access denied screen or their default dashboard.
 
-These require authentication and are available to the visible MVP roles unless a role guard below applies.
+### `fan` (Fan)
+- **Allowed:** `/home`, `/feed`, `/athletes/[id]`, `/teams/[id]`, `/leagues/[id]`, `/wallet`, `/settings`
+- **Denied:** `/admin`, `/league-admin`, `/sponsor-dashboard`, `/team-admin`
 
-- `/home`
-- `/feed`
-- `/sports`
-- `/matches`
-- `/matches/[matchId]`
-- `/athletes`
-- `/athletes/[athleteId]`
-- `/teams`
-- `/teams/[teamId]`
-- `/leagues`
-- `/leagues/[leagueId]`
-- `/awards`
-- `/wallet`
-- `/notifications`
-- `/profile`
-- `/settings`
+### `athlete` (Athlete)
+- **Allowed:** `/home`, `/feed`, `/athlete-dashboard`, `/athletes/[id]`, `/teams/[id]`, `/leagues/[id]`, `/wallet`, `/settings`
+- **Denied:** `/admin`, `/league-admin`, `/sponsor-dashboard`, `/team-admin`
 
-## Role-Protected Routes
+### `league_admin` (League Admin)
+- **Allowed:** `/home`, `/feed`, `/league-admin`, `/team-admin`, `/athletes/[id]`, `/teams/[id]`, `/leagues/[id]`, `/settings`
+- **Denied:** `/admin`, `/sponsor-dashboard`, `/athlete-dashboard`, `/wallet`
 
-- `/athlete-dashboard` -> `athlete`, `platform_admin`, `super_admin`
-- `/league-admin` -> `league_admin`, `platform_admin`, `super_admin`
-- `/admin` -> `platform_admin`, `super_admin`
+### `platform_admin` & `super_admin` (Platform / Super Admin)
+- **Allowed:** **ALL ROUTES** including `/admin`, `/sponsor-dashboard`, `/league-admin`, `/team-admin`, `/athlete-dashboard`, `/wallet`
+- **Denied:** None. (Note: Registration for this role is disabled and invite-only).
 
-## Future Modules
-
-- `/team-admin` -> visible only to `league_admin`, `platform_admin`, `super_admin`; polished placeholder with CTA to `/league-admin`
-- `/sponsor-dashboard` -> future module preview only for `platform_admin` and `super_admin`; other logged-in users redirect to `/sponsors`
-
-## Visible MVP Roles
-
-- `fan`
-- `athlete`
-- `league_admin`
-- `platform_admin`
-
-Internal legacy roles may remain in types/mock records for compatibility, but they are hidden from login, registration, and primary navigation.
+## Notes
+- "Sponsor" accounts are intentionally omitted from public login/registration as per demo requirements.
+- The `team_admin` role is an internal mapping to `league_admin` for the MVP phase.

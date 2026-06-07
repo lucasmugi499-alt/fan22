@@ -221,7 +221,7 @@ export default function PublicLandingPage() {
             <div className="mt-8 rounded-xl border border-white/10 bg-black/40 p-5">
               <h4 className="font-bold text-[var(--goal-mint)]">Trust Statement</h4>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Paid support never affects league standings. Standings are based only on match results. The GoalPlace Index is separate and measures verification, activity, engagement, and operational quality.
+                Paid support never affects league standings. Standings are based only on match results. GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.
               </p>
             </div>
           </div>

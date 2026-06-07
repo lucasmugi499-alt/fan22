@@ -25,6 +25,7 @@ import {
   SectionHeader,
   StatusBadge,
   TabStrip,
+  ActionToolbar,
 } from '@/components/ui/product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
@@ -96,6 +97,15 @@ function SponsorDashboard() {
       />
 
       <TabStrip tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <ActionToolbar>
+        <Button size="sm" onClick={() => handleDemoAction('Opening campaign overview in demo mode...')}>
+          <ChartLineData01Icon className="size-4" /> View Campaign
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => handleDemoAction('Opening sponsor note modal in demo mode...')}>
+          <ListViewIcon className="size-4" /> Add Sponsor Note
+        </Button>
+      </ActionToolbar>
 
       <div className="mt-8 rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/5 p-4 text-sm text-[var(--goal-gold)]">
         <div className="flex items-start gap-3">
