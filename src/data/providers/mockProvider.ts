@@ -18,11 +18,13 @@ import {
   getWalletByUser,
   leagues,
   matches,
+  reports,
   sports,
   sponsors,
   teams,
   users,
   awards,
+  verifications,
 } from '../mockDatabase';
 import {
   CreateCommentInput,
@@ -118,6 +120,12 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getNotificationsByUser(userId) {
     return getNotificationsByUser(userId);
+  },
+  async getReports() {
+    return reports;
+  },
+  async getVerifications() {
+    return verifications;
   },
   async getStandingsByLeague(leagueId) {
     return getStandingsByLeague(leagueId);

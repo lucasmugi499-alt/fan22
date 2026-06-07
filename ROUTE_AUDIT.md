@@ -39,7 +39,7 @@ These require authentication and are available to the visible MVP roles unless a
 ## Future Modules
 
 - `/team-admin` -> visible only to `league_admin`, `platform_admin`, `super_admin`; polished placeholder with CTA to `/league-admin`
-- `/sponsor-dashboard` -> logged-in placeholder with CTA to `/sponsors`
+- `/sponsor-dashboard` -> future module preview only for `platform_admin` and `super_admin`; other logged-in users redirect to `/sponsors`
 
 ## Visible MVP Roles
 

@@ -5,7 +5,7 @@ import { UserGroupIcon, SecurityCheckIcon, UserIcon, Upload01Icon, Calendar01Ico
 import { Trophy } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { CreatePostModal } from '@/components/modals/app-modals';
-import { DataCard, DetailDrawer, ImpactStatCard, SportBadge, TabStrip } from '@/components/ui/product';
+import { DataCard, DetailDrawer, ImpactStatCard, SportBadge, StatusBadge, TabStrip } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
@@ -16,6 +16,14 @@ export default function AthleteDashboardPage() {
   const athlete = athletes[0];
   const athleteChallenges = athlete ? challenges.filter((challenge) => challenge.athleteId === athlete.id) : [];
   const upcomingMatches = matches.filter(match => match.status === 'scheduled' || match.status === 'Upcoming').slice(0, 3);
+  const nextMatch = upcomingMatches[0];
+  const profileCompleteness = athlete?.verified ? 92 : 74;
+  const verificationSteps = [
+    ['Identity', 'Complete'],
+    ['League roster', athlete?.verified ? 'Complete' : 'Reviewing'],
+    ['Media review', 'Pending upload'],
+  ];
+  const statRows = Object.entries(athlete?.stats ?? {}).slice(0, 4);
   
   const [activeTab, setActiveTab] = useState('Overview');
   const [postOpen, setPostOpen] = useState(false);
@@ -97,17 +105,41 @@ export default function AthleteDashboardPage() {
                 </section>
                 
                 <section className="grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-5">
+                    <SecurityCheckIcon className="mb-4 size-6 text-[var(--goal-mint)]" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-display text-xl font-black text-white">Career Readiness</h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-300">Profile completeness, verification progress, and public profile readiness.</p>
+                      </div>
+                      <StatusBadge tone={athlete?.verified ? 'success' : 'warning'}>{athlete?.verified ? 'Verified' : 'Reviewing'}</StatusBadge>
+                    </div>
+                    <div className="mt-4">
+                      <div className="mb-2 flex justify-between text-xs font-bold text-slate-300"><span>Profile completeness</span><span>{profileCompleteness}%</span></div>
+                      <div className="h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${profileCompleteness}%` }} /></div>
+                    </div>
+                    <div className="mt-4 grid gap-2">
+                      {verificationSteps.map(([label, status]) => (
+                        <div key={label} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
+                          <span className="text-slate-300">{label}</span>
+                          <span className="font-bold text-[var(--goal-mint)]">{status}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button className="mt-4 w-full" variant="gold" onClick={() => athlete ? window.location.assign(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>View Public Profile</Button>
+                  </div>
+
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Calendar01Icon className="mb-4 size-6 text-[var(--goal-mint)]" />
-                    <h3 className="font-display text-xl font-black text-white">Upcoming Matches</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">You have {upcomingMatches.length} upcoming scheduled fixtures.</p>
+                    <h3 className="font-display text-xl font-black text-white">Next Match</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">{nextMatch ? `${new Date(nextMatch.scheduledAt).toLocaleDateString()} at ${nextMatch.venue}` : 'No upcoming fixture assigned yet.'}</p>
                     <Button className="mt-4" variant="outline" onClick={() => setActiveTab('Matches')}>View Schedule</Button>
                   </div>
                   
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Activity01Icon className="mb-4 size-6 text-[var(--goal-gold)]" />
-                    <h3 className="font-display text-xl font-black text-white">Recent Engagement</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">Your latest feed post received 24 new interactions.</p>
+                    <h3 className="font-display text-xl font-black text-white">Supporter Comments</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">&quot;The work rate showed today. Keep building toward the next fixture.&quot;</p>
                     <Button className="mt-4" variant="outline" onClick={() => demoAction('Feed opened')}>View Feed Activity</Button>
                   </div>
                   
@@ -115,8 +147,33 @@ export default function AthleteDashboardPage() {
                     <Video01Icon className="mb-4 size-6 text-blue-400" />
                     <h3 className="font-display text-xl font-black text-white">Highlight Activity</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">Upload your latest match highlights to attract support.</p>
-                    <Button className="mt-4" variant="outline" onClick={() => demoAction('Upload modal opened')}>Upload Media</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => openDrawer('Upload Media', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}>Upload Media</Button>
                   </div>
+                </section>
+
+                <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+                  <DataCard>
+                    <h3 className="font-display text-xl font-black text-white">Sport Stats</h3>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {(statRows.length ? statRows : [['Appearances', 8], ['Goals', 3], ['Assists', 2], ['Minutes', 640]]).map(([label, value]) => (
+                        <div key={String(label)} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{String(label)}</p>
+                          <p className="mt-1 font-display text-2xl font-black text-white">{String(value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </DataCard>
+                  <DataCard>
+                    <h3 className="font-display text-xl font-black text-white">Active Challenges</h3>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {athleteChallenges.slice(0, 2).map((challenge) => (
+                        <div key={challenge.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                          <p className="font-bold text-white">{challenge.targetDescription ?? challenge.description}</p>
+                          <p className="mt-1 text-sm text-slate-400">{formatUGX(challenge.totalPledged)} pledged • {challenge.supportersCount} supporters</p>
+                        </div>
+                      ))}
+                    </div>
+                  </DataCard>
                 </section>
               </>
             )}

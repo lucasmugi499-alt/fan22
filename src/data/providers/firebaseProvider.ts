@@ -14,7 +14,7 @@ import {
   GoalPlaceDataProvider,
   SaveTargetType,
 } from './types';
-import { Match, Team, VerificationStatus } from '@/types';
+import { Match, Report, Team, Verification, VerificationStatus } from '@/types';
 import { StandingRow } from '../mockDatabase';
 
 function missingFirebase<T>(fallback: T): T {
@@ -191,6 +191,12 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     if (!isFirebaseConfigured) return mockProvider.getNotificationsByUser(userId);
     const notifications = await readCollection<Awaited<ReturnType<typeof mockProvider.getNotificationsByUser>>[number]>('notifications');
     return notifications.filter((notification) => notification.userId === userId);
+  },
+  async getReports() {
+    return isFirebaseConfigured ? readCollection<Report>('reports') : mockProvider.getReports();
+  },
+  async getVerifications() {
+    return isFirebaseConfigured ? readCollection<Verification>('verifications') : mockProvider.getVerifications();
   },
   async getStandingsByLeague(leagueId) {
     if (!isFirebaseConfigured) return mockProvider.getStandingsByLeague(leagueId);

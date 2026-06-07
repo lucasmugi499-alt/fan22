@@ -45,7 +45,7 @@ import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { formatUGX } from '@/lib/sportThemes';
-import { Athlete, Challenge, Match, Team, VerificationStatus } from '@/types';
+import { Athlete, Challenge, Match, Report, Team, VerificationStatus } from '@/types';
 
 type DrawerState = {
   title: string;
@@ -77,6 +77,10 @@ function formatDate(value?: string) {
 
 function teamName(teams: Team[], id?: string) {
   return teams.find((team) => team.id === id)?.name ?? 'Team pending';
+}
+
+function actionHistoryText(history?: string[]) {
+  return history?.length ? history.join(' -> ') : 'No action history yet';
 }
 
 function challengeTitle(challenge: Challenge, athlete?: Athlete) {
@@ -131,7 +135,7 @@ export default function LeagueAdminPage() {
 }
 
 function LeagueAdminDashboard() {
-  const { leagues, teams, athletes, matches, challenges, feedPosts } = useGoalPlaceData();
+  const { leagues, teams, athletes, matches, challenges, feedPosts, reports, verifications } = useGoalPlaceData();
   const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id ?? '');
   const [activeTab, setActiveTab] = useState('Overview');
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -289,6 +293,8 @@ function LeagueAdminDashboard() {
     id: `team_request_${team.id}`,
     team,
     submittedBy: index === 0 ? 'League secretary' : 'Team manager',
+    submittedAt: index === 0 ? '36m ago' : '2h ago',
+    evidenceStatus: index === 0 ? 'Roster list attached' : 'Venue letter missing',
     status: index === 0 ? 'Pending profile review' : 'Needs roster proof',
   }));
   const athleteAchievements = leagueChallenges.slice(0, 3).map((challenge) => ({
@@ -296,15 +302,39 @@ function LeagueAdminDashboard() {
     athlete: athletes.find((athlete) => athlete.id === challenge.athleteId),
     match: matches.find((match) => match.id === challenge.matchId),
   }));
-  const disputes = leagueMatches.slice(0, 3).map((match, index) => ({
+  const leagueReports = reports.filter((report) => ['disputed_match_result', 'payout_review_issue', 'support_issue', 'result_issue'].includes(report.type)).slice(0, 4);
+  const fallbackDisputes: Report[] = leagueMatches.slice(0, 3).map((match, index) => ({
     id: `dispute_${match.id}`,
-    type: index === 0 ? 'Score review' : index === 1 ? 'Challenge evidence' : 'Player eligibility',
-    match,
-    parties: `${teamName(teams, match.homeTeamId)} / ${teamName(teams, match.awayTeamId)}`,
+    reporterId: `league_reporter_${index + 1}`,
+    type: index === 0 ? 'disputed_match_result' : index === 1 ? 'payout_review_issue' : 'athlete_verification_issue',
+    targetCollection: 'matches',
+    summary: `${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`,
+    reporterName: index === 0 ? 'Team manager' : 'League secretary',
+    affectedEntity: `${teamName(teams, match.homeTeamId)} / ${teamName(teams, match.awayTeamId)}`,
     severity: index === 0 ? 'High' : index === 1 ? 'Medium' : 'Low',
-    status: index === 0 ? 'Open' : 'Reviewing',
-    updated: index === 0 ? '18m ago' : `${index + 2}h ago`,
+    status: index === 0 ? 'open' : 'reviewing',
+    lastUpdate: index === 0 ? '18m ago' : `${index + 2}h ago`,
+    actionHistory: ['Report opened', 'Evidence requested'],
+    createdAt: match.createdAt,
   }));
+  const disputes = (leagueReports.length ? leagueReports : fallbackDisputes).map((report, index) => {
+    const match = leagueMatches[index % Math.max(leagueMatches.length, 1)];
+    const challenge = leagueChallenges[index % Math.max(leagueChallenges.length, 1)];
+    const athlete = athletes.find((item) => item.id === challenge?.athleteId);
+    return {
+      id: report.id,
+      type: report.type.replaceAll('_', ' '),
+      involved: report.targetCollection === 'supportPledges'
+        ? challenge?.targetDescription ?? challenge?.description ?? report.summary
+        : match ? `${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}` : report.summary,
+      submittedBy: report.reporterName ?? report.reporterId,
+      affected: report.affectedEntity ?? athlete?.name ?? 'Team or athlete pending',
+      severity: report.severity ?? 'Medium',
+      status: report.status,
+      updated: report.lastUpdate ?? formatDate(report.updatedAt ?? report.createdAt),
+      history: report.actionHistory,
+    };
+  });
   const payoutReviews = leagueChallenges.slice(0, 4).map((challenge, index) => {
     const athlete = athletes.find((item) => item.id === challenge.athleteId);
     const amount = challenge.totalPledged;
@@ -313,6 +343,7 @@ function LeagueAdminDashboard() {
       id: `payout_${challenge.id}`,
       athlete,
       team: teams.find((team) => team.id === athlete?.teamId),
+      supportType: index % 2 === 0 ? 'Performance challenge' : 'Direct support pool',
       amount,
       fee,
       net: amount - fee,
@@ -560,33 +591,87 @@ function LeagueAdminDashboard() {
         <div className="grid gap-8 xl:grid-cols-2">
           <DashboardSection eyebrow="Match Results" title="Match result reviews">
             <div className="space-y-3">
-              {pendingMatches.map((match) => (
-                <MobileDataCard key={match.id} title={`${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`} eyebrow={`${match.venue} • submitted 28m ago`} meta={<StatusBadge tone={statusTone(String(matchOverrides[match.id] ?? match.verificationStatus))}>{matchOverrides[match.id] ?? match.verificationStatus}</StatusBadge>} actions={<><Button size="sm" onClick={() => updateMatch(match, 'verified')} disabled={pendingId === match.id}>Verify</Button><Button size="sm" variant="outline" onClick={() => updateMatch(match, 'disputed')} disabled={pendingId === match.id}>Dispute</Button></>}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <MiniMeta label="Score/status" value={match.score.home === null ? 'Scheduled' : `${match.score.home}-${match.score.away}`} />
-                    <MiniMeta label="Evidence" value="Media + score sheet" />
-                  </div>
-                </MobileDataCard>
-              ))}
+              {pendingMatches.map((match) => {
+                const record = verifications.find((item) => item.relatedId === match.id || item.type === 'match_result');
+                const visibleStatus = matchOverrides[match.id] ?? match.verificationStatus;
+                const matchLabel = `${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`;
+                return (
+                  <MobileDataCard
+                    key={match.id}
+                    title={matchLabel}
+                    eyebrow={`Submitted by ${record?.submittedBy ?? 'league match desk'} • ${formatDate(record?.createdAt ?? match.createdAt)}`}
+                    meta={<StatusBadge tone={statusTone(String(visibleStatus))}>{visibleStatus}</StatusBadge>}
+                    actions={
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => setDrawer({
+                          title: matchLabel,
+                          description: 'Match result verification detail.',
+                          body: <div className="space-y-4"><MiniMeta label="Evidence" value={record?.evidenceStatus ?? 'Score sheet + media'} /><MiniMeta label="Action history" value={actionHistoryText(record?.actionHistory)} /><MiniMeta label="Amount affected" value={formatUGX(record?.amountAffected ?? match.totalSupport)} /></div>,
+                        })}>View Details</Button>
+                        <Button size="sm" onClick={() => updateMatch(match, 'verified')} disabled={pendingId === match.id}>Verify</Button>
+                        <Button size="sm" variant="outline" onClick={() => updateMatch(match, 'rejected')} disabled={pendingId === match.id}>Reject</Button>
+                        <Button size="sm" variant="outline" onClick={() => updateMatch(match, 'disputed')} disabled={pendingId === match.id}>Dispute</Button>
+                      </>
+                    }
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <MiniMeta label="Related match" value={matchLabel} />
+                      <MiniMeta label="Athlete/team" value={`${teamName(teams, match.homeTeamId)} / ${teamName(teams, match.awayTeamId)}`} />
+                      <MiniMeta label="Score/status" value={match.score.home === null ? 'Scheduled' : `${match.score.home}-${match.score.away}`} />
+                      <MiniMeta label="Evidence" value={record?.evidenceStatus ?? 'Media + score sheet'} />
+                      <MiniMeta label="Amount affected" value={formatUGX(record?.amountAffected ?? match.totalSupport)} />
+                      <MiniMeta label="Action history" value={actionHistoryText(record?.actionHistory)} />
+                    </div>
+                  </MobileDataCard>
+                );
+              })}
             </div>
           </DashboardSection>
           <DashboardSection eyebrow="Athlete Achievements" title="Challenge result reviews">
             <div className="space-y-3">
-              {athleteAchievements.map(({ challenge, athlete, match }) => (
-                <MobileDataCard key={challenge.id} title={challengeTitle(challenge, athlete)} eyebrow={`${teamName(teams, match?.homeTeamId)} vs ${teamName(teams, match?.awayTeamId)}`} meta={<StatusBadge tone={statusTone(String(challengeOverrides[challenge.id] ?? challenge.verificationStatus))}>{challengeOverrides[challenge.id] ?? challenge.verificationStatus}</StatusBadge>} actions={<><Button size="sm" onClick={() => updateChallenge(challenge.id, 'verified')} disabled={pendingId === challenge.id}>Verify</Button><Button size="sm" variant="outline" onClick={() => updateChallenge(challenge.id, 'rejected')} disabled={pendingId === challenge.id}>Reject</Button></>}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <MiniMeta label="Target" value={challenge.targetDescription ?? challenge.description} />
-                    <MiniMeta label="Supporters" value={challenge.supportersCount} />
-                  </div>
-                </MobileDataCard>
-              ))}
+              {athleteAchievements.map(({ challenge, athlete, match }) => {
+                const visibleStatus = challengeOverrides[challenge.id] ?? challenge.verificationStatus;
+                const matchLabel = `${teamName(teams, match?.homeTeamId)} vs ${teamName(teams, match?.awayTeamId)}`;
+                return (
+                  <MobileDataCard
+                    key={challenge.id}
+                    title={challengeTitle(challenge, athlete)}
+                    eyebrow={`${matchLabel} • submitted by ${challenge.submittedBy ?? 'challenge moderator'}`}
+                    meta={<StatusBadge tone={statusTone(String(visibleStatus))}>{visibleStatus}</StatusBadge>}
+                    actions={
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => setDrawer({
+                          title: challengeTitle(challenge, athlete),
+                          description: 'Challenge verification detail.',
+                          body: <div className="space-y-4"><MiniMeta label="Evidence" value={challenge.evidenceStatus ?? 'Evidence pending'} /><MiniMeta label="Action history" value={actionHistoryText(challenge.actionHistory)} /><MiniMeta label="Amount affected" value={formatUGX(challenge.amountAffected ?? challenge.totalPledged)} /></div>,
+                        })}>View Details</Button>
+                        <Button size="sm" onClick={() => updateChallenge(challenge.id, 'verified')} disabled={pendingId === challenge.id}>Verify</Button>
+                        <Button size="sm" variant="outline" onClick={() => updateChallenge(challenge.id, 'rejected')} disabled={pendingId === challenge.id}>Reject</Button>
+                        <Button size="sm" variant="outline" onClick={() => updateChallenge(challenge.id, 'disputed')} disabled={pendingId === challenge.id}>Dispute</Button>
+                      </>
+                    }
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <MiniMeta label="Athlete/team" value={`${athlete?.name ?? 'Athlete pending'} / ${teamName(teams, athlete?.teamId)}`} />
+                      <MiniMeta label="Related match" value={matchLabel} />
+                      <MiniMeta label="Target" value={challenge.targetDescription ?? challenge.description} />
+                      <MiniMeta label="Evidence" value={challenge.evidenceStatus ?? 'Evidence pending'} />
+                      <MiniMeta label="Amount affected" value={formatUGX(challenge.amountAffected ?? challenge.totalPledged)} />
+                      <MiniMeta label="Action history" value={actionHistoryText(challenge.actionHistory)} />
+                    </div>
+                  </MobileDataCard>
+                );
+              })}
             </div>
           </DashboardSection>
           <DashboardSection eyebrow="Team Requests" title="Team profile requests">
             <div className="space-y-3">
               {teamRequests.map((request) => (
-                <MobileDataCard key={request.id} title={request.team.name} eyebrow={`Submitted by ${request.submittedBy}`} meta={<StatusBadge tone="warning">{request.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => toast.success(`${request.team.name} request reviewed.`)}>Review Request</Button>}>
-                  <MiniMeta label="City" value={request.team.city} />
+                <MobileDataCard key={request.id} title={request.team.name} eyebrow={`Submitted by ${request.submittedBy} • ${request.submittedAt}`} meta={<StatusBadge tone="warning">{request.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => toast.success(`${request.team.name} request reviewed.`)}>Review Request</Button>}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniMeta label="City" value={request.team.city} />
+                    <MiniMeta label="Evidence" value={request.evidenceStatus} />
+                  </div>
                 </MobileDataCard>
               ))}
             </div>
@@ -621,10 +706,23 @@ function LeagueAdminDashboard() {
                     <StatusBadge tone={statusTone(String(visibleStatus))}>{visibleStatus}</StatusBadge>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <MiniMeta label="Athlete" value={athlete?.name ?? 'Athlete pending'} />
+                    <MiniMeta label="Team" value={teamName(teams, athlete?.teamId)} />
+                    <MiniMeta label="Match" value={`${teamName(teams, match?.homeTeamId)} vs ${teamName(teams, match?.awayTeamId)}`} />
                     <MiniMeta label="Target" value={challenge.targetDescription ?? challenge.description} />
                     <MiniMeta label="Pledged" value={formatUGX(challenge.totalPledged)} />
                     <MiniMeta label="Supporters" value={challenge.supportersCount} />
-                    <MiniMeta label="Action" value={<button className="text-[var(--goal-mint)]" onClick={() => updateChallenge(challenge.id, 'verified')}>Verify</button>} />
+                    <MiniMeta label="Challenge status" value={challenge.status} />
+                    <MiniMeta label="Match date" value={formatDate(match?.scheduledAt)} />
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setDrawer({
+                      title: challengeTitle(challenge, athlete),
+                      description: 'Performance challenge operating detail.',
+                      body: <div className="space-y-4"><MiniMeta label="Evidence" value={challenge.evidenceStatus ?? 'Evidence pending'} /><MiniMeta label="Submitted by" value={challenge.submittedBy ?? 'Challenge moderator'} /><MiniMeta label="Action history" value={actionHistoryText(challenge.actionHistory)} /></div>,
+                    })}>View Details</Button>
+                    <Button size="sm" onClick={() => updateChallenge(challenge.id, 'verified')} disabled={pendingId === challenge.id}>Verify</Button>
+                    <Button size="sm" variant="outline" onClick={() => updateChallenge(challenge.id, 'disputed')} disabled={pendingId === challenge.id}>Dispute</Button>
                   </div>
                 </DataCard>
               );
@@ -665,8 +763,26 @@ function LeagueAdminDashboard() {
         <DashboardSection eyebrow="Disputes" title="Dispute records">
           <div className="grid gap-3 lg:grid-cols-3">
             {disputes.map((dispute) => (
-              <MobileDataCard key={dispute.id} title={dispute.type} eyebrow={dispute.parties} meta={<StatusBadge tone={statusTone(dispute.severity)}>{dispute.severity}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => setDrawer({ title: dispute.type, description: 'Review notes, parties, evidence, and last admin action.', body: <div className="space-y-4"><MiniMeta label="Status" value={dispute.status} /><MiniMeta label="Last update" value={dispute.updated} /><Button onClick={() => { setDrawer(null); toast.success('Dispute marked reviewed in demo mode.'); }}>Mark Reviewed</Button></div> })}>Review Dispute</Button>}>
-                <div className="grid grid-cols-2 gap-3">
+              <MobileDataCard
+                key={dispute.id}
+                title={dispute.type}
+                eyebrow={`${dispute.involved} • submitted by ${dispute.submittedBy}`}
+                meta={<StatusBadge tone={statusTone(dispute.severity)}>{dispute.severity}</StatusBadge>}
+                actions={
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setDrawer({
+                      title: dispute.type,
+                      description: 'Review notes, parties, evidence, and last admin action.',
+                      body: <div className="space-y-4"><MiniMeta label="Status" value={dispute.status} /><MiniMeta label="Affected" value={dispute.affected} /><MiniMeta label="Action history" value={actionHistoryText(dispute.history)} /><Button onClick={() => { setDrawer(null); toast.success('Dispute marked reviewed in demo mode.'); }}>Mark Reviewed</Button></div>,
+                    })}>View Details</Button>
+                    <Button size="sm" onClick={() => toast.success('Dispute action recorded in demo mode.')}>Resolve</Button>
+                    <Button size="sm" variant="outline" onClick={() => toast.success('Dispute escalated in demo mode.')}>Escalate</Button>
+                  </>
+                }
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MiniMeta label="Match/challenge" value={dispute.involved} />
+                  <MiniMeta label="Affected" value={dispute.affected} />
                   <MiniMeta label="Status" value={dispute.status} />
                   <MiniMeta label="Updated" value={dispute.updated} />
                 </div>
@@ -684,16 +800,24 @@ function LeagueAdminDashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-display text-lg font-black text-white">{payout.athlete?.name ?? 'Athlete pending'}</h3>
-                    <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.challenge.targetDescription ?? payout.challenge.description}</p>
+                    <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.supportType}</p>
                   </div>
                   <StatusBadge tone="warning">{payout.status}</StatusBadge>
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <MiniMeta label="Amount" value={formatUGX(payout.amount)} />
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <MiniMeta label="Related challenge" value={payout.challenge.targetDescription ?? payout.challenge.description} />
+                  <MiniMeta label="Gross amount" value={formatUGX(payout.amount)} />
                   <MiniMeta label="Platform fee" value={formatUGX(payout.fee)} />
                   <MiniMeta label="Net" value={formatUGX(payout.net)} />
                 </div>
-                <Button className="mt-4" size="sm" variant="gold" onClick={() => toast.success('Support release approved in demo mode. Real payments remain disabled.')}>Approve Demo Review</Button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setDrawer({
+                    title: payout.athlete?.name ?? 'Support review',
+                    description: 'Support release review detail.',
+                    body: <div className="space-y-4"><MiniMeta label="Support type" value={payout.supportType} /><MiniMeta label="Related challenge" value={payout.challenge.targetDescription ?? payout.challenge.description} /><MiniMeta label="Net amount" value={formatUGX(payout.net)} /></div>,
+                  })}>View Details</Button>
+                  <Button size="sm" variant="gold" onClick={() => toast.success('Support release approved in demo mode. Real payments remain disabled.')}>Approve Demo Review</Button>
+                </div>
               </DataCard>
             ))}
           </div>

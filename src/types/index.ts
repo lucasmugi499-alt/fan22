@@ -286,6 +286,10 @@ export interface Challenge {
   supportersCount: number;
   status: ChallengeStatus;
   verificationStatus: VerificationStatus;
+  submittedBy?: string;
+  evidenceStatus?: string;
+  amountAffected?: number;
+  actionHistory?: string[];
   createdAt: string;
 }
 
@@ -346,6 +350,7 @@ export interface FeedPost {
   comments?: number;
   sharesCount: number;
   shares?: number;
+  flagReason?: string;
   statsRow?: string[];
   verified?: boolean;
   status: "active" | "hidden" | "reported";
@@ -399,6 +404,10 @@ export interface Verification {
   status: VerificationStatus;
   submittedBy: string;
   reviewedBy?: string;
+  relatedLabel?: string;
+  evidenceStatus?: string;
+  amountAffected?: number;
+  actionHistory?: string[];
   notes: string;
   createdAt: string;
   reviewedAt?: string;
@@ -450,6 +459,14 @@ export interface Report {
     | "verification_issue";
   status: "open" | "reviewing" | "resolved" | "dismissed";
   summary: string;
+  reporterName?: string;
+  reportedEntity?: string;
+  affectedEntity?: string;
+  severity?: "Low" | "Medium" | "High" | "Critical";
+  assignedReviewer?: string;
+  lastUpdate?: string;
+  reasonFlagged?: string;
+  actionHistory?: string[];
   targetCollection?: string;
   targetId?: string;
   createdAt?: string;

@@ -9,9 +9,11 @@ import {
   FeedPost,
   League,
   Match,
+  Report,
   SportSlug,
   SportType,
   Team,
+  Verification,
   VerificationStatus,
   WalletTransaction,
 } from '@/types';
@@ -160,16 +162,20 @@ const initialData = {
   matches: [] as Match[],
   challenges: [] as Challenge[],
   feedPosts: [] as FeedPost[],
+  reports: [] as Report[],
+  verifications: [] as Verification[],
 };
 
 async function loadGoalPlaceData(provider = dataProvider) {
-  const [athletes, teams, leagues, matches, challenges, feedPosts] = await Promise.all([
+  const [athletes, teams, leagues, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
     provider.getAthletes(),
     provider.getTeams(),
     provider.getLeagues(),
     provider.getMatches(),
     provider.getChallenges(),
     provider.getFeedPosts(),
+    provider.getReports(),
+    provider.getVerifications(),
   ]);
 
   return {
@@ -179,6 +185,8 @@ async function loadGoalPlaceData(provider = dataProvider) {
     matches: matches.map(adaptMatch),
     challenges: challenges.map(adaptChallenge),
     feedPosts: feedPosts.map(adaptFeedPost),
+    reports,
+    verifications,
   };
 }
 

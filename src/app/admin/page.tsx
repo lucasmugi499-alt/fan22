@@ -36,7 +36,7 @@ import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatUGX } from '@/lib/sportThemes';
-import { AwardCategory, Sponsor, User } from '@/types';
+import { AwardCategory, Report, Sponsor, User } from '@/types';
 
 type DrawerState = {
   title: string;
@@ -68,6 +68,10 @@ function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function actionHistoryText(history?: string[]) {
+  return history?.length ? history.join(' -> ') : 'No action history yet';
+}
+
 export default function AdminPage() {
   return (
     <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
@@ -77,7 +81,7 @@ export default function AdminPage() {
 }
 
 function AdminDashboard() {
-  const { leagues, matches, athletes, teams, feedPosts, challenges, source } = useGoalPlaceData();
+  const { leagues, matches, athletes, teams, feedPosts, challenges, reports, verifications, source } = useGoalPlaceData();
   const [activeTab, setActiveTab] = useState('Overview');
   const [users, setUsers] = useState<User[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -108,12 +112,24 @@ function AdminDashboard() {
 
   const pendingMatches = matches.filter((match) => String(match.verificationStatus).toLowerCase().includes('pending'));
   const pendingLeagues = leagues.filter((league) => league.status !== 'partner').slice(0, 5);
-  const platformReports = useMemo(() => [
-    { id: 'report_001', type: 'Reported post', target: feedPosts[0]?.caption.slice(0, 52) ?? 'Feed post', severity: 'Medium', status: 'Reviewing', owner: 'Moderation desk', updated: '18m ago' },
-    { id: 'report_002', type: 'Disputed result', target: matches[1] ? `${matches[1].homeTeamId} / ${matches[1].awayTeamId}` : 'Match result', severity: 'High', status: 'Open', owner: 'League operations', updated: '42m ago' },
-    { id: 'report_003', type: 'Account issue', target: users[4]?.displayName ?? 'User account', severity: 'Low', status: 'Open', owner: 'Support desk', updated: '2h ago' },
-    { id: 'report_004', type: 'Support review', target: challenges[0]?.description ?? 'Challenge support', severity: 'Medium', status: 'Reviewing', owner: 'Finance review', updated: '4h ago' },
-  ], [challenges, feedPosts, matches, users]);
+  const platformReports = useMemo(() => {
+    const fallback: Report[] = [
+      { id: 'report_001', reporterId: 'demo_reporter_001', type: 'reported_feed_post', summary: feedPosts[0]?.caption.slice(0, 52) ?? 'Feed post', reporterName: 'Content desk', reportedEntity: 'Feed post', severity: 'Medium', status: 'reviewing', assignedReviewer: 'Moderation desk', lastUpdate: '18m ago', createdAt: new Date().toISOString() },
+      { id: 'report_002', reporterId: 'demo_reporter_002', type: 'disputed_match_result', summary: matches[1] ? `${matches[1].homeTeamId} / ${matches[1].awayTeamId}` : 'Match result', reporterName: 'League ops', reportedEntity: 'Match result', severity: 'High', status: 'open', assignedReviewer: 'League operations', lastUpdate: '42m ago', createdAt: new Date().toISOString() },
+    ];
+    return (reports.length ? reports : fallback).slice(0, 8).map((report) => ({
+      id: report.id,
+      type: report.type.replaceAll('_', ' '),
+      reporter: report.reporterName ?? report.reporterId,
+      reportedEntity: report.reportedEntity ?? report.summary,
+      severity: report.severity ?? 'Medium',
+      status: report.status,
+      reviewer: report.assignedReviewer ?? 'Unassigned',
+      updated: report.lastUpdate ?? formatDate(report.updatedAt ?? report.createdAt),
+      reason: report.reasonFlagged ?? report.summary,
+      history: report.actionHistory,
+    }));
+  }, [feedPosts, matches, reports]);
 
   const payoutRows = challenges.slice(0, 5).map((challenge, index) => {
     const athlete = athletes.find((item) => item.id === challenge.athleteId);
@@ -123,6 +139,7 @@ function AdminDashboard() {
       id: `platform_payout_${challenge.id}`,
       athlete,
       team,
+      supportType: index % 2 === 0 ? 'Performance challenge' : 'Athlete support pool',
       amount: challenge.totalPledged,
       fee,
       net: challenge.totalPledged - fee,
@@ -245,7 +262,7 @@ function AdminDashboard() {
           <DataTableCard className="hidden lg:block">
             <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="bg-white/6 text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                <tr><th className="px-4 py-3">Name</th><th>Email</th><th>Role</th><th>Status</th><th>City</th><th>Joined</th><th className="px-4">Actions</th></tr>
+                <tr><th className="px-4 py-3">Name</th><th>Email</th><th>Role</th><th>Status</th><th>City</th><th>Points</th><th>Wallet</th><th className="px-4">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-white/8">
                 {users.slice(0, 12).map((user) => (
@@ -255,8 +272,9 @@ function AdminDashboard() {
                     <td className="text-slate-300">{user.role.replace('_', ' ')}</td>
                     <td><StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge></td>
                     <td className="text-slate-300">{user.city}</td>
-                    <td className="text-slate-300">{formatDate(user.createdAt)}</td>
-                    <td className="px-4"><Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['Wallet', formatUGX(user.walletBalance)]])}>Inspect</Button></td>
+                    <td className="text-slate-300">{user.points}</td>
+                    <td className="text-slate-300">{formatUGX(user.walletBalance)}</td>
+                    <td className="px-4"><Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['Status', user.status], ['Points', user.points], ['Wallet', formatUGX(user.walletBalance)], ['Joined', formatDate(user.createdAt)]])}>Inspect</Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -267,7 +285,8 @@ function AdminDashboard() {
               <MobileDataCard key={user.id} title={user.displayName} eyebrow={user.email} meta={<StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['City', user.city]])}>Inspect</Button>}>
                 <div className="grid grid-cols-2 gap-3">
                   <MiniMeta label="Role" value={user.role.replace('_', ' ')} />
-                  <MiniMeta label="Joined" value={formatDate(user.createdAt)} />
+                  <MiniMeta label="Points" value={user.points} />
+                  <MiniMeta label="Wallet" value={formatUGX(user.walletBalance)} />
                 </div>
               </MobileDataCard>
             ))}
@@ -335,33 +354,56 @@ function AdminDashboard() {
       )}
 
       {activeTab === 'Verifications' && (
-        <div className="grid gap-8 xl:grid-cols-2">
-          {[
-            ['League verification', pendingLeagues.map((league) => ({ id: league.id, title: league.name, detail: `${league.city} • ${league.status}`, action: () => approveLeague(league.id) }))],
-            ['Athlete verification', athletes.slice(0, 4).map((athlete) => ({ id: athlete.id, title: athlete.name, detail: `${athlete.position} • ${athlete.verificationStatus}`, action: () => toast.success(`${athlete.name} verification recorded.`) }))],
-            ['Match verification', pendingMatches.slice(0, 4).map((match) => ({ id: match.id, title: `${match.homeTeamId} vs ${match.awayTeamId}`, detail: `${match.venue} • ${match.verificationStatus}`, action: () => toast.success('Match verification recorded.') }))],
-            ['Challenge verification', challenges.slice(0, 4).map((challenge) => ({ id: challenge.id, title: challenge.description, detail: `${formatUGX(challenge.totalPledged)} • ${challenge.verificationStatus}`, action: () => toast.success('Challenge verification recorded.') }))],
-            ['Payout review', payoutRows.slice(0, 4).map((payout) => ({ id: payout.id, title: payout.athlete?.name ?? 'Athlete support', detail: `${formatUGX(payout.net)} net • ${payout.status}`, action: () => toast.success('Demo payout review recorded.') }))],
-          ].map(([title, items]) => (
-            <DashboardSection key={title as string} eyebrow="Queue" title={title as string}>
-              <div className="space-y-3">
-                {(items as { id: string; title: string; detail: string; action: () => void }[]).map((item) => (
-                  <MobileDataCard key={item.id} title={item.title} eyebrow={item.detail} actions={<Button size="sm" variant="outline" onClick={item.action}>Review</Button>} />
-                ))}
-              </div>
-            </DashboardSection>
-          ))}
-        </div>
+        <DashboardSection eyebrow="Trust Queue" title="Verification operating queue" description="Review league, athlete, match, challenge, and support-release evidence from one place.">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {verifications.slice(0, 10).map((record) => (
+              <MobileDataCard
+                key={record.id}
+                title={record.relatedLabel ?? record.type.replaceAll('_', ' ')}
+                eyebrow={`Submitted by ${record.submittedBy} • ${formatDate(record.createdAt)}`}
+                meta={<StatusBadge tone={statusTone(String(record.status))}>{record.status}</StatusBadge>}
+                actions={
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => openDetail(record.relatedLabel ?? record.type, 'Verification record detail.', [['Evidence', record.evidenceStatus ?? 'Evidence pending'], ['Amount affected', formatUGX(record.amountAffected ?? 0)], ['Action history', actionHistoryText(record.actionHistory)]])}>View</Button>
+                    <Button size="sm" onClick={() => toast.success(`${record.id} verified in demo mode.`)}>Verify</Button>
+                    <Button size="sm" variant="outline" onClick={() => toast.success(`${record.id} rejected in demo mode.`)}>Reject</Button>
+                  </>
+                }
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MiniMeta label="Type" value={record.type.replaceAll('_', ' ')} />
+                  <MiniMeta label="Related record" value={record.relatedId} />
+                  <MiniMeta label="Evidence" value={record.evidenceStatus ?? 'Evidence pending'} />
+                  <MiniMeta label="Amount affected" value={formatUGX(record.amountAffected ?? 0)} />
+                </div>
+              </MobileDataCard>
+            ))}
+          </div>
+        </DashboardSection>
       )}
 
       {activeTab === 'Reports' && (
         <DashboardSection eyebrow="Reports" title="Moderation and dispute reports">
           <div className="grid gap-3 lg:grid-cols-2">
             {platformReports.map((report) => (
-              <MobileDataCard key={report.id} title={report.type} eyebrow={`${report.target} • ${report.owner}`} meta={<StatusBadge tone={statusTone(report.severity)}>{report.severity}</StatusBadge>} actions={<><Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Target', report.target], ['Status', report.status], ['Updated', report.updated]])}>View</Button><Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve</Button></>}>
-                <div className="grid grid-cols-2 gap-3">
+              <MobileDataCard
+                key={report.id}
+                title={report.type}
+                eyebrow={`${report.reporter} reported ${report.reportedEntity}`}
+                meta={<StatusBadge tone={statusTone(report.severity)}>{report.severity}</StatusBadge>}
+                actions={
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Reporter', report.reporter], ['Reported entity', report.reportedEntity], ['Assigned reviewer', report.reviewer], ['Reason', report.reason], ['Action history', actionHistoryText(report.history)]])}>View</Button>
+                    <Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve</Button>
+                    <Button size="sm" variant="outline" onClick={() => toast.success(`${report.id} escalated in demo mode.`)}>Escalate</Button>
+                  </>
+                }
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MiniMeta label="Report type" value={report.type} />
+                  <MiniMeta label="Assigned reviewer" value={report.reviewer} />
                   <MiniMeta label="Status" value={report.status} />
-                  <MiniMeta label="Updated" value={report.updated} />
+                  <MiniMeta label="Last update" value={report.updated} />
                 </div>
               </MobileDataCard>
             ))}
@@ -375,7 +417,24 @@ function AdminDashboard() {
             {feedPosts.slice(0, 6).map((post, index) => {
               const hidden = hiddenPostIds.has(post.id);
               return (
-                <MobileDataCard key={post.id} title={post.caption.slice(0, 84)} eyebrow={`${post.authorName} • ${post.likesCount} likes • ${post.commentsCount} comments`} meta={<StatusBadge tone={hidden ? 'danger' : index < 2 ? 'warning' : 'success'}>{hidden ? 'Hidden' : index < 2 ? 'Flagged' : 'Active'}</StatusBadge>} actions={<><Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>View</Button><Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore' : 'Hide'}</Button><Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate</Button></>} />
+                <MobileDataCard
+                  key={post.id}
+                  title={post.caption.slice(0, 84)}
+                  eyebrow={`${post.authorName} • ${String(post.type).replaceAll('_', ' ')} • ${post.flagReason ?? (index < 2 ? 'Engagement spike review' : 'Routine visibility check')}`}
+                  meta={<StatusBadge tone={hidden ? 'danger' : index < 2 || post.status === 'reported' ? 'warning' : 'success'}>{hidden ? 'Hidden' : post.status === 'reported' || index < 2 ? 'Flagged' : 'Active'}</StatusBadge>}
+                  actions={
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Post type', String(post.type).replaceAll('_', ' ')], ['Reason flagged', post.flagReason ?? 'Engagement spike review'], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>View</Button>
+                      <Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore' : 'Hide'}</Button>
+                      <Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate</Button>
+                    </>
+                  }
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <MiniMeta label="Post author" value={post.authorName} />
+                    <MiniMeta label="Engagement" value={`${post.likesCount} likes / ${post.commentsCount} comments / ${post.sharesCount} shares`} />
+                  </div>
+                </MobileDataCard>
               );
             })}
           </div>
@@ -390,16 +449,20 @@ function AdminDashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-display text-lg font-black text-white">{payout.athlete?.name ?? 'Athlete support'}</h3>
-                    <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.type}</p>
+                    <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.supportType}</p>
                   </div>
                   <StatusBadge tone="warning">{payout.status}</StatusBadge>
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <MiniMeta label="Amount" value={formatUGX(payout.amount)} />
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <MiniMeta label="Related challenge" value={payout.type} />
+                  <MiniMeta label="Gross amount" value={formatUGX(payout.amount)} />
                   <MiniMeta label="Platform fee" value={formatUGX(payout.fee)} />
                   <MiniMeta label="Net" value={formatUGX(payout.net)} />
                 </div>
-                <Button className="mt-4" size="sm" variant="gold" onClick={() => toast.success('Demo support release approved. Real payments are not enabled yet.')}>Approve Demo Review</Button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openDetail(payout.athlete?.name ?? 'Support release', 'Support/Payout review detail.', [['Athlete/team', `${payout.athlete?.name ?? 'Athlete'} / ${payout.team?.name ?? 'Team pending'}`], ['Support type', payout.supportType], ['Related challenge', payout.type], ['Net amount', formatUGX(payout.net)]])}>Review</Button>
+                  <Button size="sm" variant="gold" onClick={() => toast.success('Demo support release approved. Real payments are not enabled yet.')}>Approve Demo Review</Button>
+                </div>
               </DataCard>
             ))}
           </div>
@@ -450,12 +513,13 @@ function AdminDashboard() {
             {[
               ['Data mode', source, 'info'],
               ['Firebase configured', isFirebaseConfigured ? 'Yes' : 'No', isFirebaseConfigured ? 'success' : 'warning'],
-              ['Mock mode status', source === 'mock' ? 'Active' : 'Fallback ready', 'success'],
-              ['Seed data status', `${leagues.length} leagues loaded`, 'success'],
-              ['Storage status', 'Rules prepared', 'info'],
-              ['Build status', 'Last local build passed before sandbox block', 'warning'],
+              ['Mock provider status', source === 'mock' ? 'Active' : 'Fallback ready', 'success'],
+              ['Firestore provider status', isFirebaseConfigured ? 'Ready for live reads' : 'Using safe fallback', isFirebaseConfigured ? 'success' : 'warning'],
+              ['Storage status', isFirebaseConfigured ? 'Rules ready' : 'Rules prepared for setup', 'info'],
+              ['Last seed/export', `${leagues.length} leagues / ${athletes.length} athletes loaded`, 'success'],
+              ['Known warnings', isFirebaseConfigured ? 'None active' : 'Firebase env missing in mock mode', isFirebaseConfigured ? 'success' : 'warning'],
               ['Admin logs', 'Demo visible', 'success'],
-              ['Alerts', platformReports.length ? 'Reports open' : 'Clear', platformReports.length ? 'warning' : 'success'],
+              ['Alerts', platformReports.length ? `${platformReports.length} reports open` : 'Clear', platformReports.length ? 'warning' : 'success'],
             ].map(([label, value, tone]) => (
               <DataCard key={label as string}>
                 <Activity01Icon className="mb-4 size-5 text-[var(--goal-mint)]" />

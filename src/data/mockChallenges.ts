@@ -7,14 +7,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_015",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "clean_sheet",
+    "type": "goal",
     "target": 1,
-    "description": "Keep a clean sheet",
+    "description": "Score 1 goal",
     "totalPledged": 58783,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score 1 goal",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 58783,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_002",
@@ -29,7 +37,15 @@ export const challenges: Challenge[] = [
     "supportersCount": 8,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score a try",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 11581,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_003",
@@ -38,13 +54,21 @@ export const challenges: Challenge[] = [
     "leagueId": "league_008",
     "sport": "rugby",
     "type": "tackles",
-    "target": 15,
-    "description": "Make 15 tackles",
+    "target": 8,
+    "description": "Make 8 tackles",
     "totalPledged": 92618,
     "supportersCount": 9,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 8 tackles",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 92618,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_004",
@@ -52,14 +76,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_017",
     "leagueId": "league_005",
     "sport": "basketball",
-    "type": "blocks",
-    "target": 2,
-    "description": "Record 2 blocks",
+    "type": "points",
+    "target": 20,
+    "description": "Reach 20 points",
     "totalPledged": 77110,
     "supportersCount": 1,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Reach 20 points",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 77110,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_005",
@@ -67,14 +99,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_016",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "clean_sheet",
+    "type": "assist",
     "target": 1,
-    "description": "Keep a clean sheet",
+    "description": "Provide 1 assist",
     "totalPledged": 12636,
     "supportersCount": 4,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Set up 1 goal from open play",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 12636,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_006",
@@ -89,7 +129,15 @@ export const challenges: Challenge[] = [
     "supportersCount": 1,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Grab 10 rebounds",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 45227,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_007",
@@ -97,14 +145,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_026",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "points",
-    "target": 20,
-    "description": "Score 20 points",
+    "type": "assists",
+    "target": 5,
+    "description": "Make 5 assists",
     "totalPledged": 18354,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 assists",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 18354,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_008",
@@ -114,12 +170,20 @@ export const challenges: Challenge[] = [
     "sport": "basketball",
     "type": "steals",
     "target": 3,
-    "description": "Make 3 steals",
+    "description": "Record 3 steals",
     "totalPledged": 56255,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Record 3 steals",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 56255,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_009",
@@ -127,14 +191,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_008",
     "leagueId": "league_002",
     "sport": "football",
-    "type": "tackles",
-    "target": 5,
-    "description": "Make 5 successful tackles",
+    "type": "clean_sheet",
+    "target": 1,
+    "description": "Keep a clean sheet",
     "totalPledged": 37825,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Keep a clean sheet",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 37825,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_010",
@@ -142,14 +214,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_013",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "distance",
-    "target": 10,
-    "description": "Cover 10km distance",
+    "type": "minutes",
+    "target": 75,
+    "description": "Complete 75 minutes",
     "totalPledged": 59799,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete 75 minutes",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 59799,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_011",
@@ -157,14 +237,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_002",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "distance",
-    "target": 10,
-    "description": "Cover 10km distance",
+    "type": "player_of_match",
+    "target": 1,
+    "description": "Win Player of the Match",
     "totalPledged": 22778,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Win Player of the Match",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 22778,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_012",
@@ -172,14 +260,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_018",
     "leagueId": "league_005",
     "sport": "basketball",
-    "type": "steals",
+    "type": "three_pointers",
     "target": 3,
-    "description": "Make 3 steals",
+    "description": "Hit 3 three-pointers",
     "totalPledged": 82202,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Hit 3 three-pointers",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 82202,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_013",
@@ -189,12 +285,20 @@ export const challenges: Challenge[] = [
     "sport": "rugby",
     "type": "appearance",
     "target": 1,
-    "description": "Complete 80 minutes",
+    "description": "Complete the match",
     "totalPledged": 81577,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete the match",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 81577,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_014",
@@ -202,14 +306,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_004",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "assist",
-    "target": 1,
-    "description": "Provide 1 assist",
+    "type": "chances_created",
+    "target": 3,
+    "description": "Create 3 chances",
     "totalPledged": 19016,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Create 3 chances",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 19016,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_015",
@@ -217,14 +329,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_035",
     "leagueId": "league_009",
     "sport": "rugby",
-    "type": "tackles",
-    "target": 15,
-    "description": "Make 15 tackles",
+    "type": "carries",
+    "target": 5,
+    "description": "Make 5 carries",
     "totalPledged": 39809,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 carries",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 39809,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_016",
@@ -232,14 +352,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_028",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "blocks",
-    "target": 2,
-    "description": "Record 2 blocks",
+    "type": "free_throws",
+    "target": 80,
+    "description": "Complete the game with 80% free throws",
     "totalPledged": 94029,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete the game with 80% free throws",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 94029,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_017",
@@ -247,14 +375,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_002",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "goal",
-    "target": 1,
-    "description": "Score 1 goal",
+    "type": "recoveries",
+    "target": 5,
+    "description": "Make 5 key recoveries",
     "totalPledged": 63649,
     "supportersCount": 1,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 key recoveries",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 63649,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_018",
@@ -262,14 +398,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_014",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "tackles",
-    "target": 5,
-    "description": "Make 5 successful tackles",
+    "type": "goal",
+    "target": 1,
+    "description": "Score 1 goal",
     "totalPledged": 26142,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score 1 goal",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 26142,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_019",
@@ -277,14 +421,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_016",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "clean_sheet",
+    "type": "assist",
     "target": 1,
-    "description": "Keep a clean sheet",
+    "description": "Create the final pass for 1 goal",
     "totalPledged": 53234,
     "supportersCount": 8,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Deliver 1 decisive attacking pass",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 53234,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_020",
@@ -292,14 +444,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_001",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "distance",
-    "target": 10,
-    "description": "Cover 10km distance",
+    "type": "clean_sheet",
+    "target": 1,
+    "description": "Keep a clean sheet",
     "totalPledged": 63846,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Keep a clean sheet",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 63846,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_021",
@@ -307,14 +467,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_031",
     "leagueId": "league_008",
     "sport": "rugby",
-    "type": "tackles",
-    "target": 15,
-    "description": "Make 15 tackles",
+    "type": "lineouts",
+    "target": 3,
+    "description": "Win 3 lineouts",
     "totalPledged": 85046,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Win 3 lineouts",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 85046,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_022",
@@ -322,14 +490,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_018",
     "leagueId": "league_005",
     "sport": "basketball",
-    "type": "assists",
-    "target": 8,
-    "description": "Provide 8 assists",
+    "type": "blocks",
+    "target": 2,
+    "description": "Record 2 blocks",
     "totalPledged": 33777,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Record 2 blocks",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 33777,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_023",
@@ -337,14 +513,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_007",
     "leagueId": "league_002",
     "sport": "football",
-    "type": "assist",
-    "target": 1,
-    "description": "Provide 1 assist",
+    "type": "minutes",
+    "target": 75,
+    "description": "Complete 75 minutes",
     "totalPledged": 63031,
     "supportersCount": 1,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete 75 minutes",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 63031,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_024",
@@ -352,14 +536,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_007",
     "leagueId": "league_002",
     "sport": "football",
-    "type": "tackles",
-    "target": 5,
-    "description": "Make 5 successful tackles",
+    "type": "player_of_match",
+    "target": 1,
+    "description": "Win Player of the Match",
     "totalPledged": 57521,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Win Player of the Match",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 57521,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_025",
@@ -367,14 +559,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_015",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "tackles",
-    "target": 5,
-    "description": "Make 5 successful tackles",
+    "type": "chances_created",
+    "target": 3,
+    "description": "Create 3 chances",
     "totalPledged": 35714,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Create 3 chances",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 35714,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_026",
@@ -382,14 +582,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_025",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "rebounds",
-    "target": 10,
-    "description": "Grab 10 rebounds",
+    "type": "points",
+    "target": 20,
+    "description": "Reach 20 points",
     "totalPledged": 11293,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Reach 20 points",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 11293,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_027",
@@ -397,14 +605,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_027",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "assists",
-    "target": 8,
-    "description": "Provide 8 assists",
+    "type": "rebounds",
+    "target": 10,
+    "description": "Grab 10 rebounds",
     "totalPledged": 49460,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Grab 10 rebounds",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 49460,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_028",
@@ -412,14 +628,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_035",
     "leagueId": "league_009",
     "sport": "rugby",
-    "type": "tackles",
-    "target": 15,
-    "description": "Make 15 tackles",
+    "type": "turnover",
+    "target": 1,
+    "description": "Force a turnover",
     "totalPledged": 25218,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Force a turnover",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 25218,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_029",
@@ -427,14 +651,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_014",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "assist",
-    "target": 1,
-    "description": "Provide 1 assist",
+    "type": "recoveries",
+    "target": 5,
+    "description": "Make 5 key recoveries",
     "totalPledged": 87589,
     "supportersCount": 4,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 key recoveries",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 87589,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_030",
@@ -449,7 +681,15 @@ export const challenges: Challenge[] = [
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score 1 goal",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 63189,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_031",
@@ -459,12 +699,20 @@ export const challenges: Challenge[] = [
     "sport": "football",
     "type": "assist",
     "target": 1,
-    "description": "Provide 1 assist",
+    "description": "Record 1 verified assist chance",
     "totalPledged": 45297,
     "supportersCount": 9,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Create 1 goal-scoring action",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 45297,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_032",
@@ -472,14 +720,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_028",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "steals",
-    "target": 3,
-    "description": "Make 3 steals",
+    "type": "assists",
+    "target": 5,
+    "description": "Make 5 assists",
     "totalPledged": 70508,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 assists",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 70508,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_033",
@@ -487,14 +743,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_004",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "assist",
+    "type": "clean_sheet",
     "target": 1,
-    "description": "Provide 1 assist",
+    "description": "Keep a clean sheet",
     "totalPledged": 97245,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Keep a clean sheet",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 97245,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_034",
@@ -502,14 +766,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_033",
     "leagueId": "league_009",
     "sport": "rugby",
-    "type": "appearance",
-    "target": 1,
-    "description": "Complete 80 minutes",
+    "type": "conversion",
+    "target": 2,
+    "description": "Kick 2 conversions",
     "totalPledged": 36609,
     "supportersCount": 8,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Kick 2 conversions",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 36609,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_035",
@@ -517,14 +789,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_038",
     "leagueId": "league_010",
     "sport": "rugby",
-    "type": "linebreaks",
-    "target": 2,
-    "description": "Make 2 linebreaks",
+    "type": "try",
+    "target": 1,
+    "description": "Score a try",
     "totalPledged": 31185,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score a try",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 31185,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_036",
@@ -532,14 +812,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_036",
     "leagueId": "league_009",
     "sport": "rugby",
-    "type": "appearance",
-    "target": 1,
-    "description": "Complete 80 minutes",
+    "type": "tackles",
+    "target": 8,
+    "description": "Make 8 tackles",
     "totalPledged": 27014,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 8 tackles",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 27014,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_037",
@@ -547,14 +835,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_040",
     "leagueId": "league_010",
     "sport": "rugby",
-    "type": "linebreaks",
-    "target": 2,
-    "description": "Make 2 linebreaks",
+    "type": "appearance",
+    "target": 1,
+    "description": "Complete the match",
     "totalPledged": 35861,
     "supportersCount": 7,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete the match",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 35861,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_038",
@@ -562,14 +858,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_011",
     "leagueId": "league_003",
     "sport": "football",
-    "type": "clean_sheet",
-    "target": 1,
-    "description": "Keep a clean sheet",
+    "type": "minutes",
+    "target": 75,
+    "description": "Complete 75 minutes",
     "totalPledged": 85161,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete 75 minutes",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 85161,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_039",
@@ -577,14 +881,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_037",
     "leagueId": "league_010",
     "sport": "rugby",
-    "type": "tackles",
-    "target": 15,
-    "description": "Make 15 tackles",
+    "type": "carries",
+    "target": 5,
+    "description": "Make 5 carries",
     "totalPledged": 29666,
     "supportersCount": 9,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 carries",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 29666,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_040",
@@ -592,14 +904,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_013",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "assist",
+    "type": "player_of_match",
     "target": 1,
-    "description": "Provide 1 assist",
+    "description": "Win Player of the Match",
     "totalPledged": 71564,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Win Player of the Match",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 71564,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_041",
@@ -607,14 +927,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_005",
     "leagueId": "league_002",
     "sport": "football",
-    "type": "distance",
-    "target": 10,
-    "description": "Cover 10km distance",
+    "type": "chances_created",
+    "target": 3,
+    "description": "Create 3 chances",
     "totalPledged": 29308,
     "supportersCount": 5,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Create 3 chances",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 29308,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_042",
@@ -622,14 +950,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_001",
     "leagueId": "league_001",
     "sport": "football",
-    "type": "tackles",
+    "type": "recoveries",
     "target": 5,
-    "description": "Make 5 successful tackles",
+    "description": "Make 5 key recoveries",
     "totalPledged": 88143,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 key recoveries",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 88143,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_043",
@@ -637,14 +973,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_019",
     "leagueId": "league_005",
     "sport": "basketball",
-    "type": "rebounds",
-    "target": 10,
-    "description": "Grab 10 rebounds",
+    "type": "steals",
+    "target": 3,
+    "description": "Record 3 steals",
     "totalPledged": 92795,
     "supportersCount": 3,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Record 3 steals",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 92795,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_044",
@@ -652,14 +996,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_024",
     "leagueId": "league_006",
     "sport": "basketball",
-    "type": "points",
-    "target": 20,
-    "description": "Score 20 points",
+    "type": "three_pointers",
+    "target": 3,
+    "description": "Hit 3 three-pointers",
     "totalPledged": 48784,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Hit 3 three-pointers",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 48784,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_045",
@@ -667,14 +1019,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_032",
     "leagueId": "league_008",
     "sport": "rugby",
-    "type": "metres",
-    "target": 50,
-    "description": "Run 50 metres with ball",
+    "type": "lineouts",
+    "target": 3,
+    "description": "Win 3 lineouts",
     "totalPledged": 17951,
     "supportersCount": 6,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Win 3 lineouts",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 17951,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_046",
@@ -682,14 +1042,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_031",
     "leagueId": "league_008",
     "sport": "rugby",
-    "type": "metres",
-    "target": 50,
-    "description": "Run 50 metres with ball",
+    "type": "turnover",
+    "target": 1,
+    "description": "Force a turnover",
     "totalPledged": 55996,
     "supportersCount": 8,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Force a turnover",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 55996,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_047",
@@ -697,14 +1065,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_026",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "points",
-    "target": 20,
-    "description": "Score 20 points",
+    "type": "free_throws",
+    "target": 80,
+    "description": "Complete the game with 80% free throws",
     "totalPledged": 25459,
     "supportersCount": 9,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete the game with 80% free throws",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 25459,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_048",
@@ -712,14 +1088,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_016",
     "leagueId": "league_004",
     "sport": "football",
-    "type": "tackles",
-    "target": 5,
-    "description": "Make 5 successful tackles",
+    "type": "goal",
+    "target": 1,
+    "description": "Score 1 goal",
     "totalPledged": 86620,
     "supportersCount": 9,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score 1 goal",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 86620,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_049",
@@ -727,14 +1111,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_020",
     "leagueId": "league_005",
     "sport": "basketball",
-    "type": "assists",
-    "target": 8,
-    "description": "Provide 8 assists",
+    "type": "blocks",
+    "target": 2,
+    "description": "Record 2 blocks",
     "totalPledged": 70238,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Record 2 blocks",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 70238,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_050",
@@ -742,14 +1134,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_034",
     "leagueId": "league_009",
     "sport": "rugby",
-    "type": "try",
-    "target": 1,
-    "description": "Score a try",
+    "type": "conversion",
+    "target": 2,
+    "description": "Kick 2 conversions",
     "totalPledged": 32347,
     "supportersCount": 4,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Kick 2 conversions",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 32347,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_051",
@@ -757,14 +1157,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_026",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "blocks",
-    "target": 2,
-    "description": "Record 2 blocks",
+    "type": "points",
+    "target": 20,
+    "description": "Reach 20 points",
     "totalPledged": 44662,
     "supportersCount": 1,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Reach 20 points",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 44662,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_052",
@@ -772,14 +1180,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_025",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "steals",
-    "target": 3,
-    "description": "Make 3 steals",
+    "type": "rebounds",
+    "target": 10,
+    "description": "Grab 10 rebounds",
     "totalPledged": 68071,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Grab 10 rebounds",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 68071,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_053",
@@ -788,13 +1204,21 @@ export const challenges: Challenge[] = [
     "leagueId": "league_007",
     "sport": "basketball",
     "type": "assists",
-    "target": 8,
-    "description": "Provide 8 assists",
+    "target": 5,
+    "description": "Make 5 assists",
     "totalPledged": 77701,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 5 assists",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 77701,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_054",
@@ -804,12 +1228,20 @@ export const challenges: Challenge[] = [
     "sport": "football",
     "type": "assist",
     "target": 1,
-    "description": "Provide 1 assist",
+    "description": "Supply 1 match-winning pass",
     "totalPledged": 90272,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Set up 1 goal from open play",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 90272,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   },
   {
     "id": "challenge_055",
@@ -817,14 +1249,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_026",
     "leagueId": "league_007",
     "sport": "basketball",
-    "type": "points",
-    "target": 20,
-    "description": "Score 20 points",
+    "type": "steals",
+    "target": 3,
+    "description": "Record 3 steals",
     "totalPledged": 20156,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Record 3 steals",
+    "submittedBy": "Match commissioner",
+    "evidenceStatus": "Clip uploaded",
+    "amountAffected": 20156,
+    "actionHistory": [
+      "Match commissioner opened review",
+      "Clip uploaded"
+    ]
   },
   {
     "id": "challenge_056",
@@ -832,14 +1272,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_040",
     "leagueId": "league_010",
     "sport": "rugby",
-    "type": "linebreaks",
-    "target": 2,
-    "description": "Make 2 linebreaks",
+    "type": "try",
+    "target": 1,
+    "description": "Score a try",
     "totalPledged": 69935,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Score a try",
+    "submittedBy": "Team manager",
+    "evidenceStatus": "Score sheet attached",
+    "amountAffected": 69935,
+    "actionHistory": [
+      "Team manager opened review",
+      "Score sheet attached"
+    ]
   },
   {
     "id": "challenge_057",
@@ -847,14 +1295,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_023",
     "leagueId": "league_006",
     "sport": "basketball",
-    "type": "points",
-    "target": 20,
-    "description": "Score 20 points",
+    "type": "three_pointers",
+    "target": 3,
+    "description": "Hit 3 three-pointers",
     "totalPledged": 24829,
     "supportersCount": 10,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Hit 3 three-pointers",
+    "submittedBy": "Referee desk",
+    "evidenceStatus": "Referee note pending",
+    "amountAffected": 24829,
+    "actionHistory": [
+      "Referee desk opened review",
+      "Referee note pending"
+    ]
   },
   {
     "id": "challenge_058",
@@ -869,7 +1325,15 @@ export const challenges: Challenge[] = [
     "supportersCount": 4,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Keep a clean sheet",
+    "submittedBy": "League secretary",
+    "evidenceStatus": "Captain confirmation uploaded",
+    "amountAffected": 65237,
+    "actionHistory": [
+      "League secretary opened review",
+      "Captain confirmation uploaded"
+    ]
   },
   {
     "id": "challenge_059",
@@ -877,14 +1341,22 @@ export const challenges: Challenge[] = [
     "matchId": "match_030",
     "leagueId": "league_008",
     "sport": "rugby",
-    "type": "linebreaks",
-    "target": 2,
-    "description": "Make 2 linebreaks",
+    "type": "tackles",
+    "target": 8,
+    "description": "Make 8 tackles",
     "totalPledged": 79383,
     "supportersCount": 4,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Make 8 tackles",
+    "submittedBy": "Challenge moderator",
+    "evidenceStatus": "League admin review needed",
+    "amountAffected": 79383,
+    "actionHistory": [
+      "Challenge moderator opened review",
+      "League admin review needed"
+    ]
   },
   {
     "id": "challenge_060",
@@ -894,11 +1366,19 @@ export const challenges: Challenge[] = [
     "sport": "rugby",
     "type": "appearance",
     "target": 1,
-    "description": "Complete 80 minutes",
+    "description": "Complete the match",
     "totalPledged": 13499,
     "supportersCount": 2,
     "status": "open",
     "verificationStatus": "pending",
-    "createdAt": "2026-06-06T03:03:00.243Z"
+    "createdAt": "2026-06-06T03:03:00.243Z",
+    "targetDescription": "Complete the match",
+    "submittedBy": "Venue official",
+    "evidenceStatus": "Media timestamp verified",
+    "amountAffected": 13499,
+    "actionHistory": [
+      "Venue official opened review",
+      "Media timestamp verified"
+    ]
   }
 ];

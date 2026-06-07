@@ -5,150 +5,330 @@ export const reports: Report[] = [
     "id": "report_001",
     "reporterId": "user_151",
     "type": "reported_feed_post",
-    "status": "reviewing",
-    "summary": "Reported feed post for moderation review.",
+    "status": "open",
+    "summary": "Feed highlight needs verification context.",
     "targetCollection": "feedPosts",
     "targetId": "feed_001",
-    "createdAt": "2026-06-05T10:00:00.000Z"
+    "createdAt": "2026-06-05T10:00:00.000Z",
+    "reporterName": "Kampala referee desk",
+    "reportedEntity": "Content report 01",
+    "affectedEntity": "Kampala Stars FC",
+    "severity": "Medium",
+    "assignedReviewer": "Amina - Trust Desk",
+    "lastUpdate": "18m ago",
+    "reasonFlagged": "Feed highlight needs verification context.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-05T10:00:00.000Z"
   },
   {
     "id": "report_002",
     "reporterId": "user_152",
     "type": "disputed_match_result",
-    "status": "open",
-    "summary": "Disputed match result requires league admin review.",
+    "status": "reviewing",
+    "summary": "Score sheet differs from referee submission.",
     "targetCollection": "matches",
     "targetId": "match_002",
-    "createdAt": "2026-06-05T06:00:00.000Z"
+    "createdAt": "2026-06-05T06:00:00.000Z",
+    "reporterName": "Wakiso team manager",
+    "reportedEntity": "Result dispute 02",
+    "affectedEntity": "Rebecca Nanyonjo",
+    "severity": "High",
+    "assignedReviewer": "Brian - League Ops",
+    "lastUpdate": "2h ago",
+    "reasonFlagged": "Score sheet differs from referee submission.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-05T06:00:00.000Z"
   },
   {
     "id": "report_003",
     "reporterId": "user_153",
     "type": "athlete_verification_issue",
     "status": "open",
-    "summary": "Athlete verification document needs another check.",
+    "summary": "Profile document does not match roster name.",
     "targetCollection": "athletes",
     "targetId": "ath_003",
-    "createdAt": "2026-06-05T02:00:00.000Z"
+    "createdAt": "2026-06-05T02:00:00.000Z",
+    "reporterName": "Jinja league secretary",
+    "reportedEntity": "Athlete verification 03",
+    "affectedEntity": "Wakiso Hoops",
+    "severity": "Low",
+    "assignedReviewer": "Grace - Support Desk",
+    "lastUpdate": "Yesterday 6:20 PM",
+    "reasonFlagged": "Profile document does not match roster name.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-05T02:00:00.000Z"
   },
   {
     "id": "report_004",
     "reporterId": "user_154",
     "type": "payout_review_issue",
-    "status": "open",
-    "summary": "Payout review requires platform admin confirmation.",
+    "status": "resolved",
+    "summary": "Challenge evidence must be confirmed before release.",
     "targetCollection": "supportPledges",
     "targetId": "pledge_004",
-    "createdAt": "2026-06-04T22:00:00.000Z"
+    "createdAt": "2026-06-04T22:00:00.000Z",
+    "reporterName": "Fan support ticket",
+    "reportedEntity": "Support release review 04",
+    "affectedEntity": "Kyadondo Rugby U21",
+    "severity": "Critical",
+    "assignedReviewer": "Daniel - Platform Review",
+    "lastUpdate": "21m ago",
+    "reasonFlagged": "Challenge evidence must be confirmed before release.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-04T22:00:00.000Z"
   },
   {
     "id": "report_005",
     "reporterId": "user_155",
-    "type": "reported_feed_post",
-    "status": "open",
-    "summary": "Reported feed post for moderation review.",
-    "targetCollection": "feedPosts",
+    "type": "support_issue",
+    "status": "reviewing",
+    "summary": "Fan reported duplicate support confirmation.",
+    "targetCollection": "supportPledges",
     "targetId": "feed_005",
-    "createdAt": "2026-06-04T18:00:00.000Z"
+    "createdAt": "2026-06-04T18:00:00.000Z",
+    "reporterName": "Athlete representative",
+    "reportedEntity": "Support issue 05",
+    "affectedEntity": "Kampala Stars FC",
+    "severity": "Medium",
+    "assignedReviewer": "Irene - Content Desk",
+    "lastUpdate": "5h ago",
+    "reasonFlagged": "Fan reported duplicate support confirmation.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-04T18:00:00.000Z"
   },
   {
     "id": "report_006",
     "reporterId": "user_156",
-    "type": "disputed_match_result",
-    "status": "reviewing",
-    "summary": "Disputed match result requires league admin review.",
-    "targetCollection": "matches",
+    "type": "profile_issue",
+    "status": "open",
+    "summary": "Team profile is missing admin confirmation.",
+    "targetCollection": "teams",
     "targetId": "match_006",
-    "createdAt": "2026-06-04T14:00:00.000Z"
+    "createdAt": "2026-06-04T14:00:00.000Z",
+    "reporterName": "Venue marshal",
+    "reportedEntity": "Profile issue 06",
+    "affectedEntity": "Rebecca Nanyonjo",
+    "severity": "Low",
+    "assignedReviewer": "Amina - Trust Desk",
+    "lastUpdate": "Yesterday 6:20 PM",
+    "reasonFlagged": "Team profile is missing admin confirmation.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-04T14:00:00.000Z"
   },
   {
     "id": "report_007",
     "reporterId": "user_157",
-    "type": "athlete_verification_issue",
-    "status": "open",
-    "summary": "Athlete verification document needs another check.",
-    "targetCollection": "athletes",
+    "type": "reported_feed_post",
+    "status": "reviewing",
+    "summary": "Feed highlight needs verification context.",
+    "targetCollection": "feedPosts",
     "targetId": "ath_007",
-    "createdAt": "2026-06-04T10:00:00.000Z"
+    "createdAt": "2026-06-04T10:00:00.000Z",
+    "reporterName": "Kampala referee desk",
+    "reportedEntity": "Content report 07",
+    "affectedEntity": "Wakiso Hoops",
+    "severity": "Medium",
+    "assignedReviewer": "Brian - League Ops",
+    "lastUpdate": "24m ago",
+    "reasonFlagged": "Feed highlight needs verification context.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-04T10:00:00.000Z"
   },
   {
     "id": "report_008",
     "reporterId": "user_158",
-    "type": "payout_review_issue",
+    "type": "disputed_match_result",
     "status": "open",
-    "summary": "Payout review requires platform admin confirmation.",
-    "targetCollection": "supportPledges",
+    "summary": "Score sheet differs from referee submission.",
+    "targetCollection": "matches",
     "targetId": "pledge_008",
-    "createdAt": "2026-06-04T06:00:00.000Z"
+    "createdAt": "2026-06-04T06:00:00.000Z",
+    "reporterName": "Wakiso team manager",
+    "reportedEntity": "Result dispute 08",
+    "affectedEntity": "Kyadondo Rugby U21",
+    "severity": "High",
+    "assignedReviewer": "Grace - Support Desk",
+    "lastUpdate": "8h ago",
+    "reasonFlagged": "Score sheet differs from referee submission.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-04T06:00:00.000Z"
   },
   {
     "id": "report_009",
     "reporterId": "user_159",
-    "type": "reported_feed_post",
-    "status": "open",
-    "summary": "Reported feed post for moderation review.",
-    "targetCollection": "feedPosts",
+    "type": "athlete_verification_issue",
+    "status": "resolved",
+    "summary": "Profile document does not match roster name.",
+    "targetCollection": "athletes",
     "targetId": "feed_009",
-    "createdAt": "2026-06-04T02:00:00.000Z"
+    "createdAt": "2026-06-04T02:00:00.000Z",
+    "reporterName": "Jinja league secretary",
+    "reportedEntity": "Athlete verification 09",
+    "affectedEntity": "Kampala Stars FC",
+    "severity": "Low",
+    "assignedReviewer": "Daniel - Platform Review",
+    "lastUpdate": "Yesterday 6:20 PM",
+    "reasonFlagged": "Profile document does not match roster name.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-04T02:00:00.000Z"
   },
   {
     "id": "report_010",
     "reporterId": "user_160",
-    "type": "disputed_match_result",
-    "status": "open",
-    "summary": "Disputed match result requires league admin review.",
-    "targetCollection": "matches",
+    "type": "payout_review_issue",
+    "status": "reviewing",
+    "summary": "Challenge evidence must be confirmed before release.",
+    "targetCollection": "supportPledges",
     "targetId": "match_010",
-    "createdAt": "2026-06-03T22:00:00.000Z"
+    "createdAt": "2026-06-03T22:00:00.000Z",
+    "reporterName": "Fan support ticket",
+    "reportedEntity": "Support release review 10",
+    "affectedEntity": "Rebecca Nanyonjo",
+    "severity": "Critical",
+    "assignedReviewer": "Irene - Content Desk",
+    "lastUpdate": "27m ago",
+    "reasonFlagged": "Challenge evidence must be confirmed before release.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-03T22:00:00.000Z"
   },
   {
     "id": "report_011",
     "reporterId": "user_161",
-    "type": "athlete_verification_issue",
-    "status": "reviewing",
-    "summary": "Athlete verification document needs another check.",
-    "targetCollection": "athletes",
+    "type": "support_issue",
+    "status": "open",
+    "summary": "Fan reported duplicate support confirmation.",
+    "targetCollection": "supportPledges",
     "targetId": "ath_011",
-    "createdAt": "2026-06-03T18:00:00.000Z"
+    "createdAt": "2026-06-03T18:00:00.000Z",
+    "reporterName": "Athlete representative",
+    "reportedEntity": "Support issue 11",
+    "affectedEntity": "Wakiso Hoops",
+    "severity": "Medium",
+    "assignedReviewer": "Amina - Trust Desk",
+    "lastUpdate": "11h ago",
+    "reasonFlagged": "Fan reported duplicate support confirmation.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-03T18:00:00.000Z"
   },
   {
     "id": "report_012",
     "reporterId": "user_162",
-    "type": "payout_review_issue",
-    "status": "open",
-    "summary": "Payout review requires platform admin confirmation.",
-    "targetCollection": "supportPledges",
+    "type": "profile_issue",
+    "status": "reviewing",
+    "summary": "Team profile is missing admin confirmation.",
+    "targetCollection": "teams",
     "targetId": "pledge_012",
-    "createdAt": "2026-06-03T14:00:00.000Z"
+    "createdAt": "2026-06-03T14:00:00.000Z",
+    "reporterName": "Venue marshal",
+    "reportedEntity": "Profile issue 12",
+    "affectedEntity": "Kyadondo Rugby U21",
+    "severity": "Low",
+    "assignedReviewer": "Brian - League Ops",
+    "lastUpdate": "Yesterday 6:20 PM",
+    "reasonFlagged": "Team profile is missing admin confirmation.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-03T14:00:00.000Z"
   },
   {
     "id": "report_013",
     "reporterId": "user_163",
     "type": "reported_feed_post",
     "status": "open",
-    "summary": "Reported feed post for moderation review.",
+    "summary": "Feed highlight needs verification context.",
     "targetCollection": "feedPosts",
     "targetId": "feed_013",
-    "createdAt": "2026-06-03T10:00:00.000Z"
+    "createdAt": "2026-06-03T10:00:00.000Z",
+    "reporterName": "Kampala referee desk",
+    "reportedEntity": "Content report 13",
+    "affectedEntity": "Kampala Stars FC",
+    "severity": "Medium",
+    "assignedReviewer": "Grace - Support Desk",
+    "lastUpdate": "30m ago",
+    "reasonFlagged": "Feed highlight needs verification context.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-03T10:00:00.000Z"
   },
   {
     "id": "report_014",
     "reporterId": "user_164",
     "type": "disputed_match_result",
-    "status": "open",
-    "summary": "Disputed match result requires league admin review.",
+    "status": "resolved",
+    "summary": "Score sheet differs from referee submission.",
     "targetCollection": "matches",
     "targetId": "match_014",
-    "createdAt": "2026-06-03T06:00:00.000Z"
+    "createdAt": "2026-06-03T06:00:00.000Z",
+    "reporterName": "Wakiso team manager",
+    "reportedEntity": "Result dispute 14",
+    "affectedEntity": "Rebecca Nanyonjo",
+    "severity": "High",
+    "assignedReviewer": "Daniel - Platform Review",
+    "lastUpdate": "14h ago",
+    "reasonFlagged": "Score sheet differs from referee submission.",
+    "actionHistory": [
+      "Report received",
+      "Reviewer assigned"
+    ],
+    "updatedAt": "2026-06-03T06:00:00.000Z"
   },
   {
     "id": "report_015",
     "reporterId": "user_165",
     "type": "athlete_verification_issue",
-    "status": "open",
-    "summary": "Athlete verification document needs another check.",
+    "status": "reviewing",
+    "summary": "Profile document does not match roster name.",
     "targetCollection": "athletes",
     "targetId": "ath_015",
-    "createdAt": "2026-06-03T02:00:00.000Z"
+    "createdAt": "2026-06-03T02:00:00.000Z",
+    "reporterName": "Jinja league secretary",
+    "reportedEntity": "Athlete verification 15",
+    "affectedEntity": "Wakiso Hoops",
+    "severity": "Low",
+    "assignedReviewer": "Irene - Content Desk",
+    "lastUpdate": "Yesterday 6:20 PM",
+    "reasonFlagged": "Profile document does not match roster name.",
+    "actionHistory": [
+      "Report received",
+      "Evidence requested"
+    ],
+    "updatedAt": "2026-06-03T02:00:00.000Z"
   }
 ];

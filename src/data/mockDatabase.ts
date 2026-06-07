@@ -60,6 +60,9 @@ export const getAthleteById = (id: string) => athletes.find((a) => a.id === id);
 export const getTeamById = (id: string) => teams.find((t) => t.id === id);
 export const getLeagueById = (id: string) => leagues.find((l) => l.id === id);
 export const getMatchById = (id: string) => matches.find((m) => m.id === id);
+export const getReportById = (id: string) => reports.find((report) => report.id === id);
+export const getVerificationById = (id: string) =>
+  verifications.find((verification) => verification.id === id);
 
 export const getAthletesBySport = (sport: SportSlug) =>
   athletes.filter((a) => a.sport === sport);

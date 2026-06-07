@@ -117,6 +117,34 @@ function HomeContent() {
             <ImpactStatCard label="Active challenges" value={String(activeChallenges.length)} icon={ZapIcon} tone="orange" />
           </section>
 
+          <section>
+            <SectionHeader eyebrow="Today" title="Today on GoalPlace256" description="Live fixtures, verified challenge activity, and fresh updates from your sports network." />
+            <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+              <div className="grid gap-3 md:grid-cols-2">
+                {todayMatches.slice(0, 2).map((match) => (
+                  <MatchCard key={`today-${match.id}`} match={match} onView={() => router.push(`/matches/${match.id}`)} />
+                ))}
+              </div>
+              <div className="space-y-3">
+                {activeChallenges.slice(0, 2).map((challenge) => {
+                  const athlete = athletes.find((item) => item.id === challenge.athleteId) ?? featuredAthletes[0];
+                  return (
+                    <DataCard key={`today-${challenge.id}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <SportBadge sport={challenge.sport} />
+                          <h3 className="mt-3 font-display text-lg font-black text-white">{challenge.targetDescription ?? challenge.description}</h3>
+                          <p className="mt-1 text-sm text-slate-400">{athlete?.name ?? 'Verified athlete'} • {formatUGX(challenge.totalPledged)} pledged</p>
+                        </div>
+                        <Button size="sm" variant="gold" onClick={() => setPledgeAthlete(athlete)}>Pledge Support</Button>
+                      </div>
+                    </DataCard>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
           <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
             <div>
               <SectionHeader eyebrow="Your athletes" title="Followed and recommended athletes" description="Keep your daily hub close to the players and teams you care about." />

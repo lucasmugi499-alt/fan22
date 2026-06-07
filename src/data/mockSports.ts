@@ -15,8 +15,9 @@ export const sports: Sport[] = [
       "Yellow Cards"
     ],
     "challengeExamples": [
-      "Score 2 goals in the next match",
-      "Keep a clean sheet"
+      "Score 1 goal",
+      "Create 3 chances",
+      "Make 5 key recoveries"
     ]
   },
   {
@@ -33,8 +34,9 @@ export const sports: Sport[] = [
       "Steals"
     ],
     "challengeExamples": [
-      "Score 20 points",
-      "Get 10 rebounds"
+      "Reach 20 points",
+      "Hit 3 three-pointers",
+      "Complete the game with 80% free throws"
     ]
   },
   {
@@ -52,7 +54,8 @@ export const sports: Sport[] = [
     ],
     "challengeExamples": [
       "Score a try",
-      "Make 15 tackles"
+      "Make 8 tackles",
+      "Force a turnover"
     ]
   }
 ];

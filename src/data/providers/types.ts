@@ -7,11 +7,13 @@ import {
   League,
   Match,
   Notification,
+  Report,
   Sport,
   Sponsor,
   SupportPledge,
   Team,
   User,
+  Verification,
   VerificationStatus,
   WalletTransaction,
 } from '@/types';
@@ -78,6 +80,8 @@ export interface GoalPlaceDataProvider {
   getCommentsByPost(postId: string): Promise<Comment[]>;
   getWalletTransactionsByUser(userId: string): Promise<WalletTransaction[]>;
   getNotificationsByUser(userId: string): Promise<Notification[]>;
+  getReports(): Promise<Report[]>;
+  getVerifications(): Promise<Verification[]>;
   getStandingsByLeague(leagueId: string): Promise<StandingRow[]>;
   getTopSupportedAthletes(limit?: number): Promise<Athlete[]>;
   getActiveChallenges(): Promise<Challenge[]>;
