@@ -109,13 +109,13 @@ export default function AthleteDashboardPage() {
                     <SecurityCheckIcon className="mb-4 size-6 text-[var(--goal-mint)]" />
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-display text-xl font-black text-white">Career Readiness</h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-300">Profile completeness, verification progress, and public profile readiness.</p>
+                        <h3 className="font-display text-xl font-black text-white">Athlete Portfolio Score</h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-300">Your visibility score based on verification and profile completeness.</p>
                       </div>
                       <StatusBadge tone={athlete?.verified ? 'success' : 'warning'}>{athlete?.verified ? 'Verified' : 'Reviewing'}</StatusBadge>
                     </div>
                     <div className="mt-4">
-                      <div className="mb-2 flex justify-between text-xs font-bold text-slate-300"><span>Profile completeness</span><span>{profileCompleteness}%</span></div>
+                      <div className="mb-2 flex justify-between text-xs font-bold text-slate-300"><span>Portfolio completeness</span><span>{profileCompleteness}%</span></div>
                       <div className="h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${profileCompleteness}%` }} /></div>
                     </div>
                     <div className="mt-4 grid gap-2">

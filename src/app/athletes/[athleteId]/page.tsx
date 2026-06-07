@@ -115,7 +115,7 @@ function AthleteProfilePageContent() {
             <div className="grid gap-2 sm:grid-cols-3 lg:w-64 lg:grid-cols-1">
               <Button onClick={() => setSupportAthlete(athlete)}>Support Athlete</Button>
               <Button variant="outline" onClick={toggleFanClub}>{joinedFanClub ? 'Fan Club Joined' : 'Join Fan Club'}</Button>
-              <Button variant="secondary" onClick={() => setPledgeAthlete(athlete)}>Pledge Performance Reward</Button>
+              <Button variant="outline" onClick={() => toast.success('Athlete card URL copied to clipboard in demo mode.')}>Share Athlete Profile</Button>
             </div>
           </div>
         </PageContainer>
@@ -144,11 +144,19 @@ function AthleteProfilePageContent() {
                 <SectionHeader eyebrow="Portfolio" title="Athlete story" className="mb-4" />
                 <p className="text-sm leading-7 text-slate-300">{athlete.bio}</p>
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {['Transport support', 'Meals and recovery', 'Training access'].map((item) => (
-                    <div key={item} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="font-display text-base font-black text-white">{item}</p>
-                    </div>
-                  ))}
+                  {['Transport to Match', 'Boots & Gear', 'Meals & Nutrition'].map((item, i) => {
+                    const progress = [80, 45, 20][i];
+                    return (
+                      <div key={item} className="rounded-xl border border-[var(--goal-emerald)]/20 bg-black/40 p-4">
+                        <p className="font-display text-sm font-black text-white">{item}</p>
+                        <div className="mt-4">
+                          <div className="mb-2 flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400"><span>Funded</span><span>{progress}%</span></div>
+                          <div className="h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${progress}%` }} /></div>
+                        </div>
+                        <Button className="mt-4 w-full" variant="outline" size="sm" onClick={() => setSupportAthlete(athlete)}>Support</Button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <TrustNote compact />

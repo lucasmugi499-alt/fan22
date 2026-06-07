@@ -112,6 +112,7 @@ export const PUBLIC_ROUTES = [
   '/about',
   '/how-it-works',
   '/sponsors',
+  '/pilot',
   '/login',
   '/register'
 ];

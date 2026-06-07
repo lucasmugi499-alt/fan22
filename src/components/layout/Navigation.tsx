@@ -69,9 +69,9 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   if (authStatus !== 'logged_in') {
     return [
       { name: 'Home', href: '/', icon: Home01Icon },
-      { name: 'About', href: '/about', icon: InformationCircleIcon },
-      { name: 'How It Works', href: '/how-it-works', icon: HelpCircleIcon },
+      { name: 'How It Works', href: '/#how-it-works', icon: HelpCircleIcon },
       { name: 'Sponsors', href: '/sponsors', icon: UserGroupIcon },
+      { name: 'Pilot', href: '/pilot', icon: InformationCircleIcon },
     ];
   }
 
@@ -93,6 +93,8 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   } else if (configRole === 'athlete') {
     desktopItems.push({ name: 'Wallet', href: '/wallet', icon: Wallet01Icon });
     desktopItems.push({ name: 'Settings', href: '/settings', icon: Settings01Icon });
+  } else if (configRole === 'platform_admin') {
+    desktopItems.push({ name: 'Sponsor Dashboard', href: '/sponsor-dashboard', icon: UserGroupIcon });
   }
   
   // Deduplicate by name just in case

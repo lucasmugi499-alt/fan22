@@ -66,6 +66,8 @@ export function SupportModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [amount, setAmount] = useState(25000);
+  const supportNeeds = ['Transport to Match', 'Boots & Gear', 'Meals & Nutrition', 'Training Equipment', 'Recovery & Medical', 'Matchday Preparation'];
+  const [selectedNeed, setSelectedNeed] = useState(supportNeeds[0]);
   const { authStatus, currentUser, userProfile } = useAuth();
   const { athletes } = useGoalPlaceData();
   const deductWalletBalance = useAppStore((state) => state.deductWalletBalance);
@@ -135,6 +137,7 @@ export function SupportModal({
                 <SportBadge sport={selectedAthlete.sport} />
                 <h3 className="mt-2 font-display text-lg font-black text-white">{selectedAthlete.name}</h3>
                 <p className="text-xs text-slate-400">{selectedAthlete.position} - {selectedAthlete.city}</p>
+                <p className="mt-2 text-sm italic text-slate-300">&quot;{selectedAthlete.bio ?? 'Passionate athlete ready for the next challenge.'}&quot;</p>
               </div>
             </div>
           </div>
@@ -162,6 +165,14 @@ export function SupportModal({
               <DemoInput type="number" min={1000} value={amount} onChange={(event) => setAmount(Number(event.target.value))} />
             </div>
             <div>
+              <FieldLabel>Support Purpose</FieldLabel>
+              <DemoSelect value={selectedNeed} onChange={(e) => setSelectedNeed(e.target.value)}>
+                {supportNeeds.map((need) => (
+                  <option key={need} value={need}>{need}</option>
+                ))}
+              </DemoSelect>
+            </div>
+            <div>
               <FieldLabel>Payment Method</FieldLabel>
               <DemoSelect defaultValue="MTN Mobile Money">
                 <option>MTN Mobile Money</option>
@@ -172,9 +183,14 @@ export function SupportModal({
               </DemoSelect>
             </div>
             <div className="rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/8 p-4">
-              <p className="text-sm leading-6 text-slate-200">
-                Your {formatUGX(amount)} helps with transport, meals, training, and recovery support.
+              <p className="text-sm font-bold text-[var(--goal-gold)]">Demo only. Real payments are not enabled yet.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-200">
+                Your {formatUGX(amount)} helps with {selectedNeed.toLowerCase()}.
               </p>
+              <ul className="mt-3 space-y-1 text-xs text-slate-300">
+                <li>• No fan cash winnings.</li>
+                <li>• Support never affects league standings.</li>
+              </ul>
             </div>
             <TrustNote compact items={trustStatements.slice(0, 3)} />
             <Button className="w-full" size="lg" onClick={submit}>
@@ -281,6 +297,11 @@ export function PledgeModal({
               <p className="text-sm leading-6 text-slate-300">
                 The athlete receives the reward only after league admins or officials confirm the achievement.
               </p>
+              <ul className="mt-3 space-y-1 text-xs text-[var(--goal-gold)] font-bold">
+                <li>• Demo only. Real payments are not enabled yet.</li>
+                <li>• No fan cash winnings.</li>
+                <li>• Support never affects league standings.</li>
+              </ul>
             </div>
             <TrustNote compact items={trustStatements.slice(1, 5)} />
             <Button className="w-full" size="lg" onClick={submit}>

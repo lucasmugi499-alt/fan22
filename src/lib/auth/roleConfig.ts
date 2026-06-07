@@ -86,6 +86,6 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
       { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingApprovals', 'activeReports', 'systemHealth'],
-    allowedRoutes: ['/home', '/admin', '/league-admin', '/athlete-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
+    allowedRoutes: ['/home', '/admin', '/league-admin', '/athlete-dashboard', '/sponsor-dashboard', '/feed', '/sports', '/matches', '/athletes', '/teams', '/leagues', '/awards', '/wallet', '/notifications', '/profile', '/settings']
   }
 };
