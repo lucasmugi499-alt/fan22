@@ -34,10 +34,10 @@ export default function PilotProgramPage() {
   ];
 
   const revenueModel = [
-    { title: 'League SaaS', detail: 'Subscription fees for verified operational software (Future phase).', icon: Building03Icon },
-    { title: 'Sponsor Packages', detail: 'Direct brand sponsorships for leagues, teams, and athletes with a platform cut.', icon: ChartLineData01Icon },
-    { title: 'Transaction Fees', detail: 'Platform processing fee on fan support pledges (Future phase).', icon: Coins01Icon },
-    { title: 'Event Sponsorship', detail: 'Title sponsorship for Annual Awards and key tournaments.', icon: ZapIcon },
+    { title: 'League SaaS', detail: 'Subscription fees for the grassroots operating system (Future phase).', icon: Building03Icon },
+    { title: 'Sponsor Packages', detail: 'Direct brand sponsorships driven by transparent impact reporting with a platform cut.', icon: ChartLineData01Icon },
+    { title: 'Data & Scouting Access', detail: 'Verified performance data access for international scouts and academies (Future phase).', icon: ZapIcon },
+    { title: 'Event Sponsorship', detail: 'Title sponsorship for Annual Awards and key tournaments.', icon: Shield01Icon },
   ];
 
   return (
@@ -69,7 +69,7 @@ export default function PilotProgramPage() {
             transition={{ duration: 0.45, delay: 0.1 }}
             className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-300 md:text-xl md:leading-9"
           >
-            <strong>Goal:</strong> Prove one league can use GoalPlace256 to onboard teams, invite team admins, create athlete profiles, publish fixtures, verify results, and generate sponsor reports.
+            <strong>Goal:</strong> Validate GoalPlace256 as the operating system for grassroots sports leagues. Prove that a local league can successfully onboard teams, let Team Admins manage rosters, publish fixtures, verify results, and generate transparent sponsor reports.
           </motion.p>
         </div>
 

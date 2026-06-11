@@ -16,12 +16,14 @@
 | Create Challenge | `/league-admin` | `league_admin`, `platform_admin` | Open Create Challenge Modal | Opens modal with league athletes pre-selected | Verified |
 | Verify Result | `/league-admin`, `/admin` | `league_admin`, `platform_admin` | Open Verify Result Modal | Opens modal, updating local match persistence overrides on submit | Verified |
 | Invite Team Admin | `/league-admin` | `league_admin`, `platform_admin` | Open Invite Team Admin Modal | Opens modal | Verified |
+| Create Notice | `/league-admin` | `league_admin`, `platform_admin` | Open Create Notice Modal | Opens modal and updates local `notices` state | Verified |
 | Open Console | `/league-admin` | `league_admin`, `platform_admin` | Navigate to `/team-admin?team=teamId` | Navigates correctly to Team Admin console | Verified |
 | Review Submissions | `/league-admin` | `league_admin`, `platform_admin` | Open Review Drawer | Shows success toast | Verified |
-| Add Athlete | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Add Athlete Modal | Opens modal | Verified |
+| Add Athlete | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Add Athlete Modal | Opens modal with correct `currentTeamId` | Verified |
 | Submit Result | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Submit Result Modal | Opens modal | Verified |
-| Upload Team Update | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Upload Team Update Modal | Opens modal | Verified |
-| Request Verification | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger request action | Updates UI to show pending badge | Verified |
+| Upload Team Update | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Upload Team Update Modal | Opens modal and updates local `recentTeamUpdates` state | Verified |
+| Request Support | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Open Request Support Modal | Opens modal and updates local `supportNeeds` state | Verified |
+| Request Verification | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Trigger request action | Updates UI to show "Pending League Review" block | Verified |
 | View Public Team Page | `/team-admin` | `team_admin`, `league_admin`, `platform_admin` | Navigate to `/teams/[teamId]` | Navigates correctly to public profile | Verified |
 
 ## Summary

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon } from 'hugeicons-react';
+import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
@@ -66,6 +66,7 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   if (authStatus !== 'logged_in') {
     return [
       { name: 'Home', href: '/', icon: Home01Icon },
+      { name: 'Verification', href: '/verification', icon: Shield01Icon },
       { name: 'How It Works', href: '/#how-it-works', icon: HelpCircleIcon },
       { name: 'Sponsors', href: '/sponsors', icon: UserGroupIcon },
       { name: 'Pilot', href: '/pilot', icon: InformationCircleIcon },

@@ -26,7 +26,7 @@ export default function SponsorsPage() {
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--goal-gold)]">Sponsors</p>
           <h1 className="mt-3 font-display text-4xl font-black tracking-tight text-white md:text-6xl">Sponsor the future of Ugandan sport.</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-            Fund athletes, teams, leagues, women and youth programs, or annual recognition with a sports-tech platform built for transparent impact.
+            Sponsor grassroots leagues, teams, and athletes on the verified talent infrastructure layer for Africa, built for transparent, measurable impact.
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
             <Button variant="gold" onClick={() => setInterestOpen(true)}>Become a Sponsor</Button>

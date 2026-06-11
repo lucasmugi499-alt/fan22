@@ -13,10 +13,11 @@
 | `/wallet` | Protected | fan, athlete, team_admin, platform_admin | Yes (Fan, Athlete) | Renders Wallet | Secure |
 | `/athlete-dashboard` | Protected | athlete, platform_admin | Yes (Athlete) | Renders Athlete Dashboard | Secure |
 | `/league-admin` | Protected | league_admin, platform_admin | Yes (League Admin) | Renders League Admin Ops | Secure |
-| `/team-admin` | Protected | team_admin, league_admin, platform_admin | Yes (Team Admin) | Renders Team Admin Console | Secure |
+| `/team-admin` | Protected | team_admin, league_admin, platform_admin | Yes (Team Admin) | Renders Team Admin Console. Default route for Team Admin | Secure |
 | `/admin` | Protected | platform_admin | Yes (Platform Admin) | Renders Platform Admin Console | Secure |
-| `/sponsor-dashboard`| Protected | platform_admin | Yes (Platform Admin) | Renders Sponsor Reporting | Secure |
+| `/sponsor-dashboard`| Protected | platform_admin | Yes (Platform Admin) | Renders Sponsor Reporting. Strictly Platform Admin only | Secure |
 | `/sponsors` | Public | All | Yes (Logged Out) | Renders Public Sponsor Inquiry | Secure |
+| `/verification` | Public | All | Yes | Renders Trust & Verification Explainer | Secure |
 | `/register` | Public | All | No | Renders Registration/Role Switcher | Secure |
 
 ## Permission Integrity

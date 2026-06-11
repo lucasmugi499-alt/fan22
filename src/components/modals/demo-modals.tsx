@@ -116,10 +116,13 @@ export function AddTeamModal({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const submit = () => {
     if (!name) { toast.error('Team name is required'); return; }
+    const league = data.leagues.find(l => l.id === leagueId);
+    const inferredSport = league?.sport || 'Football';
+    
     addDemoTeam({
       id: `team_demo_${Date.now()}`,
       name,
-      sport: 'Football',
+      sport: inferredSport,
       country: 'Uganda',
       city,
       leagueId,
@@ -161,12 +164,14 @@ export function UploadTeamUpdateModal({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   currentTeamId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  currentLeagueId
+  currentLeagueId,
+  onSuccess
 }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
   currentTeamId?: string;
   currentLeagueId?: string;
+  onSuccess?: (title: string, message: string) => void;
 }) {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -174,6 +179,7 @@ export function UploadTeamUpdateModal({
   const submit = () => {
     if (!title || !message) { toast.error('Title and message are required'); return; }
     toast.success('Team update published to feed');
+    if (onSuccess) onSuccess(title, message);
     onOpenChange(false);
   };
 
@@ -186,6 +192,114 @@ export function UploadTeamUpdateModal({
             <div><FieldLabel>Update Title</FieldLabel><DemoInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Training Schedule Change" /></div>
             <div><FieldLabel>Message</FieldLabel><DemoInput value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Detail your team update here..." /></div>
             <Button className="w-full" onClick={submit}>Publish Update</Button>
+          </div>
+        </ModalBody>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function AddSupportNeedModal({ 
+  open, 
+  onOpenChange,
+  currentTeamId,
+  onSuccess
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  currentTeamId?: string;
+  onSuccess?: (athleteName: string, type: string, amount: string) => void;
+}) {
+  const data = useGoalPlaceData();
+  const [athleteId, setAthleteId] = useState('');
+  const [type, setType] = useState('Boots');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  const availableAthletes = currentTeamId ? data.athletes.filter(a => a.teamId === currentTeamId) : data.athletes;
+
+  const submit = () => {
+    if (!athleteId || !amount) { toast.error('Athlete and Target Amount are required'); return; }
+    const athlete = availableAthletes.find(a => a.id === athleteId);
+    toast.success('Support need added in demo mode.');
+    if (onSuccess && athlete) onSuccess(athlete.name, type, amount);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={drawerClass}>
+        <ModalBody>
+          <DialogHeader className="mb-5"><DialogTitle>Request Support</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <FieldLabel>Athlete</FieldLabel>
+              <DemoSelect value={athleteId} onChange={(e) => setAthleteId(e.target.value)}>
+                <option value="">Select athlete...</option>
+                {availableAthletes.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </DemoSelect>
+            </div>
+            <div>
+              <FieldLabel>Support Need Type</FieldLabel>
+              <DemoSelect value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="Boots">Boots</option>
+                <option value="Transport">Transport</option>
+                <option value="Meals">Meals</option>
+                <option value="Training Equipment">Training Equipment</option>
+                <option value="Recovery Support">Recovery Support</option>
+              </DemoSelect>
+            </div>
+            <div><FieldLabel>Target Amount (UGX)</FieldLabel><DemoInput type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 150000" /></div>
+            <div><FieldLabel>Note (Optional)</FieldLabel><DemoInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="Context for supporters..." /></div>
+            <Button className="w-full" onClick={submit}>Submit Request</Button>
+          </div>
+        </ModalBody>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CreateLeagueNoticeModal({ 
+  open, 
+  onOpenChange,
+  onSuccess
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: (type: string, message: string) => void;
+}) {
+  const [type, setType] = useState('Fixture Update');
+  const [message, setMessage] = useState('');
+
+  const submit = () => {
+    if (!message) { toast.error('Message is required'); return; }
+    toast.success('League notice published');
+    if (onSuccess) onSuccess(type, message);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={drawerClass}>
+        <ModalBody>
+          <DialogHeader className="mb-5"><DialogTitle>Publish League Notice</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <FieldLabel>Notice Type</FieldLabel>
+              <DemoSelect value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="Fixture Update">Fixture Update</option>
+                <option value="Postponement">Postponement</option>
+                <option value="Result Announcement">Result Announcement</option>
+                <option value="Disciplinary">Disciplinary Action</option>
+                <option value="Sponsor Announcement">Sponsor Announcement</option>
+                <option value="Verification Reminder">Verification Reminder</option>
+              </DemoSelect>
+            </div>
+            <div>
+              <FieldLabel>Message</FieldLabel>
+              <DemoInput value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Detail your notice here..." />
+            </div>
+            <Button className="w-full" onClick={submit}>Publish Notice</Button>
           </div>
         </ModalBody>
       </DialogContent>
@@ -271,12 +385,15 @@ export function AddAthleteModal({
   const submit = () => {
     if (!name) { toast.error('Athlete name is required'); return; }
     const selectedTeam = availableTeams.find(t => t.id === teamId);
+    const inferredLeagueId = selectedTeam?.leagueId || defaultLeagueId || 'l1';
+    const inferredSport = data.leagues.find(l => l.id === inferredLeagueId)?.sport || sport || 'Football';
+
     addDemoAthlete({
       id: `athlete_demo_${Date.now()}`,
       name,
-      sport,
+      sport: inferredSport,
       teamId,
-      leagueId: selectedTeam?.leagueId || defaultLeagueId || 'l1',
+      leagueId: inferredLeagueId,
       country: 'Uganda',
       city: 'Kampala',
       position,
@@ -343,9 +460,14 @@ export function CreateFixtureModal({ open, onOpenChange }: { open: boolean; onOp
 
   const submit = () => {
     if (!home || !away) { toast.error('Teams are required'); return; }
+    const homeTeam = data.teams.find(t => t.id === home);
+    const inferredLeagueId = homeTeam?.leagueId || defaultLeagueId || 'l1';
+    const inferredSport = data.leagues.find(l => l.id === inferredLeagueId)?.sport || 'Football';
+
     addDemoMatch({
       id: `match_demo_${Date.now()}`,
-      sport: 'Football',
+      sport: inferredSport,
+      leagueId: inferredLeagueId,
       homeTeamId: home,
       awayTeamId: away,
       teamAId: home,

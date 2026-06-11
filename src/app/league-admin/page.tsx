@@ -14,6 +14,7 @@ import {
   Task01Icon,
   UserAdd01Icon,
   UserGroupIcon,
+  Notification01Icon,
 } from 'hugeicons-react';
 import { Trophy, Users } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
@@ -34,6 +35,7 @@ import {
   ReviewDisputeDrawer,
   ReviewPayoutDrawer,
   InviteTeamAdminModal,
+  CreateLeagueNoticeModal,
 } from '@/components/modals/demo-modals';
 import {
   ActionToolbar,
@@ -111,6 +113,7 @@ function LeagueAdminDashboard() {
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [matchOverrides, setMatchOverrides] = useState<Record<string, VerificationStatus>>({});
   const [challengeOverrides, setChallengeOverrides] = useState<Record<string, VerificationStatus>>({});
+  const [notices, setNotices] = useState<{ id: string; type: string; message: string; date: Date }[]>([]);
 
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
 
@@ -151,6 +154,7 @@ function LeagueAdminDashboard() {
     verifyChallenge: () => toast.success('Verify Challenge modal opened in demo mode.'),
     createPost: () => toast.success('Create Post form opened in demo mode.'),
     inviteTeamAdmin: () => setModalOpen('inviteTeamAdmin'),
+    createNotice: () => setModalOpen('createNotice'),
   };
 
   const updateMatch = async (match: Match, status: VerificationStatus) => {
@@ -246,6 +250,7 @@ function LeagueAdminDashboard() {
         <Button size="sm" variant="outline" onClick={quickActions.verifyResult}><CheckmarkCircle01Icon className="size-4" /> Verify Result</Button>
         <Button size="sm" variant="outline" onClick={quickActions.createChallenge}><Trophy className="size-4" /> Create Challenge</Button>
         <Button size="sm" variant="outline" onClick={quickActions.createPost}><Comment01Icon className="size-4" /> Post to Feed</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.createNotice}><Notification01Icon className="size-4" /> Create Notice</Button>
       </ActionToolbar>
 
       {activeTab === 'Overview' && (
@@ -276,6 +281,32 @@ function LeagueAdminDashboard() {
               <GoalPlaceIndexPanel league={selectedLeague} />
               <LeagueIntegrityNote />
             </div>
+          </DashboardSection>
+
+          <DashboardSection 
+            eyebrow="Communications" 
+            title="League Notices" 
+            action={<Button size="sm" variant="outline" onClick={quickActions.createNotice}><Notification01Icon className="size-4 mr-2" /> Publish Notice</Button>}
+          >
+            {notices.length === 0 ? (
+              <DataCard className="text-center text-slate-400">
+                No active league notices.
+              </DataCard>
+            ) : (
+              <div className="space-y-3">
+                {notices.map((notice) => (
+                  <DataCard key={notice.id}>
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[var(--goal-mint)]">{notice.type}</span>
+                        <p className="mt-1 text-sm font-medium text-slate-200">{notice.message}</p>
+                      </div>
+                      <span className="text-xs text-slate-500 whitespace-nowrap">{formatDate(notice.date.toISOString())}</span>
+                    </div>
+                  </DataCard>
+                ))}
+              </div>
+            )}
           </DashboardSection>
         </div>
       )}
@@ -563,8 +594,21 @@ function LeagueAdminDashboard() {
       <CreateFixtureModal open={modalOpen === 'createFixture'} onOpenChange={(open) => !open && setModalOpen(null)} />
       <SubmitResultModal open={modalOpen === 'submitResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
       <VerifyResultModal open={modalOpen === 'verifyResult'} onOpenChange={(open) => !open && setModalOpen(null)} />
-      <CreateChallengeModal open={modalOpen === 'createChallenge'} onOpenChange={(open) => !open && setModalOpen(null)} />
-      <InviteTeamAdminModal open={modalOpen === 'inviteTeamAdmin'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <CreateChallengeModal
+        open={modalOpen === 'createChallenge'}
+        onOpenChange={(isOpen) => setModalOpen(isOpen ? 'createChallenge' : null)}
+      />
+      <InviteTeamAdminModal
+        open={modalOpen === 'inviteTeamAdmin'}
+        onOpenChange={(isOpen) => setModalOpen(isOpen ? 'inviteTeamAdmin' : null)}
+      />
+      <CreateLeagueNoticeModal
+        open={modalOpen === 'createNotice'}
+        onOpenChange={(isOpen) => setModalOpen(isOpen ? 'createNotice' : null)}
+        onSuccess={(type, message) => {
+          setNotices(prev => [{ id: Math.random().toString(), type, message, date: new Date() }, ...prev]);
+        }}
+      />
     </PageContainer>
   );
 }

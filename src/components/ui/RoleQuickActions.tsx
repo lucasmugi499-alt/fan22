@@ -47,10 +47,14 @@ export function RoleQuickActions() {
       case 'Approve League': toast.info('Approve league workflow opened'); break;
       case 'Moderate Feed': router.push('/feed'); break;
       case 'Review Payouts': toast.info('Payout review opened'); break;
+      case 'Review Sponsor Dashboard': router.push('/sponsor-dashboard'); break;
 
       // Team Admin Actions
-      case 'Update Roster': router.push('/team-admin'); break;
-      case 'Upload Team Update': toast.info('Upload team update modal opened'); break;
+      // Team Admin Actions
+      case 'Add Athlete': router.push('/team-admin?tab=Roster'); break;
+      case 'Update Roster': router.push('/team-admin?tab=Roster'); break;
+      case 'Submit Result': router.push('/team-admin?tab=Fixtures'); break;
+      case 'Upload Team Update': router.push('/team-admin?tab=AthleteUpdates'); break;
       
       default: toast.info(`Action ${action} triggered`);
     }

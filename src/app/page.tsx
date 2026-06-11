@@ -91,8 +91,8 @@ export default function PublicLandingPage() {
               transition={{ duration: 0.45 }}
               className="mb-5 inline-flex items-center gap-2 rounded-lg border border-white/12 bg-black/35 px-3 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-[var(--goal-mint)] backdrop-blur-xl"
             >
-              <ZapIcon className="size-4" />
-              The operating system for grassroots sports leagues in Uganda.
+              <Shield01Icon className="size-4" />
+              The verified talent infrastructure layer for grassroots sports in Africa.
             </motion.div>
 
             <motion.h1
@@ -110,7 +110,16 @@ export default function PublicLandingPage() {
               transition={{ duration: 0.45, delay: 0.1 }}
               className="mt-6 max-w-2xl text-base leading-7 text-slate-200 md:text-xl md:leading-9"
             >
-              GoalPlace256 helps grassroots sports leagues in Uganda run verified competitions, showcase athletes, attract sponsors, and provide transparent reporting on community impact.
+              GoalPlace256 helps grassroots sports leagues in Uganda run verified competitions, manage team and athlete records, showcase talent, attract sponsors, and provide transparent reporting on community impact.
+            </motion.p>
+
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.12 }}
+              className="mt-3 max-w-2xl text-sm leading-6 text-slate-400"
+            >
+              Over time, verified athlete history can support scholarships, academy pathways, and scouting opportunities.
             </motion.p>
 
             <motion.div
@@ -216,7 +225,7 @@ export default function PublicLandingPage() {
             <Shield01Icon className="mb-6 size-10 text-[var(--goal-mint)]" />
             <h3 className="font-display text-2xl font-black text-white">The GoalPlace256 Solution</h3>
             <p className="mt-3 text-base leading-7 text-slate-300">
-              We create a <strong>verified operating layer</strong>. Everything from match results and athlete stats to support payouts and sponsor reports is tracked, verified, and transparent.
+              We create a <strong>verified operating layer</strong>. Everything from match results and athlete stats to sponsor reports is tracked, verified, and transparent.
             </p>
             <div className="mt-8 rounded-xl border border-white/10 bg-black/40 p-5">
               <h4 className="font-bold text-[var(--goal-mint)]">Trust Statement</h4>

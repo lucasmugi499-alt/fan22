@@ -1,5 +1,5 @@
 import { AppRole } from '@/types';
-import { Home01Icon, ListViewIcon, Calendar01Icon, DashboardSquare01Icon, Building01Icon, SecurityCheckIcon, UserIcon, Wallet01Icon } from 'hugeicons-react';
+import { Home01Icon, ListViewIcon, Calendar01Icon, DashboardSquare01Icon, Building01Icon, Building03Icon, SecurityCheckIcon, UserIcon, Wallet01Icon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
 import React from 'react';
 
@@ -96,11 +96,12 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     defaultRoute: '/admin',
     dashboardTitle: 'Platform Control Center',
     dashboardSubtitle: 'Oversee verifications, users, and platform health.',
-    primaryActions: ['Review Reports', 'Approve League', 'Moderate Feed', 'Review Payouts'],
+    primaryActions: ['Review Reports', 'Approve League', 'Moderate Feed', 'Review Payouts', 'Review Sponsor Dashboard'],
     navItems: [
       { name: 'Home', href: '/home', icon: Home01Icon },
       { name: 'Admin', href: '/admin', icon: SecurityCheckIcon },
       { name: 'Reports', href: '/admin', icon: ListViewIcon },
+      { name: 'Sponsors', href: '/sponsor-dashboard', icon: Building03Icon },
       { name: 'Profile', href: '/profile', icon: UserIcon },
     ],
     quickStats: ['pendingApprovals', 'activeReports', 'systemHealth'],
