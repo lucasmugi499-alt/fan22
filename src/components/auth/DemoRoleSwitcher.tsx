@@ -8,10 +8,11 @@ import { cn } from '@/lib/utils';
 
 const ROLES: { id: AppRole | null; label: string }[] = [
   { id: null, label: 'Public' },
+  { id: 'fan', label: 'Fan' },
   { id: 'athlete', label: 'Athlete' },
+  { id: 'team_admin', label: 'Team Admin' },
   { id: 'league_admin', label: 'League Admin' },
   { id: 'platform_admin', label: 'Platform Admin' },
-  { id: 'sponsor', label: 'Sponsor' },
 ];
 
 export function DemoRoleSwitcher() {

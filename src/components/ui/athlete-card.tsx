@@ -5,11 +5,11 @@ import { Athlete } from '@/types';
 import { GlassCard } from './glass-card';
 import { VerificationBadge } from './verification-badge';
 import { Button } from './button';
-import { ArrowUpRight01Icon, Location01Icon } from 'hugeicons-react';
+import { Location01Icon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
 import { ImageWithFallback } from './image-with-fallback';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
-import { SportBadge } from './product';
+import { SportBadge, StatusExplainerChip } from './product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 interface AthleteCardProps {
@@ -39,10 +39,13 @@ function getKeyStats(athlete: Athlete) {
 }
 
 export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
-  const { teams } = useGoalPlaceData();
+  const { teams, leagues } = useGoalPlaceData();
   const team = teams.find((item) => item.id === athlete.teamId);
+  const league = leagues.find((item) => item.id === athlete.leagueId);
   const theme = getSportTheme(athlete.sport);
   const keyStats = getKeyStats(athlete);
+  const profileCompletion = athlete.verified ? 100 : athlete.verificationStatus === 'Pending' || athlete.verificationStatus === 'pending' ? 82 : 64;
+  const supportNeed = athlete.impactNeeds?.[0] ?? 'Training and match-day support';
 
   return (
     <GlassCard
@@ -75,7 +78,11 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
               className="h-full w-full object-cover"
             />
           </div>
-          {athlete.verified && <VerificationBadge className="mb-1 shrink-0 bg-white/8" />}
+          <VerificationBadge
+            className="mb-1 shrink-0"
+            status={athlete.verified ? 'verified' : athlete.verificationStatus}
+            domain="athlete"
+          />
         </div>
 
         <div className="min-w-0">
@@ -86,7 +93,17 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
             <Location01Icon className="size-3 text-slate-500" />
             {athlete.position} - {athlete.city}
           </p>
-          <p className="mt-1 truncate text-xs text-slate-400">{team?.name}</p>
+          <p className="mt-1 truncate text-xs text-slate-400">{team?.name ?? 'Unassigned Team'} · {league?.name ?? 'League pending'}</p>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-white/8 bg-white/5 p-3">
+          <div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+            <span>Profile completion</span>
+            <span className="text-slate-300">{profileCompletion}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${profileCompletion}%` }} />
+          </div>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -99,7 +116,10 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
         </div>
 
         <div className="mt-3 rounded-lg border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 px-3 py-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Total Verified Support</p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--goal-mint)]">Total Verified Support</p>
+            <StatusExplainerChip domain="support" status="released" />
+          </div>
           <div className="mt-1 flex items-center justify-between gap-3">
             <p className="font-display text-base font-black text-white">{formatUGX(athlete.totalEarnings ?? athlete.totalSupport ?? 0)}</p>
             <span className="flex items-center gap-1 text-xs font-bold text-slate-300">
@@ -107,9 +127,10 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
               {athlete.supportersCount}
             </span>
           </div>
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">Current need: {supportNeed}</p>
         </div>
 
-        <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <Button
             size="sm"
             onClick={(event) => {
@@ -117,18 +138,17 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
               onSupport?.();
             }}
           >
-            Support
+            Support Athlete
           </Button>
           <Button
             variant="outline"
-            size="icon-sm"
-            aria-label={`View ${athlete.name}`}
+            size="sm"
             onClick={(event) => {
               event.stopPropagation();
               onView?.();
             }}
           >
-            <ArrowUpRight01Icon className="size-4" />
+            View Profile
           </Button>
         </div>
       </div>

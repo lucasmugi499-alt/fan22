@@ -1,16 +1,13 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Building03Icon, CheckmarkCircle01Icon, ChartLineData01Icon, Shield01Icon, ZapIcon, Coins01Icon } from 'hugeicons-react';
+import { Building03Icon, CheckmarkCircle01Icon, ChartLineData01Icon, Shield01Icon, ZapIcon } from 'hugeicons-react';
 import { Button } from '@/components/ui/button';
 import { PageContainer, SectionHeader } from '@/components/ui/product';
 import { toast } from 'sonner';
 
 export default function PilotProgramPage() {
-  const router = useRouter();
-
   const pilotStructure = [
     'Onboard League Admin',
     'Add Teams',

@@ -42,7 +42,7 @@ function HomeContent() {
   const todayMatches = useMemo(() => matches.filter((m) => m.status === 'Live' || m.status === 'Upcoming').slice(0, 4), [matches]);
   const personalizedFeed = feedPosts.slice(0, 4);
 
-  const configRole = role === 'super_admin' ? 'platform_admin' : (role || 'fan');
+  const configRole = role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
 
   const handleLogout = async () => {
@@ -167,7 +167,7 @@ function HomeContent() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => setSupportAthlete(athlete)}>Support</Button>
+                      <Button size="sm" onClick={() => setSupportAthlete(athlete)}>Support Athlete</Button>
                       <Button size="sm" variant="outline" onClick={() => router.push(`/athletes/${athlete.id}`)}>View Profile</Button>
                     </div>
                   </DataCard>
@@ -203,7 +203,7 @@ function HomeContent() {
           </section>
 
           <section>
-            <SectionHeader eyebrow="Matches" title="Live and upcoming matches" description="Track the next moments from your sports network." action={<Button variant="outline" onClick={() => router.push('/matches')}>View All</Button>} />
+            <SectionHeader eyebrow="Matches" title="Live and upcoming matches" description="Track the next moments from your sports network." action={<Button variant="outline" onClick={() => router.push('/matches')}>View All Matches</Button>} />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {todayMatches.map((match) => (
                 <MatchCard key={match.id} match={match} onView={() => router.push(`/matches/${match.id}`)} />
@@ -370,52 +370,6 @@ function HomeContent() {
                     <Button variant="outline" size="sm" onClick={() => router.push('/admin?tab=Support%2FPayout%20Review')}>Review Payout Request</Button>
                   </DataCard>
                 ))}
-              </div>
-            </div>
-          </section>
-        </>
-      )}
-
-      {configRole === 'sponsor' && (
-        <>
-          <section className="grid gap-3 md:grid-cols-4">
-            <ImpactStatCard label="Total committed" value="5M UGX" icon={Wallet01Icon} tone="gold" />
-            <ImpactStatCard label="Athletes impacted" value="45" icon={UserIcon} />
-            <ImpactStatCard label="Funded needs" value="18" icon={SecurityCheckIcon} tone="blue" />
-            <ImpactStatCard label="Reports" value="Enabled" icon={Notification01Icon} tone="orange" />
-          </section>
-
-          <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-            <div>
-              <SectionHeader eyebrow="Impact" title="Sponsor reporting snapshot" description="Review funded needs, beneficiary evidence, and monthly report readiness." />
-              <div className="space-y-4">
-                {[
-                  { title: 'Matchday transport funded', detail: '8 athletes supported with verified team admin evidence.', action: 'View Evidence' },
-                  { title: 'Training equipment allocated', detail: '12 athletes reached across a verified partner league.', action: 'Open Timeline' },
-                  { title: 'Monthly impact report ready', detail: 'Download a demo report with allocation and visibility metrics.', action: 'Download Report' },
-                ].map((item) => (
-                  <DataCard key={item.title} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-bold text-white">{item.title}</p>
-                      <p className="mt-1 text-sm leading-5 text-slate-400">{item.detail}</p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => router.push('/sponsor-dashboard')}>{item.action}</Button>
-                  </DataCard>
-                ))}
-              </div>
-            </div>
-            <div>
-              <SectionHeader eyebrow="Next" title="Sponsor actions" description="Move from overview to report, package, or brand visibility details." />
-              <div className="grid gap-3">
-                <Button onClick={() => router.push('/sponsor-dashboard?tab=Monthly%20Report')}>
-                  Download Impact Report
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/sponsor-dashboard?tab=Supported%20Entities')}>
-                  View Supported Entities
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/sponsor-dashboard?tab=Brand%20Visibility')}>
-                  View Brand Visibility
-                </Button>
               </div>
             </div>
           </section>

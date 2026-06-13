@@ -4,16 +4,13 @@ import React, { useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Activity01Icon,
   Building03Icon,
   Calendar01Icon,
   CheckmarkCircle01Icon,
   Comment01Icon,
   SecurityCheckIcon,
-  Settings01Icon,
   Task01Icon,
   UserAdd01Icon,
-  UserGroupIcon,
   Notification01Icon,
 } from 'hugeicons-react';
 import { Trophy, Users } from '@phosphor-icons/react';
@@ -32,8 +29,6 @@ import {
   SubmitResultModal,
   VerifyResultModal,
   CreateChallengeModal,
-  ReviewDisputeDrawer,
-  ReviewPayoutDrawer,
   InviteTeamAdminModal,
   CreateLeagueNoticeModal,
 } from '@/components/modals/demo-modals';
@@ -45,34 +40,22 @@ import {
   DataCard,
   DataTableCard,
   ImpactStatCard,
-  MobileDataCard,
   PageContainer,
-  SectionHeader,
   SportBadge,
   StatusBadge,
+  StatusExplainerChip,
   TabStrip,
 } from '@/components/ui/product';
 import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
-import { formatUGX } from '@/lib/sportThemes';
-import { Athlete, Challenge, Match, Report, Team, VerificationStatus } from '@/types';
+import { Match, Team, VerificationStatus } from '@/types';
 
 function normalizeVerificationStatus(status: VerificationStatus): VerificationStatus {
   if (status === 'Verified') return 'verified';
   if (status === 'Rejected') return 'rejected';
   if (status === 'Disputed') return 'disputed';
   return status;
-}
-
-function statusTone(status?: string): 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'gold' {
-  const value = status?.toLowerCase() ?? '';
-  if (value.includes('verified') || value.includes('active') || value.includes('completed')) return 'success';
-  if (value.includes('pending') || value.includes('review')) return 'warning';
-  if (value.includes('disputed') || value.includes('suspended') || value.includes('high')) return 'danger';
-  if (value.includes('partner')) return 'gold';
-  if (value.includes('scheduled') || value.includes('upcoming')) return 'info';
-  return 'neutral';
 }
 
 function formatDate(value?: string) {
@@ -82,15 +65,6 @@ function formatDate(value?: string) {
 
 function teamName(teams: Team[], id?: string) {
   return teams.find((team) => team.id === id)?.name ?? 'Team pending';
-}
-
-function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-bold text-slate-200">{value}</p>
-    </div>
-  );
 }
 
 export default function LeagueAdminPage() {
@@ -106,7 +80,7 @@ export default function LeagueAdminPage() {
 function LeagueAdminDashboard() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { leagues, teams, athletes, matches, challenges, feedPosts, reports } = useGoalPlaceData();
+  const { leagues, teams, athletes, matches, challenges } = useGoalPlaceData();
   const initialLeague = searchParams?.get('league') || leagues[0]?.id || '';
   const [selectedLeagueId, setSelectedLeagueId] = useState(initialLeague);
   const [modalOpen, setModalOpen] = useState<string | null>(null);
@@ -197,9 +171,9 @@ function LeagueAdminDashboard() {
   const recentResults = leagueMatches.filter((match) => match.score.home !== null && match.score.away !== null).slice(0, 4);
 
   const urgentTasks = [
-    { title: `${pendingMatches.length} match results awaiting decision`, detail: 'Review scores, venue notes, and submitted evidence.', action: () => setActiveTab('Verification') },
-    { title: `${pendingChallenges.length} challenge outcomes pending`, detail: 'Confirm athlete achievements before support releases.', action: () => setActiveTab('Verification') },
-    { title: 'Sponsor report due', detail: 'Generate impact report for current period.', action: () => setActiveTab('Sponsor Report') },
+    { title: `${pendingMatches.length} match results awaiting decision`, detail: 'Review scores, venue notes, and submitted evidence.', actionLabel: 'Review Match Results', action: () => setActiveTab('Verification') },
+    { title: `${pendingChallenges.length} challenge outcomes pending`, detail: 'Confirm athlete achievements before support releases.', actionLabel: 'Review Challenge Outcomes', action: () => setActiveTab('Verification') },
+    { title: 'Sponsor report due', detail: 'Generate impact report for current period.', actionLabel: 'Prepare Sponsor Report', action: () => setActiveTab('Sponsor Report') },
   ];
 
   return (
@@ -254,10 +228,10 @@ function LeagueAdminDashboard() {
         <Button size="sm" onClick={quickActions.createFixture}><Calendar01Icon className="size-4" /> Create Fixture</Button>
         <Button size="sm" variant="outline" onClick={quickActions.addTeam}><Building03Icon className="size-4" /> Add Team</Button>
         <Button size="sm" variant="outline" onClick={quickActions.addAthlete}><UserAdd01Icon className="size-4" /> Add Athlete</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.submitResult}><Task01Icon className="size-4" /> Submit Result</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.verifyResult}><CheckmarkCircle01Icon className="size-4" /> Verify Result</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.submitResult}><Task01Icon className="size-4" /> Submit Match Result</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.verifyResult}><CheckmarkCircle01Icon className="size-4" /> Verify Match Result</Button>
         <Button size="sm" variant="outline" onClick={quickActions.createChallenge}><Trophy className="size-4" /> Create Challenge</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.createPost}><Comment01Icon className="size-4" /> Post to Feed</Button>
+        <Button size="sm" variant="outline" onClick={quickActions.createPost}><Comment01Icon className="size-4" /> Publish League Post</Button>
         <Button size="sm" variant="outline" onClick={quickActions.createNotice}><Notification01Icon className="size-4" /> Create Notice</Button>
       </ActionToolbar>
 
@@ -278,7 +252,7 @@ function LeagueAdminDashboard() {
                     <h3 className="font-bold text-white">{task.title}</h3>
                     <p className="mt-1 text-sm text-slate-400">{task.detail}</p>
                   </div>
-                  <Button className="mt-4 w-full" variant="outline" size="sm" onClick={task.action}>Review</Button>
+                  <Button className="mt-4 w-full" variant="outline" size="sm" onClick={task.action}>{task.actionLabel}</Button>
                 </DataCard>
               ))}
             </div>
@@ -352,13 +326,15 @@ function LeagueAdminDashboard() {
                         <td className="whitespace-nowrap p-4 text-slate-300">
                           {team.pendingSubmissions ? <span className="text-orange-400 font-bold">{team.pendingSubmissions} items</span> : '0 items'}
                         </td>
-                        <td className="whitespace-nowrap p-4"><StatusBadge tone="success">Operational</StatusBadge></td>
+                        <td className="whitespace-nowrap p-4">
+                          <StatusExplainerChip domain="team" status={team.verified ? 'Verified' : team.verificationStatus ?? 'Pending Verification'} />
+                        </td>
                         <td className="whitespace-nowrap p-4 text-right space-x-2">
                           <Button variant="ghost" size="sm" onClick={() => router.push(`/team-admin?team=${team.id}`)}>Open Console</Button>
                           {!team.teamAdminEmail && (
                             <Button variant="ghost" size="sm" onClick={quickActions.inviteTeamAdmin}>Invite Admin</Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => toast.success('Review Team Submission drawer opened (Demo)')}>Review Submissions</Button>
+                          <Button variant="outline" size="sm" onClick={() => toast.success('Team submission review opened in demo mode.')}>Review Team Submissions</Button>
                         </td>
                       </tr>
                     ))}
@@ -386,9 +362,11 @@ function LeagueAdminDashboard() {
                       <td className="whitespace-nowrap p-4 font-bold text-white">{athlete.name}</td>
                       <td className="whitespace-nowrap p-4 text-slate-300">{teamName(teams, athlete.teamId)}</td>
                       <td className="whitespace-nowrap p-4 text-slate-300 capitalize">{athlete.position}</td>
-                      <td className="whitespace-nowrap p-4"><StatusBadge tone="info">Verified</StatusBadge></td>
                       <td className="whitespace-nowrap p-4">
-                        <Button variant="outline" size="sm" onClick={() => toast.success('Profile opened.')}>View</Button>
+                        <StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />
+                      </td>
+                      <td className="whitespace-nowrap p-4">
+                        <Button variant="outline" size="sm" onClick={() => toast.success(`${athlete.name} profile opened in demo mode.`)}>View Athlete Profile</Button>
                       </td>
                     </tr>
                   ))}
@@ -427,7 +405,7 @@ function LeagueAdminDashboard() {
                       <td className="whitespace-nowrap p-4 font-bold text-white">{teamName(teams, match.homeTeamId)}</td>
                       <td className="whitespace-nowrap p-4 font-bold text-white">{teamName(teams, match.awayTeamId)}</td>
                       <td className="whitespace-nowrap p-4 text-slate-300">{match.venue}</td>
-                      <td className="whitespace-nowrap p-4"><StatusBadge tone="info">Scheduled</StatusBadge></td>
+                      <td className="whitespace-nowrap p-4"><StatusExplainerChip domain="match" status="Scheduled" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -452,7 +430,7 @@ function LeagueAdminDashboard() {
                       <td className="whitespace-nowrap p-4 text-slate-300">{formatDate(match.date)}</td>
                       <td className="whitespace-nowrap p-4 text-slate-300">{teamName(teams, match.homeTeamId)} vs {teamName(teams, match.awayTeamId)}</td>
                       <td className="whitespace-nowrap p-4 font-bold text-white">{match.score.home} - {match.score.away}</td>
-                      <td className="whitespace-nowrap p-4"><StatusBadge tone={statusTone(matchOverrides[match.id] ?? match.verificationStatus)}>{matchOverrides[match.id] ?? match.verificationStatus}</StatusBadge></td>
+                      <td className="whitespace-nowrap p-4"><StatusExplainerChip domain="match" status={matchOverrides[match.id] ?? match.verificationStatus} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,10 +460,10 @@ function LeagueAdminDashboard() {
                       <td className="whitespace-nowrap p-4 text-slate-300">{teamName(teams, match.homeTeamId)} vs {teamName(teams, match.awayTeamId)}</td>
                       <td className="whitespace-nowrap p-4 font-bold text-white">{match.score.home} - {match.score.away}</td>
                       <td className="whitespace-nowrap p-4 text-blue-300 underline cursor-pointer" onClick={() => toast.success('Viewing evidence in demo mode.')}>View attachment</td>
-                      <td className="whitespace-nowrap p-4"><StatusBadge tone="warning">Pending</StatusBadge></td>
+                      <td className="whitespace-nowrap p-4"><StatusExplainerChip domain="match" status="Pending Verification" /></td>
                       <td className="whitespace-nowrap p-4 flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => updateMatch(match, 'verified')}>Approve</Button>
-                        <Button variant="destructive" size="sm" onClick={() => updateMatch(match, 'disputed')}>Dispute</Button>
+                        <Button variant="outline" size="sm" onClick={() => updateMatch(match, 'verified')}>Approve Match Result</Button>
+                        <Button variant="destructive" size="sm" onClick={() => updateMatch(match, 'disputed')}>Mark Result Disputed</Button>
                       </td>
                     </tr>
                   ))}
@@ -518,10 +496,10 @@ function LeagueAdminDashboard() {
                         <td className="whitespace-nowrap p-4 text-slate-300">{athlete?.name}</td>
                         <td className="whitespace-nowrap p-4 text-slate-300">{teamName(teams, match?.homeTeamId)} vs {teamName(teams, match?.awayTeamId)}</td>
                         <td className="whitespace-nowrap p-4 font-bold text-white">{challenge.type.replaceAll('_', ' ')}</td>
-                        <td className="whitespace-nowrap p-4"><StatusBadge tone="warning">Pending</StatusBadge></td>
+                        <td className="whitespace-nowrap p-4"><StatusExplainerChip domain="challenge" status="Pending Verification" /></td>
                         <td className="whitespace-nowrap p-4 flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'verified'})); toast.success('Challenge verified.'); }}>Approve</Button>
-                          <Button variant="destructive" size="sm" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'rejected'})); toast.success('Challenge rejected.'); }}>Reject</Button>
+                          <Button variant="outline" size="sm" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'verified'})); toast.success('Challenge verified. Support release review can continue.'); }}>Approve Challenge Result</Button>
+                          <Button variant="destructive" size="sm" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'rejected'})); toast.success('Challenge rejected. Support remains held for review.'); }}>Reject Challenge Result</Button>
                         </td>
                       </tr>
                     );

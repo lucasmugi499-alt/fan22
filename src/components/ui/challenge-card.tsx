@@ -4,11 +4,11 @@ import React from 'react';
 import { Challenge } from '@/types';
 import { GlassCard } from './glass-card';
 import { Button } from './button';
-import { CheckmarkCircle01Icon, Coins01Icon, SecurityCheckIcon } from 'hugeicons-react';
+import { CheckmarkCircle01Icon, Coins01Icon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
-import { SportBadge } from './product';
+import { SportBadge, StatusExplainerChip } from './product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 
 interface ChallengeCardProps {
@@ -40,12 +40,8 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <SportBadge sport={athlete.sport} />
-            {challenge.verificationStatus === 'Verified' && (
-              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--goal-mint)]">
-                <SecurityCheckIcon className="size-3" />
-                Verified
-              </span>
-            )}
+            <StatusExplainerChip domain="challenge" status={challenge.status} />
+            <StatusExplainerChip domain="challenge" status={challenge.verificationStatus} />
           </div>
           <h4 className="text-sm font-black leading-snug text-white">{challenge.targetDescription}</h4>
           <p className="mt-1 text-xs text-slate-400">{athlete.name}</p>
@@ -79,6 +75,9 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
           {achieved ? 'Challenge Achieved' : 'Challenge Closed'}
         </Button>
       )}
+      <p className="mt-3 text-xs leading-5 text-slate-400">
+        Performance support is held until verification, then released or refunded.
+      </p>
     </GlassCard>
   );
 }

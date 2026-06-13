@@ -32,7 +32,7 @@ function AthletesPageContent() {
       if (activeFilter === 'Rising') return athlete.supportersCount < 100 || !athlete.verified;
       return true;
     });
-  }, [activeFilter, athletes]);
+  }, [activeFilter, athletes, leagueId]);
 
   return (
     <PageContainer compact>

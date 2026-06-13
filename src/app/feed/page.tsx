@@ -14,7 +14,7 @@ import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterB
 import { useAuthModal } from '@/components/auth/AuthRequiredModal';
 import { useAuth } from '@/context/AuthProvider';
 
-const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Following', 'Highlights', 'Verified', 'Awards'];
+const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Following', 'Official Updates', 'Match Results', 'Fan Posts', 'Highlights', 'Verified', 'Awards'];
 
 function FeedPageContent() {
   const searchParams = useSearchParams();
@@ -45,11 +45,15 @@ function FeedPageContent() {
     return feedPosts.filter((post) => {
       if (leagueId && post.relatedLeagueId !== leagueId) return false;
       if (activeFilter === 'All') return true;
-      if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return post.sport === activeFilter.toLowerCase();
+      const postType = String(post.type).toLowerCase();
+      if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return String(post.sport).toLowerCase() === activeFilter.toLowerCase();
       if (activeFilter === 'Following') return ['fan', 'athlete'].includes(post.authorRole);
-      if (activeFilter === 'Highlights') return post.type === 'athlete_highlight';
-      if (activeFilter === 'Verified') return post.type === 'verified_achievement';
-      if (activeFilter === 'Awards') return post.type === 'annual_awards';
+      if (activeFilter === 'Official Updates') return ['league_admin', 'team_admin', 'platform_admin', 'super_admin'].includes(post.authorRole) || ['league_update', 'league_announcement', 'team_update'].includes(postType);
+      if (activeFilter === 'Match Results') return postType === 'match_result' || postType === 'matchresult';
+      if (activeFilter === 'Fan Posts') return post.authorRole === 'fan' || postType === 'fan_comment';
+      if (activeFilter === 'Highlights') return postType === 'athlete_highlight' || postType === 'athletehighlight';
+      if (activeFilter === 'Verified') return postType === 'verified_achievement' || postType === 'verifiedachievement' || post.verified;
+      if (activeFilter === 'Awards') return postType === 'annual_awards' || postType === 'annualawards';
       return true;
     });
   }, [activeFilter, feedPosts, leagueId]);

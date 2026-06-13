@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield01Icon, CheckmarkBadge01Icon, LockKeyIcon, ArrowRight01Icon, Building03Icon, UserGroupIcon, ChartLineData01Icon } from 'hugeicons-react';
+import { Shield01Icon, CheckmarkBadge01Icon, Building03Icon, UserGroupIcon, ChartLineData01Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { PageContainer, SectionHeader } from '@/components/ui/product';

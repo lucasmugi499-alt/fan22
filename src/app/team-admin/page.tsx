@@ -3,19 +3,15 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { PageContainer, SectionHeader } from '@/components/ui/product';
+import { DataCard, DetailDrawer, PageContainer, SectionHeader, StatusExplainerChip } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { 
   Building03Icon, 
   Calendar01Icon, 
-  CheckmarkBadge01Icon, 
   Settings01Icon, 
-  UserGroupIcon, 
   PlusSignIcon,
   ListViewIcon,
-  UserIcon,
-  SecurityCheckIcon
 } from 'hugeicons-react';
 import { Users, Trophy } from '@phosphor-icons/react';
 import { toast } from 'sonner';
@@ -42,6 +38,7 @@ function TeamAdminContent() {
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [verificationRequested, setVerificationRequested] = useState(false);
+  const [profileUpdated, setProfileUpdated] = useState(false);
   const [recentTeamUpdates, setRecentTeamUpdates] = useState<{title: string, message: string, timestamp: string}[]>([]);
   const [supportNeeds, setSupportNeeds] = useState<{athleteName: string, type: string, amount: string}[]>([]);
   const { teams, matches, athletes } = useGoalPlaceData();
@@ -60,16 +57,32 @@ function TeamAdminContent() {
   const team = teams.find(t => t.id === selectedTeamId) || null;
   const teamMatches = matches.filter(m => m.homeTeamId === team?.id || m.awayTeamId === team?.id);
   const teamAthletes = athletes.filter(a => a.teamId === team?.id);
+  const rosterCompleteness = team?.rosterCompleteness ?? Math.min(100, Math.max(40, teamAthletes.length * 18));
+  const publicProfileCompleteness = profileUpdated ? 100 : team?.publicProfileCompleteness ?? 76;
+  const teamStatus = verificationRequested ? 'Pending Verification' : team?.verificationStatus ?? (team?.verified ? 'Verified' : 'Needs Evidence');
+  const pendingSubmissions = (team?.pendingSubmissions ?? 0) + teamMatches.filter((match) => match.status === 'Completed' && match.verificationStatus !== 'Verified').length;
 
   const getTeamName = (id: string) => teams.find(t => t.id === id)?.name || id;
 
-  const mockAction = (actionName: string) => {
-    toast.success(`${actionName} modal opened (Demo)`);
-  };
-
   const handleRequestVerification = () => {
     setVerificationRequested(true);
-    toast.success('Verification requested successfully.');
+    toast.success('Team verification request submitted. League Admin review is now pending.');
+  };
+
+  const handlePublishHighlight = () => {
+    const update = {
+      title: 'New team highlight queued',
+      message: `${team?.name ?? 'Team'} added a highlight for league review and public feed publishing.`,
+      timestamp: 'Just now',
+    };
+    setRecentTeamUpdates((current) => [update, ...current]);
+    toast.success('Demo highlight published. It now appears in Recent Updates.');
+  };
+
+  const handleSaveProfile = () => {
+    setProfileUpdated(true);
+    setModalOpen(null);
+    toast.success('Team profile changes saved in demo mode.');
   };
 
   if (!team) {
@@ -109,9 +122,7 @@ function TeamAdminContent() {
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                   <span>{team?.city || 'Kampala'}, Uganda</span>
                   <span className="text-slate-600">•</span>
-                  <span className="flex items-center gap-1 text-[var(--goal-mint)]">
-                    <CheckmarkBadge01Icon className="size-4" /> Verified
-                  </span>
+                  <StatusExplainerChip domain="team" status={teamStatus} />
                 </div>
               </div>
             </div>
@@ -179,19 +190,26 @@ function TeamAdminContent() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <div className="text-sm font-medium text-slate-400">Roster Completeness</div>
-                  <div className="mt-2 text-2xl font-black text-white">{team?.rosterCompleteness || 0}%</div>
+                  <div className="mt-2 text-2xl font-black text-white">{rosterCompleteness}%</div>
+                  <div className="mt-3 h-1.5 rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${rosterCompleteness}%` }} />
+                  </div>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <div className="text-sm font-medium text-slate-400">Pending Submissions</div>
-                  <div className="mt-2 text-2xl font-black text-white">{team?.pendingSubmissions || 0}</div>
+                  <div className="mt-2 text-2xl font-black text-white">{pendingSubmissions}</div>
+                  <p className="mt-2 text-xs text-slate-500">Results and profile changes waiting for review.</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <div className="text-sm font-medium text-slate-400">Total Support Pool</div>
                   <div className="mt-2 text-2xl font-black text-[var(--goal-mint)]">UGX {team?.totalSupport?.toLocaleString() || 0}</div>
+                  <p className="mt-2 text-xs text-slate-500">Visible support only. Standings never use payment activity.</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <div className="text-sm font-medium text-slate-400">Verification Status</div>
-                  <div className="mt-2 text-lg font-black text-white">{team?.verificationStatus || 'Verified'}</div>
+                  <div className="mt-3">
+                    <StatusExplainerChip domain="team" status={teamStatus} showDetail />
+                  </div>
                 </div>
               </div>
 
@@ -199,26 +217,26 @@ function TeamAdminContent() {
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-6">
                   <h2 className="mb-4 font-display text-lg font-black text-white">Quick Actions</h2>
                   <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete</Button>
-                    <Button variant="outline" onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Result</Button>
-                    <Button variant="outline" onClick={() => setModalOpen('uploadUpdate')}><ListViewIcon className="mr-2 size-4" /> Upload Update</Button>
+                    <Button variant="outline" onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete to Roster</Button>
+                    <Button variant="outline" onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Match Result</Button>
+                    <Button variant="outline" onClick={() => setModalOpen('uploadUpdate')}><ListViewIcon className="mr-2 size-4" /> Publish Team Update</Button>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-6">
                   <h2 className="mb-4 font-display text-lg font-black text-white">Pending Tasks</h2>
                   <ul className="space-y-3">
-                    <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
+                    <li className="flex flex-col gap-2 rounded-lg bg-white/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-slate-300">Submit result for recent match</span>
-                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setModalOpen('submitResult')}>Submit</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setModalOpen('submitResult')}>Submit Match Result</Button>
                     </li>
-                    <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
+                    <li className="flex flex-col gap-2 rounded-lg bg-white/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-slate-300">3 athletes missing profile photos</span>
-                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Athlete Updates')}>Update</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Athlete Updates')}>Add Athlete Media</Button>
                     </li>
-                    <li className="flex items-center justify-between rounded-lg bg-white/5 p-3 text-sm">
+                    <li className="flex flex-col gap-2 rounded-lg bg-white/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-slate-300">Roster incomplete</span>
-                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Roster')}>Complete</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-[var(--goal-mint)]" onClick={() => setActiveTab('Roster')}>Complete Roster</Button>
                     </li>
                   </ul>
                 </div>
@@ -231,7 +249,7 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Team Roster</h2>
-                <Button onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete</Button>
+                <Button onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete to Roster</Button>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0A0D14] overflow-hidden">
                 {/* Desktop Table */}
@@ -248,15 +266,16 @@ function TeamAdminContent() {
                     <tbody className="divide-y divide-white/5">
                       {teamAthletes.slice(0, 5).map(athlete => (
                         <tr key={athlete.id} className="hover:bg-white/[0.02]">
-                          <td className="px-6 py-4 font-medium text-white">{athlete.name}</td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-white">{athlete.name}</div>
+                            <div className="mt-1 text-xs text-slate-500">Profile {athlete.verified ? 100 : 82}% complete</div>
+                          </td>
                           <td className="px-6 py-4">{athlete.position}</td>
                           <td className="px-6 py-4">
-                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400">
-                              Verified
-                            </span>
+                            <StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <Button variant="ghost" size="sm" className="h-8 text-xs">Edit</Button>
+                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => toast.success(`${athlete.name} profile opened for demo editing.`)}>Edit Athlete Details</Button>
                           </td>
                         </tr>
                       ))}
@@ -277,12 +296,13 @@ function TeamAdminContent() {
                           <div className="font-bold text-white">{athlete.name}</div>
                           <div className="text-xs text-slate-400 mt-1">{athlete.position}</div>
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
-                          Verified
-                        </span>
+                        <StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />
+                      </div>
+                      <div className="mt-3 h-1.5 rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${athlete.verified ? 100 : 82}%` }} />
                       </div>
                       <div className="mt-3 text-right">
-                        <Button variant="ghost" size="sm" className="h-8 text-xs w-full border border-white/10">Edit Profile</Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-full border border-white/10 text-xs" onClick={() => toast.success(`${athlete.name} profile opened for demo editing.`)}>Edit Athlete Details</Button>
                       </div>
                     </div>
                   ))}
@@ -299,24 +319,33 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Fixtures & Results</h2>
-                <Button onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Result</Button>
+                <Button onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Match Result</Button>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-6">
                 <p className="text-sm text-slate-400 mb-4">
-                  Note: Team Admins can submit match results, but final verification is performed by League Admins.
+                  Team Admins submit match results with evidence. League Admins verify results before standings or verified challenges update.
                 </p>
                 <div className="space-y-4 md:space-y-0 md:grid md:gap-4 md:grid-cols-2">
                   {teamMatches.slice(0, 3).map(match => (
                     <div key={match.id} className="flex flex-col md:flex-row md:items-center justify-between rounded-lg border border-white/5 bg-white/5 p-4">
                       <div className="mb-3 md:mb-0">
-                        <div className="text-xs font-bold text-slate-400">{new Date(match.date || new Date()).toLocaleDateString()}</div>
+                        <div className="text-xs font-bold text-slate-400">{new Date(match.date ?? match.scheduledAt).toLocaleDateString()}</div>
                         <div className="mt-1 font-medium text-white">{getTeamName(match.homeTeamId)} vs {getTeamName(match.awayTeamId)}</div>
+                        <p className="mt-1 text-xs text-slate-500">Standing impact: only after league verification.</p>
                       </div>
                       <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-                        <span className={`inline-flex rounded-full px-2 py-1 text-[10px] md:text-xs font-bold ${match.status === 'verified' ? 'bg-[var(--goal-emerald)]/10 text-[var(--goal-mint)]' : 'bg-orange-500/10 text-orange-400'}`}>
-                          {match.status}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-8 text-xs border border-white/10 md:border-0 md:hidden">Details</Button>
+                        <StatusExplainerChip
+                          domain="match"
+                          status={match.verificationStatus === 'Verified' ? 'Verified' : match.status === 'Completed' ? 'Pending Verification' : match.status === 'Upcoming' ? 'Scheduled' : match.status}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 border border-white/10 text-xs md:border-0"
+                          onClick={() => toast.success('Match evidence drawer opened in demo mode.')}
+                        >
+                          Review Match Evidence
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -330,13 +359,13 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Athlete Updates & Needs</h2>
-                <Button onClick={() => setModalOpen('addSupportNeed')}><PlusSignIcon className="mr-2 size-4" /> Request Support</Button>
+                <Button onClick={() => setModalOpen('addSupportNeed')}><PlusSignIcon className="mr-2 size-4" /> Add Support Need</Button>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Highlight Upload Placeholders</h3>
                   <p className="mt-2 text-sm text-slate-400">Ensure athletes have match footage linked to their profile.</p>
-                  <Button variant="outline" className="mt-4 w-full" onClick={() => mockAction('Upload Highlight')}>Upload Highlight</Button>
+                  <Button variant="outline" className="mt-4 w-full" onClick={handlePublishHighlight}>Publish Team Highlight</Button>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
                   <h3 className="font-bold text-white">Verification Requests</h3>
@@ -348,7 +377,7 @@ function TeamAdminContent() {
                       <span className="mt-2 text-xs text-orange-400/80 border-t border-orange-500/20 pt-2 w-full">Next step: League Admin reviews this under Verification.</span>
                     </div>
                   ) : (
-                    <Button variant="outline" className="mt-4 w-full" onClick={handleRequestVerification}>Request Verification</Button>
+                    <Button variant="outline" className="mt-4 w-full" onClick={handleRequestVerification}>Request Team Verification</Button>
                   )}
                 </div>
               </div>
@@ -364,7 +393,7 @@ function TeamAdminContent() {
                           <div key={i} className="p-3 bg-white/5 rounded-lg border border-white/10">
                             <div className="flex justify-between items-start mb-1">
                               <span className="font-bold text-sm text-white">{update.title}</span>
-                              <span className="text-[10px] uppercase text-slate-500 bg-white/10 px-2 py-0.5 rounded-full">Published Demo</span>
+                              <StatusExplainerChip domain="system" status="Submitted" />
                             </div>
                             <p className="text-xs text-slate-400">{update.message}</p>
                             <div className="text-[10px] text-slate-500 mt-2">{update.timestamp}</div>
@@ -381,6 +410,7 @@ function TeamAdminContent() {
                           <div key={i} className="p-3 bg-white/5 rounded-lg border border-white/10">
                             <div className="flex justify-between items-start mb-1">
                               <span className="font-bold text-sm text-white">{need.athleteName} - {need.type}</span>
+                              <StatusExplainerChip domain="support" status="Pending" />
                             </div>
                             <p className="text-xs text-[var(--goal-mint)] font-bold">Target: {need.amount}</p>
                           </div>
@@ -413,11 +443,15 @@ function TeamAdminContent() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 uppercase">Public Completeness</label>
-                    <div className="mt-1 text-white font-medium">{team?.publicProfileCompleteness || 0}%</div>
+                    <div className="mt-1 text-white font-medium">{publicProfileCompleteness}%</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Public Status</label>
+                    <div className="mt-2"><StatusExplainerChip domain="team" status={teamStatus} /></div>
                   </div>
                 </div>
                 <div className="mt-8 flex gap-4">
-                  <Button onClick={() => mockAction('Edit Team Profile')}>Edit Profile</Button>
+                  <Button onClick={() => setModalOpen('editProfile')}>Edit Team Profile</Button>
                   <Button variant="outline" onClick={() => router.push(`/teams/${team?.id}`)}>View Public Team Page</Button>
                 </div>
               </div>
@@ -450,6 +484,43 @@ function TeamAdminContent() {
           currentTeamId={team.id}
           onSuccess={(athleteName, type, amount) => setSupportNeeds([{ athleteName, type, amount }, ...supportNeeds])}
         />
+        <DetailDrawer
+          open={modalOpen === 'editProfile'}
+          onOpenChange={(open) => !open && setModalOpen(null)}
+          title="Edit Team Profile"
+          description="Demo edits update the visible profile completeness and public status on this page."
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-bold text-slate-300">
+                Team display name
+                <input
+                  defaultValue={team.name}
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[var(--goal-emerald)]"
+                />
+              </label>
+              <label className="text-sm font-bold text-slate-300">
+                Coach or contact
+                <input
+                  defaultValue={team.teamAdminName ?? 'Team Manager'}
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[var(--goal-emerald)]"
+                />
+              </label>
+            </div>
+            <label className="text-sm font-bold text-slate-300">
+              Public team description
+              <textarea
+                defaultValue={team.description}
+                rows={4}
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[var(--goal-emerald)]"
+              />
+            </label>
+            <DataCard>
+              <StatusExplainerChip domain="team" status={profileUpdated ? 'Verified' : 'Needs Evidence'} showDetail />
+            </DataCard>
+            <Button className="w-full" onClick={handleSaveProfile}>Save Team Profile Changes</Button>
+          </div>
+        </DetailDrawer>
       </PageContainer>
     </RoleGuard>
   );

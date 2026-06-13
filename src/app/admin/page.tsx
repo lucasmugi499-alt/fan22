@@ -32,6 +32,7 @@ import {
   PageContainer,
   SportBadge,
   StatusBadge,
+  StatusExplainerChip,
   WorkQueueCard,
 } from '@/components/ui/product';
 import { LeagueStatusBadge } from '@/components/ui/league';
@@ -193,7 +194,7 @@ function AdminDashboard() {
       body: (
         <div className="space-y-4">
           {details.map(([label, value]) => <MiniMeta key={label} label={label} value={value} />)}
-          <Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${title} action recorded in demo mode.`); }}>Record Demo Action</Button>
+          <Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${title} action recorded in demo mode.`); }}>Record {title} Decision</Button>
         </div>
       ),
     });
@@ -259,7 +260,7 @@ function AdminDashboard() {
         actions={
           <Button onClick={() => toast.success('Demo export prepared. No production data was downloaded.')}>
             <Download01Icon className="size-4" />
-            Export Data
+            Export Demo Data
           </Button>
         }
       />
@@ -331,7 +332,7 @@ function AdminDashboard() {
                     <td className="text-slate-300">{user.city}</td>
                     <td className="text-slate-300">{user.points}</td>
                     <td className="text-slate-300">{formatUGX(user.walletBalance)}</td>
-                    <td className="px-4"><Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['Status', user.status], ['Points', user.points], ['Wallet', formatUGX(user.walletBalance)], ['Joined', formatDate(user.createdAt)]])}>Inspect</Button></td>
+                    <td className="px-4"><Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['Status', user.status], ['Points', user.points], ['Wallet', formatUGX(user.walletBalance)], ['Joined', formatDate(user.createdAt)]])}>Inspect User Account</Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -339,7 +340,7 @@ function AdminDashboard() {
           </DataTableCard>
           <div className="grid gap-3 lg:hidden">
             {users.slice(0, 8).map((user) => (
-              <MobileDataCard key={user.id} title={user.displayName} eyebrow={user.email} meta={<StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['City', user.city]])}>Inspect</Button>}>
+              <MobileDataCard key={user.id} title={user.displayName} eyebrow={user.email} meta={<StatusBadge tone={statusTone(user.status)}>{user.status}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(user.displayName, 'User profile and admin controls.', [['Email', user.email], ['Role', user.role], ['City', user.city]])}>Inspect User Account</Button>}>
                 <div className="grid grid-cols-2 gap-3">
                   <MiniMeta label="Role" value={user.role.replace('_', ' ')} />
                   <MiniMeta label="Points" value={user.points} />
@@ -357,7 +358,7 @@ function AdminDashboard() {
             {leagues.map((league) => {
               const approved = approvedLeagueIds.has(league.id);
               return (
-                <MobileDataCard key={league.id} title={league.name} eyebrow={`${league.city} • ${league.sport}`} meta={<LeagueStatusBadge status={approved ? 'verified' : league.status} />} actions={<><Button size="sm" onClick={() => approveLeague(league.id)}>Approve League</Button><Button size="sm" variant="outline" onClick={() => openDetail(league.name, 'League verification detail.', [['Plan', league.plan], ['Teams', league.teamsCount], ['Athletes', league.athletesCount], ['Support', formatUGX(league.totalSupport)]])}>Inspect</Button></>}>
+                <MobileDataCard key={league.id} title={league.name} eyebrow={`${league.city} • ${league.sport}`} meta={<LeagueStatusBadge status={approved ? 'verified' : league.status} />} actions={<><Button size="sm" onClick={() => approveLeague(league.id)}>Approve League</Button><Button size="sm" variant="outline" onClick={() => openDetail(league.name, 'League verification detail.', [['Plan', league.plan], ['Teams', league.teamsCount], ['Athletes', league.athletesCount], ['Support', formatUGX(league.totalSupport)]])}>Inspect League Application</Button></>}>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <MiniMeta label="Plan" value={league.plan} />
                     <MiniMeta label="Teams" value={league.teamsCount} />
@@ -387,7 +388,7 @@ function AdminDashboard() {
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   <MiniMeta label="Profile" value={`${athlete.verified ? 94 : 67}%`} />
                   <MiniMeta label="Support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport)} />
-                  <MiniMeta label="Actions" value={<button className="text-[var(--goal-mint)]" onClick={() => toast.success(`${athlete.name} verified in demo mode.`)}>Verify</button>} />
+                  <MiniMeta label="Actions" value={<button className="text-[var(--goal-mint)]" onClick={() => toast.success(`${athlete.name} verified in demo mode.`)}>Approve Athlete Verification</button>} />
                 </div>
               </DataCard>
             ))}
@@ -399,7 +400,7 @@ function AdminDashboard() {
         <DashboardSection eyebrow="Teams" title="Platform teams">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {teams.slice(0, 12).map((team) => (
-              <MobileDataCard key={team.id} title={team.name} eyebrow={`${team.city} • ${team.sport}`} meta={<StatusBadge tone={team.verified ? 'success' : 'warning'}>{team.verified ? 'Verified' : 'Review'}</StatusBadge>} actions={<Button size="sm" variant="outline" onClick={() => openDetail(team.name, 'Team profile controls.', [['League', leagues.find((league) => league.id === team.leagueId)?.name ?? 'League pending'], ['Athletes', athletes.filter((athlete) => athlete.teamId === team.id).length], ['Support', formatUGX(team.supportPool ?? team.totalSupport)]])}>Manage</Button>}>
+              <MobileDataCard key={team.id} title={team.name} eyebrow={`${team.city} • ${team.sport}`} meta={<StatusExplainerChip domain="team" status={team.verified ? 'Verified' : team.verificationStatus ?? 'Pending Verification'} />} actions={<Button size="sm" variant="outline" onClick={() => openDetail(team.name, 'Team profile controls.', [['League', leagues.find((league) => league.id === team.leagueId)?.name ?? 'League pending'], ['Athletes', athletes.filter((athlete) => athlete.teamId === team.id).length], ['Support', formatUGX(team.supportPool ?? team.totalSupport)]])}>Open Team Controls</Button>}>
                 <div className="grid grid-cols-2 gap-3">
                   <MiniMeta label="Athletes" value={athletes.filter((athlete) => athlete.teamId === team.id).length} />
                   <MiniMeta label="Support" value={formatUGX(team.supportPool ?? team.totalSupport)} />
@@ -418,12 +419,12 @@ function AdminDashboard() {
                 key={record.id}
                 title={record.relatedLabel ?? record.type.replaceAll('_', ' ')}
                 eyebrow={`Submitted by ${record.submittedBy} • ${formatDate(record.createdAt)}`}
-                meta={<StatusBadge tone={statusTone(String(record.status))}>{record.status}</StatusBadge>}
+                meta={<StatusExplainerChip domain="system" status={String(record.status)} />}
                 actions={
                   <>
-                    <Button size="sm" variant="outline" onClick={() => openDetail(record.relatedLabel ?? record.type, 'Verification record detail.', [['Evidence', record.evidenceStatus ?? 'Evidence pending'], ['Amount affected', formatUGX(record.amountAffected ?? 0)], ['Action history', actionHistoryText(record.actionHistory)]])}>View</Button>
-                    <Button size="sm" onClick={() => toast.success(`${record.id} verified in demo mode.`)}>Verify</Button>
-                    <Button size="sm" variant="outline" onClick={() => toast.success(`${record.id} rejected in demo mode.`)}>Reject</Button>
+                    <Button size="sm" variant="outline" onClick={() => openDetail(record.relatedLabel ?? record.type, 'Verification record detail.', [['Evidence', record.evidenceStatus ?? 'Evidence pending'], ['Amount affected', formatUGX(record.amountAffected ?? 0)], ['Action history', actionHistoryText(record.actionHistory)]])}>View Verification Evidence</Button>
+                    <Button size="sm" onClick={() => toast.success(`${record.id} verified in demo mode.`)}>Approve Verification</Button>
+                    <Button size="sm" variant="outline" onClick={() => toast.success(`${record.id} rejected in demo mode.`)}>Reject Verification</Button>
                   </>
                 }
               >
@@ -450,9 +451,9 @@ function AdminDashboard() {
                 meta={<StatusBadge tone={statusTone(report.severity)}>{report.severity}</StatusBadge>}
                 actions={
                   <>
-                    <Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Reporter', report.reporter], ['Reported entity', report.reportedEntity], ['Assigned reviewer', report.reviewer], ['Reason', report.reason], ['Action history', actionHistoryText(report.history)]])}>View</Button>
-                    <Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve</Button>
-                    <Button size="sm" variant="outline" onClick={() => toast.success(`${report.id} escalated in demo mode.`)}>Escalate</Button>
+                    <Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Reporter', report.reporter], ['Reported entity', report.reportedEntity], ['Assigned reviewer', report.reviewer], ['Reason', report.reason], ['Action history', actionHistoryText(report.history)]])}>View Report Details</Button>
+                    <Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve Report</Button>
+                    <Button size="sm" variant="outline" onClick={() => toast.success(`${report.id} escalated in demo mode.`)}>Escalate Report</Button>
                   </>
                 }
               >
@@ -481,9 +482,9 @@ function AdminDashboard() {
                   meta={<StatusBadge tone={hidden ? 'danger' : index < 2 || post.status === 'reported' ? 'warning' : 'success'}>{hidden ? 'Hidden' : post.status === 'reported' || index < 2 ? 'Flagged' : 'Active'}</StatusBadge>}
                   actions={
                     <>
-                      <Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Post type', String(post.type).replaceAll('_', ' ')], ['Reason flagged', post.flagReason ?? 'Engagement spike review'], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>View</Button>
-                      <Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore' : 'Hide'}</Button>
-                      <Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate</Button>
+                      <Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Post type', String(post.type).replaceAll('_', ' ')], ['Reason flagged', post.flagReason ?? 'Engagement spike review'], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>Review Feed Post</Button>
+                      <Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore Feed Post' : 'Hide Feed Post'}</Button>
+                      <Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate Feed Post</Button>
                     </>
                   }
                 >
@@ -511,7 +512,7 @@ function AdminDashboard() {
                     <h3 className="font-display text-lg font-black text-white">{payout.athlete?.name ?? 'Athlete support'}</h3>
                     <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.supportType}</p>
                   </div>
-                  <StatusBadge tone="warning">{payout.status}</StatusBadge>
+                  <StatusExplainerChip domain="support" status="Held" />
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
                   <MiniMeta label="Related challenge" value={payout.type} />
@@ -560,7 +561,7 @@ function AdminDashboard() {
                   <MiniMeta label="Type" value={award.categoryType} />
                   <MiniMeta label="Leaders" value={award.currentLeaderIds.length} />
                 </div>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${award.name} configured in demo mode.`)}>Configure</Button>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${award.name} configured in demo mode.`)}>Configure Award Category</Button>
               </DataCard>
             ))}
           </div>
@@ -594,7 +595,7 @@ function AdminDashboard() {
         <DashboardSection eyebrow="Settings" title="Platform controls">
           <div className="grid gap-4 md:grid-cols-2">
             {[
-              ['Role access controls', 'Visible MVP roles are fan, athlete, league admin, and platform admin.'],
+              ['Role access controls', 'Visible MVP roles are fan, athlete, team admin, league admin, and platform admin.'],
               ['Demo mode settings', 'Mock writes show toasts and never process real payments.'],
               ['Future payment settings', 'Reserved for a later release and disabled in demo mode.'],
               ['Maintenance banner', 'Configure platform-wide notices for support and verification windows.'],
@@ -603,7 +604,7 @@ function AdminDashboard() {
                 <Settings01Icon className="mb-4 size-5 text-[var(--goal-mint)]" />
                 <h3 className="font-display text-xl font-black text-white">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${title} saved in demo mode.`)}>Save</Button>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${title} saved in demo mode.`)}>Save Platform Setting</Button>
               </DataCard>
             ))}
           </div>

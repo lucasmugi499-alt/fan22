@@ -3,14 +3,13 @@
 import React from 'react';
 import { Match } from '@/types';
 import { GlassCard } from './glass-card';
-import { Badge } from './badge';
 import { Button } from './button';
 import { Calendar01Icon, Location01Icon, SecurityCheckIcon, ZapIcon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatCompact, getInitials, getSportTheme } from '@/lib/sportThemes';
 import { ImageWithFallback } from './image-with-fallback';
-import { SportBadge } from './product';
+import { SportBadge, StatusExplainerChip } from './product';
 
 interface MatchCardProps {
   match: Match;
@@ -45,9 +44,17 @@ export function MatchCard({ match, onView }: MatchCardProps) {
   const formattedTime = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const activeChallenges = challenges.filter((challenge) => challenge.matchId === match.id && challenge.status === 'Active');
   const supporterCount = activeChallenges.reduce((sum, challenge) => sum + challenge.supportersCount, 0);
-  const statusTone = match.status === 'Live' ? 'destructive' : match.status === 'Completed' ? 'secondary' : 'outline';
   const homeScore = match.teamAScore ?? match.score.home ?? 0;
   const awayScore = match.teamBScore ?? match.score.away ?? 0;
+  const matchStatusLabel = match.status === 'Upcoming' ? 'Scheduled' : match.status;
+  const officialStatus =
+    match.verificationStatus === 'Verified'
+      ? 'Verified'
+      : match.verificationStatus === 'Disputed'
+        ? 'Disputed'
+        : match.status === 'Completed'
+          ? 'Pending Verification'
+          : matchStatusLabel;
 
   return (
     <GlassCard
@@ -57,9 +64,7 @@ export function MatchCard({ match, onView }: MatchCardProps) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {match.status === 'Live' && <span className="size-2 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.9)]" />}
-          <Badge variant={statusTone} className="h-6 rounded-lg text-[10px] font-black uppercase tracking-[0.16em]">
-            {match.status}
-          </Badge>
+          <StatusExplainerChip domain="match" status={matchStatusLabel} />
         </div>
         <SportBadge sport={match.sport} />
       </div>
@@ -116,14 +121,19 @@ export function MatchCard({ match, onView }: MatchCardProps) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+        <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-slate-400">
           <SecurityCheckIcon className="size-4 text-[var(--goal-mint)]" />
-          {match.verificationStatus}
+          <StatusExplainerChip domain="match" status={officialStatus} />
         </div>
         <Button size="sm" variant={match.status === 'Live' ? 'default' : 'outline'} onClick={(event) => { event.stopPropagation(); onView?.(); }}>
-          View Match
+          {match.status === 'Live' ? 'Open Live Match' : 'View Match Details'}
         </Button>
       </div>
+      {match.status === 'Completed' && match.verificationStatus !== 'Verified' && (
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          Completed results stay out of official standings until verified by the league.
+        </p>
+      )}
     </GlassCard>
   );
 }

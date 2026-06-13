@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { canAccessRoute, getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { PageContainer } from '@/components/ui/product';
-import { Shield01Icon, UserIcon, SecurityCheckIcon, Building03Icon } from 'hugeicons-react';
+import { Building01Icon, Shield01Icon, UserIcon, SecurityCheckIcon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
@@ -35,8 +35,8 @@ function AuthContent() {
   const demoRoles: { id: AppRole; label: string; description: string; icon: React.ElementType }[] = [
     { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: UserIcon },
     { id: 'athlete', label: 'Continue as Athlete', description: 'Manage your profile, view supporters, and post highlights.', icon: Trophy },
+    { id: 'team_admin', label: 'Continue as Team Admin', description: 'Manage a roster, submit match results, and publish team updates.', icon: Building01Icon },
     { id: 'league_admin', label: 'Continue as League Admin', description: 'Manage teams, athletes, fixtures, and verify results.', icon: Shield01Icon },
-    { id: 'sponsor', label: 'Continue as Sponsor', description: 'Track commitments, funded needs, evidence, and impact reports.', icon: Building03Icon },
     { id: 'platform_admin', label: 'Continue as Platform Admin', description: 'Approve leagues, moderate content, and oversee the platform.', icon: SecurityCheckIcon },
   ];
 
@@ -93,12 +93,6 @@ function AuthContent() {
                   </button>
                 );
               })}
-              <button
-                onClick={() => handleDemoLogin('team_admin')}
-                className="mt-2 text-center text-xs font-bold text-slate-500 hover:text-[var(--goal-mint)] hover:underline"
-              >
-                Preview Team Admin Console
-              </button>
             </div>
             
             <p className="mt-6 text-center text-xs text-slate-500">

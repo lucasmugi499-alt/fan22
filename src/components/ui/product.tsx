@@ -551,6 +551,500 @@ export function StatusBadge({
   );
 }
 
+export type StatusDomain = 'match' | 'challenge' | 'athlete' | 'team' | 'league' | 'support' | 'system';
+
+export interface StatusMeta {
+  label: string;
+  tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'gold';
+  explanation: string;
+  owner: string;
+  nextStep: string;
+}
+
+const defaultStatusMeta: StatusMeta = {
+  label: 'Unknown',
+  tone: 'neutral',
+  explanation: 'Status has not been classified yet.',
+  owner: 'GoalPlace256',
+  nextStep: 'Review the record before taking action.',
+};
+
+export const STATUS_SYSTEM: Record<StatusDomain, Record<string, StatusMeta>> = {
+  match: {
+    scheduled: {
+      label: 'Scheduled',
+      tone: 'info',
+      explanation: 'Fixture is created and waiting for match day.',
+      owner: 'League Admin',
+      nextStep: 'Keep fixture details current.',
+    },
+    live: {
+      label: 'Live',
+      tone: 'danger',
+      explanation: 'Match is currently in progress.',
+      owner: 'Team Admin',
+      nextStep: 'Update events and final score after full time.',
+    },
+    completed: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Result has been submitted but is not official yet.',
+      owner: 'League Admin',
+      nextStep: 'Review evidence and confirm the result.',
+    },
+    pendingverification: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Result has been submitted but is not official yet.',
+      owner: 'League Admin',
+      nextStep: 'Review score evidence and submit a decision.',
+    },
+    verified: {
+      label: 'Verified',
+      tone: 'success',
+      explanation: 'Result has been confirmed by an authorized reviewer.',
+      owner: 'League Admin',
+      nextStep: 'Use this result in standings and challenge settlement.',
+    },
+    disputed: {
+      label: 'Disputed',
+      tone: 'danger',
+      explanation: 'A score or evidence issue needs manual review.',
+      owner: 'Platform Admin',
+      nextStep: 'Compare evidence and resolve the dispute.',
+    },
+  },
+  challenge: {
+    open: {
+      label: 'Open',
+      tone: 'info',
+      explanation: 'Supporters can join before the challenge starts.',
+      owner: 'Fan',
+      nextStep: 'Pledge support or follow the challenge.',
+    },
+    active: {
+      label: 'Active',
+      tone: 'gold',
+      explanation: 'Challenge is running against a scheduled or live fixture.',
+      owner: 'League Admin',
+      nextStep: 'Wait for match result and athlete evidence.',
+    },
+    pending: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Challenge evidence is waiting for review.',
+      owner: 'League Admin',
+      nextStep: 'Verify the challenge outcome.',
+    },
+    verified: {
+      label: 'Verified',
+      tone: 'success',
+      explanation: 'Challenge outcome has been confirmed.',
+      owner: 'League Admin',
+      nextStep: 'Release eligible support or record the result.',
+    },
+    rejected: {
+      label: 'Rejected',
+      tone: 'danger',
+      explanation: 'Challenge evidence did not pass review.',
+      owner: 'League Admin',
+      nextStep: 'Close the challenge or request better evidence.',
+    },
+    locked: {
+      label: 'Locked',
+      tone: 'warning',
+      explanation: 'Challenge is closed for new support while results are reviewed.',
+      owner: 'League Admin',
+      nextStep: 'Verify the performance outcome.',
+    },
+    achieved: {
+      label: 'Achieved',
+      tone: 'success',
+      explanation: 'Target was met and awaits final release if support is attached.',
+      owner: 'League Admin',
+      nextStep: 'Confirm evidence and release eligible support.',
+    },
+    failed: {
+      label: 'Not Achieved',
+      tone: 'neutral',
+      explanation: 'Target was not met for this fixture.',
+      owner: 'League Admin',
+      nextStep: 'Close challenge and update supporters.',
+    },
+    paid: {
+      label: 'Released',
+      tone: 'success',
+      explanation: 'Verified support has been released to the athlete.',
+      owner: 'Platform Admin',
+      nextStep: 'Record payout and notify supporters.',
+    },
+    refunded: {
+      label: 'Refunded',
+      tone: 'info',
+      explanation: 'Held support was returned to supporters.',
+      owner: 'Platform Admin',
+      nextStep: 'Record refund and close the challenge.',
+    },
+    disputed: {
+      label: 'Disputed',
+      tone: 'danger',
+      explanation: 'Challenge result needs extra evidence or escalation.',
+      owner: 'Platform Admin',
+      nextStep: 'Review evidence and resolve payout status.',
+    },
+    pendingverification: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Performance has been submitted and is awaiting review.',
+      owner: 'League Admin',
+      nextStep: 'Verify the challenge outcome.',
+    },
+  },
+  athlete: {
+    draft: {
+      label: 'Draft',
+      tone: 'neutral',
+      explanation: 'Profile exists but is not ready for public verification.',
+      owner: 'Athlete',
+      nextStep: 'Complete bio, team, media, and stats.',
+    },
+    pending: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Profile was submitted for review.',
+      owner: 'League Admin',
+      nextStep: 'Check identity, team, and evidence.',
+    },
+    pendingverification: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Profile was submitted for review.',
+      owner: 'League Admin',
+      nextStep: 'Check identity, team, and evidence.',
+    },
+    verified: {
+      label: 'Verified',
+      tone: 'success',
+      explanation: 'Athlete identity and team context are confirmed.',
+      owner: 'League Admin',
+      nextStep: 'Keep performance data current.',
+    },
+    rejected: {
+      label: 'Rejected',
+      tone: 'danger',
+      explanation: 'Profile did not pass verification.',
+      owner: 'Athlete',
+      nextStep: 'Correct issues and resubmit.',
+    },
+    needsevidence: {
+      label: 'Needs Evidence',
+      tone: 'warning',
+      explanation: 'Reviewer needs clearer identity, team, or match proof.',
+      owner: 'Team Admin',
+      nextStep: 'Upload the requested evidence.',
+    },
+    suspended: {
+      label: 'Suspended',
+      tone: 'danger',
+      explanation: 'Profile is restricted during investigation.',
+      owner: 'Platform Admin',
+      nextStep: 'Resolve fraud, dispute, or policy issues.',
+    },
+  },
+  team: {
+    draft: {
+      label: 'Draft',
+      tone: 'neutral',
+      explanation: 'Team profile is not ready for public league use.',
+      owner: 'Team Admin',
+      nextStep: 'Complete roster, contacts, and profile details.',
+    },
+    pending: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Team profile was submitted for review.',
+      owner: 'League Admin',
+      nextStep: 'Confirm roster and league membership.',
+    },
+    pendingverification: {
+      label: 'Pending Verification',
+      tone: 'warning',
+      explanation: 'Team profile was submitted for review.',
+      owner: 'League Admin',
+      nextStep: 'Confirm roster and league membership.',
+    },
+    verified: {
+      label: 'Verified',
+      tone: 'success',
+      explanation: 'Team is confirmed by the league or platform.',
+      owner: 'League Admin',
+      nextStep: 'Maintain roster and match submissions.',
+    },
+    needsevidence: {
+      label: 'Needs Evidence',
+      tone: 'warning',
+      explanation: 'A reviewer requested more team proof.',
+      owner: 'Team Admin',
+      nextStep: 'Upload roster, ID, or fixture evidence.',
+    },
+    suspended: {
+      label: 'Suspended',
+      tone: 'danger',
+      explanation: 'Team access is restricted during review.',
+      owner: 'Platform Admin',
+      nextStep: 'Resolve dispute or verification issues.',
+    },
+  },
+  league: {
+    draft: {
+      label: 'Draft League',
+      tone: 'neutral',
+      explanation: 'Created but not public.',
+      owner: 'League Admin',
+      nextStep: 'Complete league profile and request publication.',
+    },
+    community: {
+      label: 'Community League',
+      tone: 'info',
+      explanation: 'Public league page with teams, fixtures, athletes, and posts.',
+      owner: 'League Admin',
+      nextStep: 'Build activity and request verification.',
+    },
+    verified: {
+      label: 'Verified League',
+      tone: 'success',
+      explanation: 'Confirmed by GoalPlace256 for verified challenges and official standings.',
+      owner: 'GoalPlace256',
+      nextStep: 'Run verified operations and annual awards eligibility.',
+    },
+    partner: {
+      label: 'Partner League',
+      tone: 'gold',
+      explanation: 'Verified league with advanced reporting, analytics, and priority support.',
+      owner: 'GoalPlace256',
+      nextStep: 'Use partner tooling and keep admin reliability high.',
+    },
+    suspended: {
+      label: 'Suspended',
+      tone: 'danger',
+      explanation: 'League is restricted because of fraud, disputes, or verification issues.',
+      owner: 'Platform Admin',
+      nextStep: 'Resolve the restriction before public operations continue.',
+    },
+  },
+  support: {
+    pending: {
+      label: 'Pending',
+      tone: 'warning',
+      explanation: 'Support action was created and awaits processing.',
+      owner: 'Fan',
+      nextStep: 'Wait for confirmation.',
+    },
+    held: {
+      label: 'Held',
+      tone: 'gold',
+      explanation: 'Pledged support is held until performance verification is complete.',
+      owner: 'GoalPlace256',
+      nextStep: 'Release or refund after verification.',
+    },
+    released: {
+      label: 'Released',
+      tone: 'success',
+      explanation: 'Support has been released to the athlete or team.',
+      owner: 'Platform Admin',
+      nextStep: 'Record impact and notify supporters.',
+    },
+    refunded: {
+      label: 'Refunded',
+      tone: 'info',
+      explanation: 'Support was returned to the fan.',
+      owner: 'Platform Admin',
+      nextStep: 'Close the transaction record.',
+    },
+    failed: {
+      label: 'Failed',
+      tone: 'danger',
+      explanation: 'Support action did not complete.',
+      owner: 'Fan',
+      nextStep: 'Retry or contact support.',
+    },
+  },
+  system: {
+    draft: {
+      label: 'Draft',
+      tone: 'neutral',
+      explanation: 'Record is saved but not submitted.',
+      owner: 'Creator',
+      nextStep: 'Complete details and submit.',
+    },
+    submitted: {
+      label: 'Submitted',
+      tone: 'info',
+      explanation: 'Record has entered the review queue.',
+      owner: 'Reviewer',
+      nextStep: 'Review evidence and decide.',
+    },
+    pendingreview: {
+      label: 'Pending Review',
+      tone: 'warning',
+      explanation: 'A reviewer needs to make a decision.',
+      owner: 'Reviewer',
+      nextStep: 'Approve, reject, or request evidence.',
+    },
+    approved: {
+      label: 'Approved',
+      tone: 'success',
+      explanation: 'Request passed review.',
+      owner: 'Reviewer',
+      nextStep: 'Apply the approved change.',
+    },
+    verified: {
+      label: 'Verified',
+      tone: 'success',
+      explanation: 'Profile or record is confirmed for demo use.',
+      owner: 'GoalPlace256',
+      nextStep: 'Keep profile details current.',
+    },
+    needsevidence: {
+      label: 'Needs Evidence',
+      tone: 'warning',
+      explanation: 'More proof is needed before approval.',
+      owner: 'Submitter',
+      nextStep: 'Upload the requested evidence.',
+    },
+    rejected: {
+      label: 'Rejected',
+      tone: 'danger',
+      explanation: 'Request did not pass review.',
+      owner: 'Submitter',
+      nextStep: 'Correct issues before resubmitting.',
+    },
+    escalated: {
+      label: 'Escalated',
+      tone: 'danger',
+      explanation: 'Issue needs platform-level review.',
+      owner: 'Platform Admin',
+      nextStep: 'Assign and resolve the case.',
+    },
+  },
+};
+
+function normalizeStatusKey(status: string) {
+  return status.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function getStatusMeta(domain: StatusDomain, status: string): StatusMeta {
+  const key = normalizeStatusKey(status);
+  return STATUS_SYSTEM[domain][key] ?? { ...defaultStatusMeta, label: status };
+}
+
+export function StatusExplainerChip({
+  domain,
+  status,
+  showDetail = false,
+  className,
+}: {
+  domain: StatusDomain;
+  status: string;
+  showDetail?: boolean;
+  className?: string;
+}) {
+  const meta = getStatusMeta(domain, status);
+  const title = `${meta.explanation} Owner: ${meta.owner}. Next step: ${meta.nextStep}`;
+
+  return (
+    <div className={cn('min-w-0', className)} title={title}>
+      <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
+      {showDetail && (
+        <div className="mt-2 space-y-1 text-xs leading-5 text-slate-400">
+          <p>{meta.explanation}</p>
+          <p><span className="font-bold text-slate-300">Owner:</span> {meta.owner}</p>
+          <p><span className="font-bold text-slate-300">Next:</span> {meta.nextStep}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function EvidenceDrawer({
+  open,
+  onOpenChange,
+  title,
+  description,
+  items,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  items: Array<{ label: string; value: string; status?: string }>;
+}) {
+  return (
+    <DetailDrawer open={open} onOpenChange={onOpenChange} title={title} description={description}>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-200">{item.value}</p>
+              </div>
+              {item.status && <StatusExplainerChip domain="system" status={item.status} />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </DetailDrawer>
+  );
+}
+
+export function SupportPledgeCard({
+  title,
+  amount,
+  status,
+  detail,
+  action,
+}: {
+  title: string;
+  amount: string;
+  status: string;
+  detail: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <DataCard>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-lg font-black text-white">{title}</h3>
+          <p className="mt-1 text-sm text-slate-300">{detail}</p>
+        </div>
+        <StatusExplainerChip domain="support" status={status} />
+      </div>
+      <p className="mt-4 font-display text-2xl font-black text-white">{amount}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </DataCard>
+  );
+}
+
+export function MobileDashboardCard({
+  title,
+  value,
+  status,
+  detail,
+}: {
+  title: string;
+  value: string;
+  status?: React.ReactNode;
+  detail?: string;
+}) {
+  return (
+    <MobileDataCard title={title} meta={status}>
+      <p className="font-display text-2xl font-black text-white">{value}</p>
+      {detail && <p className="text-sm leading-6 text-slate-300">{detail}</p>}
+    </MobileDataCard>
+  );
+}
+
 export function DemoNotice({
   title = 'Demo mode',
   children,

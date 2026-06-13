@@ -35,6 +35,7 @@ export function MobileNav() {
   const getMobileItems = (currentRole: AppRole | null) => {
     let configRole = currentRole || 'fan';
     if (configRole === 'super_admin') configRole = 'platform_admin';
+    if (configRole === 'sponsor') configRole = 'fan';
     
     const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
     return config.navItems;
@@ -130,6 +131,7 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
 
   let configRole = role || 'fan';
   if (configRole === 'super_admin') configRole = 'platform_admin';
+  if (configRole === 'sponsor') configRole = 'fan';
 
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
   

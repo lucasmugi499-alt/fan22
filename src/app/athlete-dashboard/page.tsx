@@ -6,7 +6,7 @@ import { UserGroupIcon, SecurityCheckIcon, UserIcon, Upload01Icon, Calendar01Ico
 import { Trophy } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { CreatePostModal } from '@/components/modals/app-modals';
-import { DataCard, DetailDrawer, EmptyState, ImpactStatCard, SportBadge, StatusBadge, TabStrip, VerificationStatusCard } from '@/components/ui/product';
+import { DataCard, DetailDrawer, EmptyState, ImpactStatCard, SportBadge, StatusBadge, StatusExplainerChip, TabStrip, VerificationStatusCard } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
@@ -88,20 +88,20 @@ function AthleteDashboard() {
               <h1 className="font-display text-3xl font-black text-white md:text-4xl">{athlete?.name ?? 'Athlete Command Center'}</h1>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => openDrawer('Upload Highlight', 'Upload placeholder for match clips and scouting media.', [['Media type', 'Video highlight'], ['Match', upcomingMatches[0]?.venue ?? 'Next fixture'], ['Visibility', 'Public after moderation']])}>
-                <Upload01Icon className="size-4" /> Upload Highlight
+              <Button onClick={() => openDrawer('Publish Highlight', 'Upload placeholder for match clips and scouting media.', [['Media type', 'Video highlight'], ['Match', upcomingMatches[0]?.venue ?? 'Next fixture'], ['Visibility', 'Public after moderation']])}>
+                <Upload01Icon className="size-4" /> Publish Highlight
               </Button>
               <Button variant="outline" onClick={() => demoAction('Verification request submitted')}>
-                <SecurityCheckIcon className="size-4" /> Request Verification
+                <SecurityCheckIcon className="size-4" /> Request Athlete Verification
               </Button>
               <Button variant="outline" onClick={() => setPostOpen(true)}>
-                <Video01Icon className="size-4" /> Create Post
+                <Video01Icon className="size-4" /> Create Athlete Post
               </Button>
               <Button variant="outline" onClick={() => setActiveTab('Supporters')}>
-                <UserGroupIcon className="size-4" /> View Supporters
+                <UserGroupIcon className="size-4" /> Open Supporters
               </Button>
               <Button variant="outline" onClick={() => setActiveTab('Challenges')}>
-                <Trophy className="size-4" /> View Challenges
+                <Trophy className="size-4" /> Open Challenges
               </Button>
               <Button variant="gold" onClick={() => athlete ? router.push(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>
                 Preview Public Profile
@@ -137,21 +137,21 @@ function AthleteDashboard() {
                     <Calendar01Icon className="mb-4 size-6 text-[var(--goal-mint)]" />
                     <h3 className="font-display text-xl font-black text-white">Next Match</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">{nextMatch ? `${new Date(nextMatch.scheduledAt).toLocaleDateString()} at ${nextMatch.venue}` : 'No upcoming fixture assigned yet.'}</p>
-                    <Button className="mt-4" variant="outline" onClick={() => setActiveTab('Matches')}>View Schedule</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => setActiveTab('Matches')}>View Match Schedule</Button>
                   </div>
                   
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Activity01Icon className="mb-4 size-6 text-[var(--goal-gold)]" />
                     <h3 className="font-display text-xl font-black text-white">Supporter Comments</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">&quot;The work rate showed today. Keep building toward the next fixture.&quot;</p>
-                    <Button className="mt-4" variant="outline" onClick={() => demoAction('Feed opened')}>View Support Activity</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => demoAction('Support feed opened')}>Open Support Activity</Button>
                   </div>
                   
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Video01Icon className="mb-4 size-6 text-blue-400" />
                     <h3 className="font-display text-xl font-black text-white">Highlight Activity</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">Upload your latest match highlights to attract support.</p>
-                    <Button className="mt-4" variant="outline" onClick={() => openDrawer('Upload Highlight', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}>Upload Highlight</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => openDrawer('Publish Highlight', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}>Publish Highlight</Button>
                   </div>
                 </section>
 
@@ -189,7 +189,7 @@ function AthleteDashboard() {
                 <DataCard>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-display text-xl font-black text-white">Personal Information</h3>
-                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Profile', 'Update public athlete identity and contact information.', [['Name', athlete?.name ?? 'Athlete'], ['Location', `${athlete?.city}, ${athlete?.country}`], ['Bio', athlete?.bio ?? 'Profile bio']])}><PencilEdit01Icon className="size-4" /> Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Personal Info', 'Update public athlete identity and contact information.', [['Name', athlete?.name ?? 'Athlete'], ['Location', `${athlete?.city}, ${athlete?.country}`], ['Bio', athlete?.bio ?? 'Profile bio']])}><PencilEdit01Icon className="size-4" /> Edit Personal Info</Button>
                   </div>
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-slate-400">Full Name</span><span className="text-white font-medium">{athlete?.name}</span></div>
@@ -201,7 +201,7 @@ function AthleteDashboard() {
                 <DataCard>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-display text-xl font-black text-white">Athletic Profile</h3>
-                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Athletic Profile', 'Update measurable sport profile details.', [['Position', athlete?.position ?? 'Forward'], ['Height', '180 cm'], ['Strong foot/hand', 'Right']])}><PencilEdit01Icon className="size-4" /> Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => openDrawer('Edit Athletic Details', 'Update measurable sport profile details.', [['Position', athlete?.position ?? 'Forward'], ['Height', '180 cm'], ['Strong foot/hand', 'Right']])}><PencilEdit01Icon className="size-4" /> Edit Athletic Details</Button>
                   </div>
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-slate-400">Position</span><span className="text-white font-medium">{athlete?.position ?? 'Forward'}</span></div>
@@ -217,14 +217,14 @@ function AthleteDashboard() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-display text-xl font-black text-white">Your Challenges</h3>
-                  <Button onClick={() => openDrawer('Propose Challenge', 'Draft a verified performance challenge for supporters.', [['Athlete', athlete?.name ?? 'Athlete'], ['Target', 'Score or assist in next match'], ['Review', 'League admin approval required']])}><Trophy className="size-4" /> Propose Challenge</Button>
+                  <Button onClick={() => openDrawer('Propose Verified Challenge', 'Draft a verified performance challenge for supporters.', [['Athlete', athlete?.name ?? 'Athlete'], ['Target', 'Score or assist in next match'], ['Review', 'League admin approval required']])}><Trophy className="size-4" /> Propose Verified Challenge</Button>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {athleteChallenges.length > 0 ? athleteChallenges.map(c => (
                     <DataCard key={c.id}>
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{c.type}</span>
-                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-widest ${c.status === 'open' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{c.status}</span>
+                        <StatusExplainerChip domain="challenge" status={c.status} />
                       </div>
                       <p className="font-display text-lg font-black text-white">{c.description}</p>
                       <div className="mt-4 flex justify-between items-center border-t border-white/10 pt-3">
@@ -258,8 +258,8 @@ function AthleteDashboard() {
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <span className={`text-xs font-bold px-2 py-1 rounded bg-white/10 uppercase tracking-widest ${match.status === 'verified' ? 'text-[var(--goal-mint)]' : 'text-slate-300'}`}>{match.status}</span>
-                        {match.status === 'scheduled' && <Button size="sm" variant="outline" onClick={() => openDrawer('Match Details', 'Upcoming fixture context and preparation notes.', [['Venue', match.venue], ['Date', new Date(match.scheduledAt).toLocaleDateString()], ['Status', match.status]])}>View</Button>}
+                        <StatusExplainerChip domain="match" status={match.status === 'Upcoming' ? 'Scheduled' : match.status} />
+                        {(match.status === 'scheduled' || match.status === 'Upcoming') && <Button size="sm" variant="outline" onClick={() => openDrawer('Match Details', 'Upcoming fixture context and preparation notes.', [['Venue', match.venue], ['Date', new Date(match.scheduledAt).toLocaleDateString()], ['Status', match.status]])}>View Match Details</Button>}
                       </div>
                     </DataCard>
                   ))}
@@ -271,7 +271,7 @@ function AthleteDashboard() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-display text-xl font-black text-white">Highlights & Media</h3>
-                  <Button onClick={() => openDrawer('Upload Media', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}><Upload01Icon className="size-4" /> Upload</Button>
+                  <Button onClick={() => openDrawer('Publish Media', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}><Upload01Icon className="size-4" /> Publish Media</Button>
                 </div>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
                   {[1, 2, 3].map(i => (
@@ -317,7 +317,7 @@ function AthleteDashboard() {
                       <span>Show earnings</span>
                       <input type="checkbox" className="toggle" />
                     </label>
-                    <Button variant="outline" className="w-full mt-2" onClick={() => demoAction('Privacy updated')}>Save Privacy</Button>
+                    <Button variant="outline" className="w-full mt-2" onClick={() => demoAction('Privacy updated')}>Save Athlete Privacy</Button>
                   </div>
                 </DataCard>
                 <DataCard>
@@ -334,7 +334,7 @@ function AthleteDashboard() {
                       <span>New pledges SMS</span>
                       <input type="checkbox" defaultChecked className="toggle" />
                     </label>
-                    <Button variant="outline" className="w-full mt-2" onClick={() => demoAction('Notifications updated')}>Save Notifications</Button>
+                    <Button variant="outline" className="w-full mt-2" onClick={() => demoAction('Notifications updated')}>Save Athlete Notifications</Button>
                   </div>
                 </DataCard>
               </div>

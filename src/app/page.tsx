@@ -26,7 +26,7 @@ const roleValues = [
     title: 'Run a credible league. Keep team data current.',
     points: ['leagues run verified competitions', 'teams keep athlete data current', 'publish fixtures and results', 'build sponsor-ready records', 'track GoalPlace Index'],
     ctaLabel: 'Pilot with Your League',
-    ctaLink: '/register?role=league-admin',
+    ctaLink: '/register?role=league_admin',
     icon: Building03Icon,
   },
   {
@@ -137,7 +137,7 @@ export default function PublicLandingPage() {
               transition={{ duration: 0.45, delay: 0.15 }}
               className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap"
             >
-              <Button size="lg" onClick={() => router.push('/register?role=league-admin')}>
+              <Button size="lg" onClick={() => router.push('/register?role=league_admin')}>
                 Pilot with Your League
               </Button>
               <Button size="lg" variant="gold" onClick={() => router.push('/sponsors')}>

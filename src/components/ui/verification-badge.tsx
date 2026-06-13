@@ -1,12 +1,20 @@
-import React from 'react';
-import { CheckmarkCircle01Icon } from 'hugeicons-react';
-import { cn } from '@/lib/utils';
+'use client';
 
-export function VerificationBadge({ className }: { className?: string }) {
+import React from 'react';
+import { StatusDomain, StatusExplainerChip } from './product';
+
+export function VerificationBadge({
+  className,
+  status = 'verified',
+  domain = 'athlete',
+  showDetail = false,
+}: {
+  className?: string;
+  status?: string;
+  domain?: StatusDomain;
+  showDetail?: boolean;
+}) {
   return (
-    <div className={cn("inline-flex items-center gap-1 bg-primary/20 text-primary px-2 py-0.5 rounded-full text-xs font-semibold", className)}>
-      <CheckmarkCircle01Icon className="w-3 h-3" />
-      <span>Verified</span>
-    </div>
+    <StatusExplainerChip domain={domain} status={status} showDetail={showDetail} className={className} />
   );
 }

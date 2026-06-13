@@ -34,7 +34,7 @@ function TeamsPageContent() {
         if (verifiedOnly && !team.verified) return false;
         return true;
       }),
-    [cityFilter, sportFilter, teams, verifiedOnly]
+    [cityFilter, leagueId, sportFilter, teams, verifiedOnly]
   );
 
   const totalSupport = filteredTeams.reduce((sum, team) => sum + (team.supportPool ?? team.totalSupport ?? 0), 0);

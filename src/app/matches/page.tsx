@@ -11,7 +11,7 @@ import { EmptyState, ImpactStatCard, PageContainer, SectionHeader, StickyFilterB
 import { MatchCard } from '@/components/ui/match-card';
 import { Button } from '@/components/ui/button';
 
-const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Live', 'Upcoming', 'Completed', 'Following'];
+const filters = ['All', 'Football', 'Basketball', 'Rugby', 'Live', 'Upcoming', 'Completed', 'Verified', 'Pending Verification', 'Disputed', 'Following'];
 
 function MatchesPageContent() {
   const router = useRouter();
@@ -26,10 +26,13 @@ function MatchesPageContent() {
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return match.sport === activeFilter;
       if (['Live', 'Upcoming', 'Completed'].includes(activeFilter)) return match.status === activeFilter;
+      if (activeFilter === 'Verified') return String(match.verificationStatus).toLowerCase() === 'verified';
+      if (activeFilter === 'Pending Verification') return String(match.verificationStatus).toLowerCase().includes('pending');
+      if (activeFilter === 'Disputed') return String(match.verificationStatus).toLowerCase() === 'disputed';
       if (activeFilter === 'Following') return ['m1', 'm2', 'm3'].includes(match.id);
       return true;
     });
-  }, [activeFilter, matches]);
+  }, [activeFilter, leagueId, matches]);
 
   const liveMatches = filteredMatches.filter((match) => match.status === 'Live');
   const upcomingMatches = filteredMatches.filter((match) => match.status === 'Upcoming');

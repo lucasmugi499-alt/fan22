@@ -7,9 +7,13 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight01Icon } from 'hugeicons-react';
 import { SportSlug, getSportTheme, sports } from '@/lib/sportThemes';
-import { buttonVariants } from '@/components/ui/button';
 import { ImpactStatCard, PageContainer, SectionHeader, SportBadge, TrustNote } from '@/components/ui/product';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { cn } from '@/lib/utils';
+
+const linkButtonClass = "inline-flex min-h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-center text-sm font-black leading-tight transition-all";
+const activeLinkClass = "bg-gradient-to-r from-[var(--goal-emerald)] to-[var(--goal-mint)] text-[#031008] shadow-[0_12px_35px_rgba(0,196,106,0.22)]";
+const outlineLinkClass = "border-white/12 bg-white/6 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-white/22 hover:bg-white/10";
 
 function normalizeSport(slug?: string) {
   if (slug === 'basketball') return 'Basketball';
@@ -36,7 +40,11 @@ function SportsContent() {
 
       <div className="mb-6 hide-scrollbar flex gap-2 overflow-x-auto">
         {sports.map((sport) => (
-          <Link key={sport.slug} href={`/sports?sport=${sport.slug as SportSlug}`} className={buttonVariants({ variant: sport.name === selectedSport ? 'default' : 'outline', size: 'sm' })}>
+          <Link
+            key={sport.slug}
+            href={`/sports?sport=${sport.slug as SportSlug}`}
+            className={cn(linkButtonClass, "min-h-11 px-3 py-1.5 text-[0.8rem] sm:min-h-8", sport.name === selectedSport ? activeLinkClass : outlineLinkClass)}
+          >
             {sport.name}
           </Link>
         ))}
@@ -51,10 +59,10 @@ function SportsContent() {
             Track athletes, fixtures, verified challenges, and community activity across Uganda&apos;s {selectedSport.toLowerCase()} scene.
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <Link className={buttonVariants()} href={`/athletes?filter=${theme.slug}`}>
+            <Link className={cn(linkButtonClass, activeLinkClass)} href={`/athletes?filter=${theme.slug}`}>
               Explore Athletes
             </Link>
-            <Link className={buttonVariants({ variant: 'outline' })} href="/matches">
+            <Link className={cn(linkButtonClass, outlineLinkClass)} href="/matches">
               View Matches
             </Link>
           </div>
