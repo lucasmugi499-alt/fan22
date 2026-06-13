@@ -189,7 +189,7 @@ export function SupportModal({
               </p>
               <ul className="mt-3 space-y-1 text-xs text-slate-300">
                 <li>• No fan cash winnings.</li>
-                <li>• Support never affects league standings.</li>
+                <li>• Sponsor support is tracked separately and never affects match results, rankings, or athlete verification.</li>
               </ul>
             </div>
             <TrustNote compact items={trustStatements.slice(0, 3)} />
@@ -300,7 +300,7 @@ export function PledgeModal({
               <ul className="mt-3 space-y-1 text-xs text-[var(--goal-gold)] font-bold">
                 <li>• Demo only. Real payments are not enabled yet.</li>
                 <li>• No fan cash winnings.</li>
-                <li>• Support never affects league standings.</li>
+                <li>• Sponsor support is tracked separately and never affects match results, rankings, or athlete verification.</li>
               </ul>
             </div>
             <TrustNote compact items={trustStatements.slice(1, 5)} />

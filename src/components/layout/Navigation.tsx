@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon } from 'hugeicons-react';
+import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon, ListViewIcon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
@@ -10,9 +10,22 @@ import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 
+type NavItem = { name: string; href: string; icon: React.ElementType };
+
+function isNavActive(item: NavItem, pathname: string, currentHref: string) {
+  const [itemPath] = item.href.split('?');
+
+  if (item.href.includes('?')) {
+    return currentHref === item.href;
+  }
+
+  return pathname === itemPath || (itemPath !== '/' && pathname.startsWith(`${itemPath}/`));
+}
+
 export function MobileNav() {
   const pathname = usePathname();
   const { authStatus, role } = useAuth();
+  const [moreOpen, setMoreOpen] = useState(false);
   
   if (authStatus !== 'logged_in') {
     // Hide bottom nav on logged out marketing pages
@@ -20,22 +33,50 @@ export function MobileNav() {
   }
 
   const getMobileItems = (currentRole: AppRole | null) => {
-    // If the role exists in our new ROLE_CONFIGS, use it.
     let configRole = currentRole || 'fan';
     if (configRole === 'super_admin') configRole = 'platform_admin';
-    if (configRole === 'sponsor') configRole = 'fan'; // Sponsor is just public now
     
     const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
     return config.navItems;
   };
 
   const navItems = getMobileItems(role);
+  const visibleItems = navItems.length > 5 ? navItems.slice(0, 4) : navItems.slice(0, 5);
+  const overflowItems = navItems.length > 5 ? navItems.slice(4) : [];
+  const currentHref = pathname;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#05070A]/82 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_60px_rgba(0,0,0,0.36)] backdrop-blur-2xl lg:hidden">
-      <nav className="mx-auto grid h-16 max-w-md grid-cols-5 px-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#05070A]/88 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_60px_rgba(0,0,0,0.36)] backdrop-blur-2xl lg:hidden">
+      {moreOpen && overflowItems.length > 0 && (
+        <>
+          <button className="fixed inset-0 -z-10 cursor-default" aria-label="Close mobile navigation menu" onClick={() => setMoreOpen(false)} />
+          <div className="mx-auto mb-2 max-w-md px-3">
+            <div className="rounded-xl border border-white/10 bg-[#0A0D14]/96 p-2 shadow-2xl">
+              {overflowItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = isNavActive(item, pathname, currentHref);
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setMoreOpen(false)}
+                    className={cn(
+                      "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold transition-colors",
+                      isActive ? "bg-white/8 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white"
+                    )}
+                  >
+                    <Icon className={cn("size-4", isActive && "text-[var(--goal-mint)]")} />
+                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+      <nav className="mx-auto grid h-[4.25rem] max-w-md grid-cols-5 px-2">
+        {visibleItems.map((item) => {
+          const isActive = isNavActive(item, pathname, currentHref);
           const Icon = item.icon;
           return (
             <Link
@@ -57,6 +98,20 @@ export function MobileNav() {
             </Link>
           );
         })}
+        {overflowItems.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((value) => !value)}
+            className={cn(
+              "relative flex h-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-bold transition-colors",
+              moreOpen ? "text-white" : "text-slate-400 hover:text-white"
+            )}
+          >
+            <ListViewIcon className={cn("mt-1 size-5", moreOpen && "text-[var(--goal-mint)]")} />
+            <span className="truncate">More</span>
+          </button>
+        )}
       </nav>
     </div>
   );
@@ -66,8 +121,8 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   if (authStatus !== 'logged_in') {
     return [
       { name: 'Home', href: '/', icon: Home01Icon },
+      { name: 'How It Works', href: '/how-it-works', icon: HelpCircleIcon },
       { name: 'Verification', href: '/verification', icon: Shield01Icon },
-      { name: 'How It Works', href: '/#how-it-works', icon: HelpCircleIcon },
       { name: 'Sponsors', href: '/sponsors', icon: UserGroupIcon },
       { name: 'Pilot', href: '/pilot', icon: InformationCircleIcon },
     ];
@@ -75,7 +130,6 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
 
   let configRole = role || 'fan';
   if (configRole === 'super_admin') configRole = 'platform_admin';
-  if (configRole === 'sponsor') configRole = 'fan';
 
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
   
@@ -88,10 +142,7 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
     desktopItems.push({ name: 'Awards', href: '/awards', icon: Trophy });
     desktopItems.push({ name: 'Profile', href: '/profile', icon: UserIcon });
   } else if (configRole === 'athlete') {
-    desktopItems.push({ name: 'Wallet', href: '/wallet', icon: Wallet01Icon });
-    desktopItems.push({ name: 'Settings', href: '/settings', icon: Settings01Icon });
-  } else if (configRole === 'platform_admin') {
-    desktopItems.push({ name: 'Sponsor Dashboard', href: '/sponsor-dashboard', icon: UserGroupIcon });
+    desktopItems.push({ name: 'Home', href: '/home', icon: Home01Icon });
   }
   
   // Deduplicate by name just in case
@@ -125,7 +176,7 @@ function AccountMenu() {
     <div className="relative">
       <button 
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-lg border border-[var(--goal-emerald)]/40 bg-[var(--goal-emerald)]/10 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-[var(--goal-emerald)]/20"
+        className="flex min-h-11 items-center gap-2 rounded-lg border border-[var(--goal-emerald)]/40 bg-[var(--goal-emerald)]/10 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-[var(--goal-emerald)]/20"
       >
         <span className="truncate max-w-[100px]">{userProfile.name.split(' ')[0]}</span>
         <ArrowDown01Icon className="size-4 text-[var(--goal-mint)]" />
@@ -168,10 +219,11 @@ function AccountMenu() {
 
 export function DesktopNav() {
   const pathname = usePathname();
-  const { authStatus, role } = useAuth();
+  const { authStatus, role, isDemoMode } = useAuth();
   
   const navItems = getDesktopNavItems(authStatus, role);
   const brandHref = authStatus === 'logged_in' ? '/home' : '/';
+  const currentHref = pathname;
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center border-b border-white/10 bg-[#05070A]/76 px-4 shadow-[0_14px_60px_rgba(0,0,0,0.26)] backdrop-blur-2xl xl:px-8">
@@ -182,16 +234,16 @@ export function DesktopNav() {
         <span className="hidden font-display text-lg font-black tracking-tight text-white md:block xl:text-xl">GoalPlace<span className="text-[var(--goal-mint)]">256</span></span>
       </Link>
       
-      <nav className="hidden flex-1 items-center gap-1 lg:flex lg:gap-2">
+      <nav className="hide-scrollbar hidden flex-1 items-center gap-1 overflow-x-auto lg:flex lg:gap-2" aria-label="Primary navigation">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+          const isActive = isNavActive(item, pathname, currentHref);
           const Icon = item.icon;
           return (
             <Link
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-400 transition-all hover:bg-white/6 hover:text-white xl:text-sm",
+                "flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-400 transition-all hover:bg-white/6 hover:text-white xl:text-sm",
                 isActive && "bg-white/8 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
               )}
             >
@@ -204,14 +256,21 @@ export function DesktopNav() {
       
       <div className="flex shrink-0 items-center gap-2 ml-auto lg:ml-0">
         {authStatus === 'logged_in' ? (
-          <AccountMenu />
+          <>
+            {isDemoMode && (
+              <span className="hidden rounded-lg border border-[var(--goal-gold)]/30 bg-[var(--goal-gold)]/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--goal-gold)] xl:inline-flex">
+                Demo Mode
+              </span>
+            )}
+            <AccountMenu />
+          </>
         ) : (
           <>
-            <Link href="/login" className="hidden lg:flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/5 xl:text-sm">
+            <Link href="/login" className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-white/5 sm:px-3 xl:text-sm">
               <Login01Icon className="size-4" />
-              Login
+              <span className="hidden sm:inline">Login</span>
             </Link>
-            <Link href="/register" className="flex items-center gap-2 rounded-lg bg-[var(--goal-emerald)] px-4 py-2 text-sm font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]">
+            <Link href="/register" className="flex min-h-11 items-center gap-2 rounded-lg bg-[var(--goal-emerald)] px-3 py-2 text-sm font-bold text-[#05070A] transition-colors hover:bg-[#00E67A] sm:px-4">
               Sign Up
             </Link>
           </>

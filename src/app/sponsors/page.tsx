@@ -29,9 +29,9 @@ export default function SponsorsPage() {
             Sponsor grassroots leagues, teams, and athletes on the verified talent infrastructure layer for Africa, built for transparent, measurable impact.
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <Button variant="gold" onClick={() => setInterestOpen(true)}>Become a Sponsor</Button>
-            <Button variant="outline" onClick={() => document.getElementById('packages')?.scrollIntoView({ behavior: 'smooth' })}>View Packages</Button>
-            <Button variant="outline" onClick={() => router.push('/athletes')}>Sponsor Athlete</Button>
+            <Button variant="gold" onClick={() => setInterestOpen(true)}>Sponsor a League</Button>
+            <Button variant="outline" onClick={() => document.getElementById('packages')?.scrollIntoView({ behavior: 'smooth' })}>View Sponsor Packages</Button>
+            <Button variant="outline" onClick={() => router.push('/athletes')}>Sponsor an Athlete</Button>
           </div>
         </div>
       </section>
@@ -56,7 +56,7 @@ export default function SponsorsPage() {
               <h3 className="font-display text-xl font-black text-white">{item.name}</h3>
               <p className="mt-2 text-sm font-black text-[var(--goal-gold)]">{item.price}</p>
               <p className="mt-3 flex-1 text-sm leading-6 text-slate-400">{item.detail}</p>
-              <Button className="mt-5" variant="outline" onClick={() => setInterestOpen(true)}>Request Details</Button>
+              <Button className="mt-5" variant="outline" onClick={() => setInterestOpen(true)}>Request Package Details</Button>
             </div>
           ))}
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity01Icon,
@@ -25,12 +25,14 @@ import {
   DashboardStatGrid,
   DataCard,
   DataTableCard,
+  DemoNotice,
   DetailDrawer,
   ImpactStatCard,
   MobileDataCard,
   PageContainer,
   SportBadge,
   StatusBadge,
+  WorkQueueCard,
 } from '@/components/ui/product';
 import { LeagueStatusBadge } from '@/components/ui/league';
 import { dataProvider } from '@/data/dataProvider';
@@ -86,11 +88,7 @@ export default function AdminPage() {
 
 function AdminDashboard() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { leagues, matches, athletes, teams, feedPosts, challenges, reports, verifications, source } = useGoalPlaceData();
-  const initialTab = searchParams?.get('tab') || 'Overview';
-  const initialLeague = searchParams?.get('league') || '';
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [users, setUsers] = useState<User[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [awards, setAwards] = useState<AwardCategory[]>([]);
@@ -157,7 +155,7 @@ function AdminDashboard() {
     };
   });
 
-  const tabs = [
+  const tabs = useMemo(() => [
     'Overview',
     'Users',
     'Leagues',
@@ -171,13 +169,22 @@ function AdminDashboard() {
     'Awards',
     'System Health',
     'Settings',
-  ];
-  const tabGroups = [
+  ], []);
+  const tabGroups = useMemo(() => [
     { label: 'Control', tabs: ['Overview', 'Users', 'Leagues', 'Athletes', 'Teams'] },
     { label: 'Trust', tabs: ['Verifications', 'Reports', 'Feed Moderation', 'Support/Payout Review'] },
     { label: 'Growth', tabs: ['Sponsors', 'Awards'] },
     { label: 'System', tabs: ['System Health', 'Settings'] },
-  ];
+  ], []);
+  const routeTab = searchParams?.get('tab');
+  const routeKey = searchParams?.toString() ?? '';
+  const [localTab, setLocalTab] = useState<{ routeKey: string; tab: string | null }>({ routeKey, tab: null });
+  const activeTab = localTab.routeKey === routeKey && localTab.tab
+    ? localTab.tab
+    : routeTab && tabs.includes(routeTab)
+      ? routeTab
+      : 'Overview';
+  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
 
   const openDetail = (title: string, description: string, details: [string, React.ReactNode][]) => {
     setDrawer({
@@ -196,6 +203,45 @@ function AdminDashboard() {
     setApprovedLeagueIds((items) => new Set([...items, leagueId]));
     toast.success('League approval recorded in demo mode.');
   };
+
+  const adminQueues = [
+    {
+      title: 'League Approvals Queue',
+      entity: pendingLeagues[0]?.name ?? 'Kampala Youth League',
+      detail: `${pendingLeagues.length} league records need application, admin, and competition status review.`,
+      priority: 'High' as const,
+      submittedAt: '18m ago',
+      actionLabel: 'Review League Application',
+      action: () => setActiveTab('Leagues'),
+    },
+    {
+      title: 'Report Moderation Queue',
+      entity: platformReports[0]?.reportedEntity ?? 'Reported feed post',
+      detail: `${platformReports.length} moderation or dispute reports are open or under review.`,
+      priority: 'Medium' as const,
+      submittedAt: platformReports[0]?.updated ?? '42m ago',
+      actionLabel: 'Review Moderation Report',
+      action: () => setActiveTab('Reports'),
+    },
+    {
+      title: 'Payout Review Queue',
+      entity: payoutRows[0]?.athlete?.name ?? 'Athlete support release',
+      detail: `${payoutRows.length} demo payout reviews need evidence checks before a demo approval can be recorded.`,
+      priority: 'High' as const,
+      submittedAt: 'Today',
+      actionLabel: 'Review Payout Request',
+      action: () => setActiveTab('Support/Payout Review'),
+    },
+    {
+      title: 'Sponsor Package Queue',
+      entity: sponsors[0]?.name ?? 'Sponsor package',
+      detail: 'Review package status, impact reporting readiness, and public visibility before renewal.',
+      priority: 'Low' as const,
+      submittedAt: '2h ago',
+      actionLabel: 'Manage Sponsor Package',
+      action: () => setActiveTab('Sponsors'),
+    },
+  ];
 
   return (
     <PageContainer compact className="space-y-6">
@@ -224,29 +270,31 @@ function AdminDashboard() {
         <ImpactStatCard label="Leagues" value={String(leagues.length)} detail={`${pendingLeagues.length} need review`} icon={Building01Icon} />
         <ImpactStatCard label="Athletes" value={String(athletes.length)} detail={`${athletes.filter((item) => item.verified).length} verified`} icon={Trophy} tone="gold" />
         <ImpactStatCard label="Reports" value={String(platformReports.length)} detail="Moderation and support issues" icon={Alert01Icon} tone="orange" />
-        <ImpactStatCard label="Payout reviews" value={String(payoutRows.length)} detail="Demo support releases" icon={Coins01Icon} tone="blue" />
+        <ImpactStatCard label="Payout reviews" value={String(payoutRows.length)} detail="Demo payout reviews only" icon={Coins01Icon} tone="blue" />
       </DashboardStatGrid>
 
       <ActionToolbar>
         <Button size="sm" onClick={() => { setActiveTab('Leagues'); toast.success('League approvals opened.'); }}><CheckmarkCircle01Icon className="size-4" /> Approve League</Button>
-        <Button size="sm" variant="outline" onClick={() => setModalOpen('reviewDispute')}><Flag01Icon className="size-4" /> Review Reports</Button>
-        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Feed Moderation'); toast.success('Feed moderation opened.'); }}><Comment01Icon className="size-4" /> Moderate Feed</Button>
-        <Button size="sm" variant="gold" onClick={() => setModalOpen('reviewPayout')}><Coins01Icon className="size-4" /> Review Support</Button>
+        <Button size="sm" variant="outline" onClick={() => setModalOpen('reviewDispute')}><Flag01Icon className="size-4" /> Review Moderation Report</Button>
+        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Feed Moderation'); toast.success('Reported feed posts opened.'); }}><Comment01Icon className="size-4" /> Review Reported Feed Posts</Button>
+        <Button size="sm" variant="gold" onClick={() => setModalOpen('reviewPayout')}><Coins01Icon className="size-4" /> Review Payout Requests</Button>
       </ActionToolbar>
 
       {activeTab === 'Overview' && (
         <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-          <DashboardSection eyebrow="Urgent" title="Admin priorities">
+          <DashboardSection eyebrow="Control Queues" title="Admin priorities">
             <div className="grid gap-3">
-              {[
-                ['League verification', `${pendingLeagues.length} league records need status review`, 'Leagues'],
-                ['Moderation queue', `${platformReports.length} reports are open or reviewing`, 'Reports'],
-                ['Support review', `${payoutRows.length} demo support releases await sign-off`, 'Support/Payout Review'],
-              ].map(([title, detail, tab]) => (
-                <button key={title} className="rounded-xl border border-white/10 bg-white/[0.045] p-4 text-left transition-colors hover:border-[var(--goal-emerald)]/35" onClick={() => setActiveTab(tab)}>
-                  <p className="font-display text-lg font-black text-white">{title}</p>
-                  <p className="mt-1 text-sm text-slate-400">{detail}</p>
-                </button>
+              {adminQueues.map((queue) => (
+                <WorkQueueCard
+                  key={queue.title}
+                  title={queue.title}
+                  entity={queue.entity}
+                  detail={queue.detail}
+                  priority={queue.priority}
+                  submittedAt={queue.submittedAt}
+                  actionLabel={queue.actionLabel}
+                  onAction={queue.action}
+                />
               ))}
             </div>
           </DashboardSection>
@@ -451,7 +499,10 @@ function AdminDashboard() {
       )}
 
       {activeTab === 'Support/Payout Review' && (
-        <DashboardSection eyebrow="Support/Payout Review" title="Demo support release ledger" description="Demo payout review only. Real payment processing is not enabled yet.">
+        <DashboardSection eyebrow="Support/Payout Review" title="Payout review queue" description="Demo payout reviews only. Real payment processing is not enabled.">
+          <DemoNotice title="Demo payout reviews only">
+            Real payment processing is not enabled. Demo approvals record review intent without moving funds.
+          </DemoNotice>
           <div className="grid gap-3 lg:grid-cols-2">
             {payoutRows.map((payout) => (
               <DataCard key={payout.id}>
@@ -469,8 +520,8 @@ function AdminDashboard() {
                   <MiniMeta label="Net" value={formatUGX(payout.net)} />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => openDetail(payout.athlete?.name ?? 'Support release', 'Support/Payout review detail.', [['Athlete/team', `${payout.athlete?.name ?? 'Athlete'} / ${payout.team?.name ?? 'Team pending'}`], ['Support type', payout.supportType], ['Related challenge', payout.type], ['Net amount', formatUGX(payout.net)]])}>Review</Button>
-                  <Button size="sm" variant="gold" onClick={() => toast.success('Demo support release approved. Real payments are not enabled yet.')}>Approve Demo Review</Button>
+                  <Button size="sm" variant="outline" onClick={() => openDetail(payout.athlete?.name ?? 'Support release', 'Payout request detail.', [['Athlete/team', `${payout.athlete?.name ?? 'Athlete'} / ${payout.team?.name ?? 'Team pending'}`], ['Support type', payout.supportType], ['Related challenge', payout.type], ['Net amount', formatUGX(payout.net)]])}>Review Payout Request</Button>
+                  <Button size="sm" variant="gold" onClick={() => toast.success('Demo payout review approved. Real payments are not enabled.')}>Approve Demo Review</Button>
                 </div>
               </DataCard>
             ))}
@@ -490,7 +541,7 @@ function AdminDashboard() {
                   <MiniMeta label="Commitment" value={formatUGX(sponsor.amountCommitted)} />
                 </div>
                 <p className="mt-4 text-sm leading-6 text-slate-300">{sponsor.impactSummary}</p>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${sponsor.name} package opened.`)}>Manage Package</Button>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${sponsor.name} package opened.`)}>Manage Sponsor Package</Button>
               </DataCard>
             ))}
           </div>

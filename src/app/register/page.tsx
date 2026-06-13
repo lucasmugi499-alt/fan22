@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { PageContainer } from '@/components/ui/product';
-import { Shield01Icon, UserIcon, ArrowRight01Icon } from 'hugeicons-react';
+import { Shield01Icon, UserIcon, ArrowRight01Icon, Building03Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
@@ -69,6 +69,13 @@ function RegisterContent() {
       description: 'Create a league admin account to manage teams, athletes, fixtures, results, verifications, and community updates.', 
       icon: Shield01Icon,
       color: 'text-red-400'
+    },
+    {
+      id: 'sponsor',
+      title: 'Sponsor',
+      description: 'Create a sponsor account to track funded needs, verified beneficiaries, brand visibility, and impact reports.',
+      icon: Building03Icon,
+      color: 'text-[var(--goal-gold)]'
     }
   ];
 

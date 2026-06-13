@@ -42,7 +42,7 @@ function HomeContent() {
   const todayMatches = useMemo(() => matches.filter((m) => m.status === 'Live' || m.status === 'Upcoming').slice(0, 4), [matches]);
   const personalizedFeed = feedPosts.slice(0, 4);
 
-  const configRole = role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
+  const configRole = role === 'super_admin' ? 'platform_admin' : (role || 'fan');
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
 
   const handleLogout = async () => {
@@ -356,7 +356,7 @@ function HomeContent() {
               </div>
             </div>
             <div>
-              <SectionHeader eyebrow="Payouts" title="Support/Payout Review" description="Pending transactions." />
+              <SectionHeader eyebrow="Payouts" title="Payout review queue" description="Demo payout reviews only. Real payment processing is not enabled." />
               <div className="space-y-4">
                 {[
                   { id: 'pay_1', amount: '1.2M UGX', reason: 'Challenge Complete', status: 'Pending Approval' },
@@ -367,9 +367,55 @@ function HomeContent() {
                       <p className="font-bold text-white">{pay.amount}</p>
                       <p className="mt-1 text-sm text-slate-400">{pay.reason}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => router.push('/admin')}>Approve</Button>
+                    <Button variant="outline" size="sm" onClick={() => router.push('/admin?tab=Support%2FPayout%20Review')}>Review Payout Request</Button>
                   </DataCard>
                 ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {configRole === 'sponsor' && (
+        <>
+          <section className="grid gap-3 md:grid-cols-4">
+            <ImpactStatCard label="Total committed" value="5M UGX" icon={Wallet01Icon} tone="gold" />
+            <ImpactStatCard label="Athletes impacted" value="45" icon={UserIcon} />
+            <ImpactStatCard label="Funded needs" value="18" icon={SecurityCheckIcon} tone="blue" />
+            <ImpactStatCard label="Reports" value="Enabled" icon={Notification01Icon} tone="orange" />
+          </section>
+
+          <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <SectionHeader eyebrow="Impact" title="Sponsor reporting snapshot" description="Review funded needs, beneficiary evidence, and monthly report readiness." />
+              <div className="space-y-4">
+                {[
+                  { title: 'Matchday transport funded', detail: '8 athletes supported with verified team admin evidence.', action: 'View Evidence' },
+                  { title: 'Training equipment allocated', detail: '12 athletes reached across a verified partner league.', action: 'Open Timeline' },
+                  { title: 'Monthly impact report ready', detail: 'Download a demo report with allocation and visibility metrics.', action: 'Download Report' },
+                ].map((item) => (
+                  <DataCard key={item.title} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-bold text-white">{item.title}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-400">{item.detail}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => router.push('/sponsor-dashboard')}>{item.action}</Button>
+                  </DataCard>
+                ))}
+              </div>
+            </div>
+            <div>
+              <SectionHeader eyebrow="Next" title="Sponsor actions" description="Move from overview to report, package, or brand visibility details." />
+              <div className="grid gap-3">
+                <Button onClick={() => router.push('/sponsor-dashboard?tab=Monthly%20Report')}>
+                  Download Impact Report
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/sponsor-dashboard?tab=Supported%20Entities')}>
+                  View Supported Entities
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/sponsor-dashboard?tab=Brand%20Visibility')}>
+                  View Brand Visibility
+                </Button>
               </div>
             </div>
           </section>

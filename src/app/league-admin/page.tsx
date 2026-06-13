@@ -109,7 +109,6 @@ function LeagueAdminDashboard() {
   const { leagues, teams, athletes, matches, challenges, feedPosts, reports } = useGoalPlaceData();
   const initialLeague = searchParams?.get('league') || leagues[0]?.id || '';
   const [selectedLeagueId, setSelectedLeagueId] = useState(initialLeague);
-  const [activeTab, setActiveTab] = useState('Overview');
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [matchOverrides, setMatchOverrides] = useState<Record<string, VerificationStatus>>({});
   const [challengeOverrides, setChallengeOverrides] = useState<Record<string, VerificationStatus>>({});
@@ -135,14 +134,23 @@ function LeagueAdminDashboard() {
   );
   const standings = useMemo(() => buildLeagueStandings(leagueTeams, leagueMatches), [leagueMatches, leagueTeams]);
 
-  const tabs = [
+  const tabs = useMemo(() => [
     'Overview',
     'Teams & Athletes',
     'Fixtures & Results',
     'Verification',
     'Sponsor Report',
     'Settings',
-  ];
+  ], []);
+  const routeTab = searchParams?.get('tab');
+  const routeKey = searchParams?.toString() ?? '';
+  const [localTab, setLocalTab] = useState<{ routeKey: string; tab: string | null }>({ routeKey, tab: null });
+  const activeTab = localTab.routeKey === routeKey && localTab.tab
+    ? localTab.tab
+    : routeTab && tabs.includes(routeTab)
+      ? routeTab
+      : 'Overview';
+  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
 
   const quickActions = {
     createFixture: () => setModalOpen('createFixture'),

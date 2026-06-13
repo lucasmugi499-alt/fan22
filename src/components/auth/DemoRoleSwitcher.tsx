@@ -6,11 +6,12 @@ import { AppRole } from '@/types';
 import { Shield01Icon, ArrowUp01Icon, UserIcon, Logout01Icon } from 'hugeicons-react';
 import { cn } from '@/lib/utils';
 
-const ROLES: { id: AppRole; label: string }[] = [
-  { id: 'fan', label: 'Fan' },
+const ROLES: { id: AppRole | null; label: string }[] = [
+  { id: null, label: 'Public' },
   { id: 'athlete', label: 'Athlete' },
   { id: 'league_admin', label: 'League Admin' },
   { id: 'platform_admin', label: 'Platform Admin' },
+  { id: 'sponsor', label: 'Sponsor' },
 ];
 
 export function DemoRoleSwitcher() {
@@ -33,14 +34,14 @@ export function DemoRoleSwitcher() {
         <div className="flex flex-col p-1">
           {ROLES.map((r) => (
             <button
-              key={r.id}
+              key={r.id ?? 'public'}
               onClick={() => {
                 setDemoRole(r.id);
                 setIsOpen(false);
               }}
               className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-                role === r.id 
+                "flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                (r.id === null ? !isDemoMode : role === r.id)
                   ? "bg-[var(--goal-emerald)]/10 font-bold text-[var(--goal-mint)]"
                   : "text-slate-300 hover:bg-white/5"
               )}
@@ -59,10 +60,10 @@ export function DemoRoleSwitcher() {
               }
               setIsOpen(false);
             }}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+            className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
           >
             <Logout01Icon className="size-4" />
-            Sign Out
+            {isDemoMode ? 'Exit Demo Mode' : 'Sign Out'}
           </button>
         </div>
       </div>
@@ -77,7 +78,7 @@ export function DemoRoleSwitcher() {
         )}
       >
         <Shield01Icon className="size-4" />
-        {isDemoMode ? `Demo: ${role}` : "Demo Roles"}
+        {isDemoMode ? `Demo: ${role?.replace('_', ' ')}` : "Demo Roles"}
         <ArrowUp01Icon className={cn("size-4 transition-transform duration-200", isOpen && "rotate-180")} />
       </button>
     </div>

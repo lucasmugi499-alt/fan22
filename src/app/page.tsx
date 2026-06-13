@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 import { ArrowRight01Icon, Building03Icon, CheckmarkCircle01Icon, UserGroupIcon, ChartLineData01Icon, LockKeyIcon, SecurityCheckIcon, ZapIcon, UserIcon, Shield01Icon } from 'hugeicons-react';
 import { Trophy, Users } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
-import { ImpactStatCard, PageContainer, SectionHeader, TrustNote } from '@/components/ui/product';
+import { ImpactStatCard, PageContainer, SectionHeader } from '@/components/ui/product';
 import { useAuth } from '@/context/AuthProvider';
 
 const heroImage = '/images/goalplace256-hero.png';
@@ -55,6 +55,15 @@ const roleValues = [
   },
 ];
 
+const verificationFlow = [
+  'League registers competition',
+  'Teams and athletes are verified',
+  'Matches and results are recorded',
+  'Athlete profiles become credible',
+  'Sponsors fund visible needs',
+  'Reports show measurable impact',
+];
+
 export default function PublicLandingPage() {
   const router = useRouter();
   const { authStatus } = useAuth();
@@ -75,7 +84,7 @@ export default function PublicLandingPage() {
 
   return (
     <div className="w-full overflow-hidden bg-[#05070A]">
-      <section className="relative isolate flex min-h-[calc(100svh-4rem)] items-center overflow-hidden">
+      <section className="relative isolate flex min-h-[calc(88svh-4rem)] items-center overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-40"
           style={{ backgroundImage: `url(${heroImage})` }}
@@ -200,6 +209,34 @@ export default function PublicLandingPage() {
           </div>
         </section>
 
+        <section id="verification-flow" className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div>
+            <SectionHeader
+              eyebrow="Verified Signal Infrastructure"
+              title="Verification creates trust. Trust creates value."
+              description="Every record moves through a clear operating flow so leagues, athletes, sponsors, and admins can see what happened and why it matters."
+            />
+            <div className="rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-5">
+              <SecurityCheckIcon className="mb-4 size-7 text-[var(--goal-mint)]" />
+              <p className="text-sm leading-7 text-slate-300">
+                Sponsor support is tracked separately and never affects match results, rankings, or athlete verification. Sporting credibility stays protected while impact becomes measurable.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {verificationFlow.map((step, index) => (
+              <div key={step} className="signal-card rounded-xl border border-white/10 bg-white/[0.045] p-5">
+                <div className="relative z-10">
+                  <span className="flex size-9 items-center justify-center rounded-lg border border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/10 font-display text-sm font-black text-[var(--goal-mint)]">
+                    {index + 1}
+                  </span>
+                  <h3 className="mt-5 font-display text-xl font-black text-white">{step}</h3>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section id="why-verified-records-matter" className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
             <SectionHeader
@@ -230,7 +267,7 @@ export default function PublicLandingPage() {
             <div className="mt-8 rounded-xl border border-white/10 bg-black/40 p-5">
               <h4 className="font-bold text-[var(--goal-mint)]">Trust Statement</h4>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Paid support never affects league standings. Standings are based only on match results. GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.
+                Sponsor support is tracked separately and never affects match results, rankings, or athlete verification. GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.
               </p>
             </div>
           </div>

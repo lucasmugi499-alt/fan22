@@ -18,7 +18,7 @@ export const demoAccounts: Array<{ label: string; email: string; role: AppRole; 
   { label: 'League Admin Demo', email: 'league@goalplace256.com', role: 'league_admin' },
   { label: 'Platform Admin Demo', email: 'admin@goalplace256.com', role: 'platform_admin' },
   { label: 'Internal Team Demo', email: 'team@goalplace256.com', role: 'team_admin', internal: true },
-  { label: 'Sponsor Demo', email: 'sponsor@goalplace256.com', role: 'sponsor', internal: true },
+  { label: 'Sponsor Demo', email: 'sponsor@goalplace256.com', role: 'sponsor' },
   { label: 'Internal Platform Owner Demo', email: 'superadmin@goalplace256.com', role: 'super_admin', internal: true },
 ];
 
@@ -115,7 +115,7 @@ export function routeForAppRole(role?: AppRole | null) {
   if (role === 'athlete') return '/athlete-dashboard';
   if (role === 'team_admin') return '/team-admin';
   if (role === 'league_admin') return '/league-admin';
-  if (role === 'sponsor') return '/sponsors';
+  if (role === 'sponsor') return '/sponsor-dashboard';
   if (role === 'platform_admin' || role === 'super_admin') return '/admin';
   return '/home';
 }

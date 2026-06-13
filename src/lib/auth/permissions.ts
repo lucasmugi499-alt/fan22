@@ -94,7 +94,7 @@ export function canViewPlatformAdminDashboard(auth: AuthState): boolean {
 }
 
 export function canAccessSponsorDashboard(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['platform_admin', 'super_admin']);
+  return hasAnyRole(auth, ['sponsor', 'platform_admin', 'super_admin']);
 }
 
 export function canCreateFixture(auth: AuthState): boolean {
@@ -106,7 +106,7 @@ export function canCreateChallenge(auth: AuthState): boolean {
 }
 
 export function canRegisterAsRole(role: AppRole): boolean {
-  return ['fan', 'athlete', 'league_admin'].includes(role);
+  return ['fan', 'athlete', 'league_admin', 'sponsor'].includes(role);
 }
 
 // Verifications
@@ -151,7 +151,7 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
     case 'super_admin':
       return '/admin';
     case 'sponsor':
-      return '/sponsors';
+      return '/sponsor-dashboard';
     default:
       return '/';
   }
@@ -161,6 +161,7 @@ export const PUBLIC_ROUTES = [
   '/',
   '/about',
   '/how-it-works',
+  '/verification',
   '/sponsors',
   '/pilot',
   '/login',
@@ -192,7 +193,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/sponsor-dashboard')) {
-    return hasAnyRole(auth, ['platform_admin', 'super_admin']);
+    return hasAnyRole(auth, ['sponsor', 'platform_admin', 'super_admin']);
   }
 
   // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user

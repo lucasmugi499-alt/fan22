@@ -1,34 +1,55 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { UserGroupIcon, SecurityCheckIcon, UserIcon, Upload01Icon, Calendar01Icon, Video01Icon, Activity01Icon, PencilEdit01Icon, LockKeyIcon, Notification01Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { CreatePostModal } from '@/components/modals/app-modals';
-import { DataCard, DetailDrawer, ImpactStatCard, SportBadge, StatusBadge, TabStrip } from '@/components/ui/product';
+import { DataCard, DetailDrawer, EmptyState, ImpactStatCard, SportBadge, StatusBadge, TabStrip, VerificationStatusCard } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { formatUGX } from '@/lib/sportThemes';
 import { toast } from 'sonner';
 
 export default function AthleteDashboardPage() {
+  return (
+    <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading athlete dashboard...</div>}>
+        <AthleteDashboard />
+      </Suspense>
+    </RoleGuard>
+  );
+}
+
+function AthleteDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { athletes, challenges, matches } = useGoalPlaceData();
   const athlete = athletes[0];
   const athleteChallenges = athlete ? challenges.filter((challenge) => challenge.athleteId === athlete.id) : [];
   const upcomingMatches = matches.filter(match => match.status === 'scheduled' || match.status === 'Upcoming').slice(0, 3);
   const nextMatch = upcomingMatches[0];
   const profileCompleteness = athlete?.verified ? 92 : 74;
-  const verificationSteps = [
+  const verificationSteps: Array<[string, string]> = [
     ['Identity', 'Complete'],
     ['League roster', athlete?.verified ? 'Complete' : 'Reviewing'],
     ['Media review', 'Pending upload'],
   ];
   const statRows = Object.entries(athlete?.stats ?? {}).slice(0, 4);
   
-  const [activeTab, setActiveTab] = useState('Overview');
+  const tabs = useMemo(() => ['Overview', 'Profile', 'Challenges', 'Matches', 'Media', 'Supporters', 'Settings'], []);
+  const routeTab = searchParams?.get('tab');
+  const routeKey = searchParams?.toString() ?? '';
+  const [localTab, setLocalTab] = useState<{ routeKey: string; tab: string | null }>({ routeKey, tab: null });
+  const activeTab = localTab.routeKey === routeKey && localTab.tab
+    ? localTab.tab
+    : routeTab && tabs.includes(routeTab)
+      ? routeTab
+      : 'Overview';
+  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
   const [postOpen, setPostOpen] = useState(false);
   const [drawer, setDrawer] = useState<{ title: string; description: string; body: React.ReactNode } | null>(null);
-  const tabs = ['Overview', 'Profile', 'Challenges', 'Matches', 'Media', 'Supporters', 'Settings'];
 
   const demoAction = (action: string, nextTab?: string) => {
     if (nextTab) setActiveTab(nextTab);
@@ -54,8 +75,7 @@ export default function AthleteDashboardPage() {
   };
 
   return (
-    <RoleGuard allowedRoles={['athlete', 'platform_admin', 'super_admin']}>
-      <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
+      <div className="min-h-[calc(100dvh-4rem)] bg-[#05070A]">
         <div className="border-b border-white/10 bg-[#0A0D14] px-4 py-6 md:px-8">
           <div className="mx-auto flex max-w-7xl flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div>
@@ -83,8 +103,8 @@ export default function AthleteDashboardPage() {
               <Button variant="outline" onClick={() => setActiveTab('Challenges')}>
                 <Trophy className="size-4" /> View Challenges
               </Button>
-              <Button variant="gold" onClick={() => athlete ? window.location.assign(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>
-                View Public Profile
+              <Button variant="gold" onClick={() => athlete ? router.push(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>
+                Preview Public Profile
               </Button>
             </div>
           </div>
@@ -92,7 +112,7 @@ export default function AthleteDashboardPage() {
           <TabStrip tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-[#05070A] p-4 md:p-8">
+        <div className="p-5 md:p-8 xl:px-16">
           <div className="mx-auto max-w-7xl space-y-8">
             
             {activeTab === 'Overview' && (
@@ -105,29 +125,13 @@ export default function AthleteDashboardPage() {
                 </section>
                 
                 <section className="grid gap-4 lg:grid-cols-3">
-                  <div className="rounded-xl border border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8 p-5">
-                    <SecurityCheckIcon className="mb-4 size-6 text-[var(--goal-mint)]" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-display text-xl font-black text-white">Athlete Portfolio Score</h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-300">Your visibility score based on verification and profile completeness.</p>
-                      </div>
-                      <StatusBadge tone={athlete?.verified ? 'success' : 'warning'}>{athlete?.verified ? 'Verified' : 'Reviewing'}</StatusBadge>
-                    </div>
-                    <div className="mt-4">
-                      <div className="mb-2 flex justify-between text-xs font-bold text-slate-300"><span>Portfolio completeness</span><span>{profileCompleteness}%</span></div>
-                      <div className="h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${profileCompleteness}%` }} /></div>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {verificationSteps.map(([label, status]) => (
-                        <div key={label} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
-                          <span className="text-slate-300">{label}</span>
-                          <span className="font-bold text-[var(--goal-mint)]">{status}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button className="mt-4 w-full" variant="gold" onClick={() => athlete ? window.location.assign(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>View Public Profile</Button>
-                  </div>
+                  <VerificationStatusCard
+                    title="Athlete Portfolio Score"
+                    progress={profileCompleteness}
+                    steps={verificationSteps}
+                    status={<StatusBadge tone={athlete?.verified ? 'success' : 'warning'}>{athlete?.verified ? 'Verified' : 'Pending Review'}</StatusBadge>}
+                    action={<Button className="w-full" variant="gold" onClick={() => athlete ? router.push(`/athletes/${athlete.id}`) : demoAction('Public profile opened')}>Preview Public Profile</Button>}
+                  />
 
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Calendar01Icon className="mb-4 size-6 text-[var(--goal-mint)]" />
@@ -140,14 +144,14 @@ export default function AthleteDashboardPage() {
                     <Activity01Icon className="mb-4 size-6 text-[var(--goal-gold)]" />
                     <h3 className="font-display text-xl font-black text-white">Supporter Comments</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">&quot;The work rate showed today. Keep building toward the next fixture.&quot;</p>
-                    <Button className="mt-4" variant="outline" onClick={() => demoAction('Feed opened')}>View Feed Activity</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => demoAction('Feed opened')}>View Support Activity</Button>
                   </div>
                   
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <Video01Icon className="mb-4 size-6 text-blue-400" />
                     <h3 className="font-display text-xl font-black text-white">Highlight Activity</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-300">Upload your latest match highlights to attract support.</p>
-                    <Button className="mt-4" variant="outline" onClick={() => openDrawer('Upload Media', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}>Upload Media</Button>
+                    <Button className="mt-4" variant="outline" onClick={() => openDrawer('Upload Highlight', 'Demo upload placeholder for highlight clips and images.', [['Accepted media', 'Images and video clips'], ['Moderation', 'League review before public visibility']])}>Upload Highlight</Button>
                   </div>
                 </section>
 
@@ -166,12 +170,14 @@ export default function AthleteDashboardPage() {
                   <DataCard>
                     <h3 className="font-display text-xl font-black text-white">Active Challenges</h3>
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      {athleteChallenges.slice(0, 2).map((challenge) => (
+                      {athleteChallenges.slice(0, 2).length > 0 ? athleteChallenges.slice(0, 2).map((challenge) => (
                         <div key={challenge.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
                           <p className="font-bold text-white">{challenge.targetDescription ?? challenge.description}</p>
                           <p className="mt-1 text-sm text-slate-400">{formatUGX(challenge.totalPledged)} pledged • {challenge.supportersCount} supporters</p>
                         </div>
-                      ))}
+                      )) : (
+                        <EmptyState title="No active challenges yet" description="Propose a verified performance challenge so supporters can back a clear next goal." />
+                      )}
                     </div>
                   </DataCard>
                 </section>
@@ -233,7 +239,7 @@ export default function AthleteDashboardPage() {
                       </div>
                     </DataCard>
                   )) : (
-                    <div className="col-span-full text-center py-10 border border-white/10 border-dashed rounded-xl text-slate-400">No active challenges. Propose one to engage your supporters!</div>
+                    <EmptyState title="No active challenges yet" description="Propose one verified match goal to engage your supporters and build your visibility score." />
                   )}
                 </div>
               </div>
@@ -336,7 +342,7 @@ export default function AthleteDashboardPage() {
 
             <section className="rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/8 p-5">
               <h3 className="font-display text-xl font-black text-white">Support/Payout History</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Demo payout review only. Real payment processing is not enabled yet.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Demo payout reviews only. Real payment processing is not enabled.</p>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 {[
                   ['Direct support', formatUGX(125000), 'Pending review'],
@@ -359,6 +365,5 @@ export default function AthleteDashboardPage() {
           {drawer?.body}
         </DetailDrawer>
       </div>
-    </RoleGuard>
   );
 }

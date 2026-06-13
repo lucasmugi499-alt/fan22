@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
 import { canAccessRoute, getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { PageContainer } from '@/components/ui/product';
-import { Shield01Icon, UserIcon, SecurityCheckIcon } from 'hugeicons-react';
+import { Shield01Icon, UserIcon, SecurityCheckIcon, Building03Icon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ function AuthContent() {
     { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: UserIcon },
     { id: 'athlete', label: 'Continue as Athlete', description: 'Manage your profile, view supporters, and post highlights.', icon: Trophy },
     { id: 'league_admin', label: 'Continue as League Admin', description: 'Manage teams, athletes, fixtures, and verify results.', icon: Shield01Icon },
+    { id: 'sponsor', label: 'Continue as Sponsor', description: 'Track commitments, funded needs, evidence, and impact reports.', icon: Building03Icon },
     { id: 'platform_admin', label: 'Continue as Platform Admin', description: 'Approve leagues, moderate content, and oversee the platform.', icon: SecurityCheckIcon },
   ];
 

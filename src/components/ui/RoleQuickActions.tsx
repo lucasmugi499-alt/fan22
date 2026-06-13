@@ -16,11 +16,15 @@ export function RoleQuickActions() {
   
   let configRole = role;
   if (role === 'super_admin') configRole = 'platform_admin';
-  if (role === 'sponsor') configRole = 'fan';
   
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
   
   const handleAction = (action: string) => {
+    if (action === 'Download Impact Report') {
+      router.push(configRole === 'sponsor' ? '/sponsor-dashboard?tab=Monthly%20Report' : '/league-admin?tab=Sponsor%20Report');
+      return;
+    }
+
     switch (action) {
       // Fan Actions
       case 'Support Athlete': router.push('/athletes'); break;
@@ -29,34 +33,34 @@ export function RoleQuickActions() {
       case 'View Awards': router.push('/awards'); break;
       
       // Athlete Actions
-      case 'Upload Highlight': toast.info('Highlight upload modal opened'); break;
-      case 'Create Post': toast.info('Create post modal opened'); break;
-      case 'View Supporters': router.push('/athlete-dashboard'); break;
-      case 'Request Verification': toast.success('Verification request submitted'); break;
+      case 'Upload Highlight': router.push('/athlete-dashboard?tab=Media'); break;
+      case 'View Supporters': router.push('/athlete-dashboard?tab=Supporters'); break;
+      case 'Request Verification': router.push('/athlete-dashboard?tab=Profile'); break;
+      case 'Review Public Profile': router.push('/profile'); break;
       
       // League Admin Actions
-      case 'Create Fixture': toast.info('Create fixture modal opened'); break;
-      case 'Add Team': toast.info('Add team modal opened'); break;
-      case 'Add Athlete': toast.info('Add athlete modal opened'); break;
-      case 'Submit Result': toast.info('Submit result modal opened'); break;
-      case 'Verify Result': router.push('/league-admin'); break;
-      case 'Create Challenge': toast.info('Create challenge modal opened'); break;
+      case 'Create Fixture': router.push('/league-admin?tab=Fixtures%20%26%20Results'); break;
+      case 'Add Team': router.push('/league-admin?tab=Teams%20%26%20Athletes'); break;
+      case 'Add Athlete': router.push('/league-admin?tab=Teams%20%26%20Athletes'); break;
+      case 'Submit Result': router.push('/league-admin?tab=Fixtures%20%26%20Results'); break;
       
       // Platform Admin Actions
-      case 'Review Reports': router.push('/admin'); break;
-      case 'Approve League': toast.info('Approve league workflow opened'); break;
-      case 'Moderate Feed': router.push('/feed'); break;
-      case 'Review Payouts': toast.info('Payout review opened'); break;
-      case 'Review Sponsor Dashboard': router.push('/sponsor-dashboard'); break;
+      case 'Approve League': router.push('/admin?tab=Leagues'); break;
+      case 'Review Moderation Report': router.push('/admin?tab=Reports'); break;
+      case 'Review Verification Evidence': router.push('/admin?tab=Verifications'); break;
+      case 'Review Payout Request': router.push('/admin?tab=Support%2FPayout%20Review'); break;
+      case 'Manage Sponsor Package': router.push('/admin?tab=Sponsors'); break;
 
       // Team Admin Actions
-      // Team Admin Actions
-      case 'Add Athlete': router.push('/team-admin?tab=Roster'); break;
       case 'Update Roster': router.push('/team-admin?tab=Roster'); break;
-      case 'Submit Result': router.push('/team-admin?tab=Fixtures'); break;
       case 'Upload Team Update': router.push('/team-admin?tab=AthleteUpdates'); break;
+
+      // Sponsor Actions
+      case 'View Supported Entities': router.push('/sponsor-dashboard?tab=Supported%20Entities'); break;
+      case 'View Brand Visibility': router.push('/sponsor-dashboard?tab=Brand%20Visibility'); break;
+      case 'View Sponsor Package': router.push('/sponsor-dashboard?tab=Packages'); break;
       
-      default: toast.info(`Action ${action} triggered`);
+      default: toast.info(`${action} opened in demo mode.`);
     }
   };
 

@@ -78,21 +78,21 @@ export function AppPageHeader({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-xl border border-white/10 bg-white/[0.045] p-5 md:p-7', className)}>
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <section className={cn('signal-card rounded-xl border border-white/10 bg-white/[0.045] p-5 md:p-7', className)}>
+      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           {eyebrow && (
             <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-[var(--goal-mint)]">
               {eyebrow}
             </p>
           )}
-          <h1 className="font-display text-3xl font-black tracking-tight text-white md:text-5xl">
+          <h1 className="max-w-4xl break-words font-display text-3xl font-black tracking-tight text-white md:text-5xl">
             {title}
           </h1>
           {description && <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{description}</p>}
           {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">{actions}</div>}
+        {actions && <div className="flex w-full shrink-0 flex-wrap gap-2 lg:w-auto lg:justify-end">{actions}</div>}
       </div>
     </section>
   );
@@ -154,7 +154,7 @@ export function ActionToolbar({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-2 overflow-x-auto hide-scrollbar rounded-xl border border-white/10 bg-white/[0.045] p-3 md:flex-wrap', className)}>
+    <div className={cn('flex items-center gap-2 overflow-x-auto hide-scrollbar rounded-xl border border-white/10 bg-white/[0.045] p-3 md:flex-wrap', className)} role="toolbar">
       {children}
     </div>
   );
@@ -318,12 +318,12 @@ export function ImpactStatCard({
     blue: 'text-[var(--rugby)] border-blue-400/25 bg-blue-500/10',
   };
   return (
-    <div className="glass-panel rounded-xl p-4">
+    <div className="glass-panel min-w-0 rounded-xl p-4">
       <div className={cn('mb-4 flex size-10 items-center justify-center rounded-lg border', tones[tone])}>
         <Icon className="size-5" />
       </div>
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-1 font-display text-2xl font-black text-white">{value}</p>
+      <p className="break-words text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-1 break-words font-display text-2xl font-black text-white">{value}</p>
       {detail && <p className="mt-2 text-sm leading-5 text-slate-300">{detail}</p>}
     </div>
   );
@@ -472,7 +472,7 @@ export function DataCard({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-xl border border-white/10 bg-white/5 p-4 md:p-5 transition-colors hover:border-white/15', className)}>
+    <div className={cn('min-w-0 rounded-xl border border-white/10 bg-white/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/15 md:p-5', className)}>
       {children}
     </div>
   );
@@ -512,11 +512,11 @@ export function MobileDataCard({
   className?: string;
 }) {
   return (
-    <article className={cn('rounded-xl border border-white/10 bg-white/[0.045] p-4', className)}>
+    <article className={cn('min-w-0 rounded-xl border border-white/10 bg-white/[0.045] p-4', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          {eyebrow && <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>}
-          <h3 className="mt-1 font-display text-lg font-black text-white">{title}</h3>
+          {eyebrow && <p className="break-words text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>}
+          <h3 className="mt-1 break-words font-display text-lg font-black text-white">{title}</h3>
         </div>
         {meta}
       </div>
@@ -545,9 +545,109 @@ export function StatusBadge({
   };
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]', tones[tone], className)}>
+    <span className={cn('inline-flex max-w-full select-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-center text-[10px] font-black uppercase leading-tight tracking-[0.14em]', tones[tone], className)}>
       {children}
     </span>
+  );
+}
+
+export function DemoNotice({
+  title = 'Demo mode',
+  children,
+  tone = 'gold',
+}: {
+  title?: string;
+  children: React.ReactNode;
+  tone?: 'gold' | 'info' | 'warning';
+}) {
+  const tones = {
+    gold: 'border-[var(--goal-gold)]/25 bg-[var(--goal-gold)]/8 text-[var(--goal-gold)]',
+    info: 'border-blue-400/25 bg-blue-500/8 text-blue-200',
+    warning: 'border-orange-400/25 bg-orange-500/8 text-orange-200',
+  };
+
+  return (
+    <div className={cn('rounded-xl border p-4 text-sm leading-6', tones[tone])}>
+      <p className="font-black uppercase tracking-[0.14em]">{title}</p>
+      <div className="mt-1 text-slate-300">{children}</div>
+    </div>
+  );
+}
+
+export function WorkQueueCard({
+  title,
+  entity,
+  detail,
+  priority,
+  submittedAt,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  entity: string;
+  detail: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  submittedAt: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  const tone = priority === 'Critical' || priority === 'High' ? 'danger' : priority === 'Medium' ? 'warning' : 'info';
+
+  return (
+    <DataCard className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{entity}</p>
+          <h3 className="mt-1 break-words font-display text-lg font-black text-white">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
+        </div>
+        <StatusBadge tone={tone}>{priority}</StatusBadge>
+      </div>
+      <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-bold text-slate-500">Submitted {submittedAt}</p>
+        <Button size="sm" variant="outline" onClick={onAction}>{actionLabel}</Button>
+      </div>
+    </DataCard>
+  );
+}
+
+export function VerificationStatusCard({
+  title,
+  status,
+  progress,
+  steps,
+  action,
+}: {
+  title: string;
+  status: React.ReactNode;
+  progress: number;
+  steps: Array<[string, string]>;
+  action?: React.ReactNode;
+}) {
+  return (
+    <DataCard className="border-[var(--goal-emerald)]/20 bg-[var(--goal-emerald)]/8">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <SecurityCheckIcon className="mb-4 size-6 text-[var(--goal-mint)]" />
+          <h3 className="font-display text-xl font-black text-white">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Verification creates trust. Trust creates value.</p>
+        </div>
+        {status}
+      </div>
+      <div className="mt-4">
+        <div className="mb-2 flex justify-between text-xs font-bold text-slate-300"><span>Profile completion</span><span>{progress}%</span></div>
+        <div className="h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--goal-emerald)] transition-all duration-500" style={{ width: `${progress}%` }} /></div>
+      </div>
+      <div className="mt-4 grid gap-2">
+        {steps.map(([label, stepStatus]) => (
+          <div key={label} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
+            <span className="min-w-0 text-slate-300">{label}</span>
+            <span className="shrink-0 font-bold text-[var(--goal-mint)]">{stepStatus}</span>
+          </div>
+        ))}
+      </div>
+      {action && <div className="mt-4">{action}</div>}
+    </DataCard>
   );
 }
 
@@ -607,7 +707,7 @@ export function TabStrip({
                 key={tab}
                 onClick={() => onTabChange(tab)}
                 className={cn(
-                  'whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition-colors sm:px-4',
+                  'min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-black transition-colors sm:px-4',
                   activeTab === tab
                     ? 'bg-[var(--goal-emerald)] text-[#031008] shadow-[0_10px_26px_rgba(0,196,106,0.22)]'
                     : 'text-slate-300 hover:bg-white/8 hover:text-white'

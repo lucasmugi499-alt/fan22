@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
-  Building03Icon,
   CheckmarkCircle01Icon,
   ChartLineData01Icon,
   ZapIcon,
-  Coins01Icon,
   UserGroupIcon,
   ListViewIcon,
   Download01Icon,
@@ -34,6 +33,7 @@ import { formatUGX } from '@/lib/sportThemes';
 import { sponsorPackages } from '@/data/sponsorPackages';
 import { toast } from 'sonner';
 import { SponsorReportModal } from '@/components/modals/demo-modals';
+import { useAuth } from '@/context/AuthProvider';
 
 function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -46,18 +46,29 @@ function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function SponsorDashboardPage() {
   return (
-    <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
-      <SponsorDashboard />
+    <RoleGuard allowedRoles={['sponsor', 'platform_admin', 'super_admin']}>
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading sponsor dashboard...</div>}>
+        <SponsorDashboard />
+      </Suspense>
     </RoleGuard>
   );
 }
 
 function SponsorDashboard() {
-  const [activeTab, setActiveTab] = useState('Overview');
+  const searchParams = useSearchParams();
+  const { role } = useAuth();
+  const tabs = useMemo(() => ['Overview', 'Supported Entities', 'Impact Feed', 'Brand Visibility', 'Monthly Report', 'Packages', 'Account'], []);
+  const routeTab = searchParams?.get('tab');
+  const routeKey = searchParams?.toString() ?? '';
+  const [localTab, setLocalTab] = useState<{ routeKey: string; tab: string | null }>({ routeKey, tab: null });
+  const activeTab = localTab.routeKey === routeKey && localTab.tab
+    ? localTab.tab
+    : routeTab && tabs.includes(routeTab)
+      ? routeTab
+      : 'Overview';
+  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
   const [reportModalOpen, setReportModalOpen] = useState(false);
-  const { athletes, teams, leagues, challenges, feedPosts } = useGoalPlaceData();
-
-  const tabs = ['Overview', 'Supported Entities', 'Impact Feed', 'Brand Visibility', 'Monthly Report', 'Packages'];
+  const { athletes, teams, leagues, feedPosts } = useGoalPlaceData();
 
   const needsFunded = [
     { title: 'Training Equipment', amount: 450000, athletes: 12 },
@@ -71,6 +82,17 @@ function SponsorDashboard() {
   const sponsoredLeagues = leagues.slice(0, 1);
 
   const sponsorPosts = feedPosts.slice(0, 3);
+  const isAdminPreview = role === 'platform_admin' || role === 'super_admin';
+  const impactTimeline = [
+    { date: 'Sep 04, 2026', item: 'Matchday transport', beneficiary: sponsoredTeams[0]?.name ?? 'Kampala Youth League', amount: 250000, evidence: 'Receipts and team admin confirmation', status: 'Approved' },
+    { date: 'Sep 11, 2026', item: 'Boots and gear', beneficiary: sponsoredAthletes[0]?.name ?? 'Verified athletes', amount: 800000, evidence: 'Athlete pickup photos', status: 'Evidence attached' },
+    { date: 'Sep 18, 2026', item: 'Training equipment', beneficiary: sponsoredLeagues[0]?.name ?? 'Partner league', amount: 450000, evidence: 'League inventory note', status: 'Pending review' },
+  ];
+  const evidenceCards = [
+    ['Payment allocation', `${formatUGX(3200000)} allocated to verified needs`],
+    ['Beneficiary proof', '45 athletes linked to team or league records'],
+    ['Sporting independence', 'Sponsor support is tracked separately from results and rankings'],
+  ];
 
   const handleDemoAction = (message: string) => {
     toast.success(message);
@@ -78,10 +100,12 @@ function SponsorDashboard() {
 
   return (
     <PageContainer compact className="space-y-6">
-      <Link href="/admin" className="mb-2 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
-        <ArrowLeft01Icon className="size-4" />
-        Back to Admin
-      </Link>
+      {isAdminPreview && (
+        <Link href="/admin?tab=Sponsors" className="mb-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/7 px-3 py-2 text-sm font-bold text-white">
+          <ArrowLeft01Icon className="size-4" />
+          Back to Sponsor Package Queue
+        </Link>
+      )}
       <AppPageHeader
         eyebrow="Sponsor impact reporting"
         title="Sponsor Impact Dashboard"
@@ -89,7 +113,7 @@ function SponsorDashboard() {
         meta={
           <>
             <StatusBadge tone="gold">Partner Tier: League Builder</StatusBadge>
-            <StatusBadge tone="info">Reports Active</StatusBadge>
+            <StatusBadge tone="info">Impact reports enabled</StatusBadge>
           </>
         }
         actions={
@@ -98,7 +122,7 @@ function SponsorDashboard() {
               Demo sponsor reporting only.
             </p>
             <p className="mt-1 text-[11px] text-slate-400">
-              Real payment processing is not enabled yet.
+              Real payment processing is not enabled.
             </p>
           </div>
         }
@@ -108,7 +132,7 @@ function SponsorDashboard() {
 
       <ActionToolbar>
         <Button size="sm" onClick={() => setReportModalOpen(true)}>
-          <Download01Icon className="size-4" /> Download Monthly Impact Report
+          <Download01Icon className="size-4" /> <span className="hidden sm:inline">Download Monthly Impact Report</span><span className="sm:hidden">Download Report</span>
         </Button>
         <Button size="sm" variant="outline" onClick={() => handleDemoAction('Opening campaign overview in demo mode...')}>
           <ChartLineData01Icon className="size-4" /> View Campaign
@@ -117,7 +141,7 @@ function SponsorDashboard() {
           <ListViewIcon className="size-4" /> Add Sponsor Note
         </Button>
         <Button size="sm" variant="outline" onClick={() => handleDemoAction('Renew or Upgrade Package modal opened')}>
-          <ZapIcon className="size-4" /> Renew or Upgrade Package
+          <ZapIcon className="size-4" /> <span className="hidden sm:inline">Renew or Upgrade Package</span><span className="sm:hidden">Package</span>
         </Button>
       </ActionToolbar>
 
@@ -125,7 +149,7 @@ function SponsorDashboard() {
         <div className="flex items-start gap-3">
           <LockKeyIcon className="mt-0.5 size-4 shrink-0" />
           <p>
-            <strong>Note for Platform Admins:</strong> This is an MVP demo screen. Public sponsor accounts do not exist yet. Support never affects league standings.
+            <strong>Demo payout reviews only.</strong> Real payment processing is not enabled. Sponsor support is tracked separately and never affects match results, rankings, or athlete verification.
           </p>
         </div>
       </div>
@@ -179,6 +203,38 @@ function SponsorDashboard() {
               ))}
             </div>
           </DashboardSection>
+
+          <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+            <DashboardSection eyebrow="Impact Timeline" title="Evidence-backed funding timeline">
+              <div className="space-y-3">
+                {impactTimeline.map((item) => (
+                  <MobileDataCard
+                    key={`${item.date}-${item.item}`}
+                    title={item.item}
+                    eyebrow={`${item.date} • ${item.beneficiary}`}
+                    meta={<StatusBadge tone={item.status === 'Approved' ? 'success' : item.status === 'Pending review' ? 'warning' : 'info'}>{item.status}</StatusBadge>}
+                  >
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <MiniMeta label="Amount" value={formatUGX(item.amount)} />
+                      <MiniMeta label="Evidence" value={item.evidence} />
+                      <MiniMeta label="Next step" value={item.status === 'Pending review' ? 'Review evidence' : 'Included in report'} />
+                    </div>
+                  </MobileDataCard>
+                ))}
+              </div>
+            </DashboardSection>
+            <DashboardSection eyebrow="Proof" title="Evidence summary">
+              <div className="grid gap-3">
+                {evidenceCards.map(([title, detail]) => (
+                  <DataCard key={title}>
+                    <CheckmarkCircle01Icon className="mb-3 size-5 text-[var(--goal-mint)]" />
+                    <h3 className="font-display text-lg font-black text-white">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
+                  </DataCard>
+                ))}
+              </div>
+            </DashboardSection>
+          </div>
         </div>
       )}
 
@@ -322,8 +378,26 @@ function SponsorDashboard() {
                     </li>
                   </ul>
                 </div>
-                <Button className="mt-6 w-full" variant="outline" onClick={() => handleDemoAction(`${pkg.name} selected. Demo only.`)}>Select Package</Button>
+                <Button className="mt-6 w-full" variant="outline" onClick={() => handleDemoAction(`${pkg.name} selected. Demo only.`)}>View Sponsor Package</Button>
               </div>
+            ))}
+          </div>
+        </DashboardSection>
+      )}
+
+      {activeTab === 'Account' && (
+        <DashboardSection eyebrow="Account" title="Sponsor account controls" description="Manage reporting contacts, package status, and demo account preferences.">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[
+              ['Reporting contact', 'impact@demo-sponsor.co', 'Edit reporting email'],
+              ['Package status', 'League Builder active', 'View Sponsor Package'],
+              ['Demo limitations', 'Real payments disabled', 'Review demo notice'],
+            ].map(([title, detail, action]) => (
+              <DataCard key={title}>
+                <h3 className="font-display text-lg font-black text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => handleDemoAction(`${action} opened.`)}>{action}</Button>
+              </DataCard>
             ))}
           </div>
         </DashboardSection>
