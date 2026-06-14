@@ -46,7 +46,7 @@ function MiniMeta({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function SponsorDashboardPage() {
   return (
-    <RoleGuard allowedRoles={['sponsor', 'platform_admin', 'super_admin']}>
+    <RoleGuard allowedRoles={['platform_admin', 'super_admin']}>
       <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading sponsor dashboard...</div>}>
         <SponsorDashboard />
       </Suspense>
@@ -331,7 +331,7 @@ function SponsorDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-black text-white">September 2026 Impact Report</h3>
-                  <p className="mt-1 text-sm text-slate-400">Generated for Sponsor Demo</p>
+                  <p className="mt-1 text-sm text-slate-400">Generated for internal impact preview</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Total Commitment</p>

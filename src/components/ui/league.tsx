@@ -105,8 +105,8 @@ export function LeagueStandingsTable({
   className?: string;
 }) {
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-white/10', className)}>
-      <div className="hide-scrollbar overflow-x-auto">
+    <div className={cn('space-y-3 md:overflow-hidden md:rounded-xl md:border md:border-white/10', className)}>
+      <div className="hidden md:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
             <tr>
@@ -141,6 +141,33 @@ export function LeagueStandingsTable({
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="grid gap-3 md:hidden">
+        {standings.map((standing, index) => (
+          <article key={standing.teamId} className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Rank {index + 1}</p>
+                <h3 className="mt-1 break-words font-display text-lg font-black text-white">{standing.teamName}</h3>
+              </div>
+              <div className="rounded-lg border border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/10 px-3 py-2 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--goal-mint)]">Pts</p>
+                <p className="font-display text-xl font-black text-white">{standing.points}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs text-slate-300">
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.played}</span>P</div>
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.wins}</span>W</div>
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.draws}</span>D</div>
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.losses}</span>L</div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs text-slate-300">
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.pointsFor}</span>For</div>
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.pointsAgainst}</span>Against</div>
+              <div className="rounded-lg bg-white/5 p-2"><span className="block font-bold text-white">{standing.difference}</span>Diff</div>
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   );

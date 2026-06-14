@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { DataCard, DetailDrawer, PageContainer, SectionHeader, StatusExplainerChip } from '@/components/ui/product';
+import { ActionToolbar, DataCard, DetailDrawer, PageContainer, SectionHeader, StatusExplainerChip } from '@/components/ui/product';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { 
@@ -35,21 +35,34 @@ function TeamAdminContent() {
 
   const queryTab = searchParams?.get('tab');
 
-  const [activeTab, setActiveTab] = useState<Tab>('Overview');
+  const routeKey = searchParams?.toString() ?? '';
+  const [localTab, setLocalTabState] = useState<{ routeKey: string; tab: Tab | null }>({ routeKey, tab: null });
   const [modalOpen, setModalOpen] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<{ title: string; description: string; body: React.ReactNode } | null>(null);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [profileUpdated, setProfileUpdated] = useState(false);
+  const [rosterUpdated, setRosterUpdated] = useState(false);
+  const [opponentConfirmed, setOpponentConfirmed] = useState(false);
+  const [disputeFiled, setDisputeFiled] = useState(false);
   const [recentTeamUpdates, setRecentTeamUpdates] = useState<{title: string, message: string, timestamp: string}[]>([]);
   const [supportNeeds, setSupportNeeds] = useState<{athleteName: string, type: string, amount: string}[]>([]);
   const { teams, matches, athletes } = useGoalPlaceData();
 
-  useEffect(() => {
-    if (queryTab) {
-      const match = TABS.find(t => t.id.toLowerCase().replace(/[^a-z0-9]/g, '') === queryTab.toLowerCase().replace(/[^a-z0-9]/g, ''));
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (match) setActiveTab(match.id);
+  const queryTabMatch = queryTab
+    ? TABS.find(t => t.id.toLowerCase().replace(/[^a-z0-9]/g, '') === queryTab.toLowerCase().replace(/[^a-z0-9]/g, ''))?.id ?? null
+    : null;
+  const activeTab = localTab.routeKey === routeKey && localTab.tab ? localTab.tab : queryTabMatch ?? 'Overview';
+  const setActiveTab = (tab: Tab) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (tab === 'Overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
     }
-  }, [queryTab]);
+    const query = params.toString();
+    setLocalTabState({ routeKey: query, tab });
+    router.replace(`/team-admin${query ? `?${query}` : ''}`, { scroll: false });
+  };
 
   const availableTeams = queryLeagueId ? teams.filter(t => t.leagueId === queryLeagueId) : teams;
   const selectedTeamId = queryTeamId || availableTeams[0]?.id || '';
@@ -57,7 +70,7 @@ function TeamAdminContent() {
   const team = teams.find(t => t.id === selectedTeamId) || null;
   const teamMatches = matches.filter(m => m.homeTeamId === team?.id || m.awayTeamId === team?.id);
   const teamAthletes = athletes.filter(a => a.teamId === team?.id);
-  const rosterCompleteness = team?.rosterCompleteness ?? Math.min(100, Math.max(40, teamAthletes.length * 18));
+  const rosterCompleteness = rosterUpdated ? 100 : team?.rosterCompleteness ?? Math.min(100, Math.max(40, teamAthletes.length * 18));
   const publicProfileCompleteness = profileUpdated ? 100 : team?.publicProfileCompleteness ?? 76;
   const teamStatus = verificationRequested ? 'Pending Verification' : team?.verificationStatus ?? (team?.verified ? 'Verified' : 'Needs Evidence');
   const pendingSubmissions = (team?.pendingSubmissions ?? 0) + teamMatches.filter((match) => match.status === 'Completed' && match.verificationStatus !== 'Verified').length;
@@ -83,6 +96,37 @@ function TeamAdminContent() {
     setProfileUpdated(true);
     setModalOpen(null);
     toast.success('Team profile changes saved in demo mode.');
+  };
+
+  const openActionDrawer = (title: string, description: string, body: React.ReactNode) => {
+    setDrawer({ title, description, body });
+  };
+
+  const tabActions: Record<Tab, { label: string; icon: React.ElementType; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
+    Overview: [
+      { label: 'Add Athlete', icon: PlusSignIcon, variant: 'outline', onClick: () => setModalOpen('addAthlete') },
+      { label: 'Submit Result', icon: Trophy, variant: 'outline', onClick: () => setModalOpen('submitResult') },
+      { label: 'Upload Team Update', icon: ListViewIcon, variant: 'outline', onClick: () => setModalOpen('uploadUpdate') },
+    ],
+    Roster: [
+      { label: 'Add Athlete', icon: PlusSignIcon, onClick: () => setModalOpen('addAthlete') },
+      { label: 'Update Roster', icon: Users, variant: 'outline', onClick: () => { setRosterUpdated(true); toast.success('Roster completeness updated locally.'); } },
+      { label: 'Invite Athlete', icon: Users, variant: 'outline', onClick: () => openActionDrawer('Invite Athlete', 'Prepare a demo roster invitation for a player to join this team.', <div className="space-y-4"><DataCard><StatusExplainerChip domain="athlete" status="Pending Verification" showDetail /></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success('Athlete invitation queued in demo mode.'); }}>Queue Athlete Invitation</Button></div>) },
+    ],
+    'Fixtures & Results': [
+      { label: 'Submit Result', icon: Trophy, onClick: () => setModalOpen('submitResult') },
+      { label: 'Confirm Opponent Result', icon: Calendar01Icon, variant: 'outline', onClick: () => { setOpponentConfirmed(true); toast.success('Opponent result confirmation recorded locally.'); } },
+      { label: 'Dispute Result', icon: Calendar01Icon, variant: 'outline', onClick: () => { setDisputeFiled(true); toast.success('Result dispute filed locally for league review.'); } },
+    ],
+    'Athlete Updates': [
+      { label: 'Upload Team Update', icon: ListViewIcon, onClick: () => setModalOpen('uploadUpdate') },
+      { label: 'Add Support Need', icon: PlusSignIcon, variant: 'outline', onClick: () => setModalOpen('addSupportNeed') },
+      { label: 'Request Verification', icon: Settings01Icon, variant: 'outline', onClick: handleRequestVerification },
+    ],
+    'Team Profile': [
+      { label: 'Edit Team Profile', icon: Settings01Icon, onClick: () => setModalOpen('editProfile') },
+      { label: 'View Public Team Page', icon: Building03Icon, variant: 'outline', onClick: () => router.push(`/teams/${team?.id}`) },
+    ],
   };
 
   if (!team) {
@@ -161,7 +205,7 @@ function TeamAdminContent() {
         </div>
 
         {/* Tabs */}
-        <div className="mb-8 flex space-x-1 overflow-x-auto rounded-xl bg-black/40 p-1 backdrop-blur-md">
+        <div className="mb-3 flex space-x-1 overflow-x-auto rounded-xl bg-black/40 p-1 backdrop-blur-md">
           {TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -181,6 +225,18 @@ function TeamAdminContent() {
             );
           })}
         </div>
+
+        <ActionToolbar className="mb-8">
+          {tabActions[activeTab].map((action) => {
+            const Icon = action.icon;
+            return (
+              <Button key={action.label} size="sm" variant={action.variant} onClick={action.onClick}>
+                <Icon className="size-4" />
+                {action.label}
+              </Button>
+            );
+          })}
+        </ActionToolbar>
 
         {/* Tab Content */}
         <div className="min-h-[50vh]">
@@ -215,11 +271,17 @@ function TeamAdminContent() {
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-6">
-                  <h2 className="mb-4 font-display text-lg font-black text-white">Quick Actions</h2>
-                  <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete to Roster</Button>
-                    <Button variant="outline" onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Match Result</Button>
-                    <Button variant="outline" onClick={() => setModalOpen('uploadUpdate')}><ListViewIcon className="mr-2 size-4" /> Publish Team Update</Button>
+                  <h2 className="mb-4 font-display text-lg font-black text-white">Operations Snapshot</h2>
+                  <div className="grid gap-3 text-sm text-slate-300">
+                    <div className="rounded-lg bg-white/5 p-3">
+                      <span className="font-bold text-white">{teamAthletes.length}</span> athletes are attached to this team record.
+                    </div>
+                    <div className="rounded-lg bg-white/5 p-3">
+                      <span className="font-bold text-white">{teamMatches.length}</span> fixtures or results are connected to this team.
+                    </div>
+                    <div className="rounded-lg bg-white/5 p-3">
+                      Public profile completeness is <span className="font-bold text-white">{publicProfileCompleteness}%</span>.
+                    </div>
                   </div>
                 </div>
 
@@ -249,8 +311,13 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Team Roster</h2>
-                <Button onClick={() => setModalOpen('addAthlete')}><PlusSignIcon className="mr-2 size-4" /> Add Athlete to Roster</Button>
               </div>
+              {rosterUpdated && (
+                <DataCard className="border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/8">
+                  <p className="text-sm font-bold text-[var(--goal-mint)]">Roster update recorded locally.</p>
+                  <p className="mt-1 text-sm text-slate-300">Roster completeness is now marked at 100% for this demo session.</p>
+                </DataCard>
+              )}
               <div className="rounded-xl border border-white/10 bg-[#0A0D14] overflow-hidden">
                 {/* Desktop Table */}
                 <div className="hidden md:block">
@@ -275,7 +342,7 @@ function TeamAdminContent() {
                             <StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => toast.success(`${athlete.name} profile opened for demo editing.`)}>Edit Athlete Details</Button>
+                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => openActionDrawer('Edit Athlete Details', 'Review team-managed athlete profile fields before league verification.', <div className="space-y-4"><DataCard><div className="grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase text-slate-500">Athlete</p><p className="mt-1 font-bold text-white">{athlete.name}</p></div><div><p className="text-xs font-bold uppercase text-slate-500">Position</p><p className="mt-1 font-bold text-white">{athlete.position}</p></div></div></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${athlete.name} profile update staged locally.`); }}>Stage Athlete Update</Button></div>)}>Edit Athlete Details</Button>
                           </td>
                         </tr>
                       ))}
@@ -302,7 +369,7 @@ function TeamAdminContent() {
                         <div className="h-full rounded-full bg-[var(--goal-emerald)]" style={{ width: `${athlete.verified ? 100 : 82}%` }} />
                       </div>
                       <div className="mt-3 text-right">
-                        <Button variant="ghost" size="sm" className="h-8 w-full border border-white/10 text-xs" onClick={() => toast.success(`${athlete.name} profile opened for demo editing.`)}>Edit Athlete Details</Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-full border border-white/10 text-xs" onClick={() => openActionDrawer('Edit Athlete Details', 'Review team-managed athlete profile fields before league verification.', <div className="space-y-4"><DataCard><div className="grid gap-3"><div><p className="text-xs font-bold uppercase text-slate-500">Athlete</p><p className="mt-1 font-bold text-white">{athlete.name}</p></div><div><p className="text-xs font-bold uppercase text-slate-500">Position</p><p className="mt-1 font-bold text-white">{athlete.position}</p></div></div></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${athlete.name} profile update staged locally.`); }}>Stage Athlete Update</Button></div>)}>Edit Athlete Details</Button>
                       </div>
                     </div>
                   ))}
@@ -319,12 +386,27 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Fixtures & Results</h2>
-                <Button onClick={() => setModalOpen('submitResult')}><Trophy className="mr-2 size-4" /> Submit Match Result</Button>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-6">
                 <p className="text-sm text-slate-400 mb-4">
                   Team Admins submit match results with evidence. League Admins verify results before standings or verified challenges update.
                 </p>
+                {(opponentConfirmed || disputeFiled) && (
+                  <div className="mb-4 grid gap-3 md:grid-cols-2">
+                    {opponentConfirmed && (
+                      <DataCard className="border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/8">
+                        <p className="text-sm font-bold text-[var(--goal-mint)]">Opponent confirmation recorded.</p>
+                        <p className="mt-1 text-xs text-slate-300">This demo result is ready for league verification review.</p>
+                      </DataCard>
+                    )}
+                    {disputeFiled && (
+                      <DataCard className="border-orange-400/25 bg-orange-500/10">
+                        <p className="text-sm font-bold text-orange-300">Result dispute filed.</p>
+                        <p className="mt-1 text-xs text-slate-300">League Admin will see this as a verification review item.</p>
+                      </DataCard>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-4 md:space-y-0 md:grid md:gap-4 md:grid-cols-2">
                   {teamMatches.slice(0, 3).map(match => (
                     <div key={match.id} className="flex flex-col md:flex-row md:items-center justify-between rounded-lg border border-white/5 bg-white/5 p-4">
@@ -342,7 +424,7 @@ function TeamAdminContent() {
                           variant="ghost"
                           size="sm"
                           className="h-8 border border-white/10 text-xs md:border-0"
-                          onClick={() => toast.success('Match evidence drawer opened in demo mode.')}
+                          onClick={() => openActionDrawer('Match Evidence', 'Review the submitted score context before confirming or disputing.', <div className="space-y-4"><DataCard><div className="grid gap-3"><div><p className="text-xs font-bold uppercase text-slate-500">Match</p><p className="mt-1 font-bold text-white">{getTeamName(match.homeTeamId)} vs {getTeamName(match.awayTeamId)}</p></div><div><p className="text-xs font-bold uppercase text-slate-500">Evidence</p><p className="mt-1 text-sm text-slate-300">Score sheet, venue note, and team admin confirmation placeholder.</p></div></div></DataCard><Button className="w-full" onClick={() => { setDrawer(null); setOpponentConfirmed(true); toast.success('Match evidence confirmed locally.'); }}>Confirm Evidence Reviewed</Button></div>)}
                         >
                           Review Match Evidence
                         </Button>
@@ -359,7 +441,6 @@ function TeamAdminContent() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl font-black text-white">Athlete Updates & Needs</h2>
-                <Button onClick={() => setModalOpen('addSupportNeed')}><PlusSignIcon className="mr-2 size-4" /> Add Support Need</Button>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-[#0A0D14] p-5">
@@ -450,10 +531,6 @@ function TeamAdminContent() {
                     <div className="mt-2"><StatusExplainerChip domain="team" status={teamStatus} /></div>
                   </div>
                 </div>
-                <div className="mt-8 flex gap-4">
-                  <Button onClick={() => setModalOpen('editProfile')}>Edit Team Profile</Button>
-                  <Button variant="outline" onClick={() => router.push(`/teams/${team?.id}`)}>View Public Team Page</Button>
-                </div>
               </div>
             </div>
           )}
@@ -520,6 +597,14 @@ function TeamAdminContent() {
             </DataCard>
             <Button className="w-full" onClick={handleSaveProfile}>Save Team Profile Changes</Button>
           </div>
+        </DetailDrawer>
+        <DetailDrawer
+          open={Boolean(drawer)}
+          onOpenChange={(open) => !open && setDrawer(null)}
+          title={drawer?.title ?? ''}
+          description={drawer?.description}
+        >
+          {drawer?.body}
         </DetailDrawer>
       </PageContainer>
     </RoleGuard>

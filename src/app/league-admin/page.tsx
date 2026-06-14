@@ -7,7 +7,6 @@ import {
   Building03Icon,
   Calendar01Icon,
   CheckmarkCircle01Icon,
-  Comment01Icon,
   SecurityCheckIcon,
   Task01Icon,
   UserAdd01Icon,
@@ -31,6 +30,7 @@ import {
   CreateChallengeModal,
   InviteTeamAdminModal,
   CreateLeagueNoticeModal,
+  SponsorReportModal,
 } from '@/components/modals/demo-modals';
 import {
   ActionToolbar,
@@ -39,7 +39,9 @@ import {
   DashboardStatGrid,
   DataCard,
   DataTableCard,
+  DetailDrawer,
   ImpactStatCard,
+  MobileDataCard,
   PageContainer,
   SportBadge,
   StatusBadge,
@@ -87,6 +89,9 @@ function LeagueAdminDashboard() {
   const [matchOverrides, setMatchOverrides] = useState<Record<string, VerificationStatus>>({});
   const [challengeOverrides, setChallengeOverrides] = useState<Record<string, VerificationStatus>>({});
   const [notices, setNotices] = useState<{ id: string; type: string; message: string; date: Date }[]>([]);
+  const [drawer, setDrawer] = useState<{ title: string; description: string; body: React.ReactNode } | null>(null);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [partnerRequested, setPartnerRequested] = useState(false);
 
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
 
@@ -124,7 +129,17 @@ function LeagueAdminDashboard() {
     : routeTab && tabs.includes(routeTab)
       ? routeTab
       : 'Overview';
-  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
+  const setActiveTab = (tab: string) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (tab === 'Overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const query = params.toString();
+    setLocalTab({ routeKey: query, tab });
+    router.replace(`/league-admin${query ? `?${query}` : ''}`, { scroll: false });
+  };
 
   const quickActions = {
     createFixture: () => setModalOpen('createFixture'),
@@ -133,10 +148,9 @@ function LeagueAdminDashboard() {
     verifyResult: () => setModalOpen('verifyResult'),
     submitResult: () => setModalOpen('submitResult'),
     createChallenge: () => setModalOpen('createChallenge'),
-    verifyChallenge: () => toast.success('Verify Challenge modal opened in demo mode.'),
-    createPost: () => toast.success('Create Post form opened in demo mode.'),
     inviteTeamAdmin: () => setModalOpen('inviteTeamAdmin'),
     createNotice: () => setModalOpen('createNotice'),
+    sponsorReport: () => setModalOpen('sponsorReport'),
   };
 
   const updateMatch = async (match: Match, status: VerificationStatus) => {
@@ -175,6 +189,114 @@ function LeagueAdminDashboard() {
     { title: `${pendingChallenges.length} challenge outcomes pending`, detail: 'Confirm athlete achievements before support releases.', actionLabel: 'Review Challenge Outcomes', action: () => setActiveTab('Verification') },
     { title: 'Sponsor report due', detail: 'Generate impact report for current period.', actionLabel: 'Prepare Sponsor Report', action: () => setActiveTab('Sponsor Report') },
   ];
+
+  const openActionDrawer = (title: string, description: string, body: React.ReactNode) => {
+    setDrawer({ title, description, body });
+  };
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const leagueActions: Record<string, { label: string; icon: React.ElementType; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
+    Overview: [
+      { label: 'Create Fixture', icon: Calendar01Icon, onClick: quickActions.createFixture },
+      { label: 'Add Team', icon: Building03Icon, variant: 'outline', onClick: quickActions.addTeam },
+      { label: 'Review Pending Items', icon: Task01Icon, variant: 'outline', onClick: () => setActiveTab('Verification') },
+      { label: 'Publish Notice', icon: Notification01Icon, variant: 'outline', onClick: quickActions.createNotice },
+    ],
+    'Teams & Athletes': [
+      { label: 'Add Team', icon: Building03Icon, onClick: quickActions.addTeam },
+      { label: 'Add Athlete', icon: UserAdd01Icon, variant: 'outline', onClick: quickActions.addAthlete },
+      { label: 'Invite Team Admin', icon: UserAdd01Icon, variant: 'outline', onClick: quickActions.inviteTeamAdmin },
+      {
+        label: 'Review Team Submissions',
+        icon: Task01Icon,
+        variant: 'outline',
+        onClick: () => openActionDrawer(
+          'Team Submissions',
+          'Review roster changes, missing contacts, and pending team admin invitations.',
+          <div className="space-y-4">
+            {leagueTeams.slice(0, 4).map((team) => (
+              <DataCard key={team.id}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-bold text-white">{team.name}</p>
+                    <p className="text-sm text-slate-400">{team.pendingSubmissions ?? 0} pending items</p>
+                  </div>
+                  <StatusExplainerChip domain="team" status={team.verified ? 'Verified' : team.verificationStatus ?? 'Pending Verification'} />
+                </div>
+              </DataCard>
+            ))}
+            <Button className="w-full" onClick={() => { setDrawer(null); toast.success('Team submission review recorded locally.'); }}>Record Review</Button>
+          </div>
+        ),
+      },
+    ],
+    'Fixtures & Results': [
+      { label: 'Create Fixture', icon: Calendar01Icon, onClick: quickActions.createFixture },
+      { label: 'Submit Match Result', icon: Task01Icon, variant: 'outline', onClick: quickActions.submitResult },
+      {
+        label: 'Import Fixtures',
+        icon: Calendar01Icon,
+        variant: 'outline',
+        onClick: () => openActionDrawer(
+          'Import Fixtures',
+          'Stage a fixture import for this league without changing production data.',
+          <div className="space-y-4">
+            <DataCard>
+              <p className="text-sm text-slate-300">Demo import checks team names, venues, dates, and duplicate matchups before publishing.</p>
+            </DataCard>
+            <Button className="w-full" onClick={() => { setDrawer(null); toast.success('Fixture import staged locally.'); }}>Stage Fixture Import</Button>
+          </div>
+        ),
+      },
+      { label: 'View Standings', icon: Trophy, variant: 'outline', onClick: () => scrollToSection('league-standings') },
+    ],
+    Verification: [
+      { label: 'Review Match Queue', icon: CheckmarkCircle01Icon, onClick: () => scrollToSection('league-match-queue') },
+      { label: 'Review Challenge Queue', icon: Trophy, variant: 'outline', onClick: () => scrollToSection('league-challenge-queue') },
+      { label: 'Review Disputes', icon: SecurityCheckIcon, variant: 'outline', onClick: () => scrollToSection('league-dispute-queue') },
+    ],
+    'Sponsor Report': [
+      { label: 'Generate Sponsor Report', icon: Task01Icon, onClick: quickActions.sponsorReport },
+      { label: 'Export CSV', icon: Task01Icon, variant: 'outline', onClick: quickActions.sponsorReport },
+      { label: 'View Sponsor Impact', icon: SecurityCheckIcon, variant: 'outline', onClick: () => scrollToSection('league-sponsor-impact') },
+    ],
+    Settings: [
+      { label: 'Edit League Info', icon: Building03Icon, onClick: () => scrollToSection('league-settings-form') },
+      {
+        label: 'Manage Permissions',
+        icon: SecurityCheckIcon,
+        variant: 'outline',
+        onClick: () => openActionDrawer(
+          'League Permissions',
+          'Review who can submit rosters, results, evidence, and notices for this league.',
+          <div className="space-y-4">
+            {['League Admin: full competition control', 'Team Admin: roster and result submissions', 'Platform Admin: trust and escalation oversight'].map((item) => (
+              <DataCard key={item}><p className="text-sm font-bold text-slate-200">{item}</p></DataCard>
+            ))}
+            <Button className="w-full" onClick={() => { setDrawer(null); toast.success('Permission review saved locally.'); }}>Save Permission Review</Button>
+          </div>
+        ),
+      },
+      {
+        label: 'WhatsApp Reporting Bridge',
+        icon: Notification01Icon,
+        variant: 'outline',
+        onClick: () => openActionDrawer(
+          'WhatsApp Reporting Bridge',
+          'Prepare the demo reporting bridge for fixture reminders and result intake.',
+          <div className="space-y-4">
+            <DataCard>
+              <p className="text-sm text-slate-300">Bridge status: demo-ready. Team admins would receive fixture and result prompts through the configured reporting channel.</p>
+            </DataCard>
+            <Button className="w-full" onClick={() => { setDrawer(null); toast.success('Reporting bridge checked locally.'); }}>Mark Bridge Checked</Button>
+          </div>
+        ),
+      },
+    ],
+  };
 
   return (
     <PageContainer compact className="space-y-6 pb-24">
@@ -225,14 +347,15 @@ function LeagueAdminDashboard() {
       <TabStrip tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <ActionToolbar>
-        <Button size="sm" onClick={quickActions.createFixture}><Calendar01Icon className="size-4" /> Create Fixture</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.addTeam}><Building03Icon className="size-4" /> Add Team</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.addAthlete}><UserAdd01Icon className="size-4" /> Add Athlete</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.submitResult}><Task01Icon className="size-4" /> Submit Match Result</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.verifyResult}><CheckmarkCircle01Icon className="size-4" /> Verify Match Result</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.createChallenge}><Trophy className="size-4" /> Create Challenge</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.createPost}><Comment01Icon className="size-4" /> Publish League Post</Button>
-        <Button size="sm" variant="outline" onClick={quickActions.createNotice}><Notification01Icon className="size-4" /> Create Notice</Button>
+        {leagueActions[activeTab].map((action) => {
+          const Icon = action.icon;
+          return (
+            <Button key={action.label} size="sm" variant={action.variant} onClick={action.onClick}>
+              <Icon className="size-4" />
+              {action.label}
+            </Button>
+          );
+        })}
       </ActionToolbar>
 
       {activeTab === 'Overview' && (
@@ -268,7 +391,6 @@ function LeagueAdminDashboard() {
           <DashboardSection 
             eyebrow="Communications" 
             title="League Notices" 
-            action={<Button size="sm" variant="outline" onClick={quickActions.createNotice}><Notification01Icon className="size-4 mr-2" /> Publish Notice</Button>}
           >
             {notices.length === 0 ? (
               <DataCard className="text-center text-slate-400">
@@ -295,8 +417,8 @@ function LeagueAdminDashboard() {
 
       {activeTab === 'Teams & Athletes' && (
         <div className="space-y-8">
-          <DashboardSection eyebrow="Rosters" title="Teams" action={<Button size="sm" onClick={quickActions.inviteTeamAdmin}><UserAdd01Icon className="size-4 mr-2" /> Invite Team Admin</Button>}>
-            <DataTableCard>
+          <DashboardSection eyebrow="Rosters" title="Teams">
+            <DataTableCard className="hidden md:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px] text-left text-sm">
                   <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
@@ -334,7 +456,7 @@ function LeagueAdminDashboard() {
                           {!team.teamAdminEmail && (
                             <Button variant="ghost" size="sm" onClick={quickActions.inviteTeamAdmin}>Invite Admin</Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => toast.success('Team submission review opened in demo mode.')}>Review Team Submissions</Button>
+                          <Button variant="outline" size="sm" onClick={() => openActionDrawer('Team Submissions', 'Review roster changes and pending evidence for this team.', <div className="space-y-4"><DataCard><p className="font-bold text-white">{team.name}</p><p className="mt-1 text-sm text-slate-300">{team.pendingSubmissions ?? 0} pending items need league review.</p></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${team.name} submissions reviewed locally.`); }}>Record Team Review</Button></div>)}>Review Team Submissions</Button>
                         </td>
                       </tr>
                     ))}
@@ -342,10 +464,32 @@ function LeagueAdminDashboard() {
                 </table>
               </div>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {leagueTeams.map((team) => (
+                <MobileDataCard
+                  key={team.id}
+                  title={team.name}
+                  eyebrow={`${team.city} • ${team.rosterCompleteness || 0}% roster complete`}
+                  meta={<StatusExplainerChip domain="team" status={team.verified ? 'Verified' : team.verificationStatus ?? 'Pending Verification'} />}
+                  actions={
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => router.push(`/team-admin?team=${team.id}`)}>Open Console</Button>
+                      {!team.teamAdminEmail && <Button size="sm" variant="outline" onClick={quickActions.inviteTeamAdmin}>Invite Admin</Button>}
+                      <Button size="sm" variant="outline" onClick={() => openActionDrawer('Team Submissions', 'Review roster changes and pending evidence for this team.', <div className="space-y-4"><DataCard><p className="font-bold text-white">{team.name}</p><p className="mt-1 text-sm text-slate-300">{team.pendingSubmissions ?? 0} pending items need league review.</p></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${team.name} submissions reviewed locally.`); }}>Record Team Review</Button></div>)}>Review Submissions</Button>
+                    </>
+                  }
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><p className="text-xs font-bold uppercase text-slate-500">Contact</p><p className="mt-1 font-bold text-slate-200">{team.teamAdminName || 'No Admin'}</p></div>
+                    <div><p className="text-xs font-bold uppercase text-slate-500">Pending</p><p className="mt-1 font-bold text-slate-200">{team.pendingSubmissions ?? 0} items</p></div>
+                  </div>
+                </MobileDataCard>
+              ))}
+            </div>
           </DashboardSection>
 
           <DashboardSection eyebrow="Profiles" title="Athletes">
-            <DataTableCard>
+            <DataTableCard className="hidden md:block">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
@@ -366,13 +510,24 @@ function LeagueAdminDashboard() {
                         <StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />
                       </td>
                       <td className="whitespace-nowrap p-4">
-                        <Button variant="outline" size="sm" onClick={() => toast.success(`${athlete.name} profile opened in demo mode.`)}>View Athlete Profile</Button>
+                        <Button variant="outline" size="sm" onClick={() => router.push(`/athletes/${athlete.id}`)}>View Athlete Profile</Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {leagueAthletes.map((athlete) => (
+                <MobileDataCard
+                  key={athlete.id}
+                  title={athlete.name}
+                  eyebrow={`${teamName(teams, athlete.teamId)} • ${athlete.position}`}
+                  meta={<StatusExplainerChip domain="athlete" status={athlete.verified ? 'Verified' : athlete.verificationStatus} />}
+                  actions={<Button size="sm" variant="outline" onClick={() => router.push(`/athletes/${athlete.id}`)}>View Athlete Profile</Button>}
+                />
+              ))}
+            </div>
           </DashboardSection>
         </div>
       )}
@@ -383,11 +538,13 @@ function LeagueAdminDashboard() {
             <div className="mb-4 rounded-xl border border-[var(--goal-gold)]/20 bg-[var(--goal-gold)]/5 p-4 text-sm leading-6 text-[var(--goal-gold)]">
               <strong>Important:</strong> GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.
             </div>
-            <LeagueStandingsTable standings={standings} />
+            <div id="league-standings">
+              <LeagueStandingsTable standings={standings} />
+            </div>
           </DashboardSection>
 
           <DashboardSection eyebrow="Schedule" title="Upcoming Fixtures">
-            <DataTableCard>
+            <DataTableCard className="hidden md:block">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
@@ -411,10 +568,20 @@ function LeagueAdminDashboard() {
                 </tbody>
               </table>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {upcomingFixtures.map((match) => (
+                <MobileDataCard
+                  key={match.id}
+                  title={`${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`}
+                  eyebrow={`${formatDate(match.date)} • ${match.venue}`}
+                  meta={<StatusExplainerChip domain="match" status="Scheduled" />}
+                />
+              ))}
+            </div>
           </DashboardSection>
 
           <DashboardSection eyebrow="History" title="Recent Results">
-            <DataTableCard>
+            <DataTableCard className="hidden md:block">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
@@ -436,6 +603,18 @@ function LeagueAdminDashboard() {
                 </tbody>
               </table>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {recentResults.map((match) => (
+                <MobileDataCard
+                  key={match.id}
+                  title={`${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`}
+                  eyebrow={formatDate(match.date)}
+                  meta={<StatusExplainerChip domain="match" status={matchOverrides[match.id] ?? match.verificationStatus} />}
+                >
+                  <p className="font-display text-2xl font-black text-white">{match.score.home} - {match.score.away}</p>
+                </MobileDataCard>
+              ))}
+            </div>
           </DashboardSection>
         </div>
       )}
@@ -443,7 +622,8 @@ function LeagueAdminDashboard() {
       {activeTab === 'Verification' && (
         <div className="space-y-8">
           <DashboardSection eyebrow="Matches" title="Match Verification Queue" description="Verify submitted match scores and event logs.">
-            <DataTableCard>
+            <div id="league-match-queue" />
+            <DataTableCard className="hidden md:block">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
@@ -459,7 +639,7 @@ function LeagueAdminDashboard() {
                     <tr key={match.id} className="transition-colors hover:bg-white/[0.04]">
                       <td className="whitespace-nowrap p-4 text-slate-300">{teamName(teams, match.homeTeamId)} vs {teamName(teams, match.awayTeamId)}</td>
                       <td className="whitespace-nowrap p-4 font-bold text-white">{match.score.home} - {match.score.away}</td>
-                      <td className="whitespace-nowrap p-4 text-blue-300 underline cursor-pointer" onClick={() => toast.success('Viewing evidence in demo mode.')}>View attachment</td>
+                      <td className="whitespace-nowrap p-4 text-blue-300 underline cursor-pointer" onClick={() => openActionDrawer('Match Evidence', 'Review submitted score evidence for this match.', <div className="space-y-4"><DataCard><p className="font-bold text-white">{teamName(teams, match.homeTeamId)} vs {teamName(teams, match.awayTeamId)}</p><p className="mt-1 text-sm text-slate-300">Submitted score: {match.score.home} - {match.score.away}</p><p className="mt-2 text-sm text-slate-400">Attachment placeholder: score sheet, venue note, and team admin comment.</p></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success('Evidence reviewed locally.'); }}>Mark Evidence Reviewed</Button></div>)}>View attachment</td>
                       <td className="whitespace-nowrap p-4"><StatusExplainerChip domain="match" status="Pending Verification" /></td>
                       <td className="whitespace-nowrap p-4 flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => updateMatch(match, 'verified')}>Approve Match Result</Button>
@@ -473,10 +653,29 @@ function LeagueAdminDashboard() {
                 </tbody>
               </table>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {pendingMatches.map((match) => (
+                <MobileDataCard
+                  key={match.id}
+                  title={`${teamName(teams, match.homeTeamId)} vs ${teamName(teams, match.awayTeamId)}`}
+                  eyebrow={`Submitted score ${match.score.home} - ${match.score.away}`}
+                  meta={<StatusExplainerChip domain="match" status="Pending Verification" />}
+                  actions={
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => openActionDrawer('Match Evidence', 'Review submitted score evidence for this match.', <div className="space-y-4"><DataCard><p className="font-bold text-white">{teamName(teams, match.homeTeamId)} vs {teamName(teams, match.awayTeamId)}</p><p className="mt-1 text-sm text-slate-300">Submitted score: {match.score.home} - {match.score.away}</p><p className="mt-2 text-sm text-slate-400">Attachment placeholder: score sheet, venue note, and team admin comment.</p></DataCard><Button className="w-full" onClick={() => { setDrawer(null); toast.success('Evidence reviewed locally.'); }}>Mark Evidence Reviewed</Button></div>)}>View Evidence</Button>
+                      <Button size="sm" variant="outline" onClick={() => updateMatch(match, 'verified')}>Approve</Button>
+                      <Button size="sm" variant="destructive" onClick={() => updateMatch(match, 'disputed')}>Dispute</Button>
+                    </>
+                  }
+                />
+              ))}
+              {pendingMatches.length === 0 && <DataCard className="text-center text-slate-400">Queue is empty.</DataCard>}
+            </div>
           </DashboardSection>
 
           <DashboardSection eyebrow="Challenges" title="Challenge Verification" description="Verify if athletes achieved their support challenges during matches.">
-            <DataTableCard>
+            <div id="league-challenge-queue" />
+            <DataTableCard className="hidden md:block">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-white/6 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
@@ -510,15 +709,40 @@ function LeagueAdminDashboard() {
                 </tbody>
               </table>
             </DataTableCard>
+            <div className="grid gap-3 md:hidden">
+              {pendingChallenges.map((challenge) => {
+                const athlete = athletes.find((a) => a.id === challenge.athleteId);
+                const match = matches.find((m) => m.id === challenge.matchId);
+                return (
+                  <MobileDataCard
+                    key={challenge.id}
+                    title={athlete?.name ?? 'Athlete pending'}
+                    eyebrow={`${teamName(teams, match?.homeTeamId)} vs ${teamName(teams, match?.awayTeamId)}`}
+                    meta={<StatusExplainerChip domain="challenge" status="Pending Verification" />}
+                    actions={
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'verified'})); toast.success('Challenge verified. Support release review can continue.'); }}>Approve</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setChallengeOverrides((prev) => ({...prev, [challenge.id]: 'rejected'})); toast.success('Challenge rejected. Support remains held for review.'); }}>Reject</Button>
+                      </>
+                    }
+                  >
+                    <p className="font-bold text-white">{challenge.type.replaceAll('_', ' ')}</p>
+                  </MobileDataCard>
+                );
+              })}
+              {pendingChallenges.length === 0 && <DataCard className="text-center text-slate-400">No pending challenges.</DataCard>}
+            </div>
           </DashboardSection>
 
           <DashboardSection eyebrow="Resolution" title="Disputes & Payouts" description="Resolve active disputes or review queued payouts for teams and athletes.">
-            <DataCard className="flex flex-col items-center justify-center text-center p-8">
-              <CheckmarkCircle01Icon className="mb-4 size-8 text-[var(--goal-mint)]" />
-              <h3 className="font-bold text-white">All Clear</h3>
-              <p className="mt-2 text-sm text-slate-400">No active disputes or payouts currently require your review.</p>
-              <Button variant="outline" className="mt-6" onClick={() => toast.success('Viewing resolution history...')}>Review History</Button>
-            </DataCard>
+            <div id="league-dispute-queue">
+              <DataCard className="flex flex-col items-center justify-center text-center p-8">
+                <CheckmarkCircle01Icon className="mb-4 size-8 text-[var(--goal-mint)]" />
+                <h3 className="font-bold text-white">All Clear</h3>
+                <p className="mt-2 text-sm text-slate-400">No active disputes or payouts currently require your review.</p>
+                <Button variant="outline" className="mt-6" onClick={() => openActionDrawer('Resolution History', 'Recent dispute and payout review activity for this league.', <div className="space-y-4"><DataCard><p className="text-sm text-slate-300">No open disputes. Last review cycle is clear in this demo dataset.</p></DataCard><Button className="w-full" onClick={() => setDrawer(null)}>Close History</Button></div>)}>Review History</Button>
+              </DataCard>
+            </div>
           </DashboardSection>
         </div>
       )}
@@ -526,13 +750,13 @@ function LeagueAdminDashboard() {
       {activeTab === 'Sponsor Report' && (
         <div className="space-y-8">
           <DashboardSection eyebrow="Impact" title="Sponsor Visibility & Reporting">
+            <div id="league-sponsor-impact" />
             <div className="grid gap-4 lg:grid-cols-2">
               <DataCard>
                 <h3 className="font-display text-lg font-black text-white">Monthly Sponsor Report</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-300">
                   Generate the official GoalPlace256 impact report outlining verified match activity, audience reach, and how sponsor funds supported athletes this month.
                 </p>
-                <Button className="mt-4" onClick={() => toast.success('Generating sponsor impact report...')}>Download PDF Report</Button>
               </DataCard>
               <DataCard>
                 <h3 className="font-display text-lg font-black text-white">GoalPlace Index Metrics</h3>
@@ -549,6 +773,7 @@ function LeagueAdminDashboard() {
         <div className="space-y-8">
           <DashboardSection eyebrow="Configuration" title="League Profile & Settings">
             <DataCard>
+              <div id="league-settings-form" />
               <h3 className="font-display text-lg font-black text-white">General Information</h3>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2">
@@ -566,9 +791,23 @@ function LeagueAdminDashboard() {
                   />
                 </label>
               </div>
+              {(settingsSaved || partnerRequested) && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {settingsSaved && (
+                    <div className="rounded-lg border border-[var(--goal-emerald)]/25 bg-[var(--goal-emerald)]/8 p-3">
+                      <p className="text-sm font-bold text-[var(--goal-mint)]">League profile saved locally.</p>
+                    </div>
+                  )}
+                  {partnerRequested && (
+                    <div className="rounded-lg border border-[var(--goal-gold)]/25 bg-[var(--goal-gold)]/10 p-3">
+                      <p className="text-sm font-bold text-[var(--goal-gold)]">Partner status request is pending platform review.</p>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Button onClick={() => toast.success('Settings saved.')}>Save Profile</Button>
-                <Button variant="outline" onClick={() => toast.success('Partner status request submitted.')}>Request Partner Status</Button>
+                <Button onClick={() => { setSettingsSaved(true); toast.success('Settings saved locally.'); }}>Save Profile</Button>
+                <Button variant="outline" onClick={() => { setPartnerRequested(true); toast.success('Partner status request submitted locally.'); }}>Request Partner Status</Button>
               </div>
             </DataCard>
           </DashboardSection>
@@ -595,6 +834,15 @@ function LeagueAdminDashboard() {
           setNotices(prev => [{ id: Math.random().toString(), type, message, date: new Date() }, ...prev]);
         }}
       />
+      <SponsorReportModal open={modalOpen === 'sponsorReport'} onOpenChange={(open) => !open && setModalOpen(null)} />
+      <DetailDrawer
+        open={Boolean(drawer)}
+        onOpenChange={(open) => !open && setDrawer(null)}
+        title={drawer?.title ?? ''}
+        description={drawer?.description}
+      >
+        {drawer?.body}
+      </DetailDrawer>
     </PageContainer>
   );
 }

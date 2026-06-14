@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon, ListViewIcon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
@@ -11,19 +11,57 @@ import { getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 
 type NavItem = { name: string; href: string; icon: React.ElementType };
+type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
-function isNavActive(item: NavItem, pathname: string, currentHref: string) {
-  const [itemPath] = item.href.split('?');
+const WORKSPACE_ROUTES = new Set(['/admin', '/athlete-dashboard', '/league-admin', '/team-admin', '/sponsor-dashboard']);
 
-  if (item.href.includes('?')) {
-    return currentHref === item.href;
+function getHrefParts(href: string) {
+  const [path, query = ''] = href.split('?');
+  return { path, params: new URLSearchParams(query) };
+}
+
+function normalizeHrefForDedupe(href: string) {
+  const { path, params } = getHrefParts(href);
+  const normalizedParams = Array.from(params.entries()).sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+    const keyCompare = leftKey.localeCompare(rightKey);
+    return keyCompare === 0 ? leftValue.localeCompare(rightValue) : keyCompare;
+  });
+  const query = new URLSearchParams(normalizedParams).toString();
+  return query ? `${path}?${query}` : path;
+}
+
+function dedupeNavItems(items: NavItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const destination = normalizeHrefForDedupe(item.href);
+    if (seen.has(destination)) return false;
+    seen.add(destination);
+    return true;
+  });
+}
+
+function isNavActive(item: NavItem, pathname: string, searchParams: SearchParamReader) {
+  const { path: itemPath, params: itemParams } = getHrefParts(item.href);
+  const itemParamEntries = Array.from(itemParams.entries());
+
+  if (itemParams.has('tab')) {
+    return pathname === itemPath && searchParams.get('tab') === itemParams.get('tab');
   }
 
-  return pathname === itemPath || (itemPath !== '/' && pathname.startsWith(`${itemPath}/`));
+  if (itemParamEntries.length > 0) {
+    return pathname === itemPath && itemParamEntries.every(([key, value]) => searchParams.get(key) === value);
+  }
+
+  if (pathname === itemPath) {
+    return !(WORKSPACE_ROUTES.has(itemPath) && searchParams.get('tab'));
+  }
+
+  return itemPath !== '/' && pathname.startsWith(`${itemPath}/`);
 }
 
 export function MobileNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { authStatus, role } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   
@@ -38,13 +76,12 @@ export function MobileNav() {
     if (configRole === 'sponsor') configRole = 'fan';
     
     const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
-    return config.navItems;
+    return dedupeNavItems(config.navItems);
   };
 
   const navItems = getMobileItems(role);
   const visibleItems = navItems.length > 5 ? navItems.slice(0, 4) : navItems.slice(0, 5);
   const overflowItems = navItems.length > 5 ? navItems.slice(4) : [];
-  const currentHref = pathname;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#05070A]/88 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_60px_rgba(0,0,0,0.36)] backdrop-blur-2xl lg:hidden">
@@ -55,7 +92,7 @@ export function MobileNav() {
             <div className="rounded-xl border border-white/10 bg-[#0A0D14]/96 p-2 shadow-2xl">
               {overflowItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = isNavActive(item, pathname, currentHref);
+                const isActive = isNavActive(item, pathname, searchParams);
                 return (
                   <Link
                     key={item.name}
@@ -77,7 +114,7 @@ export function MobileNav() {
       )}
       <nav className="mx-auto grid h-[4.25rem] max-w-md grid-cols-5 px-2">
         {visibleItems.map((item) => {
-          const isActive = isNavActive(item, pathname, currentHref);
+          const isActive = isNavActive(item, pathname, searchParams);
           const Icon = item.icon;
           return (
             <Link
@@ -143,18 +180,9 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
     desktopItems.push({ name: 'Leagues', href: '/leagues', icon: Building01Icon });
     desktopItems.push({ name: 'Awards', href: '/awards', icon: Trophy });
     desktopItems.push({ name: 'Profile', href: '/profile', icon: UserIcon });
-  } else if (configRole === 'athlete') {
-    desktopItems.push({ name: 'Home', href: '/home', icon: Home01Icon });
   }
   
-  // Deduplicate by name just in case
-  const uniqueItems = desktopItems.filter((item, index, self) =>
-    index === self.findIndex((t) => (
-      t.name === item.name
-    ))
-  );
-
-  return uniqueItems;
+  return dedupeNavItems(desktopItems);
 }
 
 function AccountMenu() {
@@ -221,11 +249,11 @@ function AccountMenu() {
 
 export function DesktopNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { authStatus, role, isDemoMode } = useAuth();
   
   const navItems = getDesktopNavItems(authStatus, role);
   const brandHref = authStatus === 'logged_in' ? '/home' : '/';
-  const currentHref = pathname;
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center border-b border-white/10 bg-[#05070A]/76 px-4 shadow-[0_14px_60px_rgba(0,0,0,0.26)] backdrop-blur-2xl xl:px-8">
@@ -238,7 +266,7 @@ export function DesktopNav() {
       
       <nav className="hide-scrollbar hidden flex-1 items-center gap-1 overflow-x-auto lg:flex lg:gap-2" aria-label="Primary navigation">
         {navItems.map((item) => {
-          const isActive = isNavActive(item, pathname, currentHref);
+          const isActive = isNavActive(item, pathname, searchParams);
           const Icon = item.icon;
           return (
             <Link

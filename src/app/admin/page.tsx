@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity01Icon,
@@ -9,9 +9,9 @@ import {
   Building01Icon,
   CheckmarkCircle01Icon,
   Coins01Icon,
-  Comment01Icon,
   Download01Icon,
   Flag01Icon,
+  SecurityCheckIcon,
   Settings01Icon,
 } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
@@ -89,6 +89,7 @@ export default function AdminPage() {
 
 function AdminDashboard() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { leagues, matches, athletes, teams, feedPosts, challenges, reports, verifications, source } = useGoalPlaceData();
   const [users, setUsers] = useState<User[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -96,7 +97,15 @@ function AdminDashboard() {
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [modalOpen, setModalOpen] = useState<string | null>(null);
   const [approvedLeagueIds, setApprovedLeagueIds] = useState<Set<string>>(new Set());
+  const [suspendedLeagueIds, setSuspendedLeagueIds] = useState<Set<string>>(new Set());
+  const [approvedAthleteIds, setApprovedAthleteIds] = useState<Set<string>>(new Set());
+  const [reportDecisions, setReportDecisions] = useState<Record<string, string>>({});
+  const [verificationDecisions, setVerificationDecisions] = useState<Record<string, string>>({});
+  const [approvedPayoutIds, setApprovedPayoutIds] = useState<Set<string>>(new Set());
+  const [heldPayoutIds, setHeldPayoutIds] = useState<Set<string>>(new Set());
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+  const [escalatedPostIds, setEscalatedPostIds] = useState<Set<string>>(new Set());
+  const [savedPlatformSettings, setSavedPlatformSettings] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -185,16 +194,32 @@ function AdminDashboard() {
     : routeTab && tabs.includes(routeTab)
       ? routeTab
       : 'Overview';
-  const setActiveTab = (tab: string) => setLocalTab({ routeKey, tab });
+  const setActiveTab = (tab: string) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (tab === 'Overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const query = params.toString();
+    setLocalTab({ routeKey: query, tab });
+    router.replace(`/admin${query ? `?${query}` : ''}`, { scroll: false });
+  };
 
-  const openDetail = (title: string, description: string, details: [string, React.ReactNode][]) => {
+  const openDetail = (
+    title: string,
+    description: string,
+    details: [string, React.ReactNode][],
+    actionLabel = `Record ${title} Decision`,
+    onAction?: () => void
+  ) => {
     setDrawer({
       title,
       description,
       body: (
         <div className="space-y-4">
           {details.map(([label, value]) => <MiniMeta key={label} label={label} value={value} />)}
-          <Button className="w-full" onClick={() => { setDrawer(null); toast.success(`${title} action recorded in demo mode.`); }}>Record {title} Decision</Button>
+          <Button className="w-full" onClick={() => { onAction?.(); setDrawer(null); toast.success(`${title} action recorded in demo mode.`); }}>{actionLabel}</Button>
         </div>
       ),
     });
@@ -203,6 +228,11 @@ function AdminDashboard() {
   const approveLeague = (leagueId: string) => {
     setApprovedLeagueIds((items) => new Set([...items, leagueId]));
     toast.success('League approval recorded in demo mode.');
+  };
+
+  const suspendLeague = (leagueId: string) => {
+    setSuspendedLeagueIds((items) => new Set([...items, leagueId]));
+    toast.success('League suspension marked locally.');
   };
 
   const adminQueues = [
@@ -244,6 +274,43 @@ function AdminDashboard() {
     },
   ];
 
+  const firstLeague = pendingLeagues[0] ?? leagues[0];
+  const firstVerification = verifications[0];
+  const firstSponsor = sponsors[0];
+  const firstPayout = payoutRows[0];
+  const adminActions: Record<string, { label: string; icon: React.ElementType; variant?: React.ComponentProps<typeof Button>['variant']; onClick: () => void }[]> = {
+    Overview: [
+      { label: 'Review Approvals', icon: CheckmarkCircle01Icon, onClick: () => setActiveTab('Leagues') },
+      { label: 'Review Escalations', icon: Alert01Icon, variant: 'outline', onClick: () => setActiveTab('Reports') },
+      { label: 'Export Platform Report', icon: Download01Icon, variant: 'outline', onClick: () => openDetail('Platform Report', 'Export a demo platform operating summary.', [['Leagues', leagues.length], ['Pending approvals', pendingLeagues.length], ['Reports', platformReports.length], ['Data mode', source]], 'Prepare Export') },
+    ],
+    Leagues: [
+      { label: 'Approve League', icon: CheckmarkCircle01Icon, onClick: () => firstLeague && approveLeague(firstLeague.id) },
+      { label: 'Inspect League', icon: Building01Icon, variant: 'outline', onClick: () => firstLeague && openDetail(firstLeague.name, 'League application detail.', [['Plan', firstLeague.plan], ['Teams', firstLeague.teamsCount], ['Athletes', firstLeague.athletesCount], ['Support', formatUGX(firstLeague.totalSupport)]], 'Close Inspection') },
+      { label: 'Suspend League', icon: Flag01Icon, variant: 'destructive', onClick: () => firstLeague && suspendLeague(firstLeague.id) },
+    ],
+    Verifications: [
+      { label: 'Review Evidence', icon: SecurityCheckIcon, onClick: () => firstVerification && openDetail(firstVerification.relatedLabel ?? firstVerification.type, 'Verification evidence detail.', [['Evidence', firstVerification.evidenceStatus ?? 'Evidence pending'], ['Amount affected', formatUGX(firstVerification.amountAffected ?? 0)], ['Action history', actionHistoryText(firstVerification.actionHistory)]], 'Close Evidence Review') },
+      { label: 'Approve Verification', icon: CheckmarkCircle01Icon, variant: 'outline', onClick: () => firstVerification && setVerificationDecisions((items) => ({ ...items, [firstVerification.id]: 'verified' })) },
+      { label: 'Reject Verification', icon: Flag01Icon, variant: 'outline', onClick: () => firstVerification && setVerificationDecisions((items) => ({ ...items, [firstVerification.id]: 'rejected' })) },
+    ],
+    Sponsors: [
+      { label: 'Manage Sponsor Package', icon: Coins01Icon, onClick: () => firstSponsor && openDetail(firstSponsor.name, 'Sponsor package and impact reporting detail.', [['Package', firstSponsor.packageType.replaceAll('_', ' ')], ['Commitment', formatUGX(firstSponsor.amountCommitted)], ['Category', firstSponsor.category]], 'Save Sponsor Review') },
+      { label: 'Generate Sponsor Report', icon: Download01Icon, variant: 'outline', onClick: () => firstSponsor && openDetail('Sponsor Report', 'Generate a demo impact report for sponsor review.', [['Sponsor', firstSponsor.name], ['Impact', firstSponsor.impactSummary], ['Commitment', formatUGX(firstSponsor.amountCommitted)]], 'Generate Report') },
+    ],
+    'Support/Payout Review': [
+      { label: 'Review Payout', icon: Coins01Icon, onClick: () => setModalOpen('reviewPayout') },
+      { label: 'Approve Demo Review', icon: CheckmarkCircle01Icon, variant: 'gold', onClick: () => firstPayout && setApprovedPayoutIds((items) => new Set([...items, firstPayout.id])) },
+      { label: 'Hold for Evidence', icon: Flag01Icon, variant: 'outline', onClick: () => firstPayout && setHeldPayoutIds((items) => new Set([...items, firstPayout.id])) },
+    ],
+    'System Health': [
+      { label: 'View Logs', icon: Activity01Icon, onClick: () => openDetail('System Logs', 'Review recent demo platform events.', [['Data mode', source], ['Reports open', platformReports.length], ['Firebase configured', isFirebaseConfigured ? 'Yes' : 'No']], 'Close Logs') },
+      { label: 'Check Data Mode', icon: CheckmarkCircle01Icon, variant: 'outline', onClick: () => openDetail('Data Mode', 'Check current data provider and readiness.', [['Current source', source], ['Mock fallback', 'Ready'], ['Firestore', isFirebaseConfigured ? 'Configured' : 'Not configured']], 'Close Data Check') },
+      { label: 'Export Diagnostics', icon: Download01Icon, variant: 'outline', onClick: () => openDetail('Diagnostics Export', 'Prepare a demo diagnostics bundle.', [['Leagues loaded', leagues.length], ['Athletes loaded', athletes.length], ['Known warnings', isFirebaseConfigured ? 'None active' : 'Firebase env missing in mock mode']], 'Prepare Diagnostics') },
+    ],
+  };
+  const activeAdminActions = adminActions[activeTab] ?? [];
+
   return (
     <PageContainer compact className="space-y-6">
       <AppPageHeader
@@ -257,12 +324,6 @@ function AdminDashboard() {
             <StatusBadge tone="warning">{pendingMatches.length + pendingLeagues.length} pending approvals</StatusBadge>
           </>
         }
-        actions={
-          <Button onClick={() => toast.success('Demo export prepared. No production data was downloaded.')}>
-            <Download01Icon className="size-4" />
-            Export Demo Data
-          </Button>
-        }
       />
 
       <AdminTabBar tabs={tabs} groups={tabGroups} activeTab={activeTab} onTabChange={setActiveTab} />
@@ -274,12 +335,19 @@ function AdminDashboard() {
         <ImpactStatCard label="Payout reviews" value={String(payoutRows.length)} detail="Demo payout reviews only" icon={Coins01Icon} tone="blue" />
       </DashboardStatGrid>
 
-      <ActionToolbar>
-        <Button size="sm" onClick={() => { setActiveTab('Leagues'); toast.success('League approvals opened.'); }}><CheckmarkCircle01Icon className="size-4" /> Approve League</Button>
-        <Button size="sm" variant="outline" onClick={() => setModalOpen('reviewDispute')}><Flag01Icon className="size-4" /> Review Moderation Report</Button>
-        <Button size="sm" variant="outline" onClick={() => { setActiveTab('Feed Moderation'); toast.success('Reported feed posts opened.'); }}><Comment01Icon className="size-4" /> Review Reported Feed Posts</Button>
-        <Button size="sm" variant="gold" onClick={() => setModalOpen('reviewPayout')}><Coins01Icon className="size-4" /> Review Payout Requests</Button>
-      </ActionToolbar>
+      {activeAdminActions.length > 0 && (
+        <ActionToolbar>
+          {activeAdminActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Button key={action.label} size="sm" variant={action.variant} onClick={action.onClick}>
+                <Icon className="size-4" />
+                {action.label}
+              </Button>
+            );
+          })}
+        </ActionToolbar>
+      )}
 
       {activeTab === 'Overview' && (
         <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
@@ -316,7 +384,7 @@ function AdminDashboard() {
       )}
 
       {activeTab === 'Users' && (
-        <DashboardSection eyebrow="Users" title="Registered accounts" action={<Button variant="outline" onClick={() => toast.success('Demo user export prepared.')}><Download01Icon className="size-4" /> Export Users</Button>}>
+        <DashboardSection eyebrow="Users" title="Registered accounts" action={<Button variant="outline" onClick={() => openDetail('User Export', 'Prepare a demo user account export.', [['Users in view', users.length], ['Roles included', 'Fan, Athlete, Team Admin, League Admin, Platform Admin'], ['Data mode', source]], 'Prepare User Export')}><Download01Icon className="size-4" /> Export Users</Button>}>
           <DataTableCard className="hidden lg:block">
             <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="bg-white/6 text-[11px] uppercase tracking-[0.16em] text-slate-400">
@@ -357,8 +425,9 @@ function AdminDashboard() {
           <div className="grid gap-3">
             {leagues.map((league) => {
               const approved = approvedLeagueIds.has(league.id);
+              const suspended = suspendedLeagueIds.has(league.id);
               return (
-                <MobileDataCard key={league.id} title={league.name} eyebrow={`${league.city} • ${league.sport}`} meta={<LeagueStatusBadge status={approved ? 'verified' : league.status} />} actions={<><Button size="sm" onClick={() => approveLeague(league.id)}>Approve League</Button><Button size="sm" variant="outline" onClick={() => openDetail(league.name, 'League verification detail.', [['Plan', league.plan], ['Teams', league.teamsCount], ['Athletes', league.athletesCount], ['Support', formatUGX(league.totalSupport)]])}>Inspect League Application</Button></>}>
+                <MobileDataCard key={league.id} title={league.name} eyebrow={`${league.city} • ${league.sport}`} meta={<LeagueStatusBadge status={suspended ? 'suspended' : approved ? 'verified' : league.status} />} actions={<><Button size="sm" onClick={() => approveLeague(league.id)}>Approve League</Button><Button size="sm" variant="outline" onClick={() => openDetail(league.name, 'League verification detail.', [['Plan', league.plan], ['Teams', league.teamsCount], ['Athletes', league.athletesCount], ['Support', formatUGX(league.totalSupport)]])}>Inspect League Application</Button><Button size="sm" variant="destructive" onClick={() => suspendLeague(league.id)}>Suspend League</Button></>}>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <MiniMeta label="Plan" value={league.plan} />
                     <MiniMeta label="Teams" value={league.teamsCount} />
@@ -383,12 +452,12 @@ function AdminDashboard() {
                     <h3 className="mt-3 font-display text-lg font-black text-white">{athlete.name}</h3>
                     <p className="mt-1 text-sm text-slate-400">{athlete.position} • {teams.find((team) => team.id === athlete.teamId)?.name ?? 'Team pending'}</p>
                   </div>
-                  <StatusBadge tone={statusTone(athlete.verificationStatus)}>{athlete.verificationStatus}</StatusBadge>
+                  <StatusBadge tone={statusTone(approvedAthleteIds.has(athlete.id) ? 'verified' : athlete.verificationStatus)}>{approvedAthleteIds.has(athlete.id) ? 'verified' : athlete.verificationStatus}</StatusBadge>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   <MiniMeta label="Profile" value={`${athlete.verified ? 94 : 67}%`} />
                   <MiniMeta label="Support" value={formatUGX(athlete.totalEarnings ?? athlete.totalSupport)} />
-                  <MiniMeta label="Actions" value={<button className="text-[var(--goal-mint)]" onClick={() => toast.success(`${athlete.name} verified in demo mode.`)}>Approve Athlete Verification</button>} />
+                  <MiniMeta label="Actions" value={<Button size="sm" variant="outline" onClick={() => setApprovedAthleteIds((items) => new Set([...items, athlete.id]))}>Approve Verification</Button>} />
                 </div>
               </DataCard>
             ))}
@@ -419,12 +488,12 @@ function AdminDashboard() {
                 key={record.id}
                 title={record.relatedLabel ?? record.type.replaceAll('_', ' ')}
                 eyebrow={`Submitted by ${record.submittedBy} • ${formatDate(record.createdAt)}`}
-                meta={<StatusExplainerChip domain="system" status={String(record.status)} />}
+                meta={<StatusExplainerChip domain="system" status={String(verificationDecisions[record.id] ?? record.status)} />}
                 actions={
                   <>
                     <Button size="sm" variant="outline" onClick={() => openDetail(record.relatedLabel ?? record.type, 'Verification record detail.', [['Evidence', record.evidenceStatus ?? 'Evidence pending'], ['Amount affected', formatUGX(record.amountAffected ?? 0)], ['Action history', actionHistoryText(record.actionHistory)]])}>View Verification Evidence</Button>
-                    <Button size="sm" onClick={() => toast.success(`${record.id} verified in demo mode.`)}>Approve Verification</Button>
-                    <Button size="sm" variant="outline" onClick={() => toast.success(`${record.id} rejected in demo mode.`)}>Reject Verification</Button>
+                    <Button size="sm" onClick={() => setVerificationDecisions((items) => ({ ...items, [record.id]: 'verified' }))}>Approve Verification</Button>
+                    <Button size="sm" variant="outline" onClick={() => setVerificationDecisions((items) => ({ ...items, [record.id]: 'rejected' }))}>Reject Verification</Button>
                   </>
                 }
               >
@@ -452,15 +521,15 @@ function AdminDashboard() {
                 actions={
                   <>
                     <Button size="sm" variant="outline" onClick={() => openDetail(report.type, 'Report detail and moderation notes.', [['Reporter', report.reporter], ['Reported entity', report.reportedEntity], ['Assigned reviewer', report.reviewer], ['Reason', report.reason], ['Action history', actionHistoryText(report.history)]])}>View Report Details</Button>
-                    <Button size="sm" onClick={() => toast.success(`${report.id} resolved in demo mode.`)}>Resolve Report</Button>
-                    <Button size="sm" variant="outline" onClick={() => toast.success(`${report.id} escalated in demo mode.`)}>Escalate Report</Button>
+                    <Button size="sm" onClick={() => setReportDecisions((items) => ({ ...items, [report.id]: 'resolved' }))}>Resolve Report</Button>
+                    <Button size="sm" variant="outline" onClick={() => setReportDecisions((items) => ({ ...items, [report.id]: 'escalated' }))}>Escalate Report</Button>
                   </>
                 }
               >
                 <div className="grid gap-3 sm:grid-cols-2">
                   <MiniMeta label="Report type" value={report.type} />
                   <MiniMeta label="Assigned reviewer" value={report.reviewer} />
-                  <MiniMeta label="Status" value={report.status} />
+                  <MiniMeta label="Status" value={reportDecisions[report.id] ?? report.status} />
                   <MiniMeta label="Last update" value={report.updated} />
                 </div>
               </MobileDataCard>
@@ -474,17 +543,18 @@ function AdminDashboard() {
           <div className="space-y-3">
             {feedPosts.slice(0, 6).map((post, index) => {
               const hidden = hiddenPostIds.has(post.id);
+              const escalated = escalatedPostIds.has(post.id);
               return (
                 <MobileDataCard
                   key={post.id}
                   title={post.caption.slice(0, 84)}
                   eyebrow={`${post.authorName} • ${String(post.type).replaceAll('_', ' ')} • ${post.flagReason ?? (index < 2 ? 'Engagement spike review' : 'Routine visibility check')}`}
-                  meta={<StatusBadge tone={hidden ? 'danger' : index < 2 || post.status === 'reported' ? 'warning' : 'success'}>{hidden ? 'Hidden' : post.status === 'reported' || index < 2 ? 'Flagged' : 'Active'}</StatusBadge>}
+                  meta={<StatusBadge tone={hidden || escalated ? 'danger' : index < 2 || post.status === 'reported' ? 'warning' : 'success'}>{hidden ? 'Hidden' : escalated ? 'Escalated' : post.status === 'reported' || index < 2 ? 'Flagged' : 'Active'}</StatusBadge>}
                   actions={
                     <>
                       <Button size="sm" variant="outline" onClick={() => openDetail('Feed Post', 'Review post content and engagement context.', [['Author', post.authorName], ['Post type', String(post.type).replaceAll('_', ' ')], ['Reason flagged', post.flagReason ?? 'Engagement spike review'], ['Status', hidden ? 'hidden' : post.status], ['Engagement', `${post.likesCount + post.commentsCount + post.sharesCount} actions`]])}>Review Feed Post</Button>
                       <Button size="sm" variant={hidden ? 'outline' : 'destructive'} onClick={() => { setHiddenPostIds((items) => { const next = new Set(items); if (next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; }); toast.success(hidden ? 'Post restored in demo mode.' : 'Post hidden in demo mode.'); }}>{hidden ? 'Restore Feed Post' : 'Hide Feed Post'}</Button>
-                      <Button size="sm" variant="outline" onClick={() => toast.success('Post escalated in demo mode.')}>Escalate Feed Post</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEscalatedPostIds((items) => new Set([...items, post.id]))}>Escalate Feed Post</Button>
                     </>
                   }
                 >
@@ -512,7 +582,7 @@ function AdminDashboard() {
                     <h3 className="font-display text-lg font-black text-white">{payout.athlete?.name ?? 'Athlete support'}</h3>
                     <p className="mt-1 text-sm text-slate-400">{payout.team?.name ?? 'Team pending'} • {payout.supportType}</p>
                   </div>
-                  <StatusExplainerChip domain="support" status="Held" />
+                  <StatusExplainerChip domain="support" status={approvedPayoutIds.has(payout.id) ? 'Released' : heldPayoutIds.has(payout.id) ? 'Held' : 'Held'} />
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
                   <MiniMeta label="Related challenge" value={payout.type} />
@@ -522,7 +592,8 @@ function AdminDashboard() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => openDetail(payout.athlete?.name ?? 'Support release', 'Payout request detail.', [['Athlete/team', `${payout.athlete?.name ?? 'Athlete'} / ${payout.team?.name ?? 'Team pending'}`], ['Support type', payout.supportType], ['Related challenge', payout.type], ['Net amount', formatUGX(payout.net)]])}>Review Payout Request</Button>
-                  <Button size="sm" variant="gold" onClick={() => toast.success('Demo payout review approved. Real payments are not enabled.')}>Approve Demo Review</Button>
+                  <Button size="sm" variant="gold" onClick={() => setApprovedPayoutIds((items) => new Set([...items, payout.id]))}>Approve Demo Review</Button>
+                  <Button size="sm" variant="outline" onClick={() => setHeldPayoutIds((items) => new Set([...items, payout.id]))}>Hold for Evidence</Button>
                 </div>
               </DataCard>
             ))}
@@ -542,7 +613,7 @@ function AdminDashboard() {
                   <MiniMeta label="Commitment" value={formatUGX(sponsor.amountCommitted)} />
                 </div>
                 <p className="mt-4 text-sm leading-6 text-slate-300">{sponsor.impactSummary}</p>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${sponsor.name} package opened.`)}>Manage Sponsor Package</Button>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => openDetail(sponsor.name, 'Sponsor package and impact reporting detail.', [['Package', sponsor.packageType.replaceAll('_', ' ')], ['Commitment', formatUGX(sponsor.amountCommitted)], ['Category', sponsor.category]])}>Manage Sponsor Package</Button>
               </DataCard>
             ))}
           </div>
@@ -561,7 +632,7 @@ function AdminDashboard() {
                   <MiniMeta label="Type" value={award.categoryType} />
                   <MiniMeta label="Leaders" value={award.currentLeaderIds.length} />
                 </div>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${award.name} configured in demo mode.`)}>Configure Award Category</Button>
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => openDetail(award.name, 'Award category configuration preview.', [['Type', award.categoryType], ['Current leaders', award.currentLeaderIds.length], ['Description', award.description]], 'Save Award Review')}>Configure Award Category</Button>
               </DataCard>
             ))}
           </div>
@@ -604,7 +675,10 @@ function AdminDashboard() {
                 <Settings01Icon className="mb-4 size-5 text-[var(--goal-mint)]" />
                 <h3 className="font-display text-xl font-black text-white">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
-                <Button className="mt-4" size="sm" variant="outline" onClick={() => toast.success(`${title} saved in demo mode.`)}>Save Platform Setting</Button>
+                {savedPlatformSettings.has(title) && (
+                  <StatusBadge className="mt-4" tone="success">Saved locally</StatusBadge>
+                )}
+                <Button className="mt-4" size="sm" variant="outline" onClick={() => setSavedPlatformSettings((items) => new Set([...items, title]))}>Save Platform Setting</Button>
               </DataCard>
             ))}
           </div>
