@@ -68,6 +68,53 @@
   --border-soft: rgba(255, 255, 255, 0.10);
   --border-strong: rgba(255, 255, 255, 0.18);
   --border-glow: rgba(0, 196, 106, 0.35);
+
+  /* ---------------------------------------------------------------------
+     SEMANTIC TOKENS
+     Components reference these, never the raw brand values above. A page
+     that needs "a disputed thing" uses --state-disputed, so the meaning of
+     disputed can change in one place instead of in forty class strings.
+     --------------------------------------------------------------------- */
+
+  /* Elevation ladder. Each step is a surface sitting on the one before it. */
+  --bg-base: var(--night);
+  --bg-elevated: #0B1117;
+  --surface-1: #111827;
+  --surface-2: #17202B;
+  --surface-interactive: rgba(255, 255, 255, 0.06);
+  --surface-interactive-hover: rgba(255, 255, 255, 0.10);
+
+  --text-1: var(--text-main);
+  --text-2: var(--text-soft);
+  --text-3: var(--text-muted);
+
+  --brand-primary: var(--goal-emerald);
+  --brand-secondary: var(--goal-gold);
+  --brand-accent: var(--goal-mint);
+
+  /* State colours. Each is paired with a low-alpha fill and a border so a
+     badge never depends on hue alone to be legible. */
+  --state-verified: #2DD48F;
+  --state-verified-bg: rgba(45, 212, 143, 0.12);
+  --state-pending: #F5B942;
+  --state-pending-bg: rgba(245, 185, 66, 0.12);
+  --state-warning: #FB923C;
+  --state-warning-bg: rgba(251, 146, 60, 0.12);
+  --state-disputed: #F87171;
+  --state-disputed-bg: rgba(248, 113, 113, 0.12);
+  --state-error: #EF4444;
+  --state-error-bg: rgba(239, 68, 68, 0.12);
+  --state-info: #60A5FA;
+  --state-info-bg: rgba(96, 165, 250, 0.12);
+  --state-live: #FF4D4D;
+  --state-live-bg: rgba(255, 77, 77, 0.14);
+  --state-neutral: #94A3B8;
+  --state-neutral-bg: rgba(148, 163, 184, 0.12);
+
+  /* Layout constants the shell depends on, so nothing hard-codes them. */
+  --topbar-h: 3.5rem;
+  --bottomnav-h: 4.25rem;
+  --tap-min: 2.75rem; /* 44px — the WCAG-conscious minimum touch target */
   --background: var(--night);
   --foreground: var(--text-main);
   --card: var(--surface);

@@ -3,7 +3,12 @@
 import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { ActionToolbar, DataCard, DetailDrawer, PageContainer, SectionHeader, StatusExplainerChip } from '@/components/ui/product';
+import { DataCard, DetailDrawer, PageContainer, SectionHeader, StatusExplainerChip } from '@/components/ui/product';
+import { ContextualActionBar, WorkspaceTabs } from '@/components/layout/workspace-tabs';
+import { StatusPill } from '@/components/ui/status';
+import { MatchTimeline, stepsForSubmission } from '@/components/ui/match-timeline';
+import { stateForMatch } from '@/lib/statusSystem';
+import { isOfficialMatch } from '@/lib/status';
 import { Button } from '@/components/ui/button';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { 
@@ -70,6 +75,8 @@ function TeamAdminContent() {
 
   const team = teams.find(t => t.id === selectedTeamId) || null;
   const teamMatches = matches.filter(m => m.homeTeamId === team?.id || m.awayTeamId === team?.id);
+  // Fixtures that are played but not yet official are the ones a team admin must act on.
+  const awaitingAction = teamMatches.filter((m) => m.status === 'completed' && !isOfficialMatch(m)).length;
   const teamAthletes = athletes.filter(a => a.teamId === team?.id);
   const rosterCompleteness = rosterUpdated ? 100 : team?.rosterCompleteness ?? Math.min(100, Math.max(40, teamAthletes.length * 18));
   const publicProfileCompleteness = profileUpdated ? 100 : team?.publicProfileCompleteness ?? 76;
@@ -205,39 +212,30 @@ function TeamAdminContent() {
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="mb-3 flex space-x-1 overflow-x-auto rounded-xl bg-black/40 p-1 backdrop-blur-md">
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
-                  isActive 
-                    ? 'bg-white/10 text-white shadow-sm' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-                }`}
-              >
-                <Icon className={`size-4 ${isActive ? 'text-[var(--goal-mint)]' : ''}`} />
-                {tab.id}
-              </button>
-            );
-          })}
-        </div>
+        {/* Workspace tabs: which section of this console am I in? Distinct from the global
+            nav (where am I going?) and the action bar below (what am I doing?). */}
+        <WorkspaceTabs
+          tabs={TABS.map((tab) => ({
+            id: tab.id,
+            label: tab.id,
+            badge: tab.id === 'Fixtures & Results' ? awaitingAction : undefined,
+          }))}
+          activeTab={activeTab}
+          onChange={(id) => setActiveTab(id as Tab)}
+          className="mb-4"
+        />
 
-        <ActionToolbar className="mb-8">
+        <ContextualActionBar className="mb-8">
           {tabActions[activeTab].map((action) => {
             const Icon = action.icon;
             return (
-              <Button key={action.label} size="sm" variant={action.variant} onClick={action.onClick}>
+              <Button key={action.label} size="sm" variant={action.variant} onClick={action.onClick} className="shrink-0">
                 <Icon className="size-4" />
                 {action.label}
               </Button>
             );
           })}
-        </ActionToolbar>
+        </ContextualActionBar>
 
         {/* Tab Content */}
         <div className="min-h-[50vh]">
@@ -408,30 +406,54 @@ function TeamAdminContent() {
                     )}
                   </div>
                 )}
-                <div className="space-y-4 md:space-y-0 md:grid md:gap-4 md:grid-cols-2">
-                  {teamMatches.slice(0, 3).map(match => (
-                    <div key={match.id} className="flex flex-col md:flex-row md:items-center justify-between rounded-lg border border-white/5 bg-white/5 p-4">
-                      <div className="mb-3 md:mb-0">
-                        <div className="text-xs font-bold text-slate-400">{new Date(match.date ?? match.scheduledAt).toLocaleDateString()}</div>
-                        <div className="mt-1 font-medium text-white">{getTeamName(match.homeTeamId)} vs {getTeamName(match.awayTeamId)}</div>
-                        <p className="mt-1 text-xs text-slate-500">Standing impact: only after league verification.</p>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-                        <StatusExplainerChip
-                          domain="match"
-                          status={match.verificationStatus === 'verified' ? 'Verified' : match.status === 'completed' ? 'Pending Verification' : match.status === 'scheduled' ? 'Scheduled' : match.status}
-                        />
+                <div className="grid gap-3 md:grid-cols-2">
+                  {teamMatches.slice(0, 4).map(match => {
+                    const played = match.status === 'completed';
+                    // No submission records exist in demo mode yet, so the timeline is derived
+                    // from the match's own verification state.
+                    const inferredSubmission = !played
+                      ? null
+                      : match.verificationStatus === 'verified'
+                        ? ('official' as const)
+                        : match.verificationStatus === 'disputed'
+                          ? ('disputed' as const)
+                          : ('pending_confirmation' as const);
+                    const isHome = match.homeTeamId === team?.id;
+                    const opponent = getTeamName(isHome ? match.awayTeamId : match.homeTeamId);
+                    return (
+                      <article
+                        key={match.id}
+                        className="flex min-w-0 flex-col rounded-xl border border-white/10 bg-[var(--surface-interactive)] p-4 transition-colors hover:border-white/20"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-3)]">
+                              {isHome ? 'Home' : 'Away'} · {new Date(match.date ?? match.scheduledAt).toLocaleDateString()}
+                            </p>
+                            <h3 className="mt-1 truncate font-display text-base font-black text-white">vs {opponent}</h3>
+                          </div>
+                          <StatusPill state={stateForMatch(match)} size="sm" className="shrink-0" />
+                        </div>
+
+                        {played && typeof match.score?.home === 'number' && (
+                          <p className="mt-2 font-mono text-2xl font-black tabular-nums text-white">
+                            {match.score.home}<span className="mx-1.5 text-[var(--text-3)]">–</span>{match.score.away}
+                          </p>
+                        )}
+
+                        <MatchTimeline steps={stepsForSubmission(inferredSubmission, played)} className="mt-4" />
+
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-8 border border-white/10 text-xs md:border-0"
+                          className="mt-4 w-full"
                           onClick={() => openActionDrawer('Match Evidence', 'Review the submitted score context before confirming or disputing.', <div className="space-y-4"><DataCard><div className="grid gap-3"><div><p className="text-xs font-bold uppercase text-slate-500">Match</p><p className="mt-1 font-bold text-white">{getTeamName(match.homeTeamId)} vs {getTeamName(match.awayTeamId)}</p></div><div><p className="text-xs font-bold uppercase text-slate-500">Evidence</p><p className="mt-1 text-sm text-slate-300">Score sheet, venue note, and team admin confirmation placeholder.</p></div></div></DataCard><Button className="w-full" onClick={() => { setDrawer(null); setOpponentConfirmed(true); toast.success('Match evidence confirmed locally.'); }}>Confirm Evidence Reviewed</Button></div>)}
                         >
-                          Review Match Evidence
+                          Review evidence
                         </Button>
-                      </div>
-                    </div>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             </div>
