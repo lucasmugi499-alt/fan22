@@ -13,16 +13,16 @@ import { MatchCard } from '@/components/ui/match-card';
 import { PageContainer, SectionHeader, SportBadge } from '@/components/ui/product';
 import { useAuth } from '@/context/AuthProvider';
 import { Athlete } from '@/types';
-import { formatUGX, sports } from '@/lib/sportThemes';
+import { formatUGX } from '@/lib/sportThemes';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { matchLabel, verificationLabel } from '@/lib/status';
 
-import { RoleQuickActions } from '@/components/ui/RoleQuickActions';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
 
 import { BentoCard, GlowCard, SportSignalCard } from '@/components/ui/glass-card';
 import { AnimatedStatCard } from '@/components/ui/animated-stat-card';
 import { SectionReveal } from '@/components/ui/section-reveal';
+import { TeamAdminHome } from '@/components/home/ops-home';
 
 function HomeContent() {
   const router = useRouter();
@@ -75,7 +75,22 @@ function HomeContent() {
   );
   const verifiedAthletes = useMemo(() => athletes.filter((athlete) => athlete.verified), [athletes]);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
   const configRole = role === 'super_admin' ? 'platform_admin' : role === 'sponsor' ? 'fan' : (role || 'fan');
+
+  // Team-admin home operates on a concrete team; in demo mode that is the first team, the
+  // same selection /team-admin makes.
+  const teamAdminTeam = configRole === 'team_admin' ? (teams[0] ?? null) : null;
+  const teamAdminMatches = useMemo(
+    () => (teamAdminTeam ? matches.filter((m) => m.homeTeamId === teamAdminTeam.id || m.awayTeamId === teamAdminTeam.id) : []),
+    [teamAdminTeam, matches]
+  );
+  const teamAdminAthletes = useMemo(
+    () => (teamAdminTeam ? athletes.filter((a) => a.teamId === teamAdminTeam.id) : []),
+    [teamAdminTeam, athletes]
+  );
   const config = ROLE_CONFIGS[configRole] || ROLE_CONFIGS['fan'];
 
   const handleLogout = async () => {
@@ -87,65 +102,38 @@ function HomeContent() {
 
   return (
     <PageContainer compact className="space-y-12">
-      {/* Universal Header */}
-      <SectionReveal>
-        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-stretch">
-          <BentoCard className="bg-[url('/placeholders/stadium-glow.svg')] bg-cover bg-center bg-blend-overlay bg-[#05070A]/90 border-[var(--goal-emerald)]/20 p-8 md:p-10 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#05070A] via-[#05070A]/80 to-transparent" />
-            <div className="relative z-10">
-              <div className="mb-6 flex flex-wrap items-center gap-2">
-                {sports.map((sport) => (
-                  <SportBadge key={sport.slug} sport={sport.name} />
-                ))}
-              </div>
-              <h1 className="font-display text-4xl font-black text-white md:text-6xl tracking-tight">
-                Welcome back,<br />
-                <span className="text-[var(--goal-mint)]">{userProfile?.name?.split(' ')[0] ?? currentUser?.email?.split('@')[0] ?? 'member'}</span>
-              </h1>
-              <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                {config.dashboardSubtitle}
-              </p>
-              <div className="mt-8">
-                <RoleQuickActions />
-              </div>
-            </div>
-          </BentoCard>
-
-          <GlowCard color="var(--goal-gold)">
-            <div className="flex flex-col h-full justify-between p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--goal-gold)]">Account Profile</p>
-                  <h2 className="mt-2 font-display text-2xl font-black text-white">{userProfile?.name ?? 'GoalPlace256 User'}</h2>
-                  <p className="mt-1 text-sm font-medium text-slate-400">{config.label}</p>
-                </div>
-              </div>
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {config.role === 'fan' || config.role === 'athlete' ? (
-                  <Button variant="gold" onClick={() => router.push('/wallet')}>
-                    <Wallet01Icon className="size-4" />
-                    Wallet
-                  </Button>
-                ) : null}
-                <Button variant="outline" onClick={() => router.push('/profile')}>
-                  <UserIcon className="size-4" />
-                  Profile
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/settings')}>
-                  <Notification01Icon className="size-4" />
-                  Settings
-                </Button>
-                <Button variant="destructive" onClick={handleLogout} className={config.role !== 'fan' && config.role !== 'athlete' ? "sm:col-span-2" : ""}>
-                  <Logout01Icon className="size-4" />
-                  Logout
-                </Button>
-              </div>
-            </div>
-          </GlowCard>
-        </section>
-      </SectionReveal>
+      {/* Header: a compact greeting and identity strip, not a full-screen hero. The page's
+          job is to surface what needs the user — identity is context, not the headline. */}
+      <header className="flex flex-col gap-4 pt-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--text-3)]">{greeting},</p>
+          <h1 className="mt-0.5 truncate font-display text-3xl font-black tracking-tight text-white md:text-4xl">
+            {userProfile?.name?.split(' ')[0] ?? currentUser?.email?.split('@')[0] ?? 'there'}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-3)]">{config.dashboardSubtitle}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push('/profile')}>
+            <UserIcon className="size-4" />
+            Profile
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Logout01Icon className="size-4" />
+            Sign out
+          </Button>
+        </div>
+      </header>
 
       {/* Role-Specific Content */}
+      {configRole === 'team_admin' && (
+        <TeamAdminHome
+          team={teamAdminTeam}
+          teamMatches={teamAdminMatches}
+          teamAthletes={teamAdminAthletes}
+          teamName={(id) => teams.find((t) => t.id === id)?.name ?? id}
+        />
+      )}
+
       {configRole === 'fan' && (
         <div className="space-y-12">
           <SectionReveal>

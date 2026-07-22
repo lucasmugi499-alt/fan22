@@ -267,20 +267,23 @@
   }
 
   .stadium-vignette {
+    /* A faint pitch grid and a single soft light source from above. The previous version
+       layered two hard diagonal streaks (125deg green, 58deg gold) across the whole
+       viewport, which read as rendering artefacts rather than atmosphere — they cut across
+       content, sat on top of tables, and were the first thing the eye went to on an empty
+       page. Atmosphere should be felt, not noticed. */
     background:
-      linear-gradient(rgba(77, 255, 179, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(77, 255, 179, 0.035) 1px, transparent 1px),
-      linear-gradient(125deg, transparent 0 42%, rgba(0, 196, 106, 0.13) 43%, transparent 48%),
-      linear-gradient(58deg, transparent 0 62%, rgba(245, 185, 66, 0.09) 63%, transparent 68%),
-      linear-gradient(180deg, rgba(5, 7, 10, 0.2), var(--night) 76%);
-    background-size: 56px 56px, 56px 56px, auto, auto, auto;
+      linear-gradient(rgba(77, 255, 179, 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77, 255, 179, 0.022) 1px, transparent 1px),
+      radial-gradient(120% 80% at 50% -10%, rgba(0, 196, 106, 0.07), transparent 60%),
+      linear-gradient(180deg, rgba(5, 7, 10, 0.35), var(--night) 70%);
+    background-size: 64px 64px, 64px 64px, auto, auto;
   }
 
+  /* Kept as a hook so existing markup does not break, but it no longer paints streaks. */
   .stadium-rays {
-    background:
-      linear-gradient(90deg, transparent 0 7%, rgba(255, 255, 255, 0.055) 7.2%, transparent 7.7%, transparent 92%, rgba(255, 255, 255, 0.055) 92.2%, transparent 92.7%),
-      linear-gradient(0deg, transparent 0 12%, rgba(59, 130, 246, 0.055) 12.2%, transparent 12.8%, transparent 88%, rgba(59, 130, 246, 0.05) 88.2%, transparent 88.8%);
-    opacity: 0.46;
+    background: radial-gradient(90% 60% at 80% 110%, rgba(245, 185, 66, 0.05), transparent 65%);
+    opacity: 0.6;
   }
 
   .signal-card {
