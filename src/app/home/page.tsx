@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { Athlete } from '@/types';
 import { formatUGX, sports } from '@/lib/sportThemes';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { matchLabel, verificationLabel } from '@/lib/status';
 
 import { RoleQuickActions } from '@/components/ui/RoleQuickActions';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
@@ -32,7 +33,7 @@ function HomeContent() {
   const [pledgeAthlete, setPledgeAthlete] = useState<Athlete | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
-  const activeChallenges = useMemo(() => challenges.filter((c) => c.status === 'Active').slice(0, 3), [challenges]);
+  const activeChallenges = useMemo(() => challenges.filter((c) => c.status === 'open').slice(0, 3), [challenges]);
   const featuredAthletes = useMemo(() => [...athletes].sort((a, b) => b.supportersCount - a.supportersCount).slice(0, 4), [athletes]);
   const followedAthletes = useMemo(
     () => athletes.filter((athlete) => userProfile?.followedAthletes?.includes(athlete.id)).slice(0, 3),
@@ -42,7 +43,7 @@ function HomeContent() {
     () => featuredAthletes.filter((athlete) => !userProfile?.followedAthletes?.includes(athlete.id)).slice(0, 3),
     [featuredAthletes, userProfile?.followedAthletes]
   );
-  const todayMatches = useMemo(() => matches.filter((m) => m.status === 'Live' || m.status === 'Upcoming').slice(0, 4), [matches]);
+  const todayMatches = useMemo(() => matches.filter((m) => m.status === 'live' || m.status === 'scheduled').slice(0, 4), [matches]);
   const personalizedFeed = feedPosts.slice(0, 4);
 
   // Dashboard counters, derived the same way the dedicated workspaces derive them so the
@@ -50,21 +51,21 @@ function HomeContent() {
   // the signed-in athlete in demo mode.
   const currentAthlete = athletes[0];
   const upcomingMatches = useMemo(
-    () => matches.filter((m) => m.status === 'Upcoming' || m.status === 'Live'),
+    () => matches.filter((m) => m.status === 'scheduled' || m.status === 'live'),
     [matches]
   );
   const pendingVerifications = useMemo(
-    () => verifications.filter((item) => String(item.status).toLowerCase() === 'pending'),
+    () => verifications.filter((item) => item.status === 'pending'),
     [verifications]
   );
   const openDisputes = useMemo(
     () =>
-      matches.filter((m) => String(m.verificationStatus).toLowerCase() === 'disputed').length +
-      verifications.filter((item) => String(item.status).toLowerCase() === 'disputed').length,
+      matches.filter((m) => m.verificationStatus === 'disputed').length +
+      verifications.filter((item) => item.status === 'disputed').length,
     [matches, verifications]
   );
   const pendingMatchApprovals = useMemo(
-    () => matches.filter((m) => String(m.verificationStatus).toLowerCase().includes('pending')),
+    () => matches.filter((m) => m.verificationStatus === 'pending'),
     [matches]
   );
   const pendingLeagues = useMemo(() => leagues.filter((league) => league.status !== 'partner'), [leagues]);
@@ -338,9 +339,9 @@ function HomeContent() {
                               {homeTeam?.name ?? match.homeTeamId} <span className="text-slate-500 font-medium text-base">vs</span> {awayTeam?.name ?? match.awayTeamId}
                             </p>
                             <div className="flex gap-2 items-center mt-2 text-sm font-bold text-slate-400">
-                              <span className="capitalize text-[var(--goal-mint)]">{match.status}</span>
+                              <span className="text-[var(--goal-mint)]">{matchLabel(match.status)}</span>
                               <span className="h-1 w-1 rounded-full bg-slate-600" />
-                              <span className="capitalize">{match.verificationStatus}</span>
+                              <span>{verificationLabel(match.verificationStatus)}</span>
                             </div>
                           </div>
                           <Button variant="default" size="sm" onClick={() => router.push('/league-admin')}>Review Match</Button>

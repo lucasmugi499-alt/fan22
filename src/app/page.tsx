@@ -26,8 +26,11 @@ import { AnimatedStatCard } from '@/components/ui/animated-stat-card';
 import { BentoCard, GlowCard } from '@/components/ui/glass-card';
 import { MagneticButton } from '@/components/ui/magnetic-button';
 
-// Pilot-stage figures. Keep these conservative and sourced — this page is the public
-// claim surface for a product whose entire pitch is verified data.
+// Illustrative figures drawn from the demonstration dataset, NOT onboarded traction — the
+// section that renders them says so explicitly. This page is the public claim surface for a
+// product whose entire pitch is verified data, so nothing here may imply leagues we do not
+// have. Replace with real onboarded counts once the pilot is live, and keep the disclaimer
+// until those counts are the source.
 const proofMetrics = [
   { label: 'Verified Leagues', value: 10, icon: Building03Icon },
   { label: 'Active Teams', value: 40, icon: Users },
@@ -296,12 +299,12 @@ export default function PublicLandingPage() {
           </div>
         </SectionReveal>
 
-        {/* 5. Live Ecosystem Preview (Stats) */}
+        {/* 5. What a pilot season looks like (illustrative, not live traction) */}
         <SectionReveal>
           <SectionHeader
-            eyebrow="Where We Are Today"
-            title="Pilot network, real records."
-            description="Early numbers from leagues already running on GoalPlace256."
+            eyebrow="What A Pilot Tracks"
+            title="What your league looks like on GoalPlace256."
+            description="An illustrative season built from demonstration data, showing the records a pilot league would accumulate."
             className="text-center md:items-center mx-auto"
           />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -309,6 +312,9 @@ export default function PublicLandingPage() {
               <AnimatedStatCard key={metric.label} title={metric.label} value={metric.value} suffix="+" icon={metric.icon} />
             ))}
           </div>
+          <p className="mt-6 text-center text-xs font-medium text-slate-500">
+            Demonstration data — not live operational metrics. GoalPlace256 is onboarding its first pilot leagues.
+          </p>
         </SectionReveal>
 
         {/* 8. Pilot CTA */}

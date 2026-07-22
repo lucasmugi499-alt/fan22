@@ -28,7 +28,7 @@ function AthleteDashboard() {
   const { athletes, challenges, matches } = useGoalPlaceData();
   const athlete = athletes[0];
   const athleteChallenges = athlete ? challenges.filter((challenge) => challenge.athleteId === athlete.id) : [];
-  const upcomingMatches = matches.filter(match => match.status === 'scheduled' || match.status === 'Upcoming').slice(0, 3);
+  const upcomingMatches = matches.filter(match => match.status === 'scheduled').slice(0, 3);
   const nextMatch = upcomingMatches[0];
   const profileCompleteness = athlete?.verified ? 92 : 74;
   const verificationSteps: Array<[string, string]> = [
@@ -258,8 +258,8 @@ function AthleteDashboard() {
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <StatusExplainerChip domain="match" status={match.status === 'Upcoming' ? 'Scheduled' : match.status} />
-                        {(match.status === 'scheduled' || match.status === 'Upcoming') && <Button size="sm" variant="outline" onClick={() => openDrawer('Match Details', 'Upcoming fixture context and preparation notes.', [['Venue', match.venue], ['Date', new Date(match.scheduledAt).toLocaleDateString()], ['Status', match.status]])}>View Match Details</Button>}
+                        <StatusExplainerChip domain="match" status={match.status === 'scheduled' ? 'Scheduled' : match.status} />
+                        {(match.status === 'scheduled') && <Button size="sm" variant="outline" onClick={() => openDrawer('Match Details', 'Upcoming fixture context and preparation notes.', [['Venue', match.venue], ['Date', new Date(match.scheduledAt).toLocaleDateString()], ['Status', match.status]])}>View Match Details</Button>}
                       </div>
                     </DataCard>
                   ))}

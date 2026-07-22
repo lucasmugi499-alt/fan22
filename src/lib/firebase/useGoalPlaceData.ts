@@ -14,34 +14,20 @@ import {
   SportType,
   Team,
   Verification,
-  VerificationStatus,
   WalletTransaction,
 } from '@/types';
 import { useAppStore } from '@/lib/store';
+import {
+  normalizeChallengeStatus,
+  normalizeMatchStatus,
+  normalizeMatchVerification,
+  normalizeVerificationStatus,
+} from '@/lib/status';
 
 function toSportName(sport?: SportSlug | SportType): SportType {
   if (sport === 'basketball' || sport === 'Basketball') return 'Basketball';
   if (sport === 'rugby' || sport === 'Rugby') return 'Rugby';
   return 'Football';
-}
-
-function toVerificationTitle(status?: VerificationStatus | string): 'Pending' | 'Verified' | 'Disputed' | 'Rejected' {
-  if (status === 'verified' || status === 'Verified') return 'Verified';
-  if (status === 'disputed' || status === 'Disputed') return 'Disputed';
-  if (status === 'rejected' || status === 'Rejected') return 'Rejected';
-  return 'Pending';
-}
-
-function toChallengeTitle(status?: string): 'Active' | 'Achieved' | 'Failed' {
-  if (status === 'achieved' || status === 'paid' || status === 'Achieved') return 'Achieved';
-  if (status === 'failed' || status === 'refunded' || status === 'Failed') return 'Failed';
-  return 'Active';
-}
-
-function toMatchTitle(status?: string): 'Upcoming' | 'Live' | 'Completed' {
-  if (status === 'live' || status === 'Live') return 'Live';
-  if (status === 'completed' || status === 'verified' || status === 'disputed' || status === 'Completed') return 'Completed';
-  return 'Upcoming';
 }
 
 function toFeedType(type: FeedPost['type'] | string): FeedPost['type'] {
@@ -126,8 +112,8 @@ export function adaptMatch(match: Match): Match {
     teamAScore: match.teamAScore ?? match.score?.home ?? undefined,
     teamBScore: match.teamBScore ?? match.score?.away ?? undefined,
     date: match.date ?? match.scheduledAt,
-    status: toMatchTitle(match.status),
-    verificationStatus: toVerificationTitle(match.verificationStatus),
+    status: normalizeMatchStatus(match.status),
+    verificationStatus: normalizeMatchVerification(match.verificationStatus, match.status),
   };
 }
 
@@ -136,8 +122,15 @@ export function adaptChallenge(challenge: Challenge): Challenge {
     ...challenge,
     sport: toSportName(challenge.sport),
     targetDescription: challenge.targetDescription ?? challenge.description,
-    status: toChallengeTitle(challenge.status),
-    verificationStatus: toVerificationTitle(challenge.verificationStatus),
+    status: normalizeChallengeStatus(challenge.status),
+    verificationStatus: normalizeVerificationStatus(challenge.verificationStatus),
+  };
+}
+
+export function adaptVerification(verification: Verification): Verification {
+  return {
+    ...verification,
+    status: normalizeVerificationStatus(verification.status),
   };
 }
 
@@ -187,7 +180,7 @@ async function loadGoalPlaceData(provider = dataProvider) {
     challenges: challenges.map(adaptChallenge),
     feedPosts: feedPosts.map(adaptFeedPost),
     reports,
-    verifications,
+    verifications: verifications.map(adaptVerification),
   };
 }
 

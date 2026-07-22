@@ -9,6 +9,7 @@ import { ArrowLeft01Icon, Calendar01Icon, CheckmarkCircle01Icon, Location01Icon,
 import { Trophy, Users } from '@phosphor-icons/react';
 import { Athlete } from '@/types';
 import { formatUGX, getInitials, getSportTheme } from '@/lib/sportThemes';
+import { matchLabel, verificationLabel } from '@/lib/status';
 import { Button } from '@/components/ui/button';
 import { ChallengeCard } from '@/components/ui/challenge-card';
 import { FeedCard } from '@/components/ui/feed-card';
@@ -61,8 +62,8 @@ function MatchDetailsPageContent() {
         <div className="relative z-10">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              {match.status === 'Live' && <span className="size-3 rounded-full bg-red-400 shadow-[0_0_16px_rgba(248,113,113,0.9)]" />}
-              <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-300">{match.status}</span>
+              {match.status === 'live' && <span className="size-3 rounded-full bg-red-400 shadow-[0_0_16px_rgba(248,113,113,0.9)]" />}
+              <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-300">{matchLabel(match.status)}</span>
             </div>
             <SportBadge sport={match.sport} />
           </div>
@@ -70,7 +71,7 @@ function MatchDetailsPageContent() {
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <TeamBlock name={teamA?.name ?? 'Team A'} logoUrl={teamA?.logoUrl ?? ''} sport={match.sport} onClick={() => teamA && router.push(`/teams/${teamA.id}`)} />
             <div className="rounded-xl border border-white/12 bg-black/30 px-4 py-4 text-center">
-              {match.status === 'Upcoming' ? (
+              {match.status === 'scheduled' ? (
                 <p className="font-display text-3xl font-black text-white">VS</p>
               ) : (
                 <p className="font-display text-4xl font-black text-white md:text-6xl">{homeScore} - {awayScore}</p>
@@ -83,16 +84,16 @@ function MatchDetailsPageContent() {
           <div className="mt-6 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
             <span className="flex items-center gap-2"><Calendar01Icon className="size-4 text-[var(--goal-mint)]" /> {new Date(matchDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
             <span className="flex items-center gap-2"><Location01Icon className="size-4 text-[var(--goal-gold)]" /> {match.venue}</span>
-            <span className="flex items-center gap-2"><SecurityCheckIcon className="size-4 text-[var(--goal-mint)]" /> {match.verificationStatus}</span>
+            <span className="flex items-center gap-2"><SecurityCheckIcon className="size-4 text-[var(--goal-mint)]" /> {verificationLabel(match.verificationStatus)}</span>
           </div>
         </div>
       </section>
 
       <section className="mt-8 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Support pool" value={formatUGX(supportPool)} icon={Trophy} />
-        <ImpactStatCard label="Active challenges" value={String(matchChallenges.filter((challenge) => challenge.status === 'Active').length)} icon={ZapIcon} tone="gold" />
+        <ImpactStatCard label="Active challenges" value={String(matchChallenges.filter((challenge) => challenge.status === 'open').length)} icon={ZapIcon} tone="gold" />
         <ImpactStatCard label="Rosters" value={String(teamAAthletes.length + teamBAthletes.length)} icon={Users} tone="blue" />
-        <ImpactStatCard label="Verification" value={match.verificationStatus} icon={CheckmarkCircle01Icon} tone="orange" />
+        <ImpactStatCard label="Verification" value={verificationLabel(match.verificationStatus)} icon={CheckmarkCircle01Icon} tone="orange" />
       </section>
 
       <section className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr]">

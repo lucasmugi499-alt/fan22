@@ -127,7 +127,7 @@ function emptyStanding(team: Team): StandingRow {
 
 function hasResult(match: Match) {
   return (
-    (match.status === "completed" || match.status === "verified" || match.status === "disputed") &&
+    (match.status === "completed") &&
     typeof match.score.home === "number" &&
     typeof match.score.away === "number"
   );

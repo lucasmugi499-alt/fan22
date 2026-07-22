@@ -22,10 +22,10 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
   if (!athlete) return null;
 
   const theme = getSportTheme(athlete.sport);
-  const achieved = challenge.status === 'Achieved';
+  const achieved = challenge.status === 'achieved';
 
   return (
-    <GlassCard glow={challenge.status === 'Active'} className={`rounded-xl p-4 ${theme.edgeClass}`}>
+    <GlassCard glow={challenge.status === 'open'} className={`rounded-xl p-4 ${theme.edgeClass}`}>
       <div className="flex items-start gap-3">
         <div className="size-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/8">
           <ImageWithFallback
@@ -65,7 +65,7 @@ export function ChallengeCard({ challenge, onSupport }: ChallengeCardProps) {
         </div>
       </div>
 
-      {challenge.status === 'Active' ? (
+      {challenge.status === 'open' ? (
         <Button className="mt-4 w-full" onClick={onSupport}>
           Pledge Support
         </Button>

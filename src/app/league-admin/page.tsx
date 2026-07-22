@@ -55,9 +55,9 @@ import { Match, Team, VerificationStatus } from '@/types';
 import type { IconComponent } from '@/lib/icons';
 
 function normalizeVerificationStatus(status: VerificationStatus): VerificationStatus {
-  if (status === 'Verified') return 'verified';
-  if (status === 'Rejected') return 'rejected';
-  if (status === 'Disputed') return 'disputed';
+  if (status === 'verified') return 'verified';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'disputed') return 'disputed';
   return status;
 }
 
@@ -175,14 +175,14 @@ function LeagueAdminDashboard() {
 
   const pendingMatches = leagueMatches.filter((match) => {
     const status = matchOverrides[match.id] ?? match.verificationStatus;
-    return status === 'Pending' || status === 'pending' || status === 'disputed' || status === 'Disputed';
+    return status === 'pending' || status === 'disputed';
   });
   const pendingChallenges = leagueChallenges.filter((challenge) => {
     const status = challengeOverrides[challenge.id] ?? challenge.verificationStatus;
-    return status === 'Pending' || status === 'pending' || status === 'disputed' || status === 'Disputed';
+    return status === 'pending' || status === 'disputed';
   });
 
-  const upcomingFixtures = leagueMatches.filter((match) => match.status === 'Upcoming' || match.status === 'scheduled').slice(0, 4);
+  const upcomingFixtures = leagueMatches.filter((match) => match.status === 'scheduled').slice(0, 4);
   const recentResults = leagueMatches.filter((match) => match.score.home !== null && match.score.away !== null).slice(0, 4);
 
   const urgentTasks = [

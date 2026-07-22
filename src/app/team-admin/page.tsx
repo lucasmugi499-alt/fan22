@@ -74,7 +74,7 @@ function TeamAdminContent() {
   const rosterCompleteness = rosterUpdated ? 100 : team?.rosterCompleteness ?? Math.min(100, Math.max(40, teamAthletes.length * 18));
   const publicProfileCompleteness = profileUpdated ? 100 : team?.publicProfileCompleteness ?? 76;
   const teamStatus = verificationRequested ? 'Pending Verification' : team?.verificationStatus ?? (team?.verified ? 'Verified' : 'Needs Evidence');
-  const pendingSubmissions = (team?.pendingSubmissions ?? 0) + teamMatches.filter((match) => match.status === 'Completed' && match.verificationStatus !== 'Verified').length;
+  const pendingSubmissions = (team?.pendingSubmissions ?? 0) + teamMatches.filter((match) => match.status === 'completed' && match.verificationStatus !== 'verified').length;
 
   const getTeamName = (id: string) => teams.find(t => t.id === id)?.name || id;
 
@@ -419,7 +419,7 @@ function TeamAdminContent() {
                       <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
                         <StatusExplainerChip
                           domain="match"
-                          status={match.verificationStatus === 'Verified' ? 'Verified' : match.status === 'Completed' ? 'Pending Verification' : match.status === 'Upcoming' ? 'Scheduled' : match.status}
+                          status={match.verificationStatus === 'verified' ? 'Verified' : match.status === 'completed' ? 'Pending Verification' : match.status === 'scheduled' ? 'Scheduled' : match.status}
                         />
                         <Button
                           variant="ghost"

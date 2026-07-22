@@ -44,7 +44,7 @@ export function AthleteCard({ athlete, onSupport, onView }: AthleteCardProps) {
   const league = leagues.find((item) => item.id === athlete.leagueId);
   const theme = getSportTheme(athlete.sport);
   const keyStats = getKeyStats(athlete);
-  const profileCompletion = athlete.verified ? 100 : athlete.verificationStatus === 'Pending' || athlete.verificationStatus === 'pending' ? 82 : 64;
+  const profileCompletion = athlete.verified ? 100 : athlete.verificationStatus === 'pending' ? 82 : 64;
   const supportNeed = athlete.impactNeeds?.[0] ?? 'Training and match-day support';
 
   return (

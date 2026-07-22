@@ -10,7 +10,7 @@ export const matches: Match[] = [
     "venue": "Old Kampala Grounds",
     "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 1,
       "away": 2
@@ -43,7 +43,7 @@ export const matches: Match[] = [
     "venue": "Makerere Sports Complex",
     "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 2,
       "away": 3
@@ -96,7 +96,7 @@ export const matches: Match[] = [
     "venue": "Jinja Main Ground",
     "city": "Jinja",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 4,
       "away": 0
@@ -169,7 +169,7 @@ export const matches: Match[] = [
     "venue": "Entebbe Works Ground",
     "city": "Entebbe",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 2,
       "away": 3
@@ -222,7 +222,7 @@ export const matches: Match[] = [
     "venue": "KCCA Stadium",
     "city": "Kampala",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 4,
       "away": 0
@@ -335,7 +335,7 @@ export const matches: Match[] = [
     "venue": "Makerere Sports Complex",
     "city": "Kampala",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 4,
       "away": 0
@@ -368,7 +368,7 @@ export const matches: Match[] = [
     "venue": "Wakiso Sports Field",
     "city": "Wakiso",
     "scheduledAt": "2026-06-01T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 0,
       "away": 1
@@ -421,7 +421,7 @@ export const matches: Match[] = [
     "venue": "Wakiso Sports Field",
     "city": "Wakiso",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 93,
       "away": 58
@@ -454,7 +454,7 @@ export const matches: Match[] = [
     "venue": "Jinja Main Ground",
     "city": "Jinja",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 58,
       "away": 65
@@ -507,7 +507,7 @@ export const matches: Match[] = [
     "venue": "Gulu City Sports Ground",
     "city": "Gulu",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 72,
       "away": 79
@@ -560,7 +560,7 @@ export const matches: Match[] = [
     "venue": "Masaka Recreation Ground",
     "city": "Masaka",
     "scheduledAt": "2026-05-29T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 86,
       "away": 93
@@ -613,7 +613,7 @@ export const matches: Match[] = [
     "venue": "YMCA Court Kampala",
     "city": "Kampala",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 58,
       "away": 65
@@ -646,7 +646,7 @@ export const matches: Match[] = [
     "venue": "Lugogo Indoor Arena",
     "city": "Kampala",
     "scheduledAt": "2026-06-05T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 65,
       "away": 72
@@ -699,7 +699,7 @@ export const matches: Match[] = [
     "venue": "Old Kampala Grounds",
     "city": "Kampala",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 79,
       "away": 86
@@ -752,7 +752,7 @@ export const matches: Match[] = [
     "venue": "Jinja Main Ground",
     "city": "Jinja",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 8,
       "away": 13
@@ -785,7 +785,7 @@ export const matches: Match[] = [
     "venue": "Mbarara Community Court",
     "city": "Mbarara",
     "scheduledAt": "2026-06-04T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 13,
       "away": 18
@@ -858,7 +858,7 @@ export const matches: Match[] = [
     "venue": "Masaka Recreation Ground",
     "city": "Masaka",
     "scheduledAt": "2026-05-28T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 28,
       "away": 33
@@ -891,7 +891,7 @@ export const matches: Match[] = [
     "venue": "KCCA Stadium",
     "city": "Kampala",
     "scheduledAt": "2026-05-27T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 33,
       "away": 38
@@ -964,7 +964,7 @@ export const matches: Match[] = [
     "venue": "Kyadondo Rugby Grounds",
     "city": "Kampala",
     "scheduledAt": "2026-05-30T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 12,
       "away": 17
@@ -1017,7 +1017,7 @@ export const matches: Match[] = [
     "venue": "Makerere Sports Complex",
     "city": "Kampala",
     "scheduledAt": "2026-06-02T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 22,
       "away": 27
@@ -1050,7 +1050,7 @@ export const matches: Match[] = [
     "venue": "Wakiso Sports Field",
     "city": "Wakiso",
     "scheduledAt": "2026-06-05T03:03:00.243Z",
-    "status": "verified",
+    "status": "completed",
     "score": {
       "home": 27,
       "away": 32

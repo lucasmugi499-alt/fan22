@@ -26,17 +26,17 @@ function MatchesPageContent() {
       if (activeFilter === 'All') return true;
       if (['Football', 'Basketball', 'Rugby'].includes(activeFilter)) return match.sport === activeFilter;
       if (['Live', 'Upcoming', 'Completed'].includes(activeFilter)) return match.status === activeFilter;
-      if (activeFilter === 'Verified') return String(match.verificationStatus).toLowerCase() === 'verified';
+      if (activeFilter === 'verified') return String(match.verificationStatus).toLowerCase() === 'verified';
       if (activeFilter === 'Pending Verification') return String(match.verificationStatus).toLowerCase().includes('pending');
-      if (activeFilter === 'Disputed') return String(match.verificationStatus).toLowerCase() === 'disputed';
+      if (activeFilter === 'disputed') return String(match.verificationStatus).toLowerCase() === 'disputed';
       if (activeFilter === 'Following') return ['m1', 'm2', 'm3'].includes(match.id);
       return true;
     });
   }, [activeFilter, leagueId, matches]);
 
-  const liveMatches = filteredMatches.filter((match) => match.status === 'Live');
-  const upcomingMatches = filteredMatches.filter((match) => match.status === 'Upcoming');
-  const completedMatches = filteredMatches.filter((match) => match.status === 'Completed');
+  const liveMatches = filteredMatches.filter((match) => match.status === 'live');
+  const upcomingMatches = filteredMatches.filter((match) => match.status === 'scheduled');
+  const completedMatches = filteredMatches.filter((match) => match.status === 'completed');
 
   return (
     <PageContainer compact>
@@ -48,9 +48,9 @@ function MatchesPageContent() {
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
-        <ImpactStatCard label="Live now" value={String(matches.filter((match) => match.status === 'Live').length)} icon={SignalIcon} />
-        <ImpactStatCard label="Upcoming" value={String(matches.filter((match) => match.status === 'Upcoming').length)} icon={Calendar01Icon} tone="gold" />
-        <ImpactStatCard label="Verified results" value={String(matches.filter((match) => match.verificationStatus === 'Verified').length)} icon={CheckmarkCircle01Icon} tone="blue" />
+        <ImpactStatCard label="Live now" value={String(matches.filter((match) => match.status === 'live').length)} icon={SignalIcon} />
+        <ImpactStatCard label="Upcoming" value={String(matches.filter((match) => match.status === 'scheduled').length)} icon={Calendar01Icon} tone="gold" />
+        <ImpactStatCard label="Verified results" value={String(matches.filter((match) => match.verificationStatus === 'verified').length)} icon={CheckmarkCircle01Icon} tone="blue" />
       </div>
 
       <StickyFilterBar filters={filters} active={activeFilter} onChange={setActiveFilter} />

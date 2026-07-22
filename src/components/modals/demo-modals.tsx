@@ -475,7 +475,7 @@ export function CreateFixtureModal({ open, onOpenChange }: { open: boolean; onOp
       date: date ? new Date(`${date}T${time || '12:00'}`).toISOString() : new Date().toISOString(),
       location: venue,
       status: 'Upcoming',
-      verificationStatus: 'Pending',
+      verificationStatus: 'pending',
     } as unknown as Match);
     toast.success('Demo fixture created');
     onOpenChange(false);
@@ -543,7 +543,7 @@ export function SubmitResultModal({
   const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const defaultLeagueId = currentLeagueId || sp.get('league');
   const upcomingMatches = data.matches.filter((m) => {
-    if (m.status !== 'Upcoming') return false;
+    if (m.status !== 'scheduled') return false;
     if (defaultLeagueId && m.leagueId !== defaultLeagueId) return false;
     if (currentTeamId && m.teamAId !== currentTeamId && m.teamBId !== currentTeamId) return false;
     return true;
@@ -552,8 +552,8 @@ export function SubmitResultModal({
   const submit = () => {
     if (!matchId) { toast.error('Match is required'); return; }
     updateDemoMatch(matchId, {
-      status: 'Completed',
-      verificationStatus: 'Pending',
+      status: 'completed',
+      verificationStatus: 'pending',
       score: {
         home: parseInt(homeScore),
         away: parseInt(awayScore),
@@ -605,12 +605,12 @@ export function VerifyResultModal({ open, onOpenChange }: { open: boolean; onOpe
 
   const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const defaultLeagueId = sp.get('league');
-  const pendingMatches = data.matches.filter((m) => m.verificationStatus === 'Pending' && m.status === 'Completed' && (!defaultLeagueId || m.leagueId === defaultLeagueId));
+  const pendingMatches = data.matches.filter((m) => m.verificationStatus === 'pending' && m.status === 'completed' && (!defaultLeagueId || m.leagueId === defaultLeagueId));
 
   const submit = () => {
     if (!matchId) { toast.error('Match is required'); return; }
     if (decision === 'Verify') {
-      updateDemoMatch(matchId, { verificationStatus: 'Verified' });
+      updateDemoMatch(matchId, { verificationStatus: 'verified' });
       toast.success('Match result verified locally');
     } else {
       toast.info(`Match action: ${decision}`);
@@ -692,7 +692,7 @@ export function CreateChallengeModal({ open, onOpenChange }: { open: boolean; on
       type: challengeType,
       targetDescription: target,
       status: 'Active',
-      verificationStatus: 'Pending',
+      verificationStatus: 'pending',
       totalPledged: 0,
       supportersCount: 0,
       createdAt: new Date().toISOString()

@@ -72,7 +72,7 @@ function SportsContent() {
       <section className="mt-8 grid gap-3 md:grid-cols-4">
         <ImpactStatCard label="Athletes" value={String(sportAthletes.length)} />
         <ImpactStatCard label="Matches" value={String(sportMatches.length)} tone="gold" />
-        <ImpactStatCard label="Active challenges" value={String(sportChallenges.filter((challenge) => challenge.status === 'Active').length)} tone="blue" />
+        <ImpactStatCard label="Active challenges" value={String(sportChallenges.filter((challenge) => challenge.status === 'open').length)} tone="blue" />
         <ImpactStatCard label="Verified support" value={`${sportAthletes.reduce((sum, athlete) => sum + (athlete.totalEarnings ?? athlete.totalSupport ?? 0), 0).toLocaleString()} UGX`} tone="orange" />
       </section>
 

@@ -1,4 +1,5 @@
 import { League, LeagueStatus, Match, Team } from '@/types';
+import { isOfficialMatch } from '@/lib/status';
 
 export const leagueRankingDisclaimer =
   'GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.';
@@ -159,9 +160,13 @@ export function buildLeagueStandings(teams: Team[], matches: Match[]): LeagueSta
   });
 
   matches
+    // Only official results move a table. This previously admitted any completed match,
+    // so pending and disputed results were silently counted — the platform's central
+    // trust claim was not true of its own standings. `isOfficialMatch` is the one
+    // definition; do not inline this condition anywhere else.
     .filter(
       (match) =>
-        match.status === 'Completed' &&
+        isOfficialMatch(match) &&
         typeof match.teamAScore === 'number' &&
         typeof match.teamBScore === 'number'
     )

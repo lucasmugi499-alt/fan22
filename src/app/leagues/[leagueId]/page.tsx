@@ -100,7 +100,7 @@ function LeagueDetailPageContent() {
           <SectionHeader
             eyebrow="League Standings"
             title="Sporting table"
-            description="The table is calculated from completed match scores only."
+            description="The table counts verified results only. Submitted results stay out until the league confirms them."
           />
           <LeagueStandingsTable standings={standings} />
           <LeagueIntegrityNote className="mt-4" />

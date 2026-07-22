@@ -217,7 +217,7 @@ export function PledgeModal({
   const { athletes, challenges: allChallenges } = useGoalPlaceData();
   const selectedAthlete = athlete ?? athletes[0];
   const activeChallenges = useMemo(
-    () => (selectedAthlete ? allChallenges.filter((challenge) => challenge.athleteId === selectedAthlete.id && challenge.status === 'Active') : []),
+    () => (selectedAthlete ? allChallenges.filter((challenge) => challenge.athleteId === selectedAthlete.id && challenge.status === 'open') : []),
     [allChallenges, selectedAthlete]
   );
   const challenges = useMemo(

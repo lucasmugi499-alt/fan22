@@ -24,25 +24,20 @@ export type LeagueStatus =
 
 export type PlanType = "free" | "pro" | "partner";
 
-export type MatchStatus =
-  | "scheduled"
-  | "live"
-  | "completed"
-  | "verified"
-  | "disputed"
-  | "Upcoming"
-  | "Live"
-  | "Completed";
+/**
+ * Status vocabularies are canonical lowercase, matching how records are stored in
+ * Firestore and the seed data. They previously carried both casings in the same union,
+ * which meant `status === 'Verified'` silently returned false for the majority of records
+ * that store `'verified'` — so comparisons had to defend with `.toLowerCase()` and any
+ * that forgot were quietly wrong. Normalize once at the data boundary
+ * (`src/lib/status.ts`), compare against these values, and render labels with the display
+ * helpers rather than comparing against human-readable text.
+ */
 
-export type VerificationStatus =
-  | "pending"
-  | "verified"
-  | "rejected"
-  | "disputed"
-  | "Pending"
-  | "Verified"
-  | "Rejected"
-  | "Disputed";
+/** Lifecycle only. Whether a result is trustworthy is `verificationStatus`, not this. */
+export type MatchStatus = "scheduled" | "live" | "completed" | "cancelled";
+
+export type VerificationStatus = "pending" | "verified" | "rejected" | "disputed";
 
 export type ChallengeStatus =
   | "open"
@@ -51,10 +46,7 @@ export type ChallengeStatus =
   | "failed"
   | "paid"
   | "refunded"
-  | "disputed"
-  | "Active"
-  | "Achieved"
-  | "Failed";
+  | "disputed";
 
 export type SupportType =
   | "direct_support"
