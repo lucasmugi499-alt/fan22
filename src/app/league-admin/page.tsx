@@ -51,6 +51,7 @@ import {
 import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
+import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { Match, Team, VerificationStatus } from '@/types';
 import type { IconComponent } from '@/lib/icons';
 
@@ -83,7 +84,7 @@ export default function LeagueAdminPage() {
 function LeagueAdminDashboard() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { leagues, teams, athletes, matches, challenges } = useGoalPlaceData();
+  const { leagues, teams, athletes, matches, challenges, seasons } = useGoalPlaceData();
   const initialLeague = searchParams?.get('league') || leagues[0]?.id || '';
   const [selectedLeagueId, setSelectedLeagueId] = useState(initialLeague);
   const [modalOpen, setModalOpen] = useState<string | null>(null);
@@ -112,7 +113,18 @@ function LeagueAdminDashboard() {
     () => challenges.filter((challenge) => challenge.leagueId === selectedLeague?.id),
     [challenges, selectedLeague?.id]
   );
-  const standings = useMemo(() => buildLeagueStandings(leagueTeams, leagueMatches), [leagueMatches, leagueTeams]);
+  const activeSeason = useMemo(
+    () => (selectedLeague ? currentSeasonFor(seasons, selectedLeague.id, selectedLeague.currentSeasonId) : undefined),
+    [seasons, selectedLeague]
+  );
+  const standings = useMemo(
+    () =>
+      buildLeagueStandings(leagueTeams, leagueMatches, {
+        seasonId: activeSeason?.id,
+        scoring: scoringForSeason(activeSeason, selectedLeague?.sport ?? 'football'),
+      }),
+    [activeSeason, leagueMatches, leagueTeams, selectedLeague?.sport]
+  );
 
   const tabs = useMemo(() => [
     'Overview',

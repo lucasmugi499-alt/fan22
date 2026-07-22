@@ -144,6 +144,9 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async getLeagues() {
     return isFirebaseConfigured ? readCollection('leagues') : mockProvider.getLeagues();
   },
+  async getSeasons() {
+    return isFirebaseConfigured ? readCollection('seasons') : mockProvider.getSeasons();
+  },
   async getLeagueById(id) {
     return isFirebaseConfigured ? readDoc('leagues', id) : mockProvider.getLeagueById(id);
   },

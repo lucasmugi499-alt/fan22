@@ -45,6 +45,7 @@ function match(
     id,
     sport: 'football',
     leagueId: 'league_001',
+    seasonId: 'season_001',
     homeTeamId: 'team_a',
     awayTeamId: 'team_b',
     teamAId: 'team_a',

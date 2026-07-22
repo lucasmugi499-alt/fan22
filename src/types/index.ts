@@ -24,6 +24,55 @@ export type LeagueStatus =
 
 export type PlanType = "free" | "pro" | "partner";
 
+export type SeasonStatus =
+  | "draft"
+  | "registration"
+  | "active"
+  | "completed"
+  | "archived";
+
+export type CompetitionFormat = "league" | "knockout" | "group_knockout";
+
+/**
+ * Points awarded per result. Sport-specific because the platform runs football, basketball
+ * and rugby side by side and they do not share a scoring system: football is 3/1/0,
+ * basketball has no draws at all, and rugby is 4/2/0.
+ *
+ * `draw: null` means the sport cannot draw — a drawn scoreline is a data error rather than
+ * a zero-point result, and standings surface it as such instead of silently awarding 0.
+ *
+ * Rugby bonus points (a try bonus, and a losing bonus inside a 7-point margin) are NOT
+ * modelled here yet: awarding them requires per-team try counts, and `MatchEvent` does not
+ * carry them. Adding bonus rules later only extends this record — it does not migrate any
+ * match data — whereas omitting `seasonId` from matches now would.
+ */
+export interface SeasonScoringRules {
+  win: number;
+  draw: number | null;
+  loss: number;
+}
+
+/**
+ * A season is the unit that competition records belong to. Without it, a league's history
+ * is a single undifferentiated pile: last year's table cannot be told from this year's, a
+ * roster that changed between seasons cannot be represented, and an athlete's career
+ * cannot be read season by season — which is the historical record the platform's
+ * long-term value rests on.
+ */
+export interface Season {
+  id: string;
+  leagueId: string;
+  /** Human label, e.g. "2026 Regular Season". Unique within a league. */
+  name: string;
+  sport: SportSlug;
+  status: SeasonStatus;
+  startDate: string;
+  endDate?: string;
+  competitionFormat: CompetitionFormat;
+  scoring: SeasonScoringRules;
+  createdAt: string;
+}
+
 /**
  * Status vocabularies are canonical lowercase, matching how records are stored in
  * Firestore and the seed data. They previously carried both casings in the same union,
@@ -151,7 +200,10 @@ export interface League {
   plan: PlanType;
   verified: boolean;
   adminUserIds: string[];
+  /** Legacy label retained for display; `currentSeasonId` is the real relationship. */
   season: string;
+  /** The season new fixtures belong to and that dashboards default to. */
+  currentSeasonId?: string;
   teamsCount: number;
   athletesCount: number;
   matchesCount: number;
@@ -240,6 +292,7 @@ export interface Match {
   id: string;
   sport: SportSlug | SportType;
   leagueId: string;
+  seasonId: string;
   homeTeamId: string;
   teamAId?: string;
   awayTeamId: string;
@@ -278,6 +331,7 @@ export interface Challenge {
   athleteId: string;
   matchId: string;
   leagueId: string;
+  seasonId: string;
   sport: SportSlug | SportType;
   type: string;
   target: number;

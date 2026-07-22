@@ -26,6 +26,7 @@ import {
   Match,
   Notification,
   Report,
+  Season,
   Sport,
   Sponsor,
   SupportPledge,
@@ -43,6 +44,7 @@ export type FirestoreCollectionMap = {
   athletes: Athlete;
   teams: Team;
   leagues: League;
+  seasons: Season;
   matches: Match;
   challenges: Challenge;
   supportPledges: SupportPledge;
@@ -64,6 +66,7 @@ export type PublicCollections = {
   athletes: Athlete;
   teams: Team;
   leagues: League;
+  seasons: Season;
   matches: Match;
   challenges: Challenge;
   feedPosts: FeedPost;

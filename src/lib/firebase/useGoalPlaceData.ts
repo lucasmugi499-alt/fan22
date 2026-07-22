@@ -10,6 +10,7 @@ import {
   League,
   Match,
   Report,
+  Season,
   SportSlug,
   SportType,
   Team,
@@ -157,14 +158,16 @@ const initialData = {
   challenges: [] as Challenge[],
   feedPosts: [] as FeedPost[],
   reports: [] as Report[],
+  seasons: [] as Season[],
   verifications: [] as Verification[],
 };
 
 async function loadGoalPlaceData(provider = dataProvider) {
-  const [athletes, teams, leagues, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
+  const [athletes, teams, leagues, seasons, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
     provider.getAthletes(),
     provider.getTeams(),
     provider.getLeagues(),
+    provider.getSeasons(),
     provider.getMatches(),
     provider.getChallenges(),
     provider.getFeedPosts(),
@@ -176,6 +179,7 @@ async function loadGoalPlaceData(provider = dataProvider) {
     athletes: athletes.map(adaptAthlete),
     teams: teams.map(adaptTeam),
     leagues: leagues.map(adaptLeague),
+    seasons,
     matches: matches.map(adaptMatch),
     challenges: challenges.map(adaptChallenge),
     feedPosts: feedPosts.map(adaptFeedPost),
@@ -235,6 +239,7 @@ export function useGoalPlaceData() {
       athletes: [...store.demoAthletes, ...items.athletes],
       teams: [...store.demoTeams, ...items.teams],
       leagues: [...store.demoLeagues, ...items.leagues],
+      seasons: items.seasons,
       matches: uniqueMatches,
       challenges: uniqueChallenges,
       feedPosts: items.feedPosts,

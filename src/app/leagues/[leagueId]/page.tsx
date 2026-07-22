@@ -9,6 +9,7 @@ import { ArrowLeft01Icon, Calendar01Icon, SecurityCheckIcon } from 'hugeicons-re
 import { Trophy, Users } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
+import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { getSportTheme } from '@/lib/sportThemes';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthProvider';
@@ -41,7 +42,11 @@ function LeagueDetailPageContent() {
   const teams = data.teams.filter((team) => team.leagueId === league.id);
   const athletes = data.athletes.filter((athlete) => athlete.leagueId === league.id);
   const matches = data.matches.filter((match) => match.leagueId === league.id);
-  const standings = buildLeagueStandings(teams, matches);
+  const season = currentSeasonFor(data.seasons, league.id, league.currentSeasonId);
+  const standings = buildLeagueStandings(teams, matches, {
+    seasonId: season?.id,
+    scoring: scoringForSeason(season, league.sport),
+  });
 
   return (
     <PageContainer compact>

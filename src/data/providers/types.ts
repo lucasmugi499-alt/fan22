@@ -8,6 +8,7 @@ import {
   Match,
   Notification,
   Report,
+  Season,
   Sport,
   Sponsor,
   SupportPledge,
@@ -66,6 +67,7 @@ export interface GoalPlaceDataProvider {
   getSponsors(): Promise<Sponsor[]>;
   getAwardCategories(): Promise<AwardCategory[]>;
   getLeagues(): Promise<League[]>;
+  getSeasons(): Promise<Season[]>;
   getLeagueById(id: string): Promise<League | undefined>;
   getTeams(): Promise<Team[]>;
   getTeamById(id: string): Promise<Team | undefined>;

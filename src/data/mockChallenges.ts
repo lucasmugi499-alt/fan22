@@ -6,6 +6,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_044",
     "matchId": "match_015",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "goal",
     "target": 1,
@@ -29,6 +31,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_118",
     "matchId": "match_039",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "sport": "rugby",
     "type": "try",
     "target": 1,
@@ -52,6 +56,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_096",
     "matchId": "match_032",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "tackles",
     "target": 8,
@@ -75,6 +81,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_051",
     "matchId": "match_017",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "points",
     "target": 20,
@@ -98,6 +106,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_037",
     "matchId": "match_016",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "assist",
     "target": 1,
@@ -121,6 +131,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_057",
     "matchId": "match_019",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "rebounds",
     "target": 10,
@@ -144,6 +156,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_078",
     "matchId": "match_026",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "assists",
     "target": 5,
@@ -167,6 +181,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_066",
     "matchId": "match_021",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "sport": "basketball",
     "type": "steals",
     "target": 3,
@@ -190,6 +206,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_022",
     "matchId": "match_008",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "sport": "football",
     "type": "clean_sheet",
     "target": 1,
@@ -213,6 +231,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_040",
     "matchId": "match_013",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "minutes",
     "target": 75,
@@ -236,6 +256,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_007",
     "matchId": "match_002",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "player_of_match",
     "target": 1,
@@ -259,6 +281,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_057",
     "matchId": "match_018",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "three_pointers",
     "target": 3,
@@ -282,6 +306,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_105",
     "matchId": "match_035",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "appearance",
     "target": 1,
@@ -305,6 +331,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_011",
     "matchId": "match_004",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "chances_created",
     "target": 3,
@@ -328,6 +356,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_105",
     "matchId": "match_035",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "carries",
     "target": 5,
@@ -351,6 +381,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_073",
     "matchId": "match_028",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "free_throws",
     "target": 80,
@@ -374,6 +406,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_007",
     "matchId": "match_002",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "recoveries",
     "target": 5,
@@ -397,6 +431,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_045",
     "matchId": "match_014",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "goal",
     "target": 1,
@@ -420,6 +456,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_047",
     "matchId": "match_016",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "assist",
     "target": 1,
@@ -443,6 +481,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_006",
     "matchId": "match_001",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "clean_sheet",
     "target": 1,
@@ -466,6 +506,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_093",
     "matchId": "match_031",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "lineouts",
     "target": 3,
@@ -489,6 +531,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_052",
     "matchId": "match_018",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "blocks",
     "target": 2,
@@ -512,6 +556,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_023",
     "matchId": "match_007",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "sport": "football",
     "type": "minutes",
     "target": 75,
@@ -535,6 +581,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_022",
     "matchId": "match_007",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "sport": "football",
     "type": "player_of_match",
     "target": 1,
@@ -558,6 +606,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_045",
     "matchId": "match_015",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "chances_created",
     "target": 3,
@@ -581,6 +631,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_074",
     "matchId": "match_025",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "points",
     "target": 20,
@@ -604,6 +656,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_080",
     "matchId": "match_027",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "rebounds",
     "target": 10,
@@ -627,6 +681,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_108",
     "matchId": "match_035",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "turnover",
     "target": 1,
@@ -650,6 +706,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_044",
     "matchId": "match_014",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "recoveries",
     "target": 5,
@@ -673,6 +731,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_047",
     "matchId": "match_016",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "goal",
     "target": 1,
@@ -696,6 +756,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_003",
     "matchId": "match_001",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "assist",
     "target": 1,
@@ -719,6 +781,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_083",
     "matchId": "match_028",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "assists",
     "target": 5,
@@ -742,6 +806,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_010",
     "matchId": "match_004",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "clean_sheet",
     "target": 1,
@@ -765,6 +831,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_100",
     "matchId": "match_033",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "conversion",
     "target": 2,
@@ -788,6 +856,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_117",
     "matchId": "match_038",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "sport": "rugby",
     "type": "try",
     "target": 1,
@@ -811,6 +881,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_099",
     "matchId": "match_036",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "tackles",
     "target": 8,
@@ -834,6 +906,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_109",
     "matchId": "match_040",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "sport": "rugby",
     "type": "appearance",
     "target": 1,
@@ -857,6 +931,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_034",
     "matchId": "match_011",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "sport": "football",
     "type": "minutes",
     "target": 75,
@@ -880,6 +956,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_109",
     "matchId": "match_037",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "sport": "rugby",
     "type": "carries",
     "target": 5,
@@ -903,6 +981,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_038",
     "matchId": "match_013",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "player_of_match",
     "target": 1,
@@ -926,6 +1006,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_016",
     "matchId": "match_005",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "sport": "football",
     "type": "chances_created",
     "target": 3,
@@ -949,6 +1031,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_002",
     "matchId": "match_001",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "recoveries",
     "target": 5,
@@ -972,6 +1056,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_058",
     "matchId": "match_019",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "steals",
     "target": 3,
@@ -995,6 +1081,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_072",
     "matchId": "match_024",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "sport": "basketball",
     "type": "three_pointers",
     "target": 3,
@@ -1018,6 +1106,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_087",
     "matchId": "match_032",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "lineouts",
     "target": 3,
@@ -1041,6 +1131,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_093",
     "matchId": "match_031",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "turnover",
     "target": 1,
@@ -1064,6 +1156,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_079",
     "matchId": "match_026",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "free_throws",
     "target": 80,
@@ -1087,6 +1181,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_047",
     "matchId": "match_016",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "sport": "football",
     "type": "goal",
     "target": 1,
@@ -1110,6 +1206,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_059",
     "matchId": "match_020",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "sport": "basketball",
     "type": "blocks",
     "target": 2,
@@ -1133,6 +1231,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_105",
     "matchId": "match_034",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "sport": "rugby",
     "type": "conversion",
     "target": 2,
@@ -1156,6 +1256,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_076",
     "matchId": "match_026",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "points",
     "target": 20,
@@ -1179,6 +1281,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_073",
     "matchId": "match_025",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "rebounds",
     "target": 10,
@@ -1202,6 +1306,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_075",
     "matchId": "match_025",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "assists",
     "target": 5,
@@ -1225,6 +1331,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_004",
     "matchId": "match_001",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "sport": "football",
     "type": "assist",
     "target": 1,
@@ -1248,6 +1356,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_080",
     "matchId": "match_026",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "sport": "basketball",
     "type": "steals",
     "target": 3,
@@ -1271,6 +1381,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_110",
     "matchId": "match_040",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "sport": "rugby",
     "type": "try",
     "target": 1,
@@ -1294,6 +1406,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_069",
     "matchId": "match_023",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "sport": "basketball",
     "type": "three_pointers",
     "target": 3,
@@ -1317,6 +1431,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_025",
     "matchId": "match_012",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "sport": "football",
     "type": "clean_sheet",
     "target": 1,
@@ -1340,6 +1456,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_088",
     "matchId": "match_030",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "tackles",
     "target": 8,
@@ -1363,6 +1481,8 @@ export const challenges: Challenge[] = [
     "athleteId": "ath_089",
     "matchId": "match_030",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "sport": "rugby",
     "type": "appearance",
     "target": 1,

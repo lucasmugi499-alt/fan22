@@ -1,5 +1,6 @@
-import { League, LeagueStatus, Match, Team } from '@/types';
+import { League, LeagueStatus, Match, SeasonScoringRules, Team } from '@/types';
 import { isOfficialMatch } from '@/lib/status';
+import { defaultScoringFor } from '@/lib/season';
 
 export const leagueRankingDisclaimer =
   'GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.';
@@ -141,7 +142,25 @@ export type LeagueStanding = {
   points: number;
 };
 
-export function buildLeagueStandings(teams: Team[], matches: Match[]): LeagueStanding[] {
+export type BuildStandingsOptions = {
+  /**
+   * Restricts the table to one season. Standings are meaningless across seasons, so pass
+   * this wherever a season is known; omitting it keeps the pre-season-migration behaviour
+   * of counting every match supplied.
+   */
+  seasonId?: string;
+  /**
+   * Points per result. Defaults to the sport's convention when omitted. Prefer passing the
+   * season's own `scoring` so a league can depart from the default without a code change.
+   */
+  scoring?: SeasonScoringRules;
+};
+
+export function buildLeagueStandings(
+  teams: Team[],
+  matches: Match[],
+  options: BuildStandingsOptions = {}
+): LeagueStanding[] {
   const standings = new Map<string, LeagueStanding>();
 
   teams.forEach((team) => {
@@ -166,6 +185,7 @@ export function buildLeagueStandings(teams: Team[], matches: Match[]): LeagueSta
     // definition; do not inline this condition anywhere else.
     .filter(
       (match) =>
+        (!options.seasonId || match.seasonId === options.seasonId) &&
         isOfficialMatch(match) &&
         typeof match.teamAScore === 'number' &&
         typeof match.teamBScore === 'number'
@@ -189,20 +209,30 @@ export function buildLeagueStandings(teams: Team[], matches: Match[]): LeagueSta
       teamB.pointsFor += teamBScore;
       teamB.pointsAgainst += teamAScore;
 
+      // Scoring comes from the season (or the sport default). This previously hardcoded
+      // "football scores 3, everything else scores 1", which gave rugby wins 1 point
+      // instead of 4 and rugby draws nothing instead of 2.
+      const scoring = options.scoring ?? defaultScoringFor(match.sport);
+
       if (teamAScore > teamBScore) {
         teamA.wins += 1;
         teamB.losses += 1;
-        teamA.points += match.sport === 'Football' || match.sport === 'football' ? 3 : 1;
+        teamA.points += scoring.win;
+        teamB.points += scoring.loss;
       } else if (teamAScore < teamBScore) {
         teamB.wins += 1;
         teamA.losses += 1;
-        teamB.points += match.sport === 'Football' || match.sport === 'football' ? 3 : 1;
+        teamB.points += scoring.win;
+        teamA.points += scoring.loss;
       } else {
         teamA.draws += 1;
         teamB.draws += 1;
-        if (match.sport === 'Football' || match.sport === 'football') {
-          teamA.points += 1;
-          teamB.points += 1;
+        // `draw: null` means the sport cannot draw, so a drawn scoreline is a data error.
+        // Award nothing rather than inventing a value, and leave the drawn count visible
+        // so the anomaly is reportable instead of silent.
+        if (scoring.draw !== null) {
+          teamA.points += scoring.draw;
+          teamB.points += scoring.draw;
         }
       }
     });

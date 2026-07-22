@@ -5,6 +5,8 @@ export const matches: Match[] = [
     "id": "match_001",
     "sport": "football",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "homeTeamId": "team_001",
     "awayTeamId": "team_002",
     "venue": "Old Kampala Grounds",
@@ -38,6 +40,8 @@ export const matches: Match[] = [
     "id": "match_002",
     "sport": "football",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "homeTeamId": "team_002",
     "awayTeamId": "team_003",
     "venue": "Makerere Sports Complex",
@@ -71,6 +75,8 @@ export const matches: Match[] = [
     "id": "match_003",
     "sport": "football",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "homeTeamId": "team_003",
     "awayTeamId": "team_004",
     "venue": "Wakiso Sports Field",
@@ -91,6 +97,8 @@ export const matches: Match[] = [
     "id": "match_004",
     "sport": "football",
     "leagueId": "league_001",
+
+    "seasonId": "season_001",
     "homeTeamId": "team_004",
     "awayTeamId": "team_001",
     "venue": "Jinja Main Ground",
@@ -124,6 +132,8 @@ export const matches: Match[] = [
     "id": "match_005",
     "sport": "football",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "homeTeamId": "team_005",
     "awayTeamId": "team_006",
     "venue": "Mbarara Community Court",
@@ -144,6 +154,8 @@ export const matches: Match[] = [
     "id": "match_006",
     "sport": "football",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "homeTeamId": "team_006",
     "awayTeamId": "team_007",
     "venue": "Gulu City Sports Ground",
@@ -164,6 +176,8 @@ export const matches: Match[] = [
     "id": "match_007",
     "sport": "football",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "homeTeamId": "team_007",
     "awayTeamId": "team_008",
     "venue": "Entebbe Works Ground",
@@ -197,6 +211,8 @@ export const matches: Match[] = [
     "id": "match_008",
     "sport": "football",
     "leagueId": "league_002",
+
+    "seasonId": "season_002",
     "homeTeamId": "team_008",
     "awayTeamId": "team_005",
     "venue": "Masaka Recreation Ground",
@@ -217,6 +233,8 @@ export const matches: Match[] = [
     "id": "match_009",
     "sport": "football",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "homeTeamId": "team_009",
     "awayTeamId": "team_010",
     "venue": "KCCA Stadium",
@@ -250,6 +268,8 @@ export const matches: Match[] = [
     "id": "match_010",
     "sport": "football",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "homeTeamId": "team_010",
     "awayTeamId": "team_011",
     "venue": "YMCA Court Kampala",
@@ -270,6 +290,8 @@ export const matches: Match[] = [
     "id": "match_011",
     "sport": "football",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "homeTeamId": "team_011",
     "awayTeamId": "team_012",
     "venue": "Lugogo Indoor Arena",
@@ -290,6 +312,8 @@ export const matches: Match[] = [
     "id": "match_012",
     "sport": "football",
     "leagueId": "league_003",
+
+    "seasonId": "season_003",
     "homeTeamId": "team_012",
     "awayTeamId": "team_009",
     "venue": "Kyadondo Rugby Grounds",
@@ -310,6 +334,8 @@ export const matches: Match[] = [
     "id": "match_013",
     "sport": "football",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "homeTeamId": "team_013",
     "awayTeamId": "team_014",
     "venue": "Old Kampala Grounds",
@@ -330,6 +356,8 @@ export const matches: Match[] = [
     "id": "match_014",
     "sport": "football",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "homeTeamId": "team_014",
     "awayTeamId": "team_015",
     "venue": "Makerere Sports Complex",
@@ -363,6 +391,8 @@ export const matches: Match[] = [
     "id": "match_015",
     "sport": "football",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "homeTeamId": "team_015",
     "awayTeamId": "team_016",
     "venue": "Wakiso Sports Field",
@@ -396,6 +426,8 @@ export const matches: Match[] = [
     "id": "match_016",
     "sport": "football",
     "leagueId": "league_004",
+
+    "seasonId": "season_004",
     "homeTeamId": "team_016",
     "awayTeamId": "team_013",
     "venue": "Jinja Main Ground",
@@ -416,6 +448,8 @@ export const matches: Match[] = [
     "id": "match_017",
     "sport": "basketball",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "homeTeamId": "team_017",
     "awayTeamId": "team_018",
     "venue": "Wakiso Sports Field",
@@ -449,6 +483,8 @@ export const matches: Match[] = [
     "id": "match_018",
     "sport": "basketball",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "homeTeamId": "team_018",
     "awayTeamId": "team_019",
     "venue": "Jinja Main Ground",
@@ -482,6 +518,8 @@ export const matches: Match[] = [
     "id": "match_019",
     "sport": "basketball",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "homeTeamId": "team_019",
     "awayTeamId": "team_020",
     "venue": "Mbarara Community Court",
@@ -502,6 +540,8 @@ export const matches: Match[] = [
     "id": "match_020",
     "sport": "basketball",
     "leagueId": "league_005",
+
+    "seasonId": "season_005",
     "homeTeamId": "team_020",
     "awayTeamId": "team_017",
     "venue": "Gulu City Sports Ground",
@@ -535,6 +575,8 @@ export const matches: Match[] = [
     "id": "match_021",
     "sport": "basketball",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "homeTeamId": "team_021",
     "awayTeamId": "team_022",
     "venue": "Entebbe Works Ground",
@@ -555,6 +597,8 @@ export const matches: Match[] = [
     "id": "match_022",
     "sport": "basketball",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "homeTeamId": "team_022",
     "awayTeamId": "team_023",
     "venue": "Masaka Recreation Ground",
@@ -588,6 +632,8 @@ export const matches: Match[] = [
     "id": "match_023",
     "sport": "basketball",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "homeTeamId": "team_023",
     "awayTeamId": "team_024",
     "venue": "KCCA Stadium",
@@ -608,6 +654,8 @@ export const matches: Match[] = [
     "id": "match_024",
     "sport": "basketball",
     "leagueId": "league_006",
+
+    "seasonId": "season_006",
     "homeTeamId": "team_024",
     "awayTeamId": "team_021",
     "venue": "YMCA Court Kampala",
@@ -641,6 +689,8 @@ export const matches: Match[] = [
     "id": "match_025",
     "sport": "basketball",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "homeTeamId": "team_025",
     "awayTeamId": "team_026",
     "venue": "Lugogo Indoor Arena",
@@ -674,6 +724,8 @@ export const matches: Match[] = [
     "id": "match_026",
     "sport": "basketball",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "homeTeamId": "team_026",
     "awayTeamId": "team_027",
     "venue": "Kyadondo Rugby Grounds",
@@ -694,6 +746,8 @@ export const matches: Match[] = [
     "id": "match_027",
     "sport": "basketball",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "homeTeamId": "team_027",
     "awayTeamId": "team_028",
     "venue": "Old Kampala Grounds",
@@ -727,6 +781,8 @@ export const matches: Match[] = [
     "id": "match_028",
     "sport": "basketball",
     "leagueId": "league_007",
+
+    "seasonId": "season_007",
     "homeTeamId": "team_028",
     "awayTeamId": "team_025",
     "venue": "Makerere Sports Complex",
@@ -747,6 +803,8 @@ export const matches: Match[] = [
     "id": "match_029",
     "sport": "rugby",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "homeTeamId": "team_029",
     "awayTeamId": "team_030",
     "venue": "Jinja Main Ground",
@@ -780,6 +838,8 @@ export const matches: Match[] = [
     "id": "match_030",
     "sport": "rugby",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "homeTeamId": "team_030",
     "awayTeamId": "team_031",
     "venue": "Mbarara Community Court",
@@ -813,6 +873,8 @@ export const matches: Match[] = [
     "id": "match_031",
     "sport": "rugby",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "homeTeamId": "team_031",
     "awayTeamId": "team_032",
     "venue": "Gulu City Sports Ground",
@@ -833,6 +895,8 @@ export const matches: Match[] = [
     "id": "match_032",
     "sport": "rugby",
     "leagueId": "league_008",
+
+    "seasonId": "season_008",
     "homeTeamId": "team_032",
     "awayTeamId": "team_029",
     "venue": "Entebbe Works Ground",
@@ -853,6 +917,8 @@ export const matches: Match[] = [
     "id": "match_033",
     "sport": "rugby",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "homeTeamId": "team_033",
     "awayTeamId": "team_034",
     "venue": "Masaka Recreation Ground",
@@ -886,6 +952,8 @@ export const matches: Match[] = [
     "id": "match_034",
     "sport": "rugby",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "homeTeamId": "team_034",
     "awayTeamId": "team_035",
     "venue": "KCCA Stadium",
@@ -919,6 +987,8 @@ export const matches: Match[] = [
     "id": "match_035",
     "sport": "rugby",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "homeTeamId": "team_035",
     "awayTeamId": "team_036",
     "venue": "YMCA Court Kampala",
@@ -939,6 +1009,8 @@ export const matches: Match[] = [
     "id": "match_036",
     "sport": "rugby",
     "leagueId": "league_009",
+
+    "seasonId": "season_009",
     "homeTeamId": "team_036",
     "awayTeamId": "team_033",
     "venue": "Lugogo Indoor Arena",
@@ -959,6 +1031,8 @@ export const matches: Match[] = [
     "id": "match_037",
     "sport": "rugby",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "homeTeamId": "team_037",
     "awayTeamId": "team_038",
     "venue": "Kyadondo Rugby Grounds",
@@ -992,6 +1066,8 @@ export const matches: Match[] = [
     "id": "match_038",
     "sport": "rugby",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "homeTeamId": "team_038",
     "awayTeamId": "team_039",
     "venue": "Old Kampala Grounds",
@@ -1012,6 +1088,8 @@ export const matches: Match[] = [
     "id": "match_039",
     "sport": "rugby",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "homeTeamId": "team_039",
     "awayTeamId": "team_040",
     "venue": "Makerere Sports Complex",
@@ -1045,6 +1123,8 @@ export const matches: Match[] = [
     "id": "match_040",
     "sport": "rugby",
     "leagueId": "league_010",
+
+    "seasonId": "season_010",
     "homeTeamId": "team_040",
     "awayTeamId": "team_037",
     "venue": "Wakiso Sports Field",

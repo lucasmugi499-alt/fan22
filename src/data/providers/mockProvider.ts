@@ -40,6 +40,7 @@ import { feedPosts as feedPostStore } from '../mockFeedPosts';
 import { supportPledges } from '../mockSupportPledges';
 import { walletTransactions as walletStore } from '../mockWalletTransactions';
 import { comments as commentStore } from '../mockComments';
+import { seasons } from '../mockSeasons';
 import { VerificationStatus } from '@/types';
 
 const followed = new Set<string>();
@@ -78,6 +79,9 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getLeagues() {
     return leagues;
+  },
+  async getSeasons() {
+    return seasons;
   },
   async getLeagueById(idValue) {
     return getLeagueById(idValue);

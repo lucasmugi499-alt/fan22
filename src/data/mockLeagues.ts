@@ -3,6 +3,8 @@ import { League } from "@/types";
 export const leagues: League[] = [
   {
     "id": "league_001",
+
+    "currentSeasonId": "season_001",
     "name": "Kampala Grassroots Football League",
     "sport": "football",
     "city": "Kampala",
@@ -32,6 +34,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_002",
+
+    "currentSeasonId": "season_002",
     "name": "Wakiso Community Football Championship",
     "sport": "football",
     "city": "Wakiso",
@@ -61,6 +65,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_003",
+
+    "currentSeasonId": "season_003",
     "name": "Jinja Urban Football League",
     "sport": "football",
     "city": "Jinja",
@@ -90,6 +96,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_004",
+
+    "currentSeasonId": "season_004",
     "name": "Masaka Youth Football League",
     "sport": "football",
     "city": "Masaka",
@@ -119,6 +127,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_005",
+
+    "currentSeasonId": "season_005",
     "name": "Kampala Community Basketball League",
     "sport": "basketball",
     "city": "Kampala",
@@ -148,6 +158,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_006",
+
+    "currentSeasonId": "season_006",
     "name": "Wakiso Hoops Circuit",
     "sport": "basketball",
     "city": "Wakiso",
@@ -177,6 +189,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_007",
+
+    "currentSeasonId": "season_007",
     "name": "Jinja Streetball Championship",
     "sport": "basketball",
     "city": "Jinja",
@@ -206,6 +220,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_008",
+
+    "currentSeasonId": "season_008",
     "name": "Kampala Rugby Sevens League",
     "sport": "rugby",
     "city": "Kampala",
@@ -235,6 +251,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_009",
+
+    "currentSeasonId": "season_009",
     "name": "Kyadondo Community Rugby Cup",
     "sport": "rugby",
     "city": "Kampala",
@@ -264,6 +282,8 @@ export const leagues: League[] = [
   },
   {
     "id": "league_010",
+
+    "currentSeasonId": "season_010",
     "name": "Entebbe Rugby Development League",
     "sport": "rugby",
     "city": "Entebbe",
