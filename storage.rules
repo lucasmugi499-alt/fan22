@@ -26,6 +26,30 @@ service firebase.storage {
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
     }
 
+    // Match evidence backing a result submission.
+    //
+    // This previously had nowhere to live: the only writable paths were /public (world
+    // readable AND writable by any signed-in user, so an opposing team could read or
+    // overwrite disputed-match evidence) and /users. Evidence is scoped to the match and
+    // the uploading team, readable only by signed-in users, and never overwritable or
+    // deletable by the uploader — evidence that can be swapped after a dispute opens is
+    // not evidence.
+    //
+    // The 15MB cap is deliberately lower than the 50MB media ceiling: uploads happen from
+    // the touchline on Ugandan mobile data, and the client compresses before sending.
+    function validEvidence() {
+      return request.resource != null &&
+        request.resource.size < 15 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*|video/.*');
+    }
+
+    match /matchEvidence/{matchId}/{teamId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validEvidence();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     match /approvedMedia/{allPaths=**} {
       allow read: if true;
       allow create, update: if isAdmin() && validMedia();

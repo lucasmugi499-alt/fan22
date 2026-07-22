@@ -97,6 +97,112 @@ export type ChallengeStatus =
   | "refunded"
   | "disputed";
 
+/**
+ * Result submission lifecycle.
+ *
+ * There is deliberately ONE status field. An earlier draft paired `status` with a separate
+ * `opponentResponse`, which reintroduces exactly the failure this codebase just spent a
+ * migration removing: two fields describing one truth, free to contradict each other
+ * (`status: 'confirmed'` alongside `opponentResponse: 'disputed'`). The opponent's answer
+ * is implied by the status — `pending_confirmation` means they have not answered,
+ * `confirmed` and `disputed` are their answer — and who supplied it is recorded in
+ * `resolution` and `respondedByUserId`.
+ *
+ * `official` is reachable only by `system`. No client may write it; see firestore.rules.
+ */
+export type ResultSubmissionStatus =
+  | "pending_confirmation"
+  | "confirmed"
+  | "disputed"
+  | "official"
+  | "rejected"
+  | "withdrawn";
+
+export type ResultSubmissionActor =
+  | "submitting_team"
+  | "opponent_team"
+  | "league_admin"
+  | "system";
+
+/** How a submission came to be settled, kept for audit after the fact. */
+export type ResultResolution =
+  | "opponent_confirmed"
+  | "league_confirmed_unresponsive"
+  | "league_upheld"
+  | "league_corrected";
+
+export interface ScorerEntry {
+  athleteId: string;
+  teamId: string;
+  /** Goals, tries or points attributed to this athlete. */
+  count: number;
+  minute?: number;
+}
+
+/**
+ * A claim about a match result, made by one team and answered by the other.
+ *
+ * This is NOT the official record. Team admins never write to `matches` — they write here,
+ * and a trusted server-side finalizer promotes a settled submission onto the match. That
+ * separation is what lets Team Admins report results without being able to author official
+ * data.
+ *
+ * The document id is the `matchId`. That is load-bearing: it makes "one active submission
+ * per match" an atomic guarantee from Firestore itself, so two team admins submitting
+ * simultaneously resolve by first-write-wins with no transaction. The loser of that race
+ * is routed to respond to the existing submission rather than creating a second one.
+ */
+export interface ResultSubmission {
+  /** Equal to `matchId` — see the note above. */
+  id: string;
+  matchId: string;
+  leagueId: string;
+  seasonId: string;
+
+  submittedByTeamId: string;
+  opponentTeamId: string;
+  submittedByUserId: string;
+
+  /** The score as claimed by the submitting team. Never overwritten. */
+  homeScore: number;
+  awayScore: number;
+  /** Set only when a league admin adjudicates a different score. */
+  correctedHomeScore?: number;
+  correctedAwayScore?: number;
+
+  scorers: ScorerEntry[];
+  evidenceRefs: string[];
+  evidenceNote?: string;
+
+  status: ResultSubmissionStatus;
+  /** Increments when a new submission replaces a rejected or withdrawn one. */
+  revision: number;
+
+  respondedByUserId?: string;
+  disputeReason?: string;
+
+  resolvedByUserId?: string;
+  resolution?: ResultResolution;
+  finalDecisionNote?: string;
+
+  submittedAt: string;
+  respondedAt?: string;
+  resolvedAt?: string;
+  finalizedAt?: string;
+}
+
+/** One immutable entry per transition, stored in the submission's `events` subcollection. */
+export interface ResultSubmissionEvent {
+  id: string;
+  submissionId: string;
+  from: ResultSubmissionStatus | null;
+  to: ResultSubmissionStatus;
+  actor: ResultSubmissionActor;
+  actorUserId: string;
+  note?: string;
+  createdAt: string;
+}
+
 export type SupportType =
   | "direct_support"
   | "performance_pledge"
