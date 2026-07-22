@@ -1,0 +1,300 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isPlatformAdmin() {
+      return role() == 'platform_admin' || role() == 'super_admin';
+    }
+
+    function isSuperAdmin() {
+      return role() == 'super_admin';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function hasAdminList(data) {
+      return data.adminUserIds is list;
+    }
+
+    function uidInAdminList(data) {
+      return signedIn() && hasAdminList(data) && request.auth.uid in data.adminUserIds;
+    }
+
+    function leaguePath(leagueId) {
+      return /databases/$(database)/documents/leagues/$(leagueId);
+    }
+
+    function canManageLeagueById(leagueId) {
+      return isPlatformAdmin() ||
+        (signedIn() &&
+          exists(leaguePath(leagueId)) &&
+          hasAdminList(get(leaguePath(leagueId)).data) &&
+          request.auth.uid in get(leaguePath(leagueId)).data.adminUserIds);
+    }
+
+    function teamPath(teamId) {
+      return /databases/$(database)/documents/teams/$(teamId);
+    }
+
+    function canManageTeamById(teamId) {
+      return isPlatformAdmin() ||
+        (signedIn() &&
+          exists(teamPath(teamId)) &&
+          hasAdminList(get(teamPath(teamId)).data) &&
+          request.auth.uid in get(teamPath(teamId)).data.adminUserIds);
+    }
+
+    // Fields that describe the original claim. Once submitted they are immutable: an
+    // adjudicated score is written to correctedHomeScore/correctedAwayScore so the claim
+    // and the ruling both survive for audit.
+    function submissionClaimFields() {
+      return [
+        'matchId', 'leagueId', 'seasonId', 'submittedByTeamId', 'opponentTeamId',
+        'submittedByUserId', 'homeScore', 'awayScore', 'scorers', 'revision', 'submittedAt'
+      ];
+    }
+
+    function claimUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(submissionClaimFields());
+    }
+
+    function changedKeysWithin(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    function nonNegativeAmount() {
+      return request.resource.data.amount is number && request.resource.data.amount > 0;
+    }
+
+    match /sports/{sportId} {
+      allow read: if true;
+      allow create, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+      allow read: if isOwner(uid) || isPlatformAdmin();
+      allow update: if isOwner(uid) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /athletes/{athleteId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || isOwner(request.resource.data.userId);
+      allow update: if isPlatformAdmin() || isOwner(resource.data.userId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
+      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /leagues/{leagueId} {
+      allow read: if true;
+      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
+      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Seasons are league-owned competition containers. Publicly readable so fans can browse
+    // historical tables; only the owning league's admins (or platform admins) may create or
+    // change one. Deletion is never allowed below super admin: removing a season would
+    // orphan every match, challenge and standing that references it.
+    match /seasons/{seasonId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        request.resource.data.leagueId == resource.data.leagueId;
+      allow delete: if isSuperAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Result submissions: a team's CLAIM about a match, not the official record.
+    //
+    // The document id must equal the matchId. That is what makes "one active submission per
+    // match" atomic — two team admins submitting at once resolve by first-write-wins,
+    // because the second create collides with an existing document.
+    //
+    // No client can write status 'official'. Promotion onto the match record is done by the
+    // trusted server-side finalizer using the Admin SDK, which bypasses these rules. That
+    // asymmetry is the trust boundary: team admins report, the server decides.
+    match /resultSubmissions/{matchId} {
+      allow read: if isPlatformAdmin() ||
+        canManageLeagueById(resource.data.leagueId) ||
+        canManageTeamById(resource.data.submittedByTeamId) ||
+        canManageTeamById(resource.data.opponentTeamId);
+
+      // Only an admin of the submitting team may open a claim, only against a team they are
+      // not also running, and only in the awaiting-response state.
+      allow create: if canManageTeamById(request.resource.data.submittedByTeamId) &&
+        matchId == request.resource.data.matchId &&
+        request.resource.data.submittedByTeamId != request.resource.data.opponentTeamId &&
+        !canManageTeamById(request.resource.data.opponentTeamId) &&
+        request.resource.data.status == 'pending_confirmation' &&
+        request.resource.data.submittedByUserId == request.auth.uid &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision >= 1 &&
+        request.resource.data.resultVersion is int &&
+        request.resource.data.resultVersion >= 1 &&
+        // A live match only enters the workflow when the submitter explicitly declares the
+        // match ended, so an in-progress score cannot start a confirmation by accident.
+        request.resource.data.submittedAsFinal == true &&
+        request.resource.data.confirmationDeadline is string;
+
+      // The opponent answers: confirm or dispute. They may never edit the claimed score.
+      allow update: if canManageTeamById(resource.data.opponentTeamId) &&
+        !canManageTeamById(resource.data.submittedByTeamId) &&
+        resource.data.status in ['pending_confirmation', 'confirmation_overdue'] &&
+        request.resource.data.status in ['confirmed', 'disputed'] &&
+        claimUnchanged() &&
+        changedKeysWithin(['status', 'respondedByUserId', 'respondedAt', 'disputeReason', 'resolution']) &&
+        request.resource.data.respondedByUserId == request.auth.uid;
+
+      // The submitter may retract an unanswered claim, and nothing else.
+      allow update: if canManageTeamById(resource.data.submittedByTeamId) &&
+        resource.data.status == 'pending_confirmation' &&
+        request.resource.data.status == 'withdrawn' &&
+        claimUnchanged() &&
+        changedKeysWithin(['status', 'resolvedAt', 'resolvedByUserId']);
+
+      // The league adjudicates. It may correct a score, but only into the corrected fields,
+      // and it still cannot declare a result official.
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        resource.data.status in ['pending_confirmation', 'confirmation_overdue', 'confirmed', 'disputed'] &&
+        // 'pending_confirmation' is how a league extends the window: it resets the clock
+        // rather than deciding anything.
+        request.resource.data.status in ['confirmed', 'disputed', 'rejected', 'pending_confirmation'] &&
+        claimUnchanged() &&
+        changedKeysWithin([
+          'status', 'resolution', 'resolvedByUserId', 'resolvedAt', 'finalDecisionNote',
+          'disputeReason', 'correctedHomeScore', 'correctedAwayScore',
+          'confirmationDeadline', 'confirmedByUserId', 'confirmationReason', 'confirmedAt',
+          'evidenceRefs', 'evidenceNote'
+        ]);
+
+      // Raising a correction against an official result. This only records the REQUEST —
+      // the version swap itself is done by the finalizer, which is why 'superseded' and
+      // 'official' remain unwritable from any client.
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        resource.data.status == 'official' &&
+        request.resource.data.status == 'official' &&
+        claimUnchanged() &&
+        request.resource.data.correctionReason is string &&
+        request.resource.data.correctionReason.size() > 0 &&
+        changedKeysWithin(['correctionReason', 'correctionRequestedBy', 'correctionApprovedBy']);
+
+      allow delete: if isSuperAdmin();
+
+      // Append-only audit trail. Entries are never edited, so the history of a disputed
+      // result cannot be rewritten after the fact.
+      match /events/{eventId} {
+        allow read: if isPlatformAdmin() ||
+          canManageLeagueById(get(/databases/$(database)/documents/resultSubmissions/$(matchId)).data.leagueId);
+        allow create: if signedIn() && request.resource.data.actorUserId == request.auth.uid;
+        allow update: if false;
+        allow delete: if isSuperAdmin();
+      }
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /feedPosts/{postId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isPlatformAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow delete: if isSuperAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isPlatformAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /supportPledges/{pledgeId} {
+      allow create: if signedIn() &&
+        request.resource.data.fanId == request.auth.uid &&
+        nonNegativeAmount() &&
+        request.resource.data.status in ['pending', 'held'];
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.fanId == request.auth.uid);
+      allow update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /walletTransactions/{transactionId} {
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.amount is number;
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow create: if isPlatformAdmin();
+      allow read, update: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /sponsors/{sponsorId} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update: if isPlatformAdmin() || (signedIn() && resource.data.adminUserIds is list && request.auth.uid in resource.data.adminUserIds);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /awards/{awardId} {
+      allow read: if true;
+      allow create, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /verifications/{verificationId} {
+      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow create: if canManageLeagueById(request.resource.data.leagueId) || isPlatformAdmin();
+      allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update: if isPlatformAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /adminLogs/{logId} {
+      allow create, read: if isPlatformAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}

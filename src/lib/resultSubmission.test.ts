@@ -445,3 +445,99 @@ describe('submitting from a live match (decision 4)', () => {
     expect(decision.plan.match.status).toBe('completed');
   });
 });
+
+describe('stale finalization cannot overwrite a newer official result', () => {
+  const baseMatch = {
+    id: 'match_001',
+    leagueId: 'league_001',
+    seasonId: 'season_001',
+    homeTeamId: 'team_a',
+    awayTeamId: 'team_b',
+  };
+  const now = '2026-03-05T00:00:00.000Z';
+
+  it('refuses a version older than the live one', () => {
+    // Firestore delivers events at least once with no ordering guarantee, so a v1 event can
+    // arrive after a v2 correction is already live. The ledger cannot catch this: v1 and v2
+    // have different finalization keys.
+    expect(
+      planFinalization({
+        submission: submission({ status: 'confirmed', resultVersion: 1 }),
+        match: { ...baseMatch, officialResultVersion: 2 },
+        processedKeys: [],
+        now,
+      })
+    ).toEqual({ action: 'noop', reason: 'stale_version' });
+  });
+
+  it('refuses re-finalizing the version already live', () => {
+    expect(
+      planFinalization({
+        submission: submission({ status: 'confirmed', resultVersion: 2 }),
+        match: { ...baseMatch, officialResultVersion: 2 },
+        processedKeys: [],
+        now,
+      })
+    ).toEqual({ action: 'noop', reason: 'stale_version' });
+  });
+
+  it('accepts a correction that is genuinely newer, and archives the version it replaces', () => {
+    const decision = planFinalization({
+      submission: submission({ status: 'confirmed', resultVersion: 2 }),
+      match: { ...baseMatch, officialResultVersion: 1 },
+      processedKeys: [],
+      now,
+    });
+    if (decision.action !== 'finalize') throw new Error('expected finalize');
+    expect(decision.plan.resultVersion).toBe(2);
+    expect(decision.plan.supersedesVersion).toBe(1);
+  });
+
+  it('has no version to supersede for a first result', () => {
+    const decision = planFinalization({
+      submission: submission({ status: 'confirmed' }),
+      match: baseMatch,
+      processedKeys: [],
+      now,
+    });
+    if (decision.action !== 'finalize') throw new Error('expected finalize');
+    expect(decision.plan.supersedesVersion).toBeUndefined();
+  });
+
+  it('gives a correction its own ledger key, distinct from the original', () => {
+    expect(finalizationKeyFor(submission({ resultVersion: 1 }))).not.toBe(
+      finalizationKeyFor(submission({ resultVersion: 2 }))
+    );
+  });
+});
+
+describe('trigger and sweep converge on the same outcome', () => {
+  const match = {
+    id: 'match_001',
+    leagueId: 'league_001',
+    seasonId: 'season_001',
+    homeTeamId: 'team_a',
+    awayTeamId: 'team_b',
+  };
+  const now = '2026-03-05T00:00:00.000Z';
+
+  it('sweep no-ops after the trigger has finalized', () => {
+    const finalized = submission({ status: 'official', finalizedAt: now });
+    expect(planFinalization({ submission: finalized, match, processedKeys: [], now })).toEqual({
+      action: 'noop',
+      reason: 'not_finalizable',
+    });
+  });
+
+  it('trigger no-ops after the sweep has finalized', () => {
+    // The sweep wrote the ledger entry; a late trigger sees it and stops.
+    expect(
+      planFinalization({
+        submission: submission({ status: 'confirmed' }),
+        match,
+        processedKeys: ['match_001:match_001:1'],
+        now,
+      })
+    ).toEqual({ action: 'noop', reason: 'already_finalized' });
+  });
+});

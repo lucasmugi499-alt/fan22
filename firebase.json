@@ -1,8 +1,10 @@
 {
-  "firestore": {
-    "database": "fg256",
-    "rules": "firestore.rules"
-  },
+  "firestore": [
+    {
+      "database": "fg256",
+      "rules": "firestore.rules"
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },

@@ -329,13 +329,21 @@ export type FinalizationPlan = {
     finalizationSource: FinalizationSource;
     finalizedAt: string;
   };
-  /** Set when this result replaces an earlier official version. */
-  supersedes?: string;
+  /**
+   * The version being made live. Written to the match so a later, older finalization can be
+   * recognised as stale and refused.
+   */
+  resultVersion: number;
+  /** The version this replaces, to be archived as `superseded`. Absent for a first result. */
+  supersedesVersion?: number;
 };
 
 export type FinalizationDecision =
   | { action: 'finalize'; plan: FinalizationPlan }
-  | { action: 'noop'; reason: 'already_finalized' | 'not_finalizable' | 'mismatched_parents' };
+  | {
+      action: 'noop';
+      reason: 'already_finalized' | 'not_finalizable' | 'mismatched_parents' | 'stale_version';
+    };
 
 /**
  * Decides what the finalizer should write, as a pure function so the whole thing is
@@ -348,7 +356,10 @@ export type FinalizationDecision =
  */
 export function planFinalization(input: {
   submission: ResultSubmission;
-  match: Pick<Match, 'id' | 'leagueId' | 'seasonId' | 'homeTeamId' | 'awayTeamId'>;
+  match: Pick<
+    Match,
+    'id' | 'leagueId' | 'seasonId' | 'homeTeamId' | 'awayTeamId' | 'officialResultVersion'
+  >;
   processedKeys: string[];
   now: string;
 }): FinalizationDecision {
@@ -372,6 +383,16 @@ export function planFinalization(input: {
     return { action: 'noop', reason: 'already_finalized' };
   }
 
+  // Firestore delivers events at least once and does not guarantee ordering, so an old
+  // event can arrive after a correction has already been made live. The ledger cannot
+  // catch this — each version has its own key — so the live version is compared directly.
+  if (
+    typeof match.officialResultVersion === 'number' &&
+    match.officialResultVersion >= submission.resultVersion
+  ) {
+    return { action: 'noop', reason: 'stale_version' };
+  }
+
   const score = finalScore(submission);
 
   return {
@@ -392,7 +413,8 @@ export function planFinalization(input: {
           finalizationSourceFor({ previousStatus: 'confirmed', actor: 'league_admin' }),
         finalizedAt: now,
       },
-      supersedes: submission.supersedesSubmissionId,
+      resultVersion: submission.resultVersion,
+      supersedesVersion: match.officialResultVersion,
     },
   };
 }

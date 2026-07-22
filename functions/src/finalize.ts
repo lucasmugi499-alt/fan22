@@ -67,12 +67,28 @@ export async function finalizeSubmission(
       return { action: 'skipped', reason: 'already_finalized' };
     }
 
+    // A correction replaces an earlier official version. The earlier version is copied to
+    // an immutable archive rather than edited — `resultSubmissions/{matchId}` holds exactly
+    // one document (its id IS the matchId, which is what makes submission creation
+    // atomic), so prior versions live in the `versions` subcollection.
+    if (typeof plan.supersedesVersion === 'number') {
+      tx.create(submissionRef.collection('versions').doc(String(plan.supersedesVersion)), {
+        ...submissionSnap.data(),
+        status: 'superseded',
+        supersededBySubmissionId: submission.id,
+        supersededAt: plan.submission.finalizedAt,
+      });
+    }
+
     tx.update(matchRef, {
       status: plan.match.status,
       verificationStatus: plan.match.verificationStatus,
       score: plan.match.score,
       teamAScore: plan.match.score.home,
       teamBScore: plan.match.score.away,
+      // Records which version is live, so a late event for an older version is refused
+      // rather than silently overwriting a correction.
+      officialResultVersion: plan.resultVersion,
       verifiedBy: 'system:finalizer',
       updatedAt: plan.submission.finalizedAt,
     });
@@ -102,15 +118,6 @@ export async function finalizeSubmission(
       resultVersion: submission.resultVersion,
       finalizedAt: plan.submission.finalizedAt,
     });
-
-    // A correction replaces an earlier official version, which is retained rather than
-    // edited. `official -> superseded` is a system-only transition.
-    if (plan.supersedes) {
-      tx.update(db.collection(SUBMISSIONS).doc(plan.supersedes), {
-        status: 'superseded',
-        supersededBySubmissionId: submission.id,
-      });
-    }
 
     return { action: 'finalized', finalizationKey: plan.finalizationKey };
   });

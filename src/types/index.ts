@@ -463,6 +463,12 @@ export interface Match {
     away: number | null;
   };
   verificationStatus: VerificationStatus;
+  /**
+   * Which submission version produced the live official result. Guards against a stale
+   * finalization overwriting a newer correction: the idempotency ledger cannot catch that,
+   * because v1 and v2 have different finalization keys.
+   */
+  officialResultVersion?: number;
   verifiedBy?: string;
   topPerformerId?: string;
   supportersCount: number;

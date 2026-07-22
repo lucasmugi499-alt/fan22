@@ -9,7 +9,12 @@ import { readFileSync } from 'node:fs';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 /**
- * Security rules tests. These run against the Firestore emulator, so they need Java:
+ * Security rules tests for `firestore.rules.next` — the pending authorization matrix
+ * covering seasons and result submissions. It is NOT the deployed ruleset: it was rolled
+ * back from production on 2026-07-22 because it had compiled but never been behaviourally
+ * verified (see docs/INCIDENT-2026-07-22-rules-deploy.md).
+ *
+ * These run against the Firestore emulator, so they need Java:
  *
  *   brew install --cask temurin      (or any JDK 11+)
  *   npm run test:rules
@@ -57,7 +62,11 @@ beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
-      rules: readFileSync('firestore.rules', 'utf8'),
+      // Deliberately NOT firestore.rules. That file mirrors what is live in
+      // production (the known-good baseline). The new authorization matrix lives in
+      // firestore.rules.next until this suite passes against it in staging — so an
+      // accidental `firebase deploy` can only ever redeploy the validated baseline.
+      rules: readFileSync('firestore.rules.next', 'utf8'),
       host: '127.0.0.1',
       port: 8080,
     },
