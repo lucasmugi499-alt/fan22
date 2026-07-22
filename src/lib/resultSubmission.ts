@@ -7,10 +7,15 @@ import {
   ResultSubmissionActor,
   ResultSubmissionStatus,
   VerificationStatus,
-} from '@/types';
+} from '../types';
 
 /**
  * The result submission state machine.
+ *
+ * NOTE: this module is compiled into the Cloud Functions bundle as well as the app, so it
+ * must stay portable — relative imports only (TypeScript does not rewrite `@/` path
+ * aliases on emit, so an aliased import would compile to a `require` that fails at
+ * runtime in the function), and no React, Next or browser APIs.
  *
  * Team admins report results here; they never write to `matches`. A settled submission is
  * promoted onto the official match record by a trusted server-side finalizer, which is the

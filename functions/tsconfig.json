@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "moduleResolution": "node",
+    "outDir": "lib",
+    // rootDir is the repo root so the shared, framework-free logic in ../src/lib can be
+    // compiled into the deployed bundle rather than duplicated. Output therefore lands at
+    // lib/functions/src/index.js, which is what package.json "main" points at.
+    "rootDir": "..",
+    "sourceMap": true,
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "../src/lib/resultSubmission.ts",
+    "../src/types/index.ts"
+  ]
+}

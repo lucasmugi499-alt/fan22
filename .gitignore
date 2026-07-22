@@ -44,3 +44,7 @@ next-env.d.ts
 
 # agent tooling
 /.agent/
+
+# cloud functions build output
+/functions/lib
+/functions/node_modules

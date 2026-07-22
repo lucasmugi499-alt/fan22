@@ -216,10 +216,34 @@ automatically, rather than depending on someone to flip the lifecycle by hand.
 
 ## Remaining work
 
-1. `functions/` package with the `onWrite` trigger and the hourly scheduled sweep, both
-   thin wrappers over `planFinalization()`. Requires the Blaze plan.
-2. Reminder dispatch at 24h/48h (`dueReminders()` computes what is owed) and the sweep that
-   moves lapsed submissions to `confirmation_overdue`.
+Done:
+
+- `functions/` package with the `onWrite` trigger and the hourly reconciliation sweep, both
+  thin wrappers over `planFinalization()`. Compiles and the entrypoint loads.
+- Idempotency ledger at `finalizations/{finalizationKey}`, written inside the same
+  transaction that applies the result.
+- Security rules suite (`npm run test:rules`) covering the create/answer/adjudicate matrix
+  and the trust boundary.
+
+Outstanding:
+
+1. **Install a JDK and run the rules suite.** The rules have still never been compiled.
+   `brew install --cask temurin`, then `npm run test:rules`.
+2. Reminder dispatch at 24h/48h. `dueReminders()` computes what is owed; nothing sends yet.
 3. UI: submit / confirm / dispute / league resolution, and the correction request form.
-4. Rules unit tests via `@firebase/rules-unit-testing` — the rules still have not been
-   compiled locally, since the emulator needs Java.
+4. A `staging` alias in `.firebaserc`. There is currently only `default`, pointing at the
+   production project, so `firebase deploy --only firestore:rules` goes straight to prod.
+
+### Deploy notes
+
+The Firestore instance is the **named database `fg256`**, not `(default)`. Both
+`getFirestore(DATABASE_ID)` and the trigger's `database` option depend on this. A v1
+trigger, or a v2 trigger without `database`, listens to `(default)` — which is empty in
+this project. It would deploy cleanly, report healthy, and never fire.
+
+```bash
+npm run functions:build      # compile, including the shared pure logic
+npm run test:rules           # needs a JDK
+firebase deploy --only functions
+firebase deploy --only firestore:rules   # PRODUCTION — verify with the emulator first
+```
