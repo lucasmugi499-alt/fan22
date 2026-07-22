@@ -1,9 +1,12 @@
 import {
+  FinalizationSource,
   Match,
+  MatchStatus,
   ResultResolution,
   ResultSubmission,
   ResultSubmissionActor,
   ResultSubmissionStatus,
+  VerificationStatus,
 } from '@/types';
 
 /**
@@ -41,6 +44,14 @@ const TRANSITIONS: Transition[] = [
   { from: 'pending_confirmation', to: 'disputed', actors: ['opponent_team', 'league_admin'] },
   // The submitter can retract a mistyped score while it is still unanswered.
   { from: 'pending_confirmation', to: 'withdrawn', actors: ['submitting_team'] },
+  // 72h with no answer. Escalation only — silence is never consent.
+  { from: 'pending_confirmation', to: 'confirmation_overdue', actors: ['system'] },
+  // A late opponent response still counts, and still carries mutual provenance.
+  { from: 'confirmation_overdue', to: 'confirmed', actors: ['opponent_team', 'league_admin'] },
+  { from: 'confirmation_overdue', to: 'disputed', actors: ['opponent_team', 'league_admin'] },
+  // Extending the deadline puts the clock back rather than deciding anything.
+  { from: 'confirmation_overdue', to: 'pending_confirmation', actors: ['league_admin'] },
+  { from: 'confirmation_overdue', to: 'rejected', actors: ['league_admin'] },
   // Settled, awaiting promotion onto the match. System only — this is the trust boundary.
   { from: 'confirmed', to: 'official', actors: ['system'] },
   // A league admin may pull a confirmed result back for review before it is finalized.
@@ -48,9 +59,27 @@ const TRANSITIONS: Transition[] = [
   // Adjudication: upheld as submitted, or corrected to a different score.
   { from: 'disputed', to: 'confirmed', actors: ['league_admin'] },
   { from: 'disputed', to: 'rejected', actors: ['league_admin'] },
+  // A correction supersedes an official result. Only the finalizer performs the swap, once
+  // the replacement version has been approved.
+  { from: 'official', to: 'superseded', actors: ['system'] },
 ];
 
-export const TERMINAL_STATUSES: ResultSubmissionStatus[] = ['official', 'rejected', 'withdrawn'];
+/**
+ * `official` is NOT terminal: referee corrections, eligibility rulings and abandoned
+ * matches are ordinary sports operations, and a pilot cannot depend on super-admin database
+ * surgery for them. It is replaceable only by a new version, via `system`.
+ */
+export const TERMINAL_STATUSES: ResultSubmissionStatus[] = [
+  'rejected',
+  'withdrawn',
+  'superseded',
+];
+
+/** How long an opponent has to answer before the claim escalates to the league. */
+export const CONFIRMATION_WINDOW_HOURS = 72;
+
+/** Hours after submission at which the opponent is reminded. */
+export const REMINDER_SCHEDULE_HOURS = [24, 48];
 
 /** Statuses from which a match may receive a brand new submission. */
 const REPLACEABLE_STATUSES: ResultSubmissionStatus[] = ['rejected', 'withdrawn'];
@@ -104,7 +133,10 @@ export type TransitionRefusal = {
     | 'illegal_transition'
     | 'actor_not_permitted'
     | 'self_confirmation'
-    | 'correction_requires_score';
+    | 'correction_requires_score'
+    | 'official_requires_correction'
+    | 'not_marked_final'
+    | 'correction_requires_reason';
   message: string;
 };
 
@@ -132,6 +164,15 @@ export function checkTransition(input: {
       ok: false,
       reason: 'terminal',
       message: `A ${from} submission cannot change. Create a new submission instead.`,
+    };
+  }
+
+  // An official result may only be displaced by an approved correction, never edited.
+  if (from === 'official' && !(to === 'superseded' && actor === 'system')) {
+    return {
+      ok: false,
+      reason: 'official_requires_correction',
+      message: 'An official result can only be replaced by an approved correction version.',
     };
   }
 
@@ -213,4 +254,194 @@ export function matchVerificationFor(status: ResultSubmissionStatus) {
     default:
       return 'pending' as const;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Confirmation window
+// ---------------------------------------------------------------------------
+
+export function confirmationDeadlineFrom(submittedAt: string): string {
+  return new Date(new Date(submittedAt).getTime() + CONFIRMATION_WINDOW_HOURS * 3_600_000)
+    .toISOString();
+}
+
+/** Reminder timestamps that should have been sent by `now`, for the sweep to reconcile. */
+export function dueReminders(submittedAt: string, now: string): number[] {
+  const elapsedHours = (new Date(now).getTime() - new Date(submittedAt).getTime()) / 3_600_000;
+  return REMINDER_SCHEDULE_HOURS.filter((hours) => elapsedHours >= hours);
+}
+
+/**
+ * Whether the confirmation window has elapsed. Passing the deadline escalates to the
+ * league; it never confirms anything. Silence is not consent.
+ */
+export function isConfirmationOverdue(
+  submission: Pick<ResultSubmission, 'status' | 'confirmationDeadline'>,
+  now: string
+): boolean {
+  return (
+    submission.status === 'pending_confirmation' &&
+    new Date(now).getTime() >= new Date(submission.confirmationDeadline).getTime()
+  );
+}
+
+/**
+ * Provenance for a settlement. A league admin confirming after silence is recorded
+ * distinctly from a genuine mutual confirmation — the public result may read "Official",
+ * the audit trail must show how it got there.
+ */
+export function finalizationSourceFor(input: {
+  previousStatus: ResultSubmissionStatus;
+  actor: ResultSubmissionActor;
+}): FinalizationSource {
+  if (input.actor === 'opponent_team') return 'mutual_confirmation';
+  if (input.previousStatus === 'confirmation_overdue') {
+    return 'league_admin_nonresponse_confirmation';
+  }
+  if (input.previousStatus === 'disputed') return 'league_admin_dispute_resolution';
+  return 'league_admin_nonresponse_confirmation';
+}
+
+// ---------------------------------------------------------------------------
+// Finalization
+// ---------------------------------------------------------------------------
+
+export function finalizationKeyFor(
+  submission: Pick<ResultSubmission, 'id' | 'matchId' | 'resultVersion'>
+): string {
+  return `${submission.matchId}:${submission.id}:${submission.resultVersion}`;
+}
+
+export type FinalizationPlan = {
+  finalizationKey: string;
+  match: {
+    status: MatchStatus;
+    verificationStatus: VerificationStatus;
+    score: { home: number; away: number };
+  };
+  submission: {
+    status: 'official';
+    finalizationSource: FinalizationSource;
+    finalizedAt: string;
+  };
+  /** Set when this result replaces an earlier official version. */
+  supersedes?: string;
+};
+
+export type FinalizationDecision =
+  | { action: 'finalize'; plan: FinalizationPlan }
+  | { action: 'noop'; reason: 'already_finalized' | 'not_finalizable' | 'mismatched_parents' };
+
+/**
+ * Decides what the finalizer should write, as a pure function so the whole thing is
+ * testable without Firestore. The Cloud Function applies this inside one transaction and
+ * does nothing else.
+ *
+ * Idempotency is by `finalizationKey`: an onWrite retry, a duplicate trigger, or the hourly
+ * reconciliation sweep re-running all resolve to a no-op rather than applying a result
+ * twice.
+ */
+export function planFinalization(input: {
+  submission: ResultSubmission;
+  match: Pick<Match, 'id' | 'leagueId' | 'seasonId' | 'homeTeamId' | 'awayTeamId'>;
+  processedKeys: string[];
+  now: string;
+}): FinalizationDecision {
+  const { submission, match, processedKeys, now } = input;
+
+  if (submission.status !== 'confirmed') {
+    return { action: 'noop', reason: 'not_finalizable' };
+  }
+
+  // Never finalize a submission onto a match it does not belong to.
+  if (
+    submission.matchId !== match.id ||
+    submission.leagueId !== match.leagueId ||
+    submission.seasonId !== match.seasonId
+  ) {
+    return { action: 'noop', reason: 'mismatched_parents' };
+  }
+
+  const finalizationKey = finalizationKeyFor(submission);
+  if (submission.finalizedAt || processedKeys.includes(finalizationKey)) {
+    return { action: 'noop', reason: 'already_finalized' };
+  }
+
+  const score = finalScore(submission);
+
+  return {
+    action: 'finalize',
+    plan: {
+      finalizationKey,
+      match: {
+        // Submitting from a live match advances the lifecycle automatically rather than
+        // depending on someone to flip it by hand.
+        status: 'completed',
+        verificationStatus: 'verified',
+        score,
+      },
+      submission: {
+        status: 'official',
+        finalizationSource:
+          submission.finalizationSource ??
+          finalizationSourceFor({ previousStatus: 'confirmed', actor: 'league_admin' }),
+        finalizedAt: now,
+      },
+      supersedes: submission.supersedesSubmissionId,
+    },
+  };
+}
+
+/**
+ * Whether a correction may be raised against an official result without platform sign-off.
+ * Inside the grace window a league admin may correct their own league; after it, a
+ * platform admin must approve, so late edits to a settled table are always escalated.
+ */
+export const CORRECTION_SELF_SERVICE_HOURS = 72;
+
+export function correctionRequiresPlatformApproval(
+  finalizedAt: string,
+  now: string
+): boolean {
+  const elapsed = (new Date(now).getTime() - new Date(finalizedAt).getTime()) / 3_600_000;
+  return elapsed > CORRECTION_SELF_SERVICE_HOURS;
+}
+
+export function checkCorrectionRequest(input: {
+  submission: Pick<ResultSubmission, 'status' | 'finalizedAt'>;
+  reason?: string;
+  approvedByPlatformAdmin: boolean;
+  now: string;
+}): TransitionCheck {
+  const { submission, reason, approvedByPlatformAdmin, now } = input;
+
+  if (submission.status !== 'official') {
+    return {
+      ok: false,
+      reason: 'illegal_transition',
+      message: 'Only an official result can be corrected.',
+    };
+  }
+
+  if (!reason || !reason.trim()) {
+    return {
+      ok: false,
+      reason: 'correction_requires_reason',
+      message: 'A correction must record why the official result is being replaced.',
+    };
+  }
+
+  if (
+    submission.finalizedAt &&
+    correctionRequiresPlatformApproval(submission.finalizedAt, now) &&
+    !approvedByPlatformAdmin
+  ) {
+    return {
+      ok: false,
+      reason: 'actor_not_permitted',
+      message: `Corrections more than ${CORRECTION_SELF_SERVICE_HOURS}h after finalization need platform approval.`,
+    };
+  }
+
+  return { ok: true };
 }

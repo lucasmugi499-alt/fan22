@@ -154,12 +154,18 @@ service cloud.firestore {
         request.resource.data.status == 'pending_confirmation' &&
         request.resource.data.submittedByUserId == request.auth.uid &&
         request.resource.data.revision is int &&
-        request.resource.data.revision >= 1;
+        request.resource.data.revision >= 1 &&
+        request.resource.data.resultVersion is int &&
+        request.resource.data.resultVersion >= 1 &&
+        // A live match only enters the workflow when the submitter explicitly declares the
+        // match ended, so an in-progress score cannot start a confirmation by accident.
+        request.resource.data.submittedAsFinal == true &&
+        request.resource.data.confirmationDeadline is string;
 
       // The opponent answers: confirm or dispute. They may never edit the claimed score.
       allow update: if canManageTeamById(resource.data.opponentTeamId) &&
         !canManageTeamById(resource.data.submittedByTeamId) &&
-        resource.data.status == 'pending_confirmation' &&
+        resource.data.status in ['pending_confirmation', 'confirmation_overdue'] &&
         request.resource.data.status in ['confirmed', 'disputed'] &&
         claimUnchanged() &&
         changedKeysWithin(['status', 'respondedByUserId', 'respondedAt', 'disputeReason', 'resolution']) &&
@@ -175,13 +181,28 @@ service cloud.firestore {
       // The league adjudicates. It may correct a score, but only into the corrected fields,
       // and it still cannot declare a result official.
       allow update: if canManageLeagueById(resource.data.leagueId) &&
-        resource.data.status in ['pending_confirmation', 'confirmed', 'disputed'] &&
-        request.resource.data.status in ['confirmed', 'disputed', 'rejected'] &&
+        resource.data.status in ['pending_confirmation', 'confirmation_overdue', 'confirmed', 'disputed'] &&
+        // 'pending_confirmation' is how a league extends the window: it resets the clock
+        // rather than deciding anything.
+        request.resource.data.status in ['confirmed', 'disputed', 'rejected', 'pending_confirmation'] &&
         claimUnchanged() &&
         changedKeysWithin([
           'status', 'resolution', 'resolvedByUserId', 'resolvedAt', 'finalDecisionNote',
-          'disputeReason', 'correctedHomeScore', 'correctedAwayScore'
+          'disputeReason', 'correctedHomeScore', 'correctedAwayScore',
+          'confirmationDeadline', 'confirmedByUserId', 'confirmationReason', 'confirmedAt',
+          'evidenceRefs', 'evidenceNote'
         ]);
+
+      // Raising a correction against an official result. This only records the REQUEST —
+      // the version swap itself is done by the finalizer, which is why 'superseded' and
+      // 'official' remain unwritable from any client.
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        resource.data.status == 'official' &&
+        request.resource.data.status == 'official' &&
+        claimUnchanged() &&
+        request.resource.data.correctionReason is string &&
+        request.resource.data.correctionReason.size() > 0 &&
+        changedKeysWithin(['correctionReason', 'correctionRequestedBy', 'correctionApprovedBy']);
 
       allow delete: if isSuperAdmin();
 

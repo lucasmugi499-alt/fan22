@@ -1,8 +1,8 @@
 # Result Submission Workflow
 
-Status: **drafted, not wired to any UI.** The state machine, ownership model, Firestore
-rule matrix and evidence storage path are in place. The trusted finalizer and the UI are
-not — four decisions below need answering first.
+Status: **designed and decided; not yet wired to any UI.** The state machine, ownership
+model, Firestore rule matrix, evidence storage path and finalization planner are in place
+and tested. The Cloud Functions package and the UI are not — see Remaining work.
 
 Implements §8 of the product definition: Team Admin A submits, Team Admin B confirms or
 disputes, League Admin handles only the exceptions.
@@ -25,18 +25,25 @@ security model has to make that structurally true, not merely conventional.
 
 ```
 (new) ──submitting team──▶ pending_confirmation
-                               │
-        opponent confirms ─────┼────▶ confirmed ──system──▶ official
-        opponent disputes ─────┤          ▲  │
-                               │          │  └──league admin──▶ disputed
-        submitter withdraws ───┼──▶ withdrawn │
-                               │              │
-                               └──▶ disputed ─┘  (league admin upholds or corrects)
-                                        │
-                                        └──league admin──▶ rejected
+                               │  │
+        opponent confirms ─────┤  └──72h, system──▶ confirmation_overdue
+        opponent disputes ─────┤                          │
+        submitter withdraws ───┼──▶ withdrawn             │ league admin:
+                               │                          │  confirm / dispute /
+                               ▼                          │  extend / reject
+                          confirmed ◀─────────────────────┘  (late opponent reply
+                               │  ▲                            also accepted)
+                    system     │  │ league admin upholds or corrects
+                               ▼  │
+                          official │
+                               │   └── disputed ──league admin──▶ rejected
+                    system     │
+                               ▼
+                          superseded  (replaced by an approved correction version)
 ```
 
-`official`, `rejected` and `withdrawn` are terminal. A rejected or withdrawn match may
+`rejected`, `withdrawn` and `superseded` are terminal. `official` is **not** — it is
+replaceable by a correction version, via `system` only. A rejected or withdrawn match may
 receive a fresh submission at the next `revision`.
 
 ### One status field, not two
@@ -77,10 +84,10 @@ survive. `finalScore()` returns the adjudicated score when present.
 |---|---|---|
 | Submitting team admin | create (own team only, status `pending_confirmation`); withdraw while unanswered | confirm own claim; edit after a response; touch `matches` |
 | Opponent team admin | confirm or dispute | edit the claimed score; act if they also run the submitting team |
-| League admin | confirm, dispute, reject, correct score | change the original claim; declare `official` |
-| Platform admin | all of the above | — |
-| **System (Admin SDK)** | **`confirmed → official`** | — |
-| Anyone | — | **write `official` from a client** |
+| League admin | confirm, dispute, reject, correct score, extend the deadline, raise a correction request | change the original claim; declare `official` or `superseded` |
+| Platform admin | all of the above; approve corrections after the 72h grace window | — |
+| **System (Admin SDK)** | **`confirmed → official`**, `official → superseded`, `pending_confirmation → confirmation_overdue` | — |
+| Anyone | — | **write `official` or `superseded` from a client** |
 
 Claim fields are pinned by `claimUnchanged()`; each actor's writable fields are pinned by
 `changedKeysWithin()`. The `events` subcollection is append-only (`allow update: if false`)
@@ -110,12 +117,11 @@ mobile data. The client must compress before upload.
 `confirmed → official` is the only transition producing an official result, and no client
 can perform it.
 
-**Recommended host: a Next.js route handler using the Admin SDK**, not a Cloud Function.
-`firebase-admin` is already wired in `src/lib/firebase/admin.ts`, `firebase.json` uses
-`frameworksBackend`, so server code already deploys — this needs no new runtime. The Admin
-SDK bypasses security rules, which is exactly the asymmetry the trust boundary requires.
+Host: a Firestore **`onWrite` Cloud Function** (see Decision 2), applying the plan returned
+by `planFinalization()` inside a single transaction. The Admin SDK bypasses security rules,
+which is exactly the asymmetry the trust boundary requires.
 
-The finalizer must, in a single transaction:
+The finalizer must, in that transaction:
 
 1. re-read the submission and re-run `checkTransition(..., actor: 'system')` server-side —
    never trust a client-supplied state;
@@ -130,29 +136,90 @@ Athlete statistics are **not** updated here yet; that depends on the athlete sta
 (`athletes/{id}/seasonStats/{seasonId}`), which is separate work.
 
 ---
+## Decisions (settled)
 
-## Open decisions
+### 1. Unresponsive opponent — silence is never consent
 
-These block implementation. Each is a product call, not a technical one.
+No auto-confirmation in the pilot. 72-hour window, reminders at 24h and 48h, then
+`confirmation_overdue`, which escalates to the league rather than deciding anything.
 
-**1. Unresponsive opponent.** The most common real failure will be team B simply never
-answering. Currently a league admin can confirm on their behalf
-(`league_confirmed_unresponsive`). Should there also be a timeout — auto-confirm after N
-days? If so, N, and does auto-confirmation carry the same weight as a real confirmation in
-a later dispute? A 72-hour default matching a weekend fixture cycle is the obvious
-starting point, but it is your call.
+Once overdue a league admin has exactly four options — confirm on behalf, dispute, extend
+the deadline (back to `pending_confirmation`), or reject. A late opponent response is still
+accepted and still carries **mutual** provenance.
 
-**2. What triggers finalization.** Options: (a) Firestore `onWrite` trigger — needs Cloud
-Functions after all; (b) the confirming client calls the route handler, with a sweep for
-missed calls; (c) a scheduled sweep only, adding latency. (b) with a periodic reconciliation
-sweep is the pragmatic choice, but it means the endpoint must be idempotent.
+Provenance is recorded in `finalizationSource`, deliberately separate from `status`:
 
-**3. Correcting an official result.** `official` is terminal and there is no unwind path. A
-referee report arriving late, or a scoring error found weeks on, currently has no route
-except super-admin surgery. Does the pilot need a correction flow, or is
-"official is final" acceptable for one season?
+| source | meaning |
+|---|---|
+| `mutual_confirmation` | the opponent actually agreed |
+| `league_admin_dispute_resolution` | adjudicated after a dispute |
+| `league_admin_nonresponse_confirmation` | confirmed after silence — **weaker** |
+| `correction` | produced by a correction version |
 
-**4. Whether a match can be submitted before it is marked completed.**
-`canSubmitResultFor()` currently accepts `live` as well as `completed`, so a team admin can
-report at the final whistle before anyone flips the lifecycle. If fixtures are not reliably
-moved to `completed`, this matters; if they are, tighten it to `completed` only.
+The public result may read "Official". The audit trail must always show which of these it
+was. `confirmedByUserId`, `confirmationReason`, `confirmedAt` and `evidenceRefs` are stored
+alongside.
+
+Configurable per-league timeout confirmation is explicitly deferred until the pilot shows
+reliable behaviour.
+
+### 2. Finalization — `onWrite` trigger, idempotent, with an hourly sweep
+
+Clients only submit, confirm, dispute and record league decisions. Clients never write
+official match status, standings, team records or official athlete statistics.
+
+Idempotency key: `` `${matchId}:${submissionId}:${resultVersion}` ``. `planFinalization()`
+returns `noop / already_finalized` when the key has been processed or `finalizedAt` is set,
+so a retried trigger and the reconciliation sweep cannot double-apply a result. It also
+returns `noop / mismatched_parents` if the submission's match, league or season does not
+match the target — a submission can never be finalized onto the wrong fixture.
+
+The decision logic is a **pure function**; the Cloud Function applies its plan inside one
+transaction and does nothing else. That keeps the correctness-critical part testable
+without Firestore, which matters because Cloud Functions are the hardest thing here to test.
+
+> This choice supersedes the earlier recommendation of a Next route handler. It is the more
+> robust option — execution no longer depends on the client completing a call — at the cost
+> of a new deploy surface. **Note that Cloud Functions require the Firebase Blaze plan**,
+> which the project does not appear to be on yet.
+
+Standings need no work in the finalizer: they are derived and `buildLeagueStandings` already
+gates on `isOfficialMatch`. Athlete statistics remain out of scope until the athlete stats
+split lands.
+
+### 3. Corrections — versioned, never destructive
+
+`official` is **not** terminal. Referee corrections, eligibility rulings, abandoned matches
+and disciplinary decisions are ordinary sports operations, and a live pilot cannot depend on
+super-admin database surgery for them.
+
+```
+Official result v1 ──correction request──▶ review ──▶ Official result v2
+       └─ retained, marked `superseded`
+```
+
+A league admin may correct within `CORRECTION_SELF_SERVICE_HOURS` (72h) of finalization;
+after that a platform admin must approve. A reason is mandatory in both cases. The version
+swap itself is performed by the finalizer — clients can write the correction *request*
+fields, never `official` or `superseded`.
+
+### 4. Submitting from a live match
+
+Allowed from `live` or `completed`, but only with `submittedAsFinal: true` — the team admin
+must explicitly declare the match ended, so an in-progress score cannot start a confirmation
+by accident. This is enforced in the rules at create time.
+
+On finalization the match is moved to `status: 'completed'`, `verificationStatus: 'verified'`
+automatically, rather than depending on someone to flip the lifecycle by hand.
+
+---
+
+## Remaining work
+
+1. `functions/` package with the `onWrite` trigger and the hourly scheduled sweep, both
+   thin wrappers over `planFinalization()`. Requires the Blaze plan.
+2. Reminder dispatch at 24h/48h (`dueReminders()` computes what is owed) and the sweep that
+   moves lapsed submissions to `confirmation_overdue`.
+3. UI: submit / confirm / dispute / league resolution, and the correction request form.
+4. Rules unit tests via `@firebase/rules-unit-testing` — the rules still have not been
+   compiled locally, since the emulator needs Java.

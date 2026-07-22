@@ -112,11 +112,31 @@ export type ChallengeStatus =
  */
 export type ResultSubmissionStatus =
   | "pending_confirmation"
+  /** 72h elapsed with no opponent response. Escalated to the league — never auto-confirmed. */
+  | "confirmation_overdue"
+  /** Settled and awaiting finalization. How it settled is `finalizationSource`, not a status. */
   | "confirmed"
   | "disputed"
   | "official"
   | "rejected"
-  | "withdrawn";
+  | "withdrawn"
+  /** A previously official result replaced by a correction. Archived, never mutated. */
+  | "superseded";
+
+/**
+ * How a result became finalizable. Deliberately a separate field rather than three
+ * finalizable statuses: the status says *whether* a submission is ready, this says *how* it
+ * got there. Folding provenance into the status would put two facts in one field — the
+ * failure mode this codebase has already had to migrate away from twice.
+ *
+ * A league admin confirming after silence does NOT carry the provenance of mutual
+ * confirmation. The public result may still read "Official"; the audit trail must not.
+ */
+export type FinalizationSource =
+  | "mutual_confirmation"
+  | "league_admin_dispute_resolution"
+  | "league_admin_nonresponse_confirmation"
+  | "correction";
 
 export type ResultSubmissionActor =
   | "submitting_team"
@@ -184,6 +204,36 @@ export interface ResultSubmission {
   resolvedByUserId?: string;
   resolution?: ResultResolution;
   finalDecisionNote?: string;
+
+  /** Set true only when the submitter explicitly declares the match ended. */
+  submittedAsFinal: boolean;
+  /** 72h after submission. Passing it escalates; it never confirms anything. */
+  confirmationDeadline: string;
+  remindersSentAt?: string[];
+
+  /** How this result became official. Required once status is `official`. */
+  finalizationSource?: FinalizationSource;
+  confirmedByUserId?: string;
+  confirmationReason?: string;
+  confirmedAt?: string;
+
+  /**
+   * Official results are versioned, not immutable-forever. Referee corrections,
+   * eligibility rulings and abandoned matches are ordinary sports operations; the pilot
+   * cannot depend on super-admin database surgery for them.
+   */
+  resultVersion: number;
+  supersedesSubmissionId?: string;
+  supersededBySubmissionId?: string;
+  correctionReason?: string;
+  correctionRequestedBy?: string;
+  correctionApprovedBy?: string;
+
+  /**
+   * `${matchId}:${id}:${resultVersion}`. The finalizer no-ops if this key is already
+   * recorded, so an onWrite retry or the reconciliation sweep cannot double-apply a result.
+   */
+  finalizationKey?: string;
 
   submittedAt: string;
   respondedAt?: string;
