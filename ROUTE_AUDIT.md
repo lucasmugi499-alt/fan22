@@ -28,7 +28,7 @@ Last updated: 2026-06-13
 
 ### Fan
 
-Global nav: `Home`, `Feed`, `Matches`, `Athletes`, `Wallet`; desktop optional `Leagues`, `Awards`, `Profile`.
+Global nav: `Home`, `Feed`, `Matches`, `Athletes`, `Leagues`, `Wallet`; desktop optional `Awards`, `Profile`. `Leagues` now comes from the shared role config rather than being appended for desktop only, so mobile and desktop agree.
 
 Workspace tabs: none in the current fan hub.
 

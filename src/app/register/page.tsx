@@ -10,6 +10,7 @@ import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
+import type { IconComponent } from '@/lib/icons';
 
 function RegisterContent() {
   const { setDemoRole } = useAuth();
@@ -48,7 +49,7 @@ function RegisterContent() {
     router.push(getDefaultRouteForRole(selectedRole));
   };
 
-  const roleOptions: { id: AppRole; title: string; description: string; icon: React.ElementType; color: string }[] = [
+  const roleOptions: { id: AppRole; title: string; description: string; icon: IconComponent; color: string }[] = [
     { 
       id: 'fan', 
       title: 'Join as Fan', 

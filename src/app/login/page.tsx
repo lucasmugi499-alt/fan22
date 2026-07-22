@@ -10,6 +10,8 @@ import { Building01Icon, Shield01Icon, UserIcon, SecurityCheckIcon } from 'hugei
 import { Trophy } from '@phosphor-icons/react';
 import { AppRole } from '@/types';
 import { toast } from 'sonner';
+import type { IconComponent } from '@/lib/icons';
+import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 
 function AuthContent() {
   const { authStatus, role, setDemoRole, userProfile } = useAuth();
@@ -32,7 +34,7 @@ function AuthContent() {
     toast.success(`Logged in as ${selectedRole.replace('_', ' ')}`);
   };
 
-  const demoRoles: { id: AppRole; label: string; description: string; icon: React.ElementType }[] = [
+  const demoRoles: { id: AppRole; label: string; description: string; icon: IconComponent }[] = [
     { id: 'fan', label: 'Continue as Fan', description: 'Follow matches, support athletes, and earn GoalPlace Points.', icon: UserIcon },
     { id: 'athlete', label: 'Continue as Athlete', description: 'Manage your profile, view supporters, and post highlights.', icon: Trophy },
     { id: 'team_admin', label: 'Continue as Team Admin', description: 'Manage a roster, submit match results, and publish team updates.', icon: Building01Icon },
@@ -71,33 +73,38 @@ function AuthContent() {
               </Link>
             </div>
 
-            <div className="relative my-8 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-              <div className="relative bg-[#0A0D14] px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Demo Login Mode</div>
-            </div>
+            {isDemoModeEnabled && (
+              <>
+                <div className="relative my-8 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                  <div className="relative bg-[#0A0D14] px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Demo Login Mode</div>
+                </div>
 
-            <div className="flex flex-col gap-2">
-              {demoRoles.map((role) => {
-                const Icon = role.icon;
-                return (
-                  <button
-                    key={role.id}
-                    onClick={() => handleDemoLogin(role.id)}
-                    className="flex w-full flex-col items-start gap-1 rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:bg-white/10"
-                  >
-                    <div className="flex items-center gap-2 font-bold text-white">
-                      <Icon className="size-4 text-[var(--goal-mint)]" />
-                      {role.label}
-                    </div>
-                    <p className="text-xs text-slate-400">{role.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-            
-            <p className="mt-6 text-center text-xs text-slate-500">
-              Firebase Auth is currently in mock mode. Select a role above to explore the app instantly.
-            </p>
+                <div className="flex flex-col gap-2">
+                  {demoRoles.map((role) => {
+                    const Icon = role.icon;
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => handleDemoLogin(role.id)}
+                        className="flex w-full flex-col items-start gap-1 rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:bg-white/10"
+                      >
+                        <div className="flex items-center gap-2 font-bold text-white">
+                          <Icon className="size-4 text-[var(--goal-mint)]" />
+                          {role.label}
+                        </div>
+                        <p className="text-xs text-slate-400">{role.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-6 text-center text-xs text-slate-500">
+                  Firebase Auth is currently in mock mode. Select a role above to explore the app instantly.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </PageContainer>

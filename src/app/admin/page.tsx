@@ -42,6 +42,7 @@ import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { formatUGX } from '@/lib/sportThemes';
 import { AwardCategory, Report, Sponsor, User } from '@/types';
 import { ReviewDisputeDrawer, ReviewPayoutDrawer } from '@/components/modals/demo-modals';
+import type { IconComponent } from '@/lib/icons';
 
 type DrawerState = {
   title: string;
@@ -278,7 +279,7 @@ function AdminDashboard() {
   const firstVerification = verifications[0];
   const firstSponsor = sponsors[0];
   const firstPayout = payoutRows[0];
-  const adminActions: Record<string, { label: string; icon: React.ElementType; variant?: React.ComponentProps<typeof Button>['variant']; onClick: () => void }[]> = {
+  const adminActions: Record<string, { label: string; icon: IconComponent; variant?: React.ComponentProps<typeof Button>['variant']; onClick: () => void }[]> = {
     Overview: [
       { label: 'Review Approvals', icon: CheckmarkCircle01Icon, onClick: () => setActiveTab('Leagues') },
       { label: 'Review Escalations', icon: Alert01Icon, variant: 'outline', onClick: () => setActiveTab('Reports') },

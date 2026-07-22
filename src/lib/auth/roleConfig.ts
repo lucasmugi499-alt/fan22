@@ -1,7 +1,7 @@
 import { AppRole } from '@/types';
 import { Home01Icon, ListViewIcon, Calendar01Icon, DashboardSquare01Icon, Building01Icon, SecurityCheckIcon, UserIcon, Wallet01Icon, ChartLineData01Icon, Settings01Icon, Coins01Icon, Activity01Icon, CheckmarkCircle01Icon } from 'hugeicons-react';
 import { Users } from '@phosphor-icons/react';
-import React from 'react';
+import type { IconComponent } from '@/lib/icons';
 
 export interface RoleConfig {
   role: AppRole;
@@ -11,7 +11,7 @@ export interface RoleConfig {
   dashboardTitle: string;
   dashboardSubtitle: string;
   primaryActions: string[];
-  navItems: { name: string; href: string; icon: React.ElementType }[];
+  navItems: { name: string; href: string; icon: IconComponent }[];
   quickStats: string[];
   allowedRoutes: string[];
 }
@@ -30,6 +30,7 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
       { name: 'Feed', href: '/feed', icon: ListViewIcon },
       { name: 'Matches', href: '/matches', icon: Calendar01Icon },
       { name: 'Athletes', href: '/athletes', icon: Users },
+      { name: 'Leagues', href: '/leagues', icon: Building01Icon },
       { name: 'Wallet', href: '/wallet', icon: Wallet01Icon },
     ],
     quickStats: ['walletBalance', 'followedAthletes', 'awardsProgress'],

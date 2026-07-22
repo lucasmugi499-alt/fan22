@@ -7,6 +7,7 @@ import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { AppRole, UserProfile } from '@/types';
 import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
+import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 
 const demoRoleStorageKey = 'goalplace256.demoRole';
 
@@ -29,7 +30,7 @@ function isAppRole(value: string | null): value is AppRole {
 }
 
 function getStoredDemoRole() {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || !isDemoModeEnabled) return null;
   const storedRole = window.sessionStorage?.getItem?.(demoRoleStorageKey) ?? getCookieDemoRole();
   return isAppRole(storedRole) ? storedRole : null;
 }
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [storageChecked, setStorageChecked] = useState(false);
 
   const setDemoRole = useCallback((newRole: AppRole | null) => {
-    if (newRole) {
+    if (newRole && isDemoModeEnabled) {
       storeDemoRole(newRole);
       setIsDemoMode(true);
       setDemoRoleState(newRole);

@@ -57,6 +57,13 @@ export default function RootLayout({
       lang="en"
       className="h-full antialiased dark"
     >
+      <head>
+        {/* Scroll-reveal sections start at opacity:0 and are animated in by JS. Without
+            this, a visitor whose JavaScript fails or is blocked sees a near-empty page. */}
+        <noscript>
+          <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
+        </noscript>
+      </head>
       <body className={`min-h-full flex flex-col bg-background text-foreground ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}>
         <AuthProvider>
           <AuthModalProvider>

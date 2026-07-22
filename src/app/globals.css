@@ -169,13 +169,54 @@
     display: none;
   }
 
+  /* Entrance animation for above-the-fold content. CSS rather than JS on purpose: a
+     JS-driven `initial={{ opacity: 0 }}` ships opacity:0 in the server HTML, so the hero
+     stays blank until hydration finishes — seconds, on the mobile connections this product
+     targets. A CSS animation runs at first paint, needs no JavaScript, and degrades to
+     "simply visible" when animations are unavailable or unwanted. */
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-rise-in {
+    animation: rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise-in {
+      animation: none;
+    }
+  }
+
+  /* `backdrop-filter` forces the compositor to re-sample everything behind the element on
+     every frame — among the most expensive effects on low-end mobile GPUs, and this class
+     is applied to ~55 surfaces including cards that repeat down long lists. Below the
+     tablet breakpoint the blur is dropped and the panel is made more opaque instead, which
+     reads near-identically on a small screen where cards span the full width anyway. The
+     wide, soft drop shadow is scaled down for the same reason. */
   .glass-panel {
     background:
       linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
-      rgba(17, 24, 39, 0.72);
+      rgba(17, 24, 39, 0.93);
     border: 1px solid var(--border-soft);
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(22px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  @media (min-width: 768px) {
+    .glass-panel {
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+        rgba(17, 24, 39, 0.72);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(22px);
+    }
   }
 
   .stadium-vignette {

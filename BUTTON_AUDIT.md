@@ -55,9 +55,17 @@ Last updated: 2026-06-13
 | `Configure Award Category` | `/admin` | Toast only | Opens award review drawer. | Resolved |
 | `Save Platform Setting` | `/admin` | Toast only | Shows saved local state. | Resolved |
 
-## Known Remaining Toast-Only Demo Buttons
+## Known Remaining Toast-Only or Shallow Demo Actions
 
 Some broader demo surfaces still use toast-only feedback outside the requested admin cleanup path, including parts of `athlete-dashboard`, public league follow/share actions, generic feed save/share actions, and reusable demo modals. These are documented as remaining demo-mode debt, not newly introduced by this sprint.
+
+Additionally, within the workspace pages (`/league-admin`, `/admin`), certain drawer-based actions act as "shallow demo actions", where the modal/drawer opens correctly with local context, but the final confirmation button merely displays a toast without updating the data model:
+- `Record Team Review` (League Admin -> Teams & Athletes)
+- `Stage Fixture Import` (League Admin -> Fixtures & Results)
+- `Save Permission Review` (League Admin -> Settings)
+- `Mark Bridge Checked` (League Admin -> Settings)
+- `Mark Evidence Reviewed` (League Admin -> Verification)
+- `Prepare User Export` (Platform Admin -> Users)
 
 ## Mobile Layout Audit
 

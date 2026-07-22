@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { AppRole } from '@/types';
 import { Shield01Icon, ArrowUp01Icon, UserIcon, Logout01Icon } from 'hugeicons-react';
 import { cn } from '@/lib/utils';
+import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 
 const ROLES: { id: AppRole | null; label: string }[] = [
   { id: null, label: 'Public' },
@@ -19,7 +20,7 @@ export function DemoRoleSwitcher() {
   const { setDemoRole, role, isDemoMode, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (process.env.NODE_ENV !== 'development') {
+  if (!isDemoModeEnabled) {
     return null;
   }
 

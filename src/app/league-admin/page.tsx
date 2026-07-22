@@ -52,6 +52,7 @@ import { dataProvider } from '@/data/dataProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { Match, Team, VerificationStatus } from '@/types';
+import type { IconComponent } from '@/lib/icons';
 
 function normalizeVerificationStatus(status: VerificationStatus): VerificationStatus {
   if (status === 'Verified') return 'verified';
@@ -198,7 +199,7 @@ function LeagueAdminDashboard() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const leagueActions: Record<string, { label: string; icon: React.ElementType; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
+  const leagueActions: Record<string, { label: string; icon: IconComponent; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
     Overview: [
       { label: 'Create Fixture', icon: Calendar01Icon, onClick: quickActions.createFixture },
       { label: 'Add Team', icon: Building03Icon, variant: 'outline', onClick: quickActions.addTeam },

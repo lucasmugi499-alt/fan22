@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Home01Icon, Building01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon, ListViewIcon } from 'hugeicons-react';
+import { Home01Icon, Login01Icon, UserGroupIcon, Wallet01Icon, DashboardSquare01Icon, UserIcon, InformationCircleIcon, HelpCircleIcon, Settings01Icon, Logout01Icon, ArrowDown01Icon, Shield01Icon, ListViewIcon } from 'hugeicons-react';
 import { Trophy } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
@@ -9,8 +9,9 @@ import { AppRole } from '@/types';
 import { toast } from 'sonner';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
 import { ROLE_CONFIGS } from '@/lib/auth/roleConfig';
+import type { IconComponent } from '@/lib/icons';
 
-type NavItem = { name: string; href: string; icon: React.ElementType };
+type NavItem = { name: string; href: string; icon: IconComponent };
 type SearchParamReader = Pick<URLSearchParams, 'get' | 'toString'>;
 
 const WORKSPACE_ROUTES = new Set(['/admin', '/athlete-dashboard', '/league-admin', '/team-admin', '/sponsor-dashboard']);
@@ -177,7 +178,6 @@ function getDesktopNavItems(authStatus: string, role: AppRole | null) {
   const desktopItems = [...config.navItems];
   
   if (configRole === 'fan') {
-    desktopItems.push({ name: 'Leagues', href: '/leagues', icon: Building01Icon });
     desktopItems.push({ name: 'Awards', href: '/awards', icon: Trophy });
     desktopItems.push({ name: 'Profile', href: '/profile', icon: UserIcon });
   }

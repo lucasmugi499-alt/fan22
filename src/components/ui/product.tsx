@@ -14,6 +14,7 @@ import {
 import { getSportTheme, SportTheme, sports, trustStatements } from '@/lib/sportThemes';
 import { SportType } from '@/types';
 import { cn } from '@/lib/utils';
+import { BentoCard } from './glass-card';
 
 export function PageContainer({
   children,
@@ -78,8 +79,9 @@ export function AppPageHeader({
   className?: string;
 }) {
   return (
-    <section className={cn('signal-card rounded-xl border border-white/10 bg-white/[0.045] p-5 md:p-7', className)}>
-      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <BentoCard className={cn('p-6 md:p-8 relative overflow-hidden', className)}>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none" />
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           {eyebrow && (
             <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-[var(--goal-mint)]">
@@ -89,12 +91,12 @@ export function AppPageHeader({
           <h1 className="max-w-4xl break-words font-display text-3xl font-black tracking-tight text-white md:text-5xl">
             {title}
           </h1>
-          {description && <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{description}</p>}
-          {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
+          {description && <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{description}</p>}
+          {meta && <div className="mt-6 flex flex-wrap items-center gap-3">{meta}</div>}
         </div>
-        {actions && <div className="flex w-full shrink-0 flex-wrap gap-2 lg:w-auto lg:justify-end">{actions}</div>}
+        {actions && <div className="flex w-full shrink-0 flex-wrap gap-3 lg:w-auto lg:justify-end">{actions}</div>}
       </div>
-    </section>
+    </BentoCard>
   );
 }
 
@@ -154,7 +156,7 @@ export function ActionToolbar({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-2 overflow-x-auto hide-scrollbar rounded-xl border border-white/10 bg-white/[0.045] p-3 md:flex-wrap', className)} role="toolbar">
+    <div className={cn('flex items-center gap-2 overflow-x-auto hide-scrollbar glass-panel rounded-xl p-3 md:flex-wrap border border-white/10', className)} role="toolbar">
       {children}
     </div>
   );
@@ -318,13 +320,16 @@ export function ImpactStatCard({
     blue: 'text-[var(--rugby)] border-blue-400/25 bg-blue-500/10',
   };
   return (
-    <div className="glass-panel min-w-0 rounded-xl p-4">
-      <div className={cn('mb-4 flex size-10 items-center justify-center rounded-lg border', tones[tone])}>
-        <Icon className="size-5" />
+    <div className="glass-panel min-w-0 rounded-xl p-5 md:p-6 relative overflow-hidden group border border-white/10">
+      <div className={cn('absolute -right-6 -top-6 size-32 rounded-full blur-3xl opacity-20 transition-opacity duration-500 group-hover:opacity-40', tones[tone].split(' ')[2])} />
+      <div className="relative z-10">
+        <div className={cn('mb-5 flex size-12 items-center justify-center rounded-xl border shadow-inner', tones[tone])}>
+          <Icon className="size-6" />
+        </div>
+        <p className="break-words text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+        <p className="mt-2 break-words font-display text-3xl font-black text-white tracking-tight">{value}</p>
+        {detail && <p className="mt-3 text-sm leading-5 text-slate-300 font-medium">{detail}</p>}
       </div>
-      <p className="break-words text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-1 break-words font-display text-2xl font-black text-white">{value}</p>
-      {detail && <p className="mt-2 text-sm leading-5 text-slate-300">{detail}</p>}
     </div>
   );
 }
@@ -472,7 +477,7 @@ export function DataCard({
   className?: string;
 }) {
   return (
-    <div className={cn('min-w-0 rounded-xl border border-white/10 bg-white/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/15 md:p-5', className)}>
+    <div className={cn('glass-panel min-w-0 rounded-xl border border-white/10 p-5 md:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-white/5 hover:border-white/20', className)}>
       {children}
     </div>
   );
@@ -486,7 +491,7 @@ export function DataTableCard({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-xl border border-white/10 bg-white/5 overflow-hidden', className)}>
+    <div className={cn('glass-panel rounded-xl border border-white/10 overflow-hidden', className)}>
       <div className="overflow-x-auto hide-scrollbar">
         {children}
       </div>
@@ -512,7 +517,7 @@ export function MobileDataCard({
   className?: string;
 }) {
   return (
-    <article className={cn('min-w-0 rounded-xl border border-white/10 bg-white/[0.045] p-4', className)}>
+    <article className={cn('glass-panel min-w-0 rounded-xl border border-white/10 p-5 shadow-sm', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {eyebrow && <p className="break-words text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>}

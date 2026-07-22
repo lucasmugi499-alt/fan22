@@ -16,9 +16,10 @@ import {
 import { Users, Trophy } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { AddAthleteModal, SubmitResultModal, UploadTeamUpdateModal, AddSupportNeedModal } from '@/components/modals/demo-modals';
+import type { IconComponent } from '@/lib/icons';
 
 type Tab = 'Overview' | 'Roster' | 'Fixtures & Results' | 'Athlete Updates' | 'Team Profile';
-const TABS: { id: Tab; icon: React.ElementType }[] = [
+const TABS: { id: Tab; icon: IconComponent }[] = [
   { id: 'Overview', icon: Building03Icon },
   { id: 'Roster', icon: Users },
   { id: 'Fixtures & Results', icon: Calendar01Icon },
@@ -102,7 +103,7 @@ function TeamAdminContent() {
     setDrawer({ title, description, body });
   };
 
-  const tabActions: Record<Tab, { label: string; icon: React.ElementType; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
+  const tabActions: Record<Tab, { label: string; icon: IconComponent; variant?: 'default' | 'outline'; onClick: () => void }[]> = {
     Overview: [
       { label: 'Add Athlete', icon: PlusSignIcon, variant: 'outline', onClick: () => setModalOpen('addAthlete') },
       { label: 'Submit Result', icon: Trophy, variant: 'outline', onClick: () => setModalOpen('submitResult') },
