@@ -1,6 +1,6 @@
 {
   "projects": {
-    "staging": "REPLACE-WITH-STAGING-PROJECT-ID",
+    "staging": "studio-534174814-9df36",
     "prod": "manifest-quasar-479416-s7"
   }
 }
