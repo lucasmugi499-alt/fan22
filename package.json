@@ -22,7 +22,12 @@
     "reset:demo": "node --experimental-strip-types scripts/reset-demo-data.ts",
     "test:rules": "firebase emulators:exec --only firestore --project goalplace256-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "functions:build": "npm --prefix functions run build",
-    "functions:typecheck": "npm --prefix functions run typecheck"
+    "functions:typecheck": "npm --prefix functions run typecheck",
+    "clean:preview": "tsx scripts/clean-preview.ts",
+    "clean:execute": "tsx scripts/clean-execute.ts",
+    "deploy:staging": "firebase deploy --project $GOALPLACE_STAGING_PROJECT --only firestore:fg256,functions",
+    "deploy:prod": "firebase deploy --project manifest-quasar-479416-s7 --only firestore:fg256,functions",
+    "create:owner": "tsx scripts/create-owner.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -51,7 +56,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "firebase-tools": "^15.19.1",
+    "firebase-tools": "^15.24.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5",

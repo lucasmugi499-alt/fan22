@@ -48,3 +48,9 @@ next-env.d.ts
 # cloud functions build output
 /functions/lib
 /functions/node_modules
+
+# Reset inventories contain account emails and UIDs; never commit them.
+reports/
+auth-backup*.json
+*-sa.json
+service-account*.json
