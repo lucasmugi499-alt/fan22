@@ -1,103 +1,79 @@
-import * as React from "react"
+import type { HTMLAttributes } from 'react';
+import { cn } from '@/lib/utils';
 
-import { cn } from "@/lib/utils"
-
-function Card({
+/**
+ * The base surface. Opaque dark core with a concentric inset highlight so it reads as
+ * machined hardware rather than a flat rectangle. Depth comes from the highlight + a
+ * tinted shadow, never from backdrop-blur on scrolling content (perf on mid-range Android).
+ */
+export function Card({
   className,
-  size = "default",
+  interactive = false,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: HTMLAttributes<HTMLDivElement> & { interactive?: boolean }) {
   return (
     <div
-      data-slot="card"
-      data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        'rounded-[var(--radius-lg)] border border-border bg-surface-1 shadow-e1 bezel-core',
+        interactive &&
+          'transition-[box-shadow,transform,border-color] duration-[var(--dur-micro)] ease-[var(--ease-fluid)] hover:-translate-y-0.5 hover:border-border-strong hover:shadow-e2',
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * The double-bezel (Doppelrand): an outer shell holding an inner core with its own radius
+ * and highlight, for hero/priority moments that should feel physically enclosed. Reserve
+ * for the one or two most important surfaces per screen.
+ */
+export function Bezel({
+  className,
+  innerClassName,
+  glow = false,
+  children,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { innerClassName?: string; glow?: boolean }) {
   return (
     <div
-      data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-4 group-data-[size=sm]/card:px-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3",
+        'rounded-[var(--radius-2xl)] border border-border bg-surface-glass p-1.5',
+        glow && 'border-[color:var(--border-glow)] shadow-[var(--glow-brand)]',
         className
       )}
       {...props}
-    />
-  )
+    >
+      <div
+        className={cn(
+          'rounded-[calc(var(--radius-2xl)-6px)] bg-surface-1 bezel-core',
+          innerClassName
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('flex items-start justify-between gap-3 p-4 pb-0', className)} {...props} />;
+}
+
+export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('p-4', className)} {...props} />;
+}
+
+export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
+  return <h3 className={cn('text-[15px] font-semibold text-text-strong', className)} {...props} />;
+}
+
+export function Eyebrow({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <div
-      data-slot="card-title"
-      className={cn(
-        "font-display text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
-        className
-      )}
+    <p
+      className={cn('text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle', className)}
       {...props}
     />
-  )
-}
-
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("px-4 group-data-[size=sm]/card:px-3", className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-4 group-data-[size=sm]/card:p-3",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardAction,
-  CardDescription,
-  CardContent,
+  );
 }

@@ -1,323 +1,338 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
 
-@custom-variant dark (&:is(.dark *));
+/* =============================================================================
+   GoalPlace256 — design tokens  ("Broadcast OS", dark)
+   -----------------------------------------------------------------------------
+   Theme-locked dark. Deep near-black base with a restrained emerald/gold mesh
+   glow, machined "double-bezel" surfaces, and fluid spring motion. Components
+   reference semantic tokens, never raw hex. Brand is emerald; the semantic
+   state palette (verified / pending / disputed / live) drives statusSystem.ts.
 
+   Performance rule: backdrop-blur lives ONLY on fixed/sticky chrome and
+   overlays. Scrolling content fakes depth with gradients + inset highlights,
+   never backdrop-filter, so mid-range Android stays smooth.
+============================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* -- Brand palette (the recovered GoalPlace identity) -------------------- */
+  --night: #05070a;
+  --charcoal: #0b1117;
+  --goal-emerald: #00c46a;
+  --goal-emerald-dark: #008f4c;
+  --goal-mint: #4dffb3;
+  --goal-gold: #f5b942;
+  --goal-warm-gold: #d99a1e;
+  --football: #22c55e;
+  --basketball: #f97316;
+  --rugby: #3b82f6;
+
+  /* -- Elevation ladder ---------------------------------------------------- */
+  --surface-0: #05070a; /* page base */
+  --surface-1: #0b1117; /* card / primary */
+  --surface-2: #111827; /* raised */
+  --surface-3: #17202b; /* inset / track */
+  --surface-glass: rgba(255, 255, 255, 0.04);
+  --surface-glass-hover: rgba(255, 255, 255, 0.07);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-glow: rgba(0, 196, 106, 0.35);
+  --hairline: rgba(255, 255, 255, 0.06);
+
+  /* -- Text ramp ----------------------------------------------------------- */
+  --text-strong: #f8fafc;
+  --text: #dbe3ec;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --on-brand: #05100a;
+
+  /* -- Brand semantic ------------------------------------------------------ */
+  --brand: #00c46a;
+  --brand-hover: #17d67d;
+  --brand-pressed: #00a259;
+  --brand-subtle: rgba(0, 196, 106, 0.12);
+  --brand-ring: rgba(0, 196, 106, 0.45);
+  --brand-2: #f5b942; /* gold */
+  --brand-2-subtle: rgba(245, 185, 66, 0.12);
+
+  /* Vibrant gradients: the premium accent on hero banners and identity cards. */
+  --grad-brand: linear-gradient(108deg, #00c46a 0%, #0aa7bd 52%, #22d3ee 100%);
+  --grad-gold: linear-gradient(108deg, #f5b942 0%, #e0913a 46%, #10b981 100%);
+  --grad-broadcast: linear-gradient(108deg, #22d3ee 0%, #3b82f6 46%, #7c3aed 100%);
+  --grad-pitch: linear-gradient(108deg, #0b3f2f 0%, #08694a 55%, #00c46a 100%);
+  /* Sport identity gradients for club/athlete hero cards. */
+  --grad-football: linear-gradient(120deg, #0a7d4a 0%, #10331f 100%);
+  --grad-basketball: linear-gradient(120deg, #c2410c 0%, #3a1305 100%);
+  --grad-rugby: linear-gradient(120deg, #1d4ed8 0%, #0b1a44 100%);
+
+  /* -- Semantic state tokens (paired fg + tint bg; consumed by statusSystem) */
+  --state-verified: #2dd48f;
+  --state-verified-bg: rgba(45, 212, 143, 0.12);
+  --state-pending: #f5b942;
+  --state-pending-bg: rgba(245, 185, 66, 0.12);
+  --state-warning: #fb923c;
+  --state-warning-bg: rgba(251, 146, 60, 0.12);
+  --state-disputed: #f87171;
+  --state-disputed-bg: rgba(248, 113, 113, 0.12);
+  --state-error: #ef4444;
+  --state-error-bg: rgba(239, 68, 68, 0.12);
+  --state-info: #60a5fa;
+  --state-info-bg: rgba(96, 165, 250, 0.12);
+  --state-live: #ff4d4d;
+  --state-live-bg: rgba(255, 77, 77, 0.14);
+  --state-neutral: #94a3b8;
+  --state-neutral-bg: rgba(148, 163, 184, 0.12);
+
+  /* -- Shadows: tinted dark, plus concentric inset highlight -------------- */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 12px 32px -8px rgba(0, 0, 0, 0.65);
+  --elevation-3: 0 32px 64px -16px rgba(0, 0, 0, 0.8);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glow-brand: 0 0 0 1px rgba(0, 196, 106, 0.28), 0 14px 40px -12px rgba(0, 196, 106, 0.4);
+  --glow-live: 0 0 0 1px rgba(255, 77, 77, 0.3), 0 12px 32px -12px rgba(255, 77, 77, 0.45);
+
+  /* -- Radii --------------------------------------------------------------- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+  --radius-2xl: 32px;
+  --radius-pill: 999px;
+
+  /* -- Layout constants ---------------------------------------------------- */
+  --tap-min: 44px;
+  --topbar-h: 60px;
+  --nav-h: 68px;
+  --page-max: 1200px;
+  --gutter: 16px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* -- Motion (fluid spring feel) ----------------------------------------- */
+  --dur-micro: 180ms;
+  --dur-drawer: 320ms;
+  --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Map semantic tokens into Tailwind's utility namespaces (light/dark flows
+   through because `inline` emits var() at the utility). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-strong: var(--text-strong);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-2: var(--brand-2);
+  --color-on-brand: var(--on-brand);
+
+  --color-verified: var(--state-verified);
+  --color-pending: var(--state-pending);
+  --color-warning: var(--state-warning);
+  --color-disputed: var(--state-disputed);
+  --color-error: var(--state-error);
+  --color-info: var(--state-info);
+  --color-live: var(--state-live);
+
+  --color-football: var(--football);
+  --color-basketball: var(--basketball);
+  --color-rugby: var(--rugby);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
 
-:root {
-  --night: #05070A;
-  --charcoal: #0B1117;
-  --surface: #111827;
-  --surface-soft: #17202B;
-  --surface-glass: rgba(255, 255, 255, 0.06);
-  --goal-emerald: #00C46A;
-  --goal-emerald-dark: #008F4C;
-  --goal-mint: #4DFFB3;
-  --goal-gold: #F5B942;
-  --goal-warm-gold: #D99A1E;
-  --football: #22C55E;
-  --basketball: #F97316;
-  --rugby: #3B82F6;
-  --text-main: #F8FAFC;
-  --text-soft: #CBD5E1;
-  --text-muted: #94A3B8;
-  --border-soft: rgba(255, 255, 255, 0.10);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --border-glow: rgba(0, 196, 106, 0.35);
-
-  /* ---------------------------------------------------------------------
-     SEMANTIC TOKENS
-     Components reference these, never the raw brand values above. A page
-     that needs "a disputed thing" uses --state-disputed, so the meaning of
-     disputed can change in one place instead of in forty class strings.
-     --------------------------------------------------------------------- */
-
-  /* Elevation ladder. Each step is a surface sitting on the one before it. */
-  --bg-base: var(--night);
-  --bg-elevated: #0B1117;
-  --surface-1: #111827;
-  --surface-2: #17202B;
-  --surface-interactive: rgba(255, 255, 255, 0.06);
-  --surface-interactive-hover: rgba(255, 255, 255, 0.10);
-
-  --text-1: var(--text-main);
-  --text-2: var(--text-soft);
-  --text-3: var(--text-muted);
-
-  --brand-primary: var(--goal-emerald);
-  --brand-secondary: var(--goal-gold);
-  --brand-accent: var(--goal-mint);
-
-  /* State colours. Each is paired with a low-alpha fill and a border so a
-     badge never depends on hue alone to be legible. */
-  --state-verified: #2DD48F;
-  --state-verified-bg: rgba(45, 212, 143, 0.12);
-  --state-pending: #F5B942;
-  --state-pending-bg: rgba(245, 185, 66, 0.12);
-  --state-warning: #FB923C;
-  --state-warning-bg: rgba(251, 146, 60, 0.12);
-  --state-disputed: #F87171;
-  --state-disputed-bg: rgba(248, 113, 113, 0.12);
-  --state-error: #EF4444;
-  --state-error-bg: rgba(239, 68, 68, 0.12);
-  --state-info: #60A5FA;
-  --state-info-bg: rgba(96, 165, 250, 0.12);
-  --state-live: #FF4D4D;
-  --state-live-bg: rgba(255, 77, 77, 0.14);
-  --state-neutral: #94A3B8;
-  --state-neutral-bg: rgba(148, 163, 184, 0.12);
-
-  /* Layout constants the shell depends on, so nothing hard-codes them. */
-  --topbar-h: 3.5rem;
-  --bottomnav-h: 4.25rem;
-  --tap-min: 2.75rem; /* 44px — the WCAG-conscious minimum touch target */
-  --background: var(--night);
-  --foreground: var(--text-main);
-  --card: var(--surface);
-  --card-foreground: var(--text-main);
-  --popover: var(--surface);
-  --popover-foreground: var(--text-main);
-  --primary: var(--goal-emerald);
-  --primary-foreground: var(--night);
-  --secondary: var(--goal-gold);
-  --secondary-foreground: var(--night);
-  --muted: var(--surface-soft);
-  --muted-foreground: var(--text-muted);
-  --accent: var(--surface-soft);
-  --accent-foreground: var(--text-main);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: rgba(255, 255, 255, 0.10);
-  --input: rgba(255, 255, 255, 0.13);
-  --ring: var(--goal-emerald);
-  --chart-1: var(--goal-emerald);
-  --chart-2: var(--goal-gold);
-  --chart-3: var(--basketball);
-  --chart-4: var(--rugby);
-  --chart-5: #A78BFA;
-  --radius: 0.75rem;
-  --sidebar: var(--surface);
-  --sidebar-foreground: var(--text-main);
-  --sidebar-primary: var(--goal-emerald);
-  --sidebar-primary-foreground: var(--night);
-  --sidebar-accent: var(--surface-soft);
-  --sidebar-accent-foreground: var(--text-main);
-  --sidebar-border: rgba(255, 255, 255, 0.10);
-  --sidebar-ring: var(--goal-emerald);
-}
-
-.dark {
-  --background: var(--night);
-  --foreground: var(--text-main);
-  --card: var(--surface);
-  --card-foreground: var(--text-main);
-  --popover: var(--surface);
-  --popover-foreground: var(--text-main);
-  --primary: var(--goal-emerald);
-  --primary-foreground: var(--night);
-  --secondary: var(--goal-gold);
-  --secondary-foreground: var(--night);
-  --muted: var(--surface-soft);
-  --muted-foreground: var(--text-muted);
-  --accent: var(--surface-soft);
-  --accent-foreground: var(--text-main);
-  --border: rgba(255, 255, 255, 0.10);
-  --input: rgba(255, 255, 255, 0.13);
-  --ring: var(--goal-emerald);
+  --ease-fluid: var(--ease-fluid);
+  --ease-out: var(--ease-out);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border);
   }
-  html,
-  body {
-    overflow-x: hidden;
-    min-height: 100%;
-    background: var(--night);
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
+
   html {
-    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
-  button,
-  a {
-    -webkit-tap-highlight-color: transparent;
+
+  body {
+    background: var(--surface-0);
+    color: var(--text);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    overflow-x: hidden;
   }
+
+  /* Fixed mesh glow behind everything. Fixed + pointer-events-none so it never
+     triggers repaints on scroll. Emerald top-left, gold bottom-right, faint. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60rem 40rem at 12% -8%, rgba(0, 196, 106, 0.12), transparent 60%),
+      radial-gradient(48rem 40rem at 108% 12%, rgba(245, 185, 66, 0.07), transparent 55%),
+      radial-gradient(52rem 44rem at 50% 118%, rgba(0, 143, 76, 0.08), transparent 60%);
+  }
+
+  .tabular,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  h1, h2, h3, h4 {
+    color: var(--text-strong);
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgba(0, 196, 106, 0.28);
+    color: var(--text-strong);
+  }
+
+  /* Slim, dark scrollbars in keeping with the OS feel. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 }
 
 @layer utilities {
-  .page-shell {
-    @apply mx-auto w-full max-w-7xl px-5 md:px-8 xl:px-16;
+  .tap {
+    min-height: var(--tap-min);
+    min-width: var(--tap-min);
   }
 
-  .page-safe {
-    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
-  }
+  .shadow-e1 { box-shadow: var(--elevation-1); }
+  .shadow-e2 { box-shadow: var(--elevation-2); }
+  .shadow-e3 { box-shadow: var(--elevation-3); }
 
-  @media (min-width: 1024px) {
-    .page-safe {
-      padding-bottom: 4rem;
-    }
-  }
+  /* The double-bezel core: inner highlight for the machined-hardware look. */
+  .bezel-core { box-shadow: var(--inset-hi); }
 
-  .hide-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .hide-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Entrance animation for above-the-fold content. CSS rather than JS on purpose: a
-     JS-driven `initial={{ opacity: 0 }}` ships opacity:0 in the server HTML, so the hero
-     stays blank until hydration finishes — seconds, on the mobile connections this product
-     targets. A CSS animation runs at first paint, needs no JavaScript, and degrades to
-     "simply visible" when animations are unavailable or unwanted. */
-  @keyframes rise-in {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  .animate-rise-in {
-    animation: rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .animate-rise-in {
-      animation: none;
-    }
-  }
-
-  /* `backdrop-filter` forces the compositor to re-sample everything behind the element on
-     every frame — among the most expensive effects on low-end mobile GPUs, and this class
-     is applied to ~55 surfaces including cards that repeat down long lists. Below the
-     tablet breakpoint the blur is dropped and the panel is made more opaque instead, which
-     reads near-identically on a small screen where cards span the full width anyway. The
-     wide, soft drop shadow is scaled down for the same reason. */
-  .glass-panel {
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
-      rgba(17, 24, 39, 0.93);
-    border: 1px solid var(--border-soft);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  }
-
-  @media (min-width: 768px) {
-    .glass-panel {
-      background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
-        rgba(17, 24, 39, 0.72);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-      backdrop-filter: blur(22px);
-    }
-  }
-
-  .stadium-vignette {
-    /* A faint pitch grid and a single soft light source from above. The previous version
-       layered two hard diagonal streaks (125deg green, 58deg gold) across the whole
-       viewport, which read as rendering artefacts rather than atmosphere — they cut across
-       content, sat on top of tables, and were the first thing the eye went to on an empty
-       page. Atmosphere should be felt, not noticed. */
-    background:
-      linear-gradient(rgba(77, 255, 179, 0.028) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(77, 255, 179, 0.022) 1px, transparent 1px),
-      radial-gradient(120% 80% at 50% -10%, rgba(0, 196, 106, 0.07), transparent 60%),
-      linear-gradient(180deg, rgba(5, 7, 10, 0.35), var(--night) 70%);
-    background-size: 64px 64px, 64px 64px, auto, auto;
-  }
-
-  /* Kept as a hook so existing markup does not break, but it no longer paints streaks. */
-  .stadium-rays {
-    background: radial-gradient(90% 60% at 80% 110%, rgba(245, 185, 66, 0.05), transparent 65%);
-    opacity: 0.6;
-  }
-
-  .signal-card {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .signal-card::before {
-    content: "";
+  /* Diagonal light sheen for colour-saturated identity cards (club/athlete). */
+  .sheen::after {
+    content: '';
     position: absolute;
     inset: 0;
+    background: linear-gradient(102deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0) 55%);
     pointer-events: none;
-    background:
-      linear-gradient(rgba(77, 255, 179, 0.055) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(77, 255, 179, 0.045) 1px, transparent 1px),
-      linear-gradient(135deg, rgba(0, 196, 106, 0.12), transparent 34%);
-    background-size: 28px 28px, 28px 28px, auto;
-    mask-image: linear-gradient(120deg, black, transparent 68%);
-    opacity: 0.75;
+  }
+  /* Oversized crest/mark watermark bleeding off a hero card corner. */
+  .watermark {
+    position: absolute;
+    right: -18px;
+    bottom: -28px;
+    opacity: 0.14;
+    filter: grayscale(1) brightness(2);
+    pointer-events: none;
+    user-select: none;
   }
 
-  .text-balance {
-    text-wrap: balance;
+  /* Glass is reserved for fixed/sticky chrome only (see perf rule). */
+  .glass {
+    background: rgba(11, 17, 23, 0.72);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
   }
 
-  .sport-edge-football {
-    box-shadow: inset 3px 0 0 var(--football), 0 20px 60px rgba(34, 197, 94, 0.13);
+  .snap-row {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-left: var(--gutter);
   }
+  .snap-row::-webkit-scrollbar { display: none; }
+  .snap-item { scroll-snap-align: start; flex: 0 0 auto; }
 
-  .sport-edge-basketball {
-    box-shadow: inset 3px 0 0 var(--basketball), 0 20px 60px rgba(249, 115, 22, 0.13);
-  }
+  .pb-safe { padding-bottom: var(--safe-bottom); }
 
-  .sport-edge-rugby {
-    box-shadow: inset 3px 0 0 var(--rugby), 0 20px 60px rgba(59, 130, 246, 0.13);
+  /* Fluid entrance used by scroll-reveal sections. */
+  .reveal-up {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
   }
+  .reveal-up.in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition:
+      opacity 700ms var(--ease-out),
+      transform 700ms var(--ease-out),
+      filter 700ms var(--ease-out);
+  }
+}
+
+@keyframes gp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.78); }
+}
+.animate-live-pulse { animation: gp-pulse 1.5s var(--ease-fluid) infinite; }
+
+@keyframes gp-ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.5); }
+  100% { box-shadow: 0 0 0 8px rgba(255, 77, 77, 0); }
+}
+.animate-live-ring { animation: gp-ring 1.6s var(--ease-out) infinite; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Page entrance (template.tsx). Ends at transform:none so fixed/sticky children behave. */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter {
+  animation: pageIn 280ms var(--ease-out) both;
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal-up { opacity: 1; transform: none; filter: none; }
 }

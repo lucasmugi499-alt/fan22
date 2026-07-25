@@ -1,70 +1,48 @@
-import type { Metadata } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans, Space_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Bricolage_Grotesque, Plus_Jakarta_Sans, Space_Mono } from 'next/font/google';
+import { Toaster } from 'sonner';
+import './globals.css';
+
+import { AppShell } from '@/components/layout/AppShell';
+import { AuthProvider } from '@/context/AuthProvider';
+import { AuthModalProvider } from '@/components/auth/AuthRequiredModal';
+import { DemoRoleSwitcher } from '@/components/auth/DemoRoleSwitcher';
 
 const displayFont = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
 });
 
 const sansFont = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
 });
 
 const monoFont = Space_Mono({
-  weight: ["400", "700"],
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
 });
-
-import { AppShell } from "@/components/layout/AppShell";
-import { AuthProvider } from "@/context/AuthProvider";
-import { AuthModalProvider } from "@/components/auth/AuthRequiredModal";
-import { DemoRoleSwitcher } from "@/components/auth/DemoRoleSwitcher";
 
 export const metadata: Metadata = {
   title: {
-    default: "GoalPlace256 | Back the athletes. Build the game.",
-    template: "%s | GoalPlace256",
+    default: 'GoalPlace256 | Verified grassroots sport',
+    template: '%s | GoalPlace256',
   },
   description:
-    "GoalPlace256 is Uganda's mobile-first sports platform for fans, verified athletes, leagues, teams, sponsors, and community impact.",
-  applicationName: "GoalPlace256",
-  keywords: [
-    "GoalPlace256",
-    "Uganda sport",
-    "grassroots football",
-    "Uganda basketball",
-    "Uganda rugby",
-    "athlete support",
-    "GoalPlace Points",
-  ],
+    "GoalPlace256 is Uganda's verified digital operating system for grassroots sports leagues, where a result becomes official only once both teams confirm it.",
+  applicationName: 'GoalPlace256',
 };
 
-import { Toaster } from "sonner";
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className="h-full antialiased dark"
-    >
-      <head>
-        {/* Scroll-reveal sections start at opacity:0 and are animated in by JS. Without
-            this, a visitor whose JavaScript fails or is blocked sees a near-empty page. */}
-        <noscript>
-          <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
-        </noscript>
-      </head>
-      <body className={`min-h-full flex flex-col bg-background text-foreground ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}>
+    <html lang="en" className="dark h-full antialiased">
+      <body
+        className={`min-h-full ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}
+      >
         <AuthProvider>
           <AuthModalProvider>
             <AppShell>{children}</AppShell>
@@ -73,10 +51,9 @@ export default function RootLayout({
         </AuthProvider>
         <Toaster
           theme="dark"
-          position="bottom-right"
+          position="top-center"
           toastOptions={{
-            className:
-              "border-white/10 bg-[#111827]/95 text-slate-50 backdrop-blur-xl",
+            className: 'border border-border bg-surface-2 text-text shadow-e2',
           }}
         />
       </body>

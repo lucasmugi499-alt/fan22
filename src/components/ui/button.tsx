@@ -1,63 +1,65 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+'use client';
 
-import { cn } from "@/lib/utils"
+import { cva, type VariantProps } from 'class-variance-authority';
+import { forwardRef } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import type { IconComponent } from '@/lib/icons';
 
-const buttonVariants = cva(
-  "group/button inline-flex min-w-0 max-w-full shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-center text-sm font-black leading-tight whitespace-normal transition-all duration-200 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+/**
+ * The one button. Variants encode hierarchy (exactly one `primary` per view). Fluid spring
+ * motion and a tactile press; a trailing icon rides in its own nested circle (the
+ * "button-in-button") so it reads as a deliberate control, not a glyph stuck to the label.
+ */
+const button = cva(
+  'group relative inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] font-semibold ' +
+    'transition-[background,color,box-shadow,transform,border-color] duration-[var(--dur-micro)] ease-[var(--ease-fluid)] ' +
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ' +
+    'disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] select-none whitespace-nowrap',
   {
     variants: {
       variant: {
-        default:
-          "bg-gradient-to-r from-[var(--goal-emerald)] to-[var(--goal-mint)] text-[#031008] shadow-[0_12px_35px_rgba(0,196,106,0.22)] hover:brightness-110 hover:shadow-[0_14px_45px_rgba(0,196,106,0.33)]",
-        outline:
-          "border-white/12 bg-white/6 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl hover:border-white/22 hover:bg-white/10 aria-expanded:bg-white/10 aria-expanded:text-white",
+        primary:
+          'bg-brand text-on-brand shadow-[var(--glow-brand)] hover:bg-[var(--brand-hover)]',
         secondary:
-          "border-[var(--goal-gold)]/30 bg-[var(--goal-gold)]/14 text-[var(--goal-gold)] hover:bg-[var(--goal-gold)]/22 aria-expanded:bg-[var(--goal-gold)]/22",
-        gold:
-          "bg-gradient-to-r from-[var(--goal-gold)] to-orange-300 text-[#170E02] shadow-[0_12px_35px_rgba(245,185,66,0.22)] hover:brightness-110",
-        ghost:
-          "text-slate-300 hover:bg-white/7 hover:text-white aria-expanded:bg-white/7 aria-expanded:text-white",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
+          'bg-surface-2 text-text-strong border border-border-strong bezel-core hover:bg-surface-3 hover:border-[var(--border-strong)]',
+        subtle: 'bg-brand-subtle text-brand hover:bg-[color-mix(in_srgb,var(--brand-subtle),var(--brand)_10%)]',
+        ghost: 'text-muted hover:bg-surface-glass hover:text-text-strong',
+        danger: 'bg-[var(--state-error)] text-white shadow-e1 hover:opacity-90',
       },
       size: {
-        default:
-          "min-h-11 gap-2 px-4 py-2 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
-        xs: "min-h-11 gap-1 rounded-lg px-2.5 py-1.5 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 sm:min-h-7 [&_svg:not([class*='size-'])]:size-3",
-        sm: "min-h-11 gap-1.5 rounded-lg px-3 py-1.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 sm:min-h-8 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "min-h-12 gap-2 px-5 py-2.5 text-base has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
-        icon: "size-11 sm:size-10",
-        "icon-xs":
-          "size-11 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg sm:size-6 [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-11 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg sm:size-7",
-        "icon-lg": "size-11 sm:size-9",
+        sm: 'h-9 px-4 text-sm',
+        md: 'h-11 px-5 text-[15px]',
+        lg: 'h-12 px-6 text-base',
+        icon: 'h-11 w-11 tap px-0',
       },
+      block: { true: 'w-full', false: '' },
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
+    defaultVariants: { variant: 'primary', size: 'md', block: false },
   }
-)
+);
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  type = "button",
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & VariantProps<typeof buttonVariants>) {
-  return (
-    <button
-      data-slot="button"
-      type={type}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
+export interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof button> {
+  icon?: IconComponent;
+  iconTrailing?: IconComponent;
+  children?: ReactNode;
 }
 
-export { Button, buttonVariants }
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant, size, block, icon: Icon, iconTrailing: Trailing, children, ...props },
+  ref
+) {
+  return (
+    <button ref={ref} className={cn(button({ variant, size, block }), Trailing && 'pr-1.5', className)} {...props}>
+      {Icon ? <Icon className="h-[1.15em] w-[1.15em] shrink-0" weight="bold" /> : null}
+      {children}
+      {Trailing ? (
+        <span className="ml-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/15 transition-transform duration-[var(--dur-micro)] ease-[var(--ease-fluid)] group-hover:translate-x-0.5 group-hover:-translate-y-px">
+          <Trailing className="h-4 w-4" weight="bold" />
+        </span>
+      ) : null}
+    </button>
+  );
+});

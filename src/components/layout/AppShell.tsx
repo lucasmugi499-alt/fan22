@@ -1,46 +1,50 @@
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
-import { MobileNav, DesktopNav } from './Navigation';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/context/AuthProvider';
+import { navForRole } from '@/lib/nav';
+import { PUBLIC_ROUTES } from '@/lib/auth/permissions';
+import { TopBar } from './TopBar';
+import { BottomNav } from './BottomNav';
+import { DesktopRail } from './DesktopRail';
 
-import { ReactLenis } from 'lenis/react';
-
+/**
+ * The application frame. Two chromes, one system:
+ *  - Marketing/public routes render bare (they bring their own expressive header/footer).
+ *  - App routes get the operational frame: desktop rail ⇄ mobile bottom nav, plus a top
+ *    bar for context and account. Nav, tabs and actions stay three separate things.
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [smoothScroll, setSmoothScroll] = useState(false);
+  const pathname = usePathname();
+  const { role } = useAuth();
 
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 768px) and (prefers-reduced-motion: no-preference)');
-    const update = () => setSmoothScroll(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
+  const isMarketing =
+    PUBLIC_ROUTES.includes(pathname) ||
+    pathname === '/' ||
+    pathname.startsWith('/about') ||
+    pathname.startsWith('/how-it-works') ||
+    pathname.startsWith('/pilot') ||
+    pathname.startsWith('/verification') ||
+    pathname.startsWith('/sponsors') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register');
 
-  const shell = (
-    <div className="relative flex min-h-dvh flex-col bg-background text-foreground selection:bg-[var(--goal-emerald)]/30">
-      <div className="pointer-events-none fixed inset-0 z-0 stadium-vignette" />
-      <div className="pointer-events-none fixed inset-0 z-0 stadium-rays" />
-      <div className="relative z-10 flex min-h-dvh flex-col">
-        <Suspense fallback={null}>
-          <DesktopNav />
-        </Suspense>
-        <main className="relative flex flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
-          {children}
-        </main>
-        <Suspense fallback={null}>
-          <MobileNav />
-        </Suspense>
-      </div>
-    </div>
-  );
-
-  if (!smoothScroll) {
-    return shell;
+  if (isMarketing) {
+    return <div className="min-h-dvh">{children}</div>;
   }
 
+  const nav = navForRole(role);
+
   return (
-    <ReactLenis root options={{ lerp: 0.08, duration: 1.1 }}>
-      {shell}
-    </ReactLenis>
+    <div className="min-h-dvh">
+      <DesktopRail nav={nav} />
+      <div className="md:pl-60">
+        <TopBar nav={nav} role={role} />
+        <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-[calc(var(--nav-h)+var(--safe-bottom)+16px)] pt-4 md:px-6 md:pb-12">
+          {children}
+        </main>
+      </div>
+      <BottomNav nav={nav} />
+    </div>
   );
 }

@@ -1,94 +1,91 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Cancel01Icon } from 'hugeicons-react';
+import { X, LockKey } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 
-type AuthModalContextValue = {
-  isOpen: boolean;
-  openAuthModal: () => void;
-  closeAuthModal: () => void;
+/**
+ * A gate for actions that require a signed-in user. Components call
+ * `useAuthGate().requireAuth(fn)` — if the user is signed in (or in demo mode) the action
+ * runs; otherwise a sign-in prompt is shown instead of the action silently failing.
+ */
+type AuthGate = {
+  requireAuth: (action: () => void, reason?: string) => void;
+  open: (reason?: string) => void;
 };
 
-const AuthModalContext = createContext<AuthModalContextValue | undefined>(undefined);
+const AuthGateContext = createContext<AuthGate | null>(null);
 
 export function AuthModalProvider({ children }: { children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const { authStatus } = useAuth();
+  const { authStatus, isDemoMode } = useAuth();
+  const [reason, setReason] = useState<string | null>(null);
+  const isAuthed = authStatus === 'logged_in' || isDemoMode;
 
-  const openAuthModal = () => {
-    if (authStatus !== 'logged_in') {
-      setIsOpen(true);
-    }
-  };
+  const open = useCallback((why?: string) => setReason(why ?? 'Sign in to continue.'), []);
+  const requireAuth = useCallback(
+    (action: () => void, why?: string) => {
+      if (isAuthed) action();
+      else open(why);
+    },
+    [isAuthed, open]
+  );
 
-  const closeAuthModal = () => setIsOpen(false);
+  const value = useMemo<AuthGate>(() => ({ requireAuth, open }), [requireAuth, open]);
 
   return (
-    <AuthModalContext.Provider value={{ isOpen, openAuthModal, closeAuthModal }}>
+    <AuthGateContext.Provider value={value}>
       {children}
-      <AuthRequiredModal isOpen={isOpen} onClose={closeAuthModal} />
-    </AuthModalContext.Provider>
-  );
-}
-
-export function useAuthModal() {
-  const context = useContext(AuthModalContext);
-  if (!context) {
-    throw new Error('useAuthModal must be used within an AuthModalProvider');
-  }
-  return context;
-}
-
-function AuthRequiredModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const pathname = usePathname();
-  
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#05070A]/80 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0A0D14] p-6 shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-white"
+      {reason !== null ? (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sign in required"
         >
-          <Cancel01Icon className="size-5" />
-        </button>
-
-        <div className="mb-6 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--goal-emerald)] to-[var(--goal-emerald-dark)] shadow-[0_0_24px_rgba(0,196,106,0.3)]">
-          <span className="font-display font-black text-white">GP</span>
-        </div>
-
-        <h2 className="mb-2 font-display text-2xl font-black text-white">Join GoalPlace256</h2>
-        <p className="mb-8 text-sm text-slate-400">
-          Create an account to support athletes, follow teams, earn GoalPlace Points, and join Uganda&apos;s grassroots sports community.
-        </p>
-
-        <div className="flex flex-col gap-3">
-          <Link
-            href={`/login?next=${encodeURIComponent(pathname)}`}
-            onClick={onClose}
-            className="flex w-full items-center justify-center rounded-xl bg-[var(--goal-emerald)] py-3.5 font-bold text-[#05070A] transition-colors hover:bg-[#00E67A]"
-          >
-            Login
-          </Link>
-          <Link
-            href={`/register?next=${encodeURIComponent(pathname)}`}
-            onClick={onClose}
-            className="flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3.5 font-bold text-white transition-colors hover:bg-white/10"
-          >
-            Create Account
-          </Link>
           <button
-            onClick={onClose}
-            className="mt-2 text-sm font-bold text-slate-400 hover:text-white"
-          >
-            Continue Browsing
-          </button>
+            aria-label="Close"
+            onClick={() => setReason(null)}
+            className="absolute inset-0 bg-black/45 motion-safe:animate-[fadeIn_var(--dur-micro)_ease-out]"
+          />
+          <div className="relative w-full rounded-t-[var(--radius-xl)] border border-border bg-surface-1 p-6 shadow-e3 pb-safe motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-standard)] sm:m-4 sm:max-w-sm sm:rounded-[var(--radius-xl)]">
+            <button
+              onClick={() => setReason(null)}
+              aria-label="Close"
+              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-surface-3"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-subtle text-brand">
+              <LockKey className="h-5 w-5" weight="bold" />
+            </span>
+            <h2 className="mt-3 text-lg font-semibold text-text-strong">Sign in to continue</h2>
+            <p className="mt-1 text-sm text-muted">{reason}</p>
+            <div className="mt-5 flex gap-2">
+              <Link
+                href="/login"
+                onClick={() => setReason(null)}
+                className="flex h-11 flex-1 items-center justify-center rounded-[var(--radius-md)] bg-brand px-4 text-sm font-medium text-on-brand hover:bg-[var(--brand-hover)]"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setReason(null)}
+                className="flex h-11 flex-1 items-center justify-center rounded-[var(--radius-md)] border border-border-strong bg-surface-1 px-4 text-sm font-medium text-text-strong hover:bg-surface-3"
+              >
+                Create account
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+    </AuthGateContext.Provider>
   );
+}
+
+export function useAuthGate(): AuthGate {
+  const ctx = useContext(AuthGateContext);
+  if (!ctx) throw new Error('useAuthGate must be used within AuthModalProvider');
+  return ctx;
 }

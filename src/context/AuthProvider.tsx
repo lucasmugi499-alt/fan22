@@ -86,10 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthStatus('logged_out');
       setCurrentUser(null);
       
-      // Trigger a re-check of firebase auth state if exiting demo mode
+      // Exiting demo mode needs a full page load so Firebase auth state is re-checked.
+      // Land on the public site rather than reloading in place: reloading the current
+      // (now unauthorised) workspace left users staring at a logged-out app page, which
+      // read as "sign out did nothing".
       if (isFirebaseConfigured) {
         setAuthStatus('loading');
-        window.location.reload();
+        window.location.assign('/');
       }
     }
   }, []);
