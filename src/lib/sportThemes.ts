@@ -1,5 +1,5 @@
 import type { ComponentType, CSSProperties } from 'react';
-import { Activity01Icon, RecordIcon, Dumbbell01Icon } from 'hugeicons-react';
+import { Pulse, Circle, Barbell } from '@phosphor-icons/react';
 import { SoccerBall } from '@phosphor-icons/react';
 import { SportType } from '@/types';
 
@@ -44,7 +44,7 @@ export const sportThemes: Record<SportType, SportTheme> = {
     gradient: 'from-[var(--basketball)] via-[var(--goal-gold)] to-orange-200',
     mutedGradient: 'from-orange-500/24 via-amber-500/12 to-slate-950',
     edgeClass: 'sport-edge-basketball',
-    icon: RecordIcon,
+    icon: Circle,
     statLabels: ['Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'],
     challengeExamples: ['reach 20 points', 'get 10 rebounds', 'make 5 assists'],
     image: '/placeholders/basketball-gradient.svg',
@@ -58,7 +58,7 @@ export const sportThemes: Record<SportType, SportTheme> = {
     gradient: 'from-[var(--rugby)] via-cyan-400 to-[var(--goal-mint)]',
     mutedGradient: 'from-blue-500/24 via-cyan-500/10 to-slate-950',
     edgeClass: 'sport-edge-rugby',
-    icon: Dumbbell01Icon,
+    icon: Barbell,
     statLabels: ['Tries', 'Tackles', 'Carries', 'Conversions'],
     challengeExamples: ['score a try', 'make 8 tackles', 'complete the match'],
     image: '/placeholders/rugby-gradient.svg',
@@ -113,4 +113,4 @@ export const trustStatements = [
   'GoalPlace256 is built for athlete support, not games of chance.',
 ];
 
-export const activityIcon = Activity01Icon;
+export const activityIcon = Pulse;
