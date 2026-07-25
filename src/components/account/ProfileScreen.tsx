@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { SignOut, Star, Wallet, UsersThree } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
+import { useAppStore } from '@/lib/store';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DemoDataNote } from '@/components/ui/DemoDataNote';
@@ -14,7 +15,10 @@ const ROLE_LABEL: Record<string, string> = {
 export function ProfileScreen() {
   const router = useRouter();
   const { userProfile, role, isDemoMode, logout } = useAuth();
+  const demoWalletSpent = useAppStore((s) => s.demoWalletSpent);
   const name = userProfile?.name ?? 'Guest';
+  const userId = userProfile?.id ?? userProfile?.uid ?? '';
+  const balance = (userProfile?.walletBalance ?? 0) - (demoWalletSpent[userId] ?? 0);
 
   // Signing out is a navigation event, not just a state change: land back on the public
   // site so it is unmistakable that the session ended.
@@ -43,7 +47,7 @@ export function ProfileScreen() {
       {userProfile ? (
         <div className="grid grid-cols-3 gap-2.5">
           <Stat icon={Star} label="GP Points" value={userProfile.points} accent="text-brand" />
-          <Stat icon={Wallet} label="Balance" value={userProfile.walletBalance} />
+          <Stat icon={Wallet} label="Balance" value={balance} />
           <Stat icon={UsersThree} label="Following" value={(userProfile.followedAthletes?.length ?? 0) + (userProfile.followedTeams?.length ?? 0)} />
         </div>
       ) : null}

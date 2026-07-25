@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { HandHeart, Warning, MapPin } from '@phosphor-icons/react';
-import { toast } from 'sonner';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { athletePhoto } from '@/lib/media';
 import { clubColor } from '@/lib/clubColors';
@@ -13,6 +12,7 @@ import { NextMatchCard } from '@/components/premium/NextMatchCard';
 import { PeopleCarousel } from '@/components/premium/PeopleCarousel';
 import { NewsRow } from '@/components/premium/NewsRow';
 import { OfficialStats } from '@/components/athlete/OfficialStats';
+import { SupportSheet } from '@/components/fan/SupportSheet';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -27,6 +27,7 @@ function ugx(n: number): string {
 export function AthleteProfile({ athleteId }: { athleteId: string }) {
   const { athletes, teams, matches, feedPosts, loading } = useGoalPlaceData();
   const { requireAuth } = useAuthGate();
+  const [supporting, setSupporting] = useState(false);
   const athlete = useMemo(() => athletes.find((a) => a.id === athleteId), [athletes, athleteId]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
@@ -102,10 +103,12 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
       </div>
 
       <div className="sticky bottom-[calc(var(--nav-h)+var(--safe-bottom)+8px)] md:static">
-        <Button block icon={HandHeart} onClick={() => requireAuth(() => toast('Supporting an athlete arrives in the next build step.'), 'Sign in to back this athlete.')}>
+        <Button block icon={HandHeart} onClick={() => requireAuth(() => setSupporting(true), 'Sign in to back this athlete.')}>
           Back {athlete.name.split(' ')[0]}
         </Button>
       </div>
+
+      <SupportSheet open={supporting} onClose={() => setSupporting(false)} athlete={athlete} />
     </div>
   );
 }

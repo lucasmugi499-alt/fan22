@@ -69,13 +69,12 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
               >
                 Sign in
               </Link>
-              <Link
-                href="/register"
+              <button
                 onClick={() => setReason(null)}
                 className="flex h-11 flex-1 items-center justify-center rounded-[var(--radius-md)] border border-border-strong bg-surface-1 px-4 text-sm font-medium text-text-strong hover:bg-surface-3"
               >
-                Create account
-              </Link>
+                Not now
+              </button>
             </div>
           </div>
         </div>

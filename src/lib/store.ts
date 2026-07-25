@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, SportType, League, Team, Athlete, Match, Challenge } from '@/types';
+import { User, SportType, League, Team, Athlete, Match, Challenge, SupportPledge } from '@/types';
 
 interface AppState {
   currentUser: User | null;
@@ -11,6 +11,11 @@ interface AppState {
   demoChallenges: Challenge[];
   demoMatchOverrides: Record<string, Partial<Match>>;
   demoChallengeOverrides: Record<string, Partial<Challenge>>;
+  demoAthleteOverrides: Record<string, Partial<Athlete>>;
+  /** Pledges made this session, newest first. Mirrors what the backend would persist. */
+  demoPledges: SupportPledge[];
+  /** Wallet spend this session, per user id; subtracted from the mock profile balance. */
+  demoWalletSpent: Record<string, number>;
   setCurrentUser: (user: User | null) => void;
   setSelectedSportFilter: (sport: SportType | 'All') => void;
   addPoints: (points: number) => void;
@@ -22,6 +27,9 @@ interface AppState {
   updateDemoMatch: (matchId: string, updates: Partial<Match>) => void;
   addDemoChallenge: (challenge: Challenge) => void;
   updateDemoChallenge: (challengeId: string, updates: Partial<Challenge>) => void;
+  updateDemoAthlete: (athleteId: string, updates: Partial<Athlete>) => void;
+  addDemoPledge: (pledge: SupportPledge) => void;
+  addDemoWalletSpend: (userId: string, amount: number) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -34,6 +42,9 @@ export const useAppStore = create<AppState>((set) => ({
   demoChallenges: [],
   demoMatchOverrides: {},
   demoChallengeOverrides: {},
+  demoAthleteOverrides: {},
+  demoPledges: [],
+  demoWalletSpent: {},
   setCurrentUser: (user) => set({ currentUser: user }),
   setSelectedSportFilter: (sport) => set({ selectedSportFilter: sport }),
   addPoints: (points) => set((state) => ({
@@ -53,6 +64,17 @@ export const useAppStore = create<AppState>((set) => ({
     }
     return { demoMatchOverrides: { ...state.demoMatchOverrides, [matchId]: { ...state.demoMatchOverrides[matchId], ...updates } } };
   }),
+  updateDemoAthlete: (athleteId, updates) => set((state) => {
+    const isDemo = state.demoAthletes.some(a => a.id === athleteId);
+    if (isDemo) {
+      return { demoAthletes: state.demoAthletes.map(a => a.id === athleteId ? { ...a, ...updates } : a) };
+    }
+    return { demoAthleteOverrides: { ...state.demoAthleteOverrides, [athleteId]: { ...state.demoAthleteOverrides[athleteId], ...updates } } };
+  }),
+  addDemoPledge: (pledge) => set((state) => ({ demoPledges: [pledge, ...state.demoPledges] })),
+  addDemoWalletSpend: (userId, amount) => set((state) => ({
+    demoWalletSpent: { ...state.demoWalletSpent, [userId]: (state.demoWalletSpent[userId] ?? 0) + amount }
+  })),
   addDemoChallenge: (challenge) => set((state) => ({ demoChallenges: [challenge, ...state.demoChallenges] })),
   updateDemoChallenge: (challengeId, updates) => set((state) => {
     const isDemo = state.demoChallenges.some(c => c.id === challengeId);

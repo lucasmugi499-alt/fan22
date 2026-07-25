@@ -235,8 +235,14 @@ export function useGoalPlaceData() {
     const mergedChallenges = [...store.demoChallenges, ...providerChallengesWithOverrides];
     const uniqueChallenges = Array.from(new Map(mergedChallenges.map(c => [c.id, c])).values());
 
+    // Same override pattern for athletes, so demo support pledges move visible totals.
+    const providerAthletesWithOverrides = items.athletes.map(a => {
+      const override = store.demoAthleteOverrides[a.id];
+      return override ? { ...a, ...override } as Athlete : a;
+    });
+
     return {
-      athletes: [...store.demoAthletes, ...items.athletes],
+      athletes: [...store.demoAthletes, ...providerAthletesWithOverrides],
       teams: [...store.demoTeams, ...items.teams],
       leagues: [...store.demoLeagues, ...items.leagues],
       seasons: items.seasons,
@@ -248,7 +254,7 @@ export function useGoalPlaceData() {
       loading,
       source: dataProvider.mode,
     };
-  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides]);
+  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
 }
 
 export function useUserWalletTransactions(userId?: string | null) {
