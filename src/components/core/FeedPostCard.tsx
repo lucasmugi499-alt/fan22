@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Heart, ChatCircle, ShareFat, SealCheck } from '@phosphor-icons/react';
+import { athletePhoto } from '@/lib/media';
 import type { FeedPost } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +41,7 @@ export function FeedPostCard({ post }: { post: FeedPost }) {
   const shares = post.sharesCount ?? post.shares ?? 0;
   const media = post.mediaUrl || post.mediaURL;
   const role = ROLE_LABEL[post.authorRole] ?? ROLE_LABEL[post.authorType?.toLowerCase() ?? ''] ?? 'Member';
-  const avatar = `https://i.pravatar.cc/80?u=gp-author-${post.authorId}`;
+  const avatar = athletePhoto({ id: post.authorId, name: post.authorName, teamId: post.relatedTeamId ?? post.authorId });
 
   return (
     <article className="border-b border-border px-[var(--gutter)] py-4 transition-colors hover:bg-surface-1/40 md:rounded-[var(--radius-lg)] md:border md:bg-surface-1 md:bezel-core">

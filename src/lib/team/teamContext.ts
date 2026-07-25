@@ -2,21 +2,28 @@ import type { Athlete, Match, Team, UserProfile } from '@/types';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 
 /**
- * Resolves which team the current admin operates. Real accounts are matched by
- * `adminUserIds`; the demo team-admin profile is not wired to a specific team, so it falls
- * back to the most active team so the console has something real to show. This is a UI/demo
- * convenience only — it never grants write authority, which the finalizer and rules gate.
+ * Resolves which team the current admin operates, by `adminUserIds`.
+ *
+ * The demo team-admin profile is not wired to a specific team, so in demo mode only it
+ * falls back to the most active team to give the console something real to show. That
+ * fallback must never run for a real account: a genuine admin whose assignment is missing
+ * would silently open an unrelated club's console. Outside demo mode an unassigned user
+ * gets `null`, and the caller renders an explicit empty state.
+ *
+ * This is presentation only either way; write authority is gated by the finalizer and rules.
  */
 export function resolveMyTeam(
   profile: UserProfile | null,
   teams: Team[],
-  matches: Match[]
+  matches: Match[],
+  isDemoMode = false
 ): Team | null {
   if (teams.length === 0) return null;
   if (profile) {
     const owned = teams.find((t) => t.adminUserIds?.includes(profile.uid) || t.adminUserIds?.includes(profile.id));
     if (owned) return owned;
   }
+  if (!isDemoMode) return null;
   // Demo fallback: the team with the most fixtures makes the liveliest console.
   const countByTeam = new Map<string, number>();
   for (const m of matches) {

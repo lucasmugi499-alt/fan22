@@ -7,6 +7,7 @@ import { PUBLIC_ROUTES } from '@/lib/auth/permissions';
 import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { DesktopRail } from './DesktopRail';
+import { RouteGuard } from './RouteGuard';
 
 /**
  * The application frame. Two chromes, one system:
@@ -41,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="md:pl-60">
         <TopBar nav={nav} role={role} />
         <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-[calc(var(--nav-h)+var(--safe-bottom)+16px)] pt-4 md:px-6 md:pb-12">
-          {children}
+          <RouteGuard pathname={pathname}>{children}</RouteGuard>
         </main>
       </div>
       <BottomNav nav={nav} />

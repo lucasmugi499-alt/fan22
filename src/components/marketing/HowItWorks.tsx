@@ -5,7 +5,7 @@ const CHAIN = [
   { icon: PaperPlaneTilt, t: 'A team submits the result', d: 'The submitting team enters the score. It is recorded as a claim, marked pending, and it moves nothing yet.', tone: 'text-muted', bg: 'bg-surface-3' },
   { icon: SealCheck, t: 'The opponent confirms', d: 'The opposing team has 72 hours to confirm or dispute. The team that reported a result can never be the one that confirms it.', tone: 'text-[var(--state-pending)]', bg: 'bg-[var(--state-pending-bg)]' },
   { icon: Warning, t: 'Disputes go to the league', d: 'If the teams disagree, the league adjudicates. Silence past the deadline escalates too. Silence is never treated as agreement.', tone: 'text-[var(--state-disputed)]', bg: 'bg-[var(--state-disputed-bg)]' },
-  { icon: ShieldCheck, t: 'The server finalizes it', d: 'Only a trusted server-side finalizer can make a result official. No app, team or league can write official directly. That is what makes standings trustworthy.', tone: 'text-[var(--state-verified)]', bg: 'bg-[var(--state-verified-bg)]' },
+  { icon: ShieldCheck, t: 'The server finalizes it', d: 'A trusted server-side finalizer is what promotes a result to official. Clients submit, confirm and dispute; they are designed never to write the official record themselves. That separation is what makes standings trustworthy.', tone: 'text-[var(--state-verified)]', bg: 'bg-[var(--state-verified-bg)]' },
 ];
 
 export function HowItWorks() {

@@ -1,16 +1,23 @@
 import type { Athlete, UserProfile } from '@/types';
 
 /**
- * Resolves the athlete the current user is. Real accounts match by `userId`; the demo
- * athlete profile is not wired to one, so it falls back to the most-supported athlete so the
- * portfolio has real content. UI/demo convenience only.
+ * Resolves the athlete the current user is, by `userId`.
+ *
+ * In demo mode only, an unlinked profile falls back to the most-supported athlete so the
+ * portfolio has real content. A real unlinked user returns `null`: showing someone else's
+ * career record as your own would misrepresent a verified profile.
  */
-export function resolveMyAthlete(profile: UserProfile | null, athletes: Athlete[]): Athlete | null {
+export function resolveMyAthlete(
+  profile: UserProfile | null,
+  athletes: Athlete[],
+  isDemoMode = false
+): Athlete | null {
   if (athletes.length === 0) return null;
   if (profile) {
     const mine = athletes.find((a) => a.userId === profile.uid || a.userId === profile.id);
     if (mine) return mine;
   }
+  if (!isDemoMode) return null;
   return [...athletes].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0))[0];
 }
 

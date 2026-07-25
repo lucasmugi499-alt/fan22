@@ -17,11 +17,11 @@ const TABS = ['Standings', 'All teams'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LeagueTeams() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { leagues, teams, matches, seasons, loading } = useGoalPlaceData();
   const [tab, setTab] = useState<Tab>('Standings');
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches), [userProfile, leagues, matches]);
+  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const lTeams = useMemo(() => (league ? teamsInLeague(league.id, teams) : []), [league, teams]);
   const standings = useMemo(() => {
     if (!league) return [];

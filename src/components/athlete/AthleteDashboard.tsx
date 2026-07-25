@@ -6,12 +6,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyAthlete } from '@/lib/athlete/athleteContext';
-import { athletePhoto } from '@/lib/media';
+import { athletePhoto, bannerImage } from '@/lib/media';
 import { normalizeChallengeStatus, challengeLabel } from '@/lib/status';
 import { OfficialStats } from '@/components/athlete/OfficialStats';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { NoAssignment } from '@/components/ui/NoAssignment';
 import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
 
@@ -22,10 +23,10 @@ function ugx(n: number): string {
 }
 
 export function AthleteDashboard() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { athletes, teams, challenges, loading } = useGoalPlaceData();
 
-  const athlete = useMemo(() => resolveMyAthlete(userProfile, athletes), [userProfile, athletes]);
+  const athlete = useMemo(() => resolveMyAthlete(userProfile, athletes, isDemoMode), [userProfile, athletes, isDemoMode]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);
   const myChallenges = useMemo(
     () => (athlete ? challenges.filter((c) => c.athleteId === athlete.id) : []),
@@ -33,9 +34,9 @@ export function AthleteDashboard() {
   );
 
   if (loading) return <AthleteDashboardSkeleton />;
-  if (!athlete) return null;
+  if (!athlete) return <NoAssignment kind="athlete" />;
 
-  const cover = athlete.coverUrl || athlete.coverURL || `https://picsum.photos/seed/gp-cover-${athlete.id}/800/300`;
+  const cover = athlete.coverUrl || athlete.coverURL || bannerImage(athlete.teamId || athlete.id, athlete.position);
   const avatar = athletePhoto(athlete);
   const vs = normalizeVerificationStatus(athlete.verificationStatus);
 

@@ -14,10 +14,10 @@ import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
 
 export function TeamRoster() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { teams, athletes, matches, loading } = useGoalPlaceData();
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches), [userProfile, teams, matches]);
+  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const roster = useMemo(() => (team ? rosterForTeam(team.id, athletes) : []), [team, athletes]);
 
   const addAthlete = () => toast('Roster editing arrives in the next build step.');

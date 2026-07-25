@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useMemo } from 'react';
 import { SealCheck, PencilSimple, MapPin, Trophy, Coins, Users } from '@phosphor-icons/react';
 import { toast } from 'sonner';
@@ -9,6 +11,7 @@ import { resolveMyTeam, teamRecord } from '@/lib/team/teamContext';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { NoAssignment } from '@/components/ui/NoAssignment';
 import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
 
@@ -19,10 +22,10 @@ function ugx(n: number): string {
 }
 
 export function TeamProfile() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { teams, matches, athletes, loading } = useGoalPlaceData();
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches), [userProfile, teams, matches]);
+  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const rosterCount = useMemo(
     () => (team ? athletes.filter((a) => a.teamId === team.id).length : 0),
     [team, athletes]
@@ -36,7 +39,7 @@ export function TeamProfile() {
       </div>
     );
   }
-  if (!team) return null;
+  if (!team) return <NoAssignment kind="team" />;
 
   const vs = normalizeVerificationStatus(team.verificationStatus ?? (team.verified ? 'verified' : 'pending'));
 
@@ -82,7 +85,7 @@ export function TeamProfile() {
           <p className="text-sm font-semibold text-text-strong">Roster</p>
           <p className="text-xs text-muted"><span className="tabular tabular-nums">{rosterCount}</span> registered athletes</p>
         </div>
-        <a href="/team-admin/roster" className="text-sm font-medium text-brand hover:underline">Manage</a>
+        <Link href="/team-admin/roster" className="text-sm font-medium text-brand hover:underline">Manage</Link>
       </Card>
     </div>
   );

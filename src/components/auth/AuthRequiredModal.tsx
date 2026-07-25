@@ -48,7 +48,7 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
             onClick={() => setReason(null)}
             className="absolute inset-0 bg-black/45 motion-safe:animate-[fadeIn_var(--dur-micro)_ease-out]"
           />
-          <div className="relative w-full rounded-t-[var(--radius-xl)] border border-border bg-surface-1 p-6 shadow-e3 pb-safe motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-standard)] sm:m-4 sm:max-w-sm sm:rounded-[var(--radius-xl)]">
+          <div className="relative w-full rounded-t-[var(--radius-xl)] border border-border bg-surface-1 p-6 shadow-e3 pb-safe motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-fluid)] sm:m-4 sm:max-w-sm sm:rounded-[var(--radius-xl)]">
             <button
               onClick={() => setReason(null)}
               aria-label="Close"

@@ -16,11 +16,11 @@ const TABS = ['Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LeagueFixtures() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { leagues, teams, matches, loading } = useGoalPlaceData();
   const [tab, setTab] = useState<Tab>('Upcoming');
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches), [userProfile, leagues, matches]);
+  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const buckets = useMemo(() => {
     if (!league) return { Upcoming: [], Results: [] } as Record<Tab, Match[]>;

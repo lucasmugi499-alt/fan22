@@ -26,11 +26,11 @@ const KIND_META: Record<LeagueException['kind'], string> = {
 };
 
 export function LeagueVerification({ compact = false }: { compact?: boolean }) {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { leagues, teams, matches, loading } = useGoalPlaceData();
   const [active, setActive] = useState<Match | null>(null);
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches), [userProfile, leagues, matches]);
+  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const queue = useMemo(() => (league ? exceptionQueue(league.id, matches) : []), [league, matches]);
 

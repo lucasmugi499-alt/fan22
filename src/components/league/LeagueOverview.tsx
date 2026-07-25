@@ -10,15 +10,17 @@ import { buildLeagueStandings } from '@/lib/leagueModel';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/EmptyState';
+import { NoAssignment } from '@/components/ui/NoAssignment';
 import { RichStandings } from '@/components/premium/RichStandings';
 import { LeagueVerification } from '@/components/league/LeagueVerification';
 import { cn } from '@/lib/utils';
 
 export function LeagueOverview() {
-  const { userProfile } = useAuth();
-  const { leagues, teams, matches, seasons, loading } = useGoalPlaceData();
+  const { userProfile, isDemoMode } = useAuth();
+  const { leagues, teams, matches, seasons, loading, error, retry } = useGoalPlaceData();
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches), [userProfile, leagues, matches]);
+  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
 
   const standings = useMemo(() => {
     if (!league) return [];
@@ -32,7 +34,8 @@ export function LeagueOverview() {
   }, [league, teams, matches, seasons]);
 
   if (loading) return <LeagueOverviewSkeleton />;
-  if (!league) return null;
+  if (error) return <ErrorState onRetry={retry} />;
+  if (!league) return <NoAssignment kind="league" />;
 
   const exceptions = exceptionQueue(league.id, matches);
   const rate = verifiedRate(league.id, matches);

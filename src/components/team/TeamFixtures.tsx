@@ -22,12 +22,12 @@ const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function TeamFixtures() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { teams, matches, loading } = useGoalPlaceData();
   const [tab, setTab] = useState<Tab>('Needs action');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches), [userProfile, teams, matches]);
+  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   const buckets = useMemo(() => {

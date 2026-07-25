@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { dataProvider } from '@/data/dataProvider';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { dataMode, dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import {
   Athlete,
@@ -191,29 +191,41 @@ async function loadGoalPlaceData(provider = dataProvider) {
 export function useGoalPlaceData() {
   const [items, setItems] = useState(initialData);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  /** Lets an error surface offer retry without a full page reload. */
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoading(true);
-      const nextItems = await loadGoalPlaceData();
-      if (cancelled) return;
-      setItems(nextItems);
-      setLoading(false);
+      setError(null);
+      try {
+        const nextItems = await loadGoalPlaceData();
+        if (cancelled) return;
+        setItems(nextItems);
+      } catch (cause) {
+        if (cancelled) return;
+        // A platform whose product is trusted records must never quietly replace live data
+        // with seeded fixtures: a viewer could not tell the difference. In Firebase mode a
+        // failure stays a failure, keeping whatever real snapshot we already hold. Mock
+        // mode has no fallback to make, so the error surfaces there too.
+        console.error('GoalPlace256: failed to load data from the', dataMode, 'provider', cause);
+        setError(cause instanceof Error ? cause : new Error('Failed to load data'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    load().catch(async () => {
-      if (!cancelled) {
-        setItems(await loadGoalPlaceData(mockProvider));
-        setLoading(false);
-      }
-    });
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const store = useAppStore();
 
@@ -252,9 +264,11 @@ export function useGoalPlaceData() {
       reports: items.reports,
       verifications: items.verifications,
       loading,
-      source: dataProvider.mode,
+      error,
+      retry,
+      source: dataMode,
     };
-  }, [items, loading, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
+  }, [items, loading, error, retry, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
 }
 
 export function useUserWalletTransactions(userId?: string | null) {

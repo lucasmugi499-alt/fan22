@@ -28,7 +28,7 @@ import {
 import { Card, Bezel, Eyebrow } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { MatchCard } from '@/components/core/MatchCard';
 import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
@@ -61,14 +61,15 @@ const FORM_STYLE: Record<FormResult, string> = {
 };
 
 export function TeamConsoleHome() {
-  const { userProfile } = useAuth();
-  const { teams, matches, athletes, loading } = useGoalPlaceData();
+  const { userProfile, isDemoMode } = useAuth();
+  const { teams, matches, athletes, loading, error, retry } = useGoalPlaceData();
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches), [userProfile, teams, matches]);
+  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   if (loading) return <TeamConsoleHomeSkeleton />;
+  if (error) return <ErrorState onRetry={retry} />;
 
   if (!team) {
     return (

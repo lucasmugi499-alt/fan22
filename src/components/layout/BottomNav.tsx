@@ -94,7 +94,7 @@ function MoreSheet({
         className="absolute inset-0 bg-black/40 motion-safe:animate-[fadeIn_var(--dur-micro)_ease-out]"
       />
       <div
-        className="absolute inset-x-0 bottom-0 rounded-t-[var(--radius-xl)] border-t border-border bg-surface-1 pb-safe shadow-e3 motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-standard)]"
+        className="absolute inset-x-0 bottom-0 rounded-t-[var(--radius-xl)] border-t border-border bg-surface-1 pb-safe shadow-e3 motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-fluid)]"
       >
         <div className="flex items-center justify-between px-[var(--gutter)] pt-4">
           <p className="text-sm font-semibold text-text-strong">More</p>

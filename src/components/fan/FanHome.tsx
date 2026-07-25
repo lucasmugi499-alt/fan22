@@ -14,6 +14,7 @@ import { RichStandings } from '@/components/premium/RichStandings';
 import { MatchCard } from '@/components/core/MatchCard';
 import { AthleteCard } from '@/components/core/EntityCards';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/EmptyState';
 import type { Match } from '@/types';
 
 function dayLabel(iso: string): string {
@@ -21,7 +22,7 @@ function dayLabel(iso: string): string {
 }
 
 export function FanHome() {
-  const { matches, teams, athletes, leagues, seasons, feedPosts, loading } = useGoalPlaceData();
+  const { matches, teams, athletes, leagues, seasons, feedPosts, loading, error, retry } = useGoalPlaceData();
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   const live = useMemo(() => matches.filter((m) => m.status === 'live'), [matches]);
@@ -51,6 +52,7 @@ export function FanHome() {
   }, [leagues, teams, matches, seasons]);
 
   if (loading) return <FanHomeSkeleton />;
+  if (error) return <ErrorState onRetry={retry} />;
 
   // Group the fixtures rail by day, broadcast-style.
   const byDay = new Map<string, Match[]>();

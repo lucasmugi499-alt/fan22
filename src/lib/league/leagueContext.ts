@@ -2,14 +2,17 @@ import type { League, Match, Team, UserProfile } from '@/types';
 import { isOfficialMatch } from '@/lib/status';
 
 /**
- * Resolves which league the current admin runs. Real accounts match by `adminUserIds`; the
- * demo league-admin profile is not wired to one, so it falls back to the league with the
- * most fixtures. UI/demo convenience only, never a grant of authority.
+ * Resolves which league the current admin runs, by `adminUserIds`.
+ *
+ * In demo mode only, an unassigned profile falls back to the busiest league so the desk has
+ * content. A real unassigned admin returns `null` instead, because dropping someone into
+ * another organisation's league desk would be worse than showing nothing.
  */
 export function resolveMyLeague(
   profile: UserProfile | null,
   leagues: League[],
-  matches: Match[]
+  matches: Match[],
+  isDemoMode = false
 ): League | null {
   if (leagues.length === 0) return null;
   if (profile) {
@@ -18,6 +21,7 @@ export function resolveMyLeague(
     );
     if (owned) return owned;
   }
+  if (!isDemoMode) return null;
   const count = new Map<string, number>();
   for (const m of matches) count.set(m.leagueId, (count.get(m.leagueId) ?? 0) + 1);
   return [...leagues].sort((a, b) => (count.get(b.id) ?? 0) - (count.get(a.id) ?? 0))[0];

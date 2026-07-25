@@ -19,10 +19,10 @@ function ugx(n: number): string {
 }
 
 export function LeagueReports() {
-  const { userProfile } = useAuth();
+  const { userProfile, isDemoMode } = useAuth();
   const { leagues, teams, athletes, matches, loading } = useGoalPlaceData();
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches), [userProfile, leagues, matches]);
+  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const stats = useMemo(() => {
     if (!league) return null;
     const lTeams = teamsInLeague(league.id, teams);

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CaretRight } from '@phosphor-icons/react/dist/ssr';
+import { bannerImage } from '@/lib/media';
 import type { FeedPost } from '@/types';
 
 const CATEGORY: Record<string, string> = {
@@ -28,8 +29,8 @@ export function NewsRow({ title, posts, badge, seeAllHref = '/feed' }: { title: 
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {posts.slice(0, 3).map((p) => {
-          const media = p.mediaUrl || p.mediaURL || `https://picsum.photos/seed/gp-news-${p.id}/480/300`;
           const cat = CATEGORY[p.type] ?? 'News';
+          const media = p.mediaUrl || p.mediaURL || bannerImage(p.id, cat);
           return (
             <Link key={p.id} href="/feed" className="group overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
               <div className="aspect-[16/10] w-full overflow-hidden bg-surface-3">

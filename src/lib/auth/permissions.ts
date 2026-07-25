@@ -159,13 +159,11 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
 
 export const PUBLIC_ROUTES = [
   '/',
-  '/about',
   '/how-it-works',
   '/verification',
   '/sponsors',
   '/pilot',
-  '/login',
-  '/register'
+  '/login'
 ];
 
 export function canAccessRoute(auth: AuthState, pathname: string): boolean {
