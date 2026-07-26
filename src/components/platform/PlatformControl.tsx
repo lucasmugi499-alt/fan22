@@ -12,7 +12,9 @@ import { STATE } from '@/lib/statusSystem';
 import { cn } from '@/lib/utils';
 
 export function PlatformControl() {
-  const { leagues, athletes, matches, reports, loading } = useGoalPlaceData();
+  const { leagues, athletes, matches, reports, loading } = useGoalPlaceData({
+    collections: ['leagues', 'athletes', 'matches', 'reports'],
+  });
 
   const approvals = useMemo(() => pendingApprovals(leagues, athletes), [leagues, athletes]);
   const reportsOpen = useMemo(() => openReports(reports), [reports]);

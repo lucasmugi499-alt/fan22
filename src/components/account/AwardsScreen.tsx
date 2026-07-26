@@ -3,13 +3,16 @@
 import { useMemo } from 'react';
 import { Trophy, SealCheck } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { DemoDataNote } from '@/components/ui/DemoDataNote';
 import { cn } from '@/lib/utils';
 
 export function AwardsScreen() {
-  const { athletes, loading } = useGoalPlaceData();
+  const { athletes, loading } = useGoalPlaceData({
+    collections: ['athletes'],
+    athleteRanking: 'points',
+    athleteLimit: 20,
+  });
   const ranked = useMemo(
     () => [...athletes].sort((a, b) => (b.goalPlacePoints ?? 0) - (a.goalPlacePoints ?? 0)).slice(0, 20),
     [athletes]

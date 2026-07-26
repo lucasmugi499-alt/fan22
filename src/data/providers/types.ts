@@ -78,6 +78,7 @@ export interface GoalPlaceDataProvider {
   getChallenges(): Promise<Challenge[]>;
   getChallengeById(id: string): Promise<Challenge | undefined>;
   getFeedPosts(): Promise<FeedPost[]>;
+  getLatestFeedPosts(limit?: number): Promise<FeedPost[]>;
   getFeedPostById(id: string): Promise<FeedPost | undefined>;
   getCommentsByPost(postId: string): Promise<Comment[]>;
   getWalletTransactionsByUser(userId: string): Promise<WalletTransaction[]>;
@@ -86,6 +87,7 @@ export interface GoalPlaceDataProvider {
   getVerifications(): Promise<Verification[]>;
   getStandingsByLeague(leagueId: string): Promise<StandingRow[]>;
   getTopSupportedAthletes(limit?: number): Promise<Athlete[]>;
+  getTopPointsAthletes(limit?: number): Promise<Athlete[]>;
   getActiveChallenges(): Promise<Challenge[]>;
   getVerifiedMatches(): Promise<Match[]>;
   createSupportPledge(data: CreateSupportPledgeInput): Promise<DataWriteResult>;

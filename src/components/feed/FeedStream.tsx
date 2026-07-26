@@ -9,7 +9,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export function FeedStream() {
-  const { feedPosts, loading } = useGoalPlaceData();
+  const { feedPosts, loading } = useGoalPlaceData({
+    collections: ['feedPosts'],
+    feedLimit: 50,
+  });
   const posts = useMemo(
     () =>
       [...feedPosts]

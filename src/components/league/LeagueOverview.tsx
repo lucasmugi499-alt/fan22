@@ -18,7 +18,9 @@ import { cn } from '@/lib/utils';
 
 export function LeagueOverview() {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, seasons, loading, error, retry } = useGoalPlaceData();
+  const { leagues, teams, matches, seasons, loading, error, retry } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'matches', 'seasons'],
+  });
 
   const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
 

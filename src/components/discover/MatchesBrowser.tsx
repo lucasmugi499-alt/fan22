@@ -15,7 +15,9 @@ const TABS = ['Live', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function MatchesBrowser() {
-  const { matches, teams, loading } = useGoalPlaceData();
+  const { matches, teams, loading } = useGoalPlaceData({
+    collections: ['matches', 'teams'],
+  });
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   const buckets = useMemo(() => {

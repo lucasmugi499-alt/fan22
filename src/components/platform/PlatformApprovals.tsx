@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/Button';
 import { STATE } from '@/lib/statusSystem';
 
 export function PlatformApprovals() {
-  const { leagues, athletes, loading } = useGoalPlaceData();
+  const { leagues, athletes, loading } = useGoalPlaceData({
+    collections: ['leagues', 'athletes'],
+  });
   const items = useMemo(() => pendingApprovals(leagues, athletes), [leagues, athletes]);
   const [active, setActive] = useState<ApprovalItem | null>(null);
 

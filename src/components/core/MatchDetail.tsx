@@ -38,7 +38,9 @@ const EVENT_META: Record<string, { icon: IconComponent; label: string; scoring?:
 };
 
 export function MatchDetail({ matchId }: { matchId: string }) {
-  const { matches, teams, athletes, loading } = useGoalPlaceData();
+  const { matches, teams, athletes, loading } = useGoalPlaceData({
+    collections: ['matches', 'teams', 'athletes'],
+  });
   const match = useMemo(() => matches.find((m) => m.id === matchId), [matches, matchId]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const athleteById = useMemo(() => new Map(athletes.map((a) => [a.id, a])), [athletes]);

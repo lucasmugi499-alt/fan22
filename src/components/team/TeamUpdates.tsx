@@ -13,7 +13,9 @@ import { Skeleton } from '@/components/ui/Skeleton';
 
 export function TeamUpdates() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, feedPosts, loading } = useGoalPlaceData();
+  const { teams, matches, feedPosts, loading } = useGoalPlaceData({
+    collections: ['teams', 'matches', 'feedPosts'],
+  });
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const posts = useMemo(() => {

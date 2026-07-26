@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export function TeamsDiscover() {
-  const { teams, loading } = useGoalPlaceData();
+  const { teams, loading } = useGoalPlaceData({ collections: ['teams'] });
   const list = useMemo(() => [...teams].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0)), [teams]);
 
   if (loading) {

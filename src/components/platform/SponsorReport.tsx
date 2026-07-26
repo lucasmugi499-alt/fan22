@@ -20,7 +20,9 @@ function ugx(n: number): string {
  * activity, which is the entire reason a sponsor can trust the reach numbers.
  */
 export function SponsorReport() {
-  const { teams, athletes, matches, loading } = useGoalPlaceData();
+  const { teams, athletes, matches, loading } = useGoalPlaceData({
+    collections: ['teams', 'athletes', 'matches'],
+  });
   const data = useMemo(() => {
     const played = matches.filter((m) => m.status === 'completed');
     const official = played.filter(isOfficialMatch).length;

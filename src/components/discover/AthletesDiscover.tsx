@@ -13,7 +13,7 @@ const SPORTS = ['All', 'Football', 'Basketball', 'Rugby'] as const;
 type SportFilter = (typeof SPORTS)[number];
 
 export function AthletesDiscover() {
-  const { athletes, loading } = useGoalPlaceData();
+  const { athletes, loading } = useGoalPlaceData({ collections: ['athletes'] });
   const [sport, setSport] = useState<SportFilter>('All');
 
   const list = useMemo(() => {

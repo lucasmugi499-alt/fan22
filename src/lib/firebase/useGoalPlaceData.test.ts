@@ -13,6 +13,7 @@ function providerWithCalls() {
     getMatches: vi.fn().mockResolvedValue([]),
     getChallenges: vi.fn().mockResolvedValue([]),
     getFeedPosts: vi.fn().mockResolvedValue([]),
+    getLatestFeedPosts: vi.fn().mockResolvedValue([]),
     getReports: vi.fn().mockRejectedValue(new Error('restricted reports should not load')),
     getVerifications: vi.fn().mockRejectedValue(new Error('restricted verifications should not load')),
     getSports: empty,
@@ -31,6 +32,7 @@ function providerWithCalls() {
     getNotificationsByUser: empty,
     getStandingsByLeague: empty,
     getTopSupportedAthletes: empty,
+    getTopPointsAthletes: empty,
     getActiveChallenges: empty,
     getVerifiedMatches: empty,
     createSupportPledge: vi.fn(),
@@ -68,5 +70,52 @@ describe('loadGoalPlaceData', () => {
 
     expect(provider.getReports).toHaveBeenCalledOnce();
     expect(provider.getVerifications).toHaveBeenCalledOnce();
+  });
+
+  it('requests only the collections selected by a screen', async () => {
+    const provider = providerWithCalls();
+
+    await loadGoalPlaceData(provider, {
+      role: 'fan',
+      collections: ['matches', 'teams'],
+    });
+
+    expect(provider.getMatches).toHaveBeenCalledOnce();
+    expect(provider.getTeams).toHaveBeenCalledOnce();
+    expect(provider.getAthletes).not.toHaveBeenCalled();
+    expect(provider.getLeagues).not.toHaveBeenCalled();
+    expect(provider.getSeasons).not.toHaveBeenCalled();
+    expect(provider.getChallenges).not.toHaveBeenCalled();
+    expect(provider.getFeedPosts).not.toHaveBeenCalled();
+  });
+
+  it('does not request an unselected platform collection for an admin', async () => {
+    const provider = providerWithCalls();
+    vi.mocked(provider.getReports).mockResolvedValueOnce([]);
+
+    await loadGoalPlaceData(provider, {
+      role: 'platform_admin',
+      collections: ['reports'],
+    });
+
+    expect(provider.getReports).toHaveBeenCalledOnce();
+    expect(provider.getVerifications).not.toHaveBeenCalled();
+  });
+
+  it('uses limited ranking and feed queries when a screen requests them', async () => {
+    const provider = providerWithCalls();
+
+    await loadGoalPlaceData(provider, {
+      role: 'fan',
+      collections: ['athletes', 'feedPosts'],
+      athleteRanking: 'support',
+      athleteLimit: 8,
+      feedLimit: 12,
+    });
+
+    expect(provider.getTopSupportedAthletes).toHaveBeenCalledWith(8);
+    expect(provider.getLatestFeedPosts).toHaveBeenCalledWith(12);
+    expect(provider.getAthletes).not.toHaveBeenCalled();
+    expect(provider.getFeedPosts).not.toHaveBeenCalled();
   });
 });

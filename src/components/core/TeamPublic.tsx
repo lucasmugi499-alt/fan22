@@ -26,7 +26,9 @@ function ugx(n: number): string {
 }
 
 export function TeamPublic({ teamId }: { teamId: string }) {
-  const { teams, athletes, matches, leagues, seasons, feedPosts, loading } = useGoalPlaceData();
+  const { teams, athletes, matches, leagues, seasons, feedPosts, loading } = useGoalPlaceData({
+    collections: ['teams', 'athletes', 'matches', 'leagues', 'seasons', 'feedPosts'],
+  });
   const team = useMemo(() => teams.find((t) => t.id === teamId), [teams, teamId]);
   const league = useMemo(() => leagues.find((l) => l.id === team?.leagueId), [leagues, team]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);

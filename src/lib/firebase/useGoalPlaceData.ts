@@ -165,25 +165,57 @@ const initialData = {
   verifications: [] as Verification[],
 };
 
+export type GoalPlaceDataCollection = keyof typeof initialData;
+
+export const ALL_GOALPLACE_COLLECTIONS = Object.freeze(
+  Object.keys(initialData) as GoalPlaceDataCollection[]
+);
+
 export function canReadPlatformCollections(role?: AppRole | null) {
   return role === 'platform_admin' || role === 'super_admin';
 }
 
 export async function loadGoalPlaceData(
   provider: GoalPlaceDataProvider = dataProvider,
-  { role }: { role?: AppRole | null } = {}
+  {
+    role,
+    collections = ALL_GOALPLACE_COLLECTIONS,
+    athleteRanking,
+    athleteLimit,
+    feedLimit,
+  }: {
+    role?: AppRole | null;
+    collections?: readonly GoalPlaceDataCollection[];
+    athleteRanking?: 'support' | 'points';
+    athleteLimit?: number;
+    feedLimit?: number;
+  } = {}
 ) {
+  const requested = new Set(collections);
+  const shouldLoad = (collection: GoalPlaceDataCollection) => requested.has(collection);
   const shouldLoadPlatformCollections = canReadPlatformCollections(role);
+  const loadAthletes = () => {
+    if (!shouldLoad('athletes')) return Promise.resolve([] as Athlete[]);
+    if (athleteRanking === 'support') return provider.getTopSupportedAthletes(athleteLimit);
+    if (athleteRanking === 'points') return provider.getTopPointsAthletes(athleteLimit);
+    return provider.getAthletes();
+  };
   const [athletes, teams, leagues, seasons, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
-    provider.getAthletes(),
-    provider.getTeams(),
-    provider.getLeagues(),
-    provider.getSeasons(),
-    provider.getMatches(),
-    provider.getChallenges(),
-    provider.getFeedPosts(),
-    shouldLoadPlatformCollections ? provider.getReports() : Promise.resolve([] as Report[]),
-    shouldLoadPlatformCollections ? provider.getVerifications() : Promise.resolve([] as Verification[]),
+    loadAthletes(),
+    shouldLoad('teams') ? provider.getTeams() : Promise.resolve([] as Team[]),
+    shouldLoad('leagues') ? provider.getLeagues() : Promise.resolve([] as League[]),
+    shouldLoad('seasons') ? provider.getSeasons() : Promise.resolve([] as Season[]),
+    shouldLoad('matches') ? provider.getMatches() : Promise.resolve([] as Match[]),
+    shouldLoad('challenges') ? provider.getChallenges() : Promise.resolve([] as Challenge[]),
+    shouldLoad('feedPosts')
+      ? feedLimit
+        ? provider.getLatestFeedPosts(feedLimit)
+        : provider.getFeedPosts()
+      : Promise.resolve([] as FeedPost[]),
+    shouldLoad('reports') && shouldLoadPlatformCollections ? provider.getReports() : Promise.resolve([] as Report[]),
+    shouldLoad('verifications') && shouldLoadPlatformCollections
+      ? provider.getVerifications()
+      : Promise.resolve([] as Verification[]),
   ]);
 
   return {
@@ -199,8 +231,23 @@ export async function loadGoalPlaceData(
   };
 }
 
-export function useGoalPlaceData() {
+export function useGoalPlaceData({
+  collections = ALL_GOALPLACE_COLLECTIONS,
+  athleteRanking,
+  athleteLimit,
+  feedLimit,
+}: {
+  collections?: readonly GoalPlaceDataCollection[];
+  athleteRanking?: 'support' | 'points';
+  athleteLimit?: number;
+  feedLimit?: number;
+} = {}) {
   const { role } = useAuth();
+  const collectionKey = [...collections].sort().join(',');
+  const selectedCollections = useMemo(
+    () => collectionKey.split(',').filter(Boolean) as GoalPlaceDataCollection[],
+    [collectionKey]
+  );
   const [items, setItems] = useState(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -216,7 +263,13 @@ export function useGoalPlaceData() {
       setLoading(true);
       setError(null);
       try {
-        const nextItems = await loadGoalPlaceData(dataProvider, { role });
+        const nextItems = await loadGoalPlaceData(dataProvider, {
+          role,
+          collections: selectedCollections,
+          athleteRanking,
+          athleteLimit,
+          feedLimit,
+        });
         if (cancelled) return;
         setItems(nextItems);
       } catch (cause) {
@@ -237,7 +290,7 @@ export function useGoalPlaceData() {
     return () => {
       cancelled = true;
     };
-  }, [attempt, role]);
+  }, [attempt, role, selectedCollections, athleteRanking, athleteLimit, feedLimit]);
 
   const store = useAppStore();
 

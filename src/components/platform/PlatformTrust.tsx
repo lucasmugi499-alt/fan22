@@ -17,7 +17,7 @@ import type { Report } from '@/types';
 const SEVERITY_STATE = { Critical: STATE.disputed, High: STATE.disputed, Medium: STATE.overdue, Low: STATE.pending } as const;
 
 export function PlatformTrust() {
-  const { reports, loading } = useGoalPlaceData();
+  const { reports, loading } = useGoalPlaceData({ collections: ['reports'] });
   const list = useMemo(() => openReports(reports), [reports]);
   const [active, setActive] = useState<Report | null>(null);
 

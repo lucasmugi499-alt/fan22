@@ -16,7 +16,7 @@ export function WalletScreen() {
   const { userProfile } = useAuth();
   const userId = userProfile?.id ?? userProfile?.uid ?? '';
   const { items, loading } = useUserWalletTransactions(userProfile?.id ?? userProfile?.uid);
-  const { athletes } = useGoalPlaceData();
+  const { athletes } = useGoalPlaceData({ collections: ['athletes'] });
   const { demoPledges, demoWalletSpent } = useAppStore();
 
   const balance = (userProfile?.walletBalance ?? 0) - (demoWalletSpent[userId] ?? 0);

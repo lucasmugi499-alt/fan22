@@ -17,7 +17,9 @@ function ugx(n: number): string {
 }
 
 export function PlatformReports() {
-  const { leagues, teams, athletes, matches, loading } = useGoalPlaceData();
+  const { leagues, teams, athletes, matches, loading } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'athletes', 'matches'],
+  });
   const stats = useMemo(() => {
     const played = matches.filter((m) => m.status === 'completed');
     const official = played.filter(isOfficialMatch).length;

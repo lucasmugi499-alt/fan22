@@ -15,7 +15,9 @@ import { normalizeVerificationStatus } from '@/lib/status';
 
 export function TeamRoster() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, athletes, matches, loading } = useGoalPlaceData();
+  const { teams, athletes, matches, loading } = useGoalPlaceData({
+    collections: ['teams', 'athletes', 'matches'],
+  });
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const roster = useMemo(() => (team ? rosterForTeam(team.id, athletes) : []), [team, athletes]);

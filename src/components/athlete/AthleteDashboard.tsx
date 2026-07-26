@@ -24,7 +24,9 @@ function ugx(n: number): string {
 
 export function AthleteDashboard() {
   const { userProfile, isDemoMode } = useAuth();
-  const { athletes, teams, challenges, loading } = useGoalPlaceData();
+  const { athletes, teams, challenges, loading } = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'challenges'],
+  });
 
   const athlete = useMemo(() => resolveMyAthlete(userProfile, athletes, isDemoMode), [userProfile, athletes, isDemoMode]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);

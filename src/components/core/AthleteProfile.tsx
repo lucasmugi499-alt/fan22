@@ -25,7 +25,9 @@ function ugx(n: number): string {
 }
 
 export function AthleteProfile({ athleteId }: { athleteId: string }) {
-  const { athletes, teams, matches, feedPosts, loading } = useGoalPlaceData();
+  const { athletes, teams, matches, feedPosts, loading } = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'matches', 'feedPosts'],
+  });
   const { requireAuth } = useAuthGate();
   const [supporting, setSupporting] = useState(false);
   const athlete = useMemo(() => athletes.find((a) => a.id === athleteId), [athletes, athleteId]);

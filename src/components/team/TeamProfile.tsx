@@ -23,7 +23,9 @@ function ugx(n: number): string {
 
 export function TeamProfile() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, athletes, loading } = useGoalPlaceData();
+  const { teams, matches, athletes, loading } = useGoalPlaceData({
+    collections: ['teams', 'matches', 'athletes'],
+  });
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const rosterCount = useMemo(

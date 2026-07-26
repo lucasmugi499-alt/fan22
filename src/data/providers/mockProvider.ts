@@ -113,6 +113,11 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getFeedPosts() {
     return feedPosts;
   },
+  async getLatestFeedPosts(limit = 50) {
+    return [...feedPosts]
+      .sort((a, b) => +new Date(b.createdAt || b.timestamp || 0) - +new Date(a.createdAt || a.timestamp || 0))
+      .slice(0, limit);
+  },
   async getFeedPostById(idValue) {
     return feedPosts.find((post) => post.id === idValue);
   },
@@ -136,6 +141,11 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getTopSupportedAthletes(limit = 10) {
     return getTopSupportedAthletes(limit);
+  },
+  async getTopPointsAthletes(limit = 20) {
+    return [...athletes]
+      .sort((a, b) => (b.goalPlacePoints ?? 0) - (a.goalPlacePoints ?? 0))
+      .slice(0, limit);
   },
   async getActiveChallenges() {
     return getActiveChallenges();

@@ -22,7 +22,12 @@ function dayLabel(iso: string): string {
 }
 
 export function FanHome() {
-  const { matches, teams, athletes, leagues, seasons, feedPosts, loading, error, retry } = useGoalPlaceData();
+  const { matches, teams, athletes, leagues, seasons, feedPosts, loading, error, retry } = useGoalPlaceData({
+    collections: ['matches', 'teams', 'athletes', 'leagues', 'seasons', 'feedPosts'],
+    athleteRanking: 'support',
+    athleteLimit: 8,
+    feedLimit: 12,
+  });
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   const live = useMemo(() => matches.filter((m) => m.status === 'live'), [matches]);

@@ -22,7 +22,9 @@ const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
 };
 
 export function LeaguePublic({ leagueId }: { leagueId: string }) {
-  const { leagues, teams, matches, seasons, feedPosts, loading } = useGoalPlaceData();
+  const { leagues, teams, matches, seasons, feedPosts, loading } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'matches', 'seasons', 'feedPosts'],
+  });
   const league = useMemo(() => leagues.find((l) => l.id === leagueId), [leagues, leagueId]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const lTeams = useMemo(() => teamsInLeague(leagueId, teams), [teams, leagueId]);

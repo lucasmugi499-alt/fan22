@@ -18,7 +18,9 @@ type Tab = (typeof TABS)[number];
 
 export function LeagueTeams() {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, seasons, loading } = useGoalPlaceData();
+  const { leagues, teams, matches, seasons, loading } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'matches', 'seasons'],
+  });
   const [tab, setTab] = useState<Tab>('Standings');
 
   const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);

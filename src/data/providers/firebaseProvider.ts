@@ -1,6 +1,18 @@
 'use client';
 
-import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  QueryConstraint,
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  limit as limitQuery,
+  orderBy,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { isFirebaseConfigured, requireFirebaseClient } from '@/lib/firebase/client';
 import { FirestoreCollectionName, getCollectionDocs } from '@/lib/firebase/firestore';
 import { mockProvider } from './mockProvider';
@@ -14,7 +26,16 @@ import {
   GoalPlaceDataProvider,
   SaveTargetType,
 } from './types';
-import { Match, Report, Team, Verification, VerificationStatus } from '@/types';
+import {
+  Comment,
+  Match,
+  Notification,
+  Report,
+  Team,
+  Verification,
+  VerificationStatus,
+  WalletTransaction,
+} from '@/types';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 
 function missingFirebase<T>(fallback: T): T {
@@ -24,9 +45,9 @@ function missingFirebase<T>(fallback: T): T {
   return fallback;
 }
 
-async function readCollection<T>(name: FirestoreCollectionName) {
+async function readCollection<T>(name: FirestoreCollectionName, constraints: QueryConstraint[] = []) {
   if (!isFirebaseConfigured) return missingFirebase([] as T[]);
-  return getCollectionDocs<T>(name);
+  return getCollectionDocs<T>(name, constraints);
 }
 
 async function readDoc<T>(collectionName: string, id: string) {
@@ -34,9 +55,7 @@ async function readDoc<T>(collectionName: string, id: string) {
   const { db } = requireFirebaseClient();
   const snapshot = await getDoc(doc(db, collectionName, id));
   if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as T;
-
-  const docs = await readCollection<T & { id?: string }>(collectionName as FirestoreCollectionName);
-  return docs.find((item) => item.id === id) as T | undefined;
+  return undefined;
 }
 
 async function writeResult(id: string, message?: string): Promise<DataWriteResult> {
@@ -103,23 +122,27 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async getFeedPosts() {
     return isFirebaseConfigured ? readCollection('feedPosts') : mockProvider.getFeedPosts();
   },
+  async getLatestFeedPosts(limit = 50) {
+    if (!isFirebaseConfigured) return mockProvider.getLatestFeedPosts(limit);
+    return readCollection('feedPosts', [orderBy('createdAt', 'desc'), limitQuery(limit)]);
+  },
   async getFeedPostById(id) {
     return isFirebaseConfigured ? readDoc('feedPosts', id) : mockProvider.getFeedPostById(id);
   },
   async getCommentsByPost(postId) {
     if (!isFirebaseConfigured) return mockProvider.getCommentsByPost(postId);
-    const comments = await readCollection<Awaited<ReturnType<typeof mockProvider.getCommentsByPost>>[number]>('comments');
-    return comments.filter((comment) => comment.postId === postId);
+    return readCollection<Comment>('comments', [where('postId', '==', postId)]);
   },
   async getWalletTransactionsByUser(userId) {
     if (!isFirebaseConfigured) return mockProvider.getWalletTransactionsByUser(userId);
-    const transactions = await readCollection<Awaited<ReturnType<typeof mockProvider.getWalletTransactionsByUser>>[number]>('walletTransactions');
-    return transactions.filter((transaction) => transaction.userId === userId);
+    return readCollection<WalletTransaction>(
+      'walletTransactions',
+      [where('userId', '==', userId)]
+    );
   },
   async getNotificationsByUser(userId) {
     if (!isFirebaseConfigured) return mockProvider.getNotificationsByUser(userId);
-    const notifications = await readCollection<Awaited<ReturnType<typeof mockProvider.getNotificationsByUser>>[number]>('notifications');
-    return notifications.filter((notification) => notification.userId === userId);
+    return readCollection<Notification>('notifications', [where('userId', '==', userId)]);
   },
   async getReports() {
     return isFirebaseConfigured ? readCollection<Report>('reports') : mockProvider.getReports();
@@ -129,20 +152,27 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async getStandingsByLeague(leagueId) {
     if (!isFirebaseConfigured) return mockProvider.getStandingsByLeague(leagueId);
-    const [teams, matches] = await Promise.all([this.getTeams(), this.getMatches()]);
+    const [teams, matches] = await Promise.all([
+      readCollection<Team>('teams', [where('leagueId', '==', leagueId)]),
+      readCollection<Match>('matches', [where('leagueId', '==', leagueId)]),
+    ]);
     return buildStandings(leagueId, teams, matches);
   },
   async getTopSupportedAthletes(limit = 10) {
-    const athletes = await this.getAthletes();
-    return [...athletes].sort((a, b) => b.totalSupport - a.totalSupport).slice(0, limit);
+    if (!isFirebaseConfigured) return mockProvider.getTopSupportedAthletes(limit);
+    return readCollection('athletes', [orderBy('totalSupport', 'desc'), limitQuery(limit)]);
+  },
+  async getTopPointsAthletes(limit = 20) {
+    if (!isFirebaseConfigured) return mockProvider.getTopPointsAthletes(limit);
+    return readCollection('athletes', [orderBy('goalPlacePoints', 'desc'), limitQuery(limit)]);
   },
   async getActiveChallenges() {
-    const challenges = await this.getChallenges();
-    return challenges.filter((challenge) => ['open', 'active'].includes(String(challenge.status).toLowerCase()));
+    if (!isFirebaseConfigured) return mockProvider.getActiveChallenges();
+    return readCollection('challenges', [where('status', 'in', ['open', 'active'])]);
   },
   async getVerifiedMatches() {
-    const matches = await this.getMatches();
-    return matches.filter((match) => String(match.verificationStatus).toLowerCase() === 'verified');
+    if (!isFirebaseConfigured) return mockProvider.getVerifiedMatches();
+    return readCollection('matches', [where('verificationStatus', '==', 'verified')]);
   },
   async createSupportPledge(data: CreateSupportPledgeInput) {
     if (!isFirebaseConfigured) return mockProvider.createSupportPledge(data);

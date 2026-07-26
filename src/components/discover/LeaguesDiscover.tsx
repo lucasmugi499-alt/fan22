@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export function LeaguesDiscover() {
-  const { leagues, loading } = useGoalPlaceData();
+  const { leagues, loading } = useGoalPlaceData({ collections: ['leagues'] });
   const list = useMemo(() => [...leagues].sort((a, b) => (b.goalPlaceIndex ?? 0) - (a.goalPlaceIndex ?? 0)), [leagues]);
 
   if (loading) {

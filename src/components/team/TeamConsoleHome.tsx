@@ -62,7 +62,9 @@ const FORM_STYLE: Record<FormResult, string> = {
 
 export function TeamConsoleHome() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, athletes, loading, error, retry } = useGoalPlaceData();
+  const { teams, matches, athletes, loading, error, retry } = useGoalPlaceData({
+    collections: ['teams', 'matches', 'athletes'],
+  });
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);

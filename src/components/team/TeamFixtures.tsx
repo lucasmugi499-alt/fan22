@@ -23,7 +23,9 @@ type Tab = (typeof TABS)[number];
 
 export function TeamFixtures() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, loading } = useGoalPlaceData();
+  const { teams, matches, loading } = useGoalPlaceData({
+    collections: ['teams', 'matches'],
+  });
   const [tab, setTab] = useState<Tab>('Needs action');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 

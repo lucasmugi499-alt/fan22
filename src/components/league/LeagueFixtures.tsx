@@ -17,7 +17,9 @@ type Tab = (typeof TABS)[number];
 
 export function LeagueFixtures() {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, loading } = useGoalPlaceData();
+  const { leagues, teams, matches, loading } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'matches'],
+  });
   const [tab, setTab] = useState<Tab>('Upcoming');
 
   const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
