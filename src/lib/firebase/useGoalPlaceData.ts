@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { dataMode, dataProvider } from '@/data/dataProvider';
+import { GoalPlaceDataProvider } from '@/data/providers/types';
 import { mockProvider } from '@/data/providers/mockProvider';
 import {
+  AppRole,
   Athlete,
   Challenge,
   FeedPost,
@@ -17,6 +19,7 @@ import {
   Verification,
   WalletTransaction,
 } from '@/types';
+import { useAuth } from '@/context/AuthProvider';
 import { useAppStore } from '@/lib/store';
 import {
   normalizeChallengeStatus,
@@ -162,7 +165,15 @@ const initialData = {
   verifications: [] as Verification[],
 };
 
-async function loadGoalPlaceData(provider = dataProvider) {
+export function canReadPlatformCollections(role?: AppRole | null) {
+  return role === 'platform_admin' || role === 'super_admin';
+}
+
+export async function loadGoalPlaceData(
+  provider: GoalPlaceDataProvider = dataProvider,
+  { role }: { role?: AppRole | null } = {}
+) {
+  const shouldLoadPlatformCollections = canReadPlatformCollections(role);
   const [athletes, teams, leagues, seasons, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
     provider.getAthletes(),
     provider.getTeams(),
@@ -171,8 +182,8 @@ async function loadGoalPlaceData(provider = dataProvider) {
     provider.getMatches(),
     provider.getChallenges(),
     provider.getFeedPosts(),
-    provider.getReports(),
-    provider.getVerifications(),
+    shouldLoadPlatformCollections ? provider.getReports() : Promise.resolve([] as Report[]),
+    shouldLoadPlatformCollections ? provider.getVerifications() : Promise.resolve([] as Verification[]),
   ]);
 
   return {
@@ -189,6 +200,7 @@ async function loadGoalPlaceData(provider = dataProvider) {
 }
 
 export function useGoalPlaceData() {
+  const { role } = useAuth();
   const [items, setItems] = useState(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -204,7 +216,7 @@ export function useGoalPlaceData() {
       setLoading(true);
       setError(null);
       try {
-        const nextItems = await loadGoalPlaceData();
+        const nextItems = await loadGoalPlaceData(dataProvider, { role });
         if (cancelled) return;
         setItems(nextItems);
       } catch (cause) {
@@ -225,7 +237,7 @@ export function useGoalPlaceData() {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, role]);
 
   const store = useAppStore();
 

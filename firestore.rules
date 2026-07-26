@@ -80,6 +80,14 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    match /seasons/{seasonId} {
+      allow read: if true;
+      allow create: if canManageLeagueById(request.resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        request.resource.data.leagueId == resource.data.leagueId;
+      allow delete: if isSuperAdmin();
+    }
+
     match /matches/{matchId} {
       allow read: if true;
       allow create: if canManageLeagueById(request.resource.data.leagueId);
