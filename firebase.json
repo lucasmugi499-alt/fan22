@@ -20,6 +20,11 @@
       "region": "us-central1"
     }
   },
+  "auth": {
+    "providers": {
+      "emailPassword": true
+    }
+  },
   "emulators": {
     "auth": {
       "port": 9099
