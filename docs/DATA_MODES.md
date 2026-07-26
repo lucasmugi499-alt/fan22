@@ -90,7 +90,10 @@ pnpm export:mock
 Back up Firestore collections:
 
 ```bash
-pnpm backup:firestore
+pnpm backup:firestore -- --project manifest-quasar-479416-s7 --database fg256 --env production
 ```
+
+Backups require an explicit project, database and environment. For staging, pass the staging
+service-account key with `--credentials /secure/path/staging-sa.json`.
 
 Seeded collections: `users`, `sports`, `leagues`, `teams`, `athletes`, `matches`, `challenges`, `supportPledges`, `walletTransactions`, `feedPosts`, `comments`, `sponsors`, `awards`, `verifications`, `reports`, and `notifications`.

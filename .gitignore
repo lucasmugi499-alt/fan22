@@ -51,6 +51,7 @@ next-env.d.ts
 
 # Reset inventories contain account emails and UIDs; never commit them.
 reports/
+backups/
 auth-backup*.json
 *-sa.json
 service-account*.json

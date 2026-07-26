@@ -227,12 +227,13 @@ Done:
 
 Outstanding:
 
-1. **Install a JDK and run the rules suite.** The rules have still never been compiled.
+1. **Install a JDK and run the rules suite.** The pending rules matrix still needs emulator
+   verification before promotion.
    `brew install --cask temurin`, then `npm run test:rules`.
 2. Reminder dispatch at 24h/48h. `dueReminders()` computes what is owed; nothing sends yet.
 3. UI: submit / confirm / dispute / league resolution, and the correction request form.
-4. A `staging` alias in `.firebaserc`. There is currently only `default`, pointing at the
-   production project, so `firebase deploy --only firestore:rules` goes straight to prod.
+4. Run the full Team Admin A -> Team Admin B -> finalizer -> standings workflow in staging,
+   including duplicate-trigger and stale-version cases.
 
 ### Deploy notes
 
@@ -244,6 +245,5 @@ this project. It would deploy cleanly, report healthy, and never fire.
 ```bash
 npm run functions:build      # compile, including the shared pure logic
 npm run test:rules           # needs a JDK
-firebase deploy --only functions
-firebase deploy --only firestore:rules   # PRODUCTION — verify with the emulator first
+GOALPLACE_STAGING_PROJECT=studio-534174814-9df36 npm run deploy:staging
 ```

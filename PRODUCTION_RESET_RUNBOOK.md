@@ -31,7 +31,8 @@ run when every admin account would be deleted.
 
 ## 1. Backup
 
-- [ ] Firestore backup taken: `npm run backup:firestore`
+- [ ] Firestore backup taken:
+      `npm run backup:firestore -- --project manifest-quasar-479416-s7 --database fg256 --env production`
 - [ ] Backup file location recorded here: `____________________`
 - [ ] Auth user list exported:
       `npx firebase auth:export auth-backup.json --project manifest-quasar-479416-s7`
@@ -40,6 +41,9 @@ run when every admin account would be deleted.
 
 Because production contains only fictional data, the backup is a safety net rather than a
 record of real user activity. Take it anyway.
+
+The backup script uses the same project, database, environment and credential-mismatch guards
+as the cleanup scripts, and writes to ignored `backups/firestore/<env>/...` paths.
 
 ---
 
@@ -72,8 +76,9 @@ Do not continue until every box above is ticked.
 
 ## 3. Staging rehearsal (blocking)
 
-- [ ] Staging Firebase project created, with a **named** `fg256` database
-- [ ] `.firebaserc` `staging` alias replaced (currently `REPLACE-WITH-STAGING-PROJECT-ID`)
+- [x] Staging Firebase project created, with a **named** `fg256` database:
+      `studio-534174814-9df36`
+- [x] `.firebaserc` `staging` alias replaced
 - [ ] Staging service-account key downloaded to a path outside the repo
 - [ ] Preview run against staging
 - [ ] Execute run against staging with `RESET-GOALPLACE-STAGING`
@@ -81,14 +86,17 @@ Do not continue until every box above is ticked.
 - [ ] `POST_RESET_QA.md` passes in staging
 
 ```bash
-npm run clean:preview -- --project <STAGING_ID> --database fg256 --env staging \
+npm run clean:preview -- --project studio-534174814-9df36 --database fg256 --env staging \
   --credentials /secure/path/staging-sa.json
 
-npm run clean:execute -- --project <STAGING_ID> --database fg256 --env staging \
+npm run clean:execute -- --project studio-534174814-9df36 --database fg256 --env staging \
   --credentials /secure/path/staging-sa.json \
   --preserve <STAGING_OWNER_UID> \
   --confirm RESET-GOALPLACE-STAGING
 ```
+
+Verified safety check: running the staging preview without `--credentials` is refused because
+`.env.local` contains production Admin credentials.
 
 ---
 

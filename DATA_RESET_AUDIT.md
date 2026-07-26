@@ -199,9 +199,11 @@ The reset removes **application records and obsolete accounts only**.
 
 ## 7. Required sequence (blocking order)
 
-1. Back up production Firestore (`npm run backup:firestore`) and export the Auth user list.
+1. Back up production Firestore
+   (`npm run backup:firestore -- --project manifest-quasar-479416-s7 --database fg256 --env production`)
+   and export the Auth user list.
 2. Create a staging Firebase project with a named `fg256` database; set the `staging` alias in
-   `.firebaserc` (currently the placeholder `REPLACE-WITH-STAGING-PROJECT-ID`).
+   `.firebaserc`. Done on 2026-07-26: `studio-534174814-9df36` with database `fg256`.
 3. **Create the real owner account and verify sign-in, `/admin` access and sign-out.**
    Blocking: no real admin exists today.
 4. Rehearse the full reset and rebuild in staging.
@@ -218,7 +220,7 @@ every admin account would be deleted.
 
 | Risk | Mitigation |
 |---|---|
-| Ambient production credentials in `.env.local` | Scripts require `--project` and verify the credential's project matches |
+| Ambient production credentials in `.env.local` | Cleanup, owner and backup scripts require `--project` and verify the credential's project matches |
 | Reset run against production believing it is staging | `.firebaserc` alias map must agree with `--env`; refusal is tested |
 | Typo in project ID hitting an unrelated project | Unknown projects are refused outright |
 | Incomplete collection list orphaning data | Collections discovered at run time, deletion is recursive |

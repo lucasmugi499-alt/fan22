@@ -1,12 +1,27 @@
 # STAGING_SETUP
 
-Staging must exist before production is touched. The `staging` alias in `.firebaserc` is
-currently the placeholder `REPLACE-WITH-STAGING-PROJECT-ID`, and the cleanup guards ignore that
-placeholder so it can never be targeted by accident.
+Staging must exist before production is touched.
 
-These steps need your Google account and billing, so they are yours to run.
+Status on 2026-07-26:
+
+- Project exists: `studio-534174814-9df36`
+- Named database exists: `fg256` in `nam5`
+- `.firebaserc` points `staging` at `studio-534174814-9df36`
+- Staging Web app exists: `1:1022620974291:web:a492881a24b43e450fe826`
+- Safety guard verified: a staging preview using the production Admin credentials in
+  `.env.local` is refused with a credential mismatch
+
+Still needed before any staging reset rehearsal:
+
+- Download a staging Admin service-account key to a path outside the repository
+- Verify Email/Password Authentication is enabled in the staging console
+- Verify or create the staging Storage bucket
+- Run a staging preview with the staging service-account key
+- Create and verify a staging owner account, then rehearse the reset
 
 ## 1. Create the project
+
+Done: `studio-534174814-9df36`.
 
 ```bash
 npx firebase projects:create goalplace256-staging --display-name "GoalPlace256 Staging"
@@ -18,6 +33,12 @@ you requested if that ID is taken.
 ## 2. Create the named database
 
 The database must be named `fg256`, not `(default)`, to match production.
+
+Done and verified:
+
+```text
+projects/studio-534174814-9df36/databases/fg256
+```
 
 ```bash
 npx firebase firestore:databases:create fg256 \
@@ -33,14 +54,16 @@ In the Firebase console for the staging project:
 - Storage → create a bucket
 - Firestore → confirm `fg256` exists
 
+Firestore is confirmed. Authentication and Storage still need console verification.
+
 ## 4. Point the alias at it
 
-Replace the placeholder in `.firebaserc`:
+Done. `.firebaserc` now contains:
 
 ```json
 {
   "projects": {
-    "staging": "<STAGING_ID>",
+    "staging": "studio-534174814-9df36",
     "prod": "manifest-quasar-479416-s7"
   }
 }
@@ -61,14 +84,17 @@ Pass it explicitly so staging commands never fall back to the production credent
 `.env.local`:
 
 ```bash
-npm run clean:preview -- --project <STAGING_ID> --database fg256 --env staging \
+npm run clean:preview -- --project studio-534174814-9df36 --database fg256 --env staging \
   --credentials ~/.secrets/goalplace-staging-sa.json
 ```
+
+This remains the current blocker. Without the staging key, the guard correctly refuses to use
+the production credentials from `.env.local`.
 
 ## 6. Deploy rules and functions to staging
 
 ```bash
-GOALPLACE_STAGING_PROJECT=<STAGING_ID> npm run deploy:staging
+GOALPLACE_STAGING_PROJECT=studio-534174814-9df36 npm run deploy:staging
 ```
 
 Note that `firebase.json` deploys `firestore.rules`, while the season and result-submission
@@ -84,7 +110,7 @@ The rules emulator needs Java. Install it first if `test:rules` fails to start.
 ## 7. Verify
 
 ```bash
-npm run clean:preview -- --project <STAGING_ID> --database fg256 --env staging \
+npm run clean:preview -- --project studio-534174814-9df36 --database fg256 --env staging \
   --credentials ~/.secrets/goalplace-staging-sa.json
 ```
 
