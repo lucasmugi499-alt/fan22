@@ -8,27 +8,27 @@ env:
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyDnGSTCffXgwlI5DDwivqcVC8Iuy0aDPc8
+    value: AIzaSyBTJtRq6mBajX6pM93vo8FJ858owLfObwE
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: manifest-quasar-479416-s7.firebaseapp.com
+    value: studio-534174814-9df36.firebaseapp.com
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: manifest-quasar-479416-s7
+    value: studio-534174814-9df36
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: manifest-quasar-479416-s7.firebasestorage.app
+    value: studio-534174814-9df36.firebasestorage.app
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "622986074502"
+    value: "1022620974291"
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:622986074502:web:af207af8fd2d053f437407
+    value: 1:1022620974291:web:a492881a24b43e450fe826
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
