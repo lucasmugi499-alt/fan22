@@ -1,0 +1,140 @@
+[
+  {
+    "uid": "user_platform_001",
+    "email": "anthony_platform.platform@demo.goalplace256.test",
+    "role": "platform_admin",
+    "workspace": "/admin"
+  },
+  {
+    "uid": "user_platform_002",
+    "email": "grace_trust.platform@demo.goalplace256.test",
+    "role": "platform_admin",
+    "workspace": "/admin"
+  },
+  {
+    "uid": "user_league_admin_001",
+    "email": "collins_tumwesigye.kmcfl@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_football_kampala"
+  },
+  {
+    "uid": "user_fan_01_001",
+    "email": "priscilla_namanya.fan01001@demo.goalplace256.test",
+    "role": "fan",
+    "workspace": "/home"
+  },
+  {
+    "uid": "user_team_admin_01_01",
+    "email": "samuel_nakiwala.kmcfl01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_football_01_01"
+  },
+  {
+    "uid": "user_ath_football_01_01_01",
+    "email": "martha_nansubuga.01_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  },
+  {
+    "uid": "user_league_admin_002",
+    "email": "benjamin_adoch.eurdl@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_football_eastern"
+  },
+  {
+    "uid": "user_team_admin_02_01",
+    "email": "trevor_byaruhanga.eurdl01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_football_02_01"
+  },
+  {
+    "uid": "user_ath_football_02_01_01",
+    "email": "samuel_okwir.02_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  },
+  {
+    "uid": "user_league_admin_003",
+    "email": "edward_mulindwa.kmbl@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_basketball_kampala"
+  },
+  {
+    "uid": "user_fan_03_001",
+    "email": "richard_awori.fan03001@demo.goalplace256.test",
+    "role": "fan",
+    "workspace": "/home"
+  },
+  {
+    "uid": "user_team_admin_03_01",
+    "email": "alex_waiswa.kmbl01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_basketball_03_01"
+  },
+  {
+    "uid": "user_ath_basketball_03_01_01",
+    "email": "yasin_ocen.03_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  },
+  {
+    "uid": "user_league_admin_004",
+    "email": "mary_lubega.nucbl@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_basketball_north"
+  },
+  {
+    "uid": "user_team_admin_04_01",
+    "email": "denis_nansubuga.nucbl01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_basketball_04_01"
+  },
+  {
+    "uid": "user_ath_basketball_04_01_01",
+    "email": "faridah_wasswa.04_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  },
+  {
+    "uid": "user_league_admin_005",
+    "email": "mariam_bamuturaki.kcrc@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_rugby_kampala"
+  },
+  {
+    "uid": "user_fan_05_001",
+    "email": "daphine_alinda.fan05001@demo.goalplace256.test",
+    "role": "fan",
+    "workspace": "/home"
+  },
+  {
+    "uid": "user_team_admin_05_01",
+    "email": "joel_adoch.kcrc01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_rugby_05_01"
+  },
+  {
+    "uid": "user_ath_rugby_05_01_01",
+    "email": "susan_alinda.05_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  },
+  {
+    "uid": "user_league_admin_006",
+    "email": "sarah_kintu.nerdl@demo.goalplace256.test",
+    "role": "league_admin",
+    "workspace": "/league-admin?league=league_rugby_eastern"
+  },
+  {
+    "uid": "user_team_admin_06_01",
+    "email": "vincent_nakiwala.nerdl01@demo.goalplace256.test",
+    "role": "team_admin",
+    "workspace": "/team-admin?team=team_rugby_06_01"
+  },
+  {
+    "uid": "user_ath_rugby_06_01_01",
+    "email": "janet_ssemakula.06_01_01@demo.goalplace256.test",
+    "role": "athlete",
+    "workspace": "/athlete-dashboard"
+  }
+]

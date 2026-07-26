@@ -52,32 +52,32 @@ const DISCOVERY_FEATURES = [
 
 const LEAGUES = [
   {
-    name: 'Kampala Youth Premier',
+    name: 'Kampala Metro Community Football League',
     sport: 'Football',
     location: 'Kampala',
     season: '2026 season',
-    teams: 12,
-    matches: 4,
+    teams: 10,
+    matches: 45,
     accent: 'from-emerald-950 via-emerald-900 to-surface-1',
     icon: SoccerBall,
   },
   {
-    name: 'Jinja Hoops Circuit',
+    name: 'Kampala Metropolitan Basketball League',
     sport: 'Basketball',
-    location: 'Jinja',
-    season: 'Round 8',
-    teams: 8,
-    matches: 3,
+    location: 'Kampala',
+    season: '2026 season',
+    teams: 10,
+    matches: 45,
     accent: 'from-orange-950 via-amber-950 to-surface-1',
     icon: Basketball,
   },
   {
-    name: 'Wakiso Rugby Sevens',
+    name: 'Kampala Community Rugby Championship',
     sport: 'Rugby',
-    location: 'Wakiso',
-    season: 'Series 2',
+    location: 'Kampala',
+    season: '2026 season',
     teams: 10,
-    matches: 6,
+    matches: 45,
     accent: 'from-blue-950 via-cyan-950 to-surface-1',
     icon: FlagCheckered,
   },
@@ -85,32 +85,32 @@ const LEAGUES = [
 
 const ATHLETES = [
   {
-    name: 'Amina Nalule',
-    team: 'Kampala Queens',
-    league: 'Kampala Youth Premier',
-    position: 'Forward',
-    stat: '8 goals',
-    note: 'Travel support for the regional final',
+    name: 'Daniel Aciro',
+    team: 'Luzira Athletic',
+    league: 'Kampala Metro Community Football League',
+    position: 'Defensive midfielder',
+    stat: '8 apps',
+    note: 'Training boots and strength equipment',
     color: 'bg-emerald-400',
     initials: 'AN',
   },
   {
-    name: 'Brian Okello',
-    team: 'Jinja Falcons',
-    league: 'Jinja Hoops Circuit',
-    position: 'Point guard',
-    stat: '14.6 PPG',
-    note: 'New training shoes',
+    name: 'Peter Namanya',
+    team: 'Kitgum Warriors',
+    league: 'Northern Uganda Community Basketball League',
+    position: 'Guard',
+    stat: '32 pts',
+    note: 'Registration fees',
     color: 'bg-orange-400',
     initials: 'BO',
   },
   {
-    name: 'Sarah Nakato',
-    team: 'Wakiso Rhinos',
-    league: 'Wakiso Rugby Sevens',
-    position: 'Wing',
-    stat: '6 tries',
-    note: 'Recovery and nutrition support',
+    name: 'Trevor Kalema',
+    team: 'Lubowa Harriers',
+    league: 'Kampala Community Rugby Championship',
+    position: 'Lock',
+    stat: '52 tackles',
+    note: 'Recovery support',
     color: 'bg-sky-400',
     initials: 'SN',
   },
@@ -265,33 +265,33 @@ export function Landing() {
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs">
                 <span className="flex items-center gap-2 font-semibold text-white">
                   <span className="animate-live-ring h-2 w-2 rounded-full bg-live" />
-                  Live in Kampala
+              Live in Kampala
                 </span>
                 <span className="font-mono text-slate-400">68:24</span>
               </div>
               <div className="px-5 py-5">
-                <p className="text-xs text-slate-400">Kampala Youth Premier</p>
+              <p className="text-xs text-slate-400">Kampala Metro Community Football League</p>
                 <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                   <div>
                     <span className="grid h-11 w-11 place-items-center rounded-md bg-emerald-400 text-sm font-black text-emerald-950">
-                      KQ
+                      LA
                     </span>
-                    <p className="mt-2 text-sm font-semibold text-white">Kampala Queens</p>
+                    <p className="mt-2 text-sm font-semibold text-white">Luzira Athletic</p>
                   </div>
-                  <div className="font-mono text-3xl font-bold text-white">2:1</div>
+                  <div className="font-mono text-3xl font-bold text-white">2:4</div>
                   <div className="text-right">
                     <span className="ml-auto grid h-11 w-11 place-items-center rounded-md bg-amber-400 text-sm font-black text-amber-950">
-                      LR
+                      NE
                     </span>
-                    <p className="mt-2 text-sm font-semibold text-white">Luzira Rockets</p>
+                    <p className="mt-2 text-sm font-semibold text-white">Ntinda Eagles</p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between bg-white/[0.04] px-4 py-3 text-xs">
-                <span className="text-slate-400">Nakato 51&apos;</span>
+                <span className="text-slate-400">Luzira Sports Park</span>
                 <span className="flex items-center gap-1.5 font-semibold text-brand">
                   <Eye className="h-3.5 w-3.5" weight="bold" />
-                  1,284 following
+                  53 following
                 </span>
               </div>
             </div>
@@ -304,10 +304,10 @@ export function Landing() {
           {[0, 1].map((copy) => (
             <div key={copy} className="flex items-center">
               {[
-                'Official result: KQ 2 - 1 Luzira Rockets',
-                'Jinja Hoops: tip-off 7:30 PM',
-                '6 fixtures this weekend',
-                'Athlete profile verified',
+                'Official: Kisenyi United 3 - 3 Kyambogo Rangers',
+                'Kampala Hoops: next round ready',
+                '45 fixtures remain in each league',
+                'Daniel Aciro profile verified',
               ].map((item) => (
                 <span key={`${copy}-${item}`} className="flex items-center whitespace-nowrap px-6">
                   <Lightning className="mr-2 h-4 w-4" weight="fill" />
@@ -440,31 +440,31 @@ export function Landing() {
                 <span className="animate-live-pulse h-2 w-2 rounded-full bg-live" />
                 Live now
               </span>
-              <span className="font-mono text-xs text-subtle">KYP / ROUND 12</span>
+                <span className="font-mono text-xs text-subtle">KMCFL / ROUND 09</span>
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-8 sm:px-8">
               <div>
                 <span className="grid h-12 w-12 place-items-center rounded-md bg-emerald-400 font-mono text-sm font-bold text-emerald-950">
-                  KQ
+                  LA
                 </span>
-                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Kampala Queens</p>
+                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Luzira Athletic</p>
               </div>
               <div className="text-center">
-                <p className="font-mono text-3xl font-bold text-text-strong sm:text-4xl">2 - 1</p>
+                <p className="font-mono text-3xl font-bold text-text-strong sm:text-4xl">2 - 4</p>
                 <p className="mt-2 font-mono text-xs text-live">68:24</p>
               </div>
               <div className="text-right">
                 <span className="ml-auto grid h-12 w-12 place-items-center rounded-md bg-amber-400 font-mono text-sm font-bold text-amber-950">
-                  LR
+                  NE
                 </span>
-                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Luzira Rockets</p>
+                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Ntinda Eagles</p>
               </div>
             </div>
             <div className="grid gap-px bg-border sm:grid-cols-2">
               <div className="bg-surface-2 px-5 py-4">
                 <p className="flex items-center gap-2 text-xs text-muted">
                   <MapPin className="h-4 w-4 text-brand" weight="fill" />
-                  Nakivubo Community Ground
+                  Luzira Sports Park
                 </p>
               </div>
               <div className="bg-surface-2 px-5 py-4 sm:text-right">
@@ -473,8 +473,8 @@ export function Landing() {
             </div>
             <div className="space-y-px bg-border">
               {[
-                ['Sat 02 Aug / 16:00', 'Ntinda Lions', 'Entebbe City', 'Upcoming'],
-                ['Wed 30 Jul / FT', 'Makerere United', 'Kawempe Stars', 'Official 1 - 1'],
+                ['Sat 11 Apr / 13:00', 'Kyambogo Rangers', 'Kisenyi United', 'Upcoming'],
+                ['Sat 07 Feb / FT', 'Makindye City', 'Mengo City', 'Official 0 - 1'],
               ].map(([time, home, away, state]) => (
                 <Link
                   href="/matches"
@@ -622,29 +622,29 @@ export function Landing() {
                 <Target className="h-7 w-7 text-brand-2" weight="duotone" />
               </div>
               <h3 className="mt-8 max-w-md text-2xl font-semibold text-text-strong">
-                Help Amina reach the regional final
+                Back Daniel&apos;s verified assist goal
               </h3>
               <p className="mt-3 max-w-lg text-sm leading-6 text-muted">
-                Travel, meals, and registration for a three-day competition in Jinja.
+                Support a six-assist development challenge approved by his Team Admin.
               </p>
               <div className="mt-8 h-2 overflow-hidden rounded-sm bg-surface-3">
-                <div className="landing-progress h-full w-[68%] bg-brand" />
+                <div className="landing-progress h-full w-[58%] bg-brand" />
               </div>
               <div className="mt-3 flex justify-between font-mono text-xs">
-                <span className="text-text-strong">UGX 408,000 raised</span>
-                <span className="text-subtle">68%</span>
+                <span className="text-text-strong">UGX 175,000 pledged</span>
+                <span className="text-subtle">58%</span>
               </div>
               <div className="mt-8 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-3">
                 <div>
-                  <p className="font-mono text-lg font-bold text-text-strong">31</p>
+                  <p className="font-mono text-lg font-bold text-text-strong">6</p>
                   <p className="text-xs text-subtle">supporters</p>
                 </div>
                 <div>
-                  <p className="font-mono text-lg font-bold text-text-strong">12d</p>
-                  <p className="text-xs text-subtle">remaining</p>
+                  <p className="font-mono text-lg font-bold text-text-strong">6</p>
+                  <p className="text-xs text-subtle">assist target</p>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <p className="font-mono text-lg font-bold text-verified">Approved</p>
+                  <p className="font-mono text-lg font-bold text-pending">Pending</p>
                   <p className="text-xs text-subtle">challenge state</p>
                 </div>
               </div>
