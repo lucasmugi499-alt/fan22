@@ -6,7 +6,17 @@ import {
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 
 /**
  * Security rules tests for `firestore.rules.next` — the pending authorization matrix
@@ -116,6 +126,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'matches/match_001'), {
       leagueId: 'league_001',
       seasonId: 'season_001',
+      homeTeamId: 'team_a',
+      awayTeamId: 'team_b',
       status: 'completed',
       verificationStatus: 'pending',
     });
@@ -133,6 +145,12 @@ async function seedSubmission(overrides: Record<string, unknown> = {}) {
 }
 
 describe('result submission: creating a claim', () => {
+  it('lets an involved team check that no claim exists yet', async () => {
+    await assertSucceeds(
+      getDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'))
+    );
+  });
+
   it('lets the submitting team open a claim', async () => {
     await assertSucceeds(
       setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc())
@@ -162,6 +180,38 @@ describe('result submission: creating a claim', () => {
     );
   });
 
+  it('refuses a result claim before the fixture has been played', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'matches/match_001'), {
+        status: 'scheduled',
+      });
+    });
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc())
+    );
+  });
+
+  it('refuses a claim for an already-official fixture', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'matches/match_001'), {
+        verificationStatus: 'verified',
+        officialResultVersion: 1,
+      });
+    });
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc())
+    );
+  });
+
+  it('refuses fractional scores', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'),
+        submissionDoc({ homeScore: 1.5 })
+      )
+    );
+  });
+
   it('refuses a claim that starts anywhere but pending_confirmation', async () => {
     for (const status of ['confirmed', 'official', 'disputed']) {
       await assertFails(
@@ -177,6 +227,49 @@ describe('result submission: creating a claim', () => {
       }))
     );
   });
+
+  it('refuses a claim whose teams do not match the fixture', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'),
+        submissionDoc({ opponentTeamId: 'team_z' })
+      )
+    );
+  });
+
+  it('atomically creates the claim and its first audit event', async () => {
+    const db = asUser(TEAM_A_ADMIN);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'resultSubmissions/match_001'), submissionDoc());
+    batch.set(doc(db, 'resultSubmissions/match_001/events/event_001'), {
+      submissionId: 'match_001',
+      from: null,
+      to: 'pending_confirmation',
+      actor: 'submitting_team',
+      actorUserId: TEAM_A_ADMIN,
+      createdAt: '2026-03-01T00:00:00.000Z',
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('replaces a rejected claim at the next revision with a matching event', async () => {
+    await seedSubmission({ status: 'rejected' });
+    const db = asUser(TEAM_A_ADMIN);
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, 'resultSubmissions/match_001'),
+      submissionDoc({ revision: 2 })
+    );
+    batch.set(doc(db, 'resultSubmissions/match_001/events/replacement'), {
+      submissionId: 'match_001',
+      from: 'rejected',
+      to: 'pending_confirmation',
+      actor: 'submitting_team',
+      actorUserId: TEAM_A_ADMIN,
+      createdAt: '2026-03-03T00:00:00.000Z',
+    });
+    await assertSucceeds(batch.commit());
+  });
 });
 
 describe('result submission: answering a claim', () => {
@@ -186,8 +279,19 @@ describe('result submission: answering a claim', () => {
     await assertSucceeds(
       updateDoc(doc(asUser(TEAM_B_ADMIN), 'resultSubmissions/match_001'), {
         status: 'confirmed',
+        resolution: 'opponent_confirmed',
         respondedByUserId: TEAM_B_ADMIN,
         respondedAt: '2026-03-02T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('refuses opponent confirmation with false provenance', async () => {
+    await assertFails(
+      updateDoc(doc(asUser(TEAM_B_ADMIN), 'resultSubmissions/match_001'), {
+        status: 'confirmed',
+        resolution: 'league_upheld',
+        respondedByUserId: TEAM_B_ADMIN,
       })
     );
   });
@@ -233,6 +337,54 @@ describe('result submission: answering a claim', () => {
   it('refuses a response from an unrelated user', async () => {
     await assertFails(
       updateDoc(doc(asUser(OUTSIDER), 'resultSubmissions/match_001'), { status: 'confirmed' })
+    );
+  });
+});
+
+describe('result submission queues', () => {
+  beforeEach(() => seedSubmission());
+
+  it('lets the opponent query its confirmation inbox', async () => {
+    const db = asUser(TEAM_B_ADMIN);
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'resultSubmissions'),
+          where('opponentTeamId', '==', 'team_b')
+        )
+      )
+    );
+  });
+
+  it('lets the owning league query its exception queue', async () => {
+    const db = asUser(LEAGUE_ADMIN);
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'resultSubmissions'),
+          where('leagueId', '==', 'league_001')
+        )
+      )
+    );
+  });
+
+  it('refuses the same queues to an unrelated user', async () => {
+    const db = asUser(OUTSIDER);
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'resultSubmissions'),
+          where('opponentTeamId', '==', 'team_b')
+        )
+      )
+    );
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'resultSubmissions'),
+          where('leagueId', '==', 'league_001')
+        )
+      )
     );
   });
 });
@@ -408,6 +560,30 @@ describe('league adjudication', () => {
     );
   });
 
+  it('ties a league decision to the authenticated admin', async () => {
+    await seedSubmission({ status: 'disputed' });
+    await assertFails(
+      updateDoc(doc(asUser(LEAGUE_ADMIN), 'resultSubmissions/match_001'), {
+        status: 'confirmed',
+        resolution: 'league_upheld',
+        resolvedByUserId: OUTSIDER,
+      })
+    );
+  });
+
+  it('requires corrected provenance when the league changes the score', async () => {
+    await seedSubmission({ status: 'disputed' });
+    await assertFails(
+      updateDoc(doc(asUser(LEAGUE_ADMIN), 'resultSubmissions/match_001'), {
+        status: 'confirmed',
+        resolution: 'league_upheld',
+        resolvedByUserId: LEAGUE_ADMIN,
+        correctedHomeScore: 4,
+        correctedAwayScore: 0,
+      })
+    );
+  });
+
   it('lets the league extend a lapsed confirmation window', async () => {
     await seedSubmission({ status: 'confirmation_overdue' });
     await assertSucceeds(
@@ -424,19 +600,72 @@ describe('league adjudication', () => {
       updateDoc(doc(asUser(OUTSIDER), 'resultSubmissions/match_001'), { status: 'confirmed' })
     );
   });
+
+  it('binds correction-request attribution to the league admin', async () => {
+    await seedSubmission({
+      status: 'official',
+      finalizedAt: '2026-03-02T00:00:00.000Z',
+    });
+    const ref = doc(asUser(LEAGUE_ADMIN), 'resultSubmissions/match_001');
+    await assertSucceeds(
+      updateDoc(ref, {
+        correctionReason: 'Referee report corrected the score.',
+        correctionRequestedBy: LEAGUE_ADMIN,
+      })
+    );
+    await assertFails(
+      updateDoc(ref, {
+        correctionReason: 'Spoofed request.',
+        correctionRequestedBy: OUTSIDER,
+      })
+    );
+  });
 });
 
 describe('audit trail is append-only', () => {
   beforeEach(() => seedSubmission());
 
-  it('allows appending an event', async () => {
-    await assertSucceeds(
-      setDoc(doc(asUser(TEAM_B_ADMIN), 'resultSubmissions/match_001/events/e1'), {
+  it('allows a transition and matching event in one batch', async () => {
+    const db = asUser(TEAM_B_ADMIN);
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'resultSubmissions/match_001'), {
+      status: 'confirmed',
+      resolution: 'opponent_confirmed',
+      respondedByUserId: TEAM_B_ADMIN,
+      respondedAt: '2026-03-02T00:00:00.000Z',
+    });
+    batch.set(doc(db, 'resultSubmissions/match_001/events/e1'), {
+      submissionId: 'match_001',
+      from: 'pending_confirmation',
+      to: 'confirmed',
+      actor: 'opponent_team',
+      actorUserId: TEAM_B_ADMIN,
+      createdAt: '2026-03-02T00:00:00.000Z',
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('refuses an event that does not match a real transition', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_B_ADMIN), 'resultSubmissions/match_001/events/fabricated'), {
         submissionId: 'match_001',
         from: 'pending_confirmation',
         to: 'confirmed',
         actor: 'opponent_team',
         actorUserId: TEAM_B_ADMIN,
+        createdAt: '2026-03-02T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('refuses a no-op event at the current status', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001/events/noop'), {
+        submissionId: 'match_001',
+        from: 'pending_confirmation',
+        to: 'pending_confirmation',
+        actor: 'submitting_team',
+        actorUserId: TEAM_A_ADMIN,
         createdAt: '2026-03-02T00:00:00.000Z',
       })
     );

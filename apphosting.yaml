@@ -35,3 +35,11 @@ env:
     value: fg256
     availability:
       - BUILD
+  - variable: GOALPLACE_ADMIN_PROJECT_ID
+    value: studio-534174814-9df36
+    availability:
+      - RUNTIME
+  - variable: GOALPLACE_FIRESTORE_DATABASE_ID
+    value: fg256
+    availability:
+      - RUNTIME

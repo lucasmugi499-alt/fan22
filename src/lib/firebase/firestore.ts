@@ -26,6 +26,7 @@ import {
   Match,
   Notification,
   Report,
+  ResultSubmission,
   Season,
   Sport,
   Sponsor,
@@ -56,6 +57,7 @@ export type FirestoreCollectionMap = {
   awards: AwardCategory;
   verifications: Verification;
   reports: Report;
+  resultSubmissions: ResultSubmission;
   adminLogs: AdminLog;
 };
 

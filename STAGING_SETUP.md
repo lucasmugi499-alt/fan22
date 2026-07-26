@@ -8,16 +8,18 @@ Status on 2026-07-26:
 - Named database exists: `fg256` in `nam5`
 - `.firebaserc` points `staging` at `studio-534174814-9df36`
 - Staging Web app exists: `1:1022620974291:web:a492881a24b43e450fe826`
+- Candidate rules from `firestore.rules.next` are deployed to staging only
+- The App Hosting managed identity has `roles/datastore.user` on staging so the
+  authenticated server finalizer can transact against `fg256` without a downloaded key
 - Safety guard verified: a staging preview using the production Admin credentials in
   `.env.local` is refused with a credential mismatch
 
-Still needed before any staging reset rehearsal:
+Still needed:
 
-- Download a staging Admin service-account key to a path outside the repository
-- Verify Email/Password Authentication is enabled in the staging console
 - Verify or create the staging Storage bucket
-- Run a staging preview with the staging service-account key
-- Create and verify a staging owner account, then rehearse the reset
+- Re-run the investor seed after the daily Firestore quota resets so
+  `resultSubmissionEvents` move into their nested subcollections
+- Run the two-team submit → confirm → trusted finalizer smoke test
 
 ## 1. Create the project
 
@@ -88,24 +90,30 @@ npm run clean:preview -- --project studio-534174814-9df36 --database fg256 --env
   --credentials ~/.secrets/goalplace-staging-sa.json
 ```
 
-This remains the current blocker. Without the staging key, the guard correctly refuses to use
-the production credentials from `.env.local`.
+This key is still useful for destructive reset rehearsals. It is not used by the hosted
+application: App Hosting uses its managed runtime identity and no private key is committed.
 
 ## 6. Deploy rules and functions to staging
 
 ```bash
-GOALPLACE_STAGING_PROJECT=studio-534174814-9df36 npm run deploy:staging
+npm run deploy:staging
 ```
 
-Note that `firebase.json` deploys `firestore.rules`, while the season and result-submission
-rules live in `firestore.rules.next` and have never been promoted. Decide deliberately which
-file staging should carry, and validate with the emulator before promoting anything:
+`firebase.staging.json` explicitly deploys `firestore.rules.next`. The normal `firebase.json`
+still points to the production baseline in `firestore.rules`.
 
 ```bash
 npm run test:rules
 ```
 
-The rules emulator needs Java. Install it first if `test:rules` fails to start.
+The project-local JDK under `.tools/` can run the suite. Cloud Functions remain optional
+until staging moves to Blaze:
+
+```bash
+npm run deploy:staging:functions
+```
+
+On Spark, trusted finalization runs through the authenticated App Hosting route instead.
 
 ## 7. Verify
 

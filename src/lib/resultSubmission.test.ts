@@ -3,6 +3,7 @@ import { ResultSubmission, ResultSubmissionActor, ResultSubmissionStatus } from 
 import {
   actorsAllowedTo,
   canAcceptNewSubmission,
+  canRequestTrustedFinalization,
   canSubmitResultFor,
   canTransition,
   checkCorrectionRequest,
@@ -10,6 +11,7 @@ import {
   confirmationDeadlineFrom,
   dueReminders,
   finalizationKeyFor,
+  finalizationSourceFromResolution,
   finalizationSourceFor,
   finalScore,
   isConfirmationOverdue,
@@ -176,6 +178,32 @@ describe('concurrent submissions', () => {
   });
 });
 
+describe('trusted finalization requests', () => {
+  const settled = submission({
+    respondedByUserId: 'opponent_admin',
+    resolvedByUserId: 'league_admin',
+  });
+
+  it('accepts the team or league admin who settled the claim', () => {
+    expect(
+      canRequestTrustedFinalization(settled, { uid: 'opponent_admin' })
+    ).toBe(true);
+    expect(
+      canRequestTrustedFinalization(settled, { uid: 'league_admin' })
+    ).toBe(true);
+  });
+
+  it('accepts platform admins and rejects unrelated users', () => {
+    expect(
+      canRequestTrustedFinalization(settled, {
+        uid: 'platform',
+        role: 'platform_admin',
+      })
+    ).toBe(true);
+    expect(canRequestTrustedFinalization(settled, { uid: 'outsider' })).toBe(false);
+  });
+});
+
 describe('league adjudication', () => {
   it('requires a score when the resolution corrects one', () => {
     expect(
@@ -305,6 +333,32 @@ describe('finalization is idempotent (decision 2)', () => {
       verificationStatus: 'verified',
       score: { home: 2, away: 1 },
     });
+  });
+
+  it('preserves mutual-confirmation provenance from the opponent response', () => {
+    const decision = planFinalization({
+      submission: submission({
+        status: 'confirmed',
+        resolution: 'opponent_confirmed',
+      }),
+      match,
+      processedKeys: [],
+      now,
+    });
+    if (decision.action !== 'finalize') throw new Error('expected finalize');
+    expect(decision.plan.submission.finalizationSource).toBe('mutual_confirmation');
+  });
+
+  it('distinguishes league dispute and non-response decisions', () => {
+    expect(finalizationSourceFromResolution('league_upheld')).toBe(
+      'league_admin_dispute_resolution'
+    );
+    expect(finalizationSourceFromResolution('league_corrected')).toBe(
+      'league_admin_dispute_resolution'
+    );
+    expect(finalizationSourceFromResolution('league_confirmed_unresponsive')).toBe(
+      'league_admin_nonresponse_confirmation'
+    );
   });
 
   it('no-ops when the key was already processed (retry or sweep)', () => {

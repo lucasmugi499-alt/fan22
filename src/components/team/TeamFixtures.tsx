@@ -13,9 +13,10 @@ import {
 import { isOfficialMatch } from '@/lib/status';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { MatchCard } from '@/components/core/MatchCard';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
+import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
 import type { Match } from '@/types';
 
 const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
@@ -23,7 +24,7 @@ type Tab = (typeof TABS)[number];
 
 export function TeamFixtures() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, loading } = useGoalPlaceData({
+  const { teams, matches, loading, error, retry } = useGoalPlaceData({
     collections: ['teams', 'matches'],
   });
   const [tab, setTab] = useState<Tab>('Needs action');
@@ -31,18 +32,28 @@ export function TeamFixtures() {
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
+  const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
+    useTeamConfirmationInbox(team?.id);
 
   const buckets = useMemo(() => {
     if (!team) return { 'Needs action': [], Upcoming: [], Results: [] } as Record<Tab, Match[]>;
     const results = matchesForTeam(team.id, matches)
       .filter((m) => m.status === 'completed')
       .sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt));
+    const confirmationIds = new Set(confirmationInbox.map((item) => item.matchId));
+    const confirmations = confirmationInbox.flatMap((item) => {
+      const match = matches.find((candidate) => candidate.id === item.matchId);
+      return match ? [match] : [];
+    });
+    const remainingActions = pendingActions(team.id, matches)
+      .map((action) => action.match)
+      .filter((match) => !confirmationIds.has(match.id));
     return {
-      'Needs action': pendingActions(team.id, matches).map((a) => a.match),
+      'Needs action': [...confirmations, ...remainingActions],
       Upcoming: upcomingForTeam(team.id, matches),
       Results: results,
     } as Record<Tab, Match[]>;
-  }, [team, matches]);
+  }, [confirmationInbox, team, matches]);
 
   if (loading) {
     return (
@@ -53,6 +64,8 @@ export function TeamFixtures() {
       </div>
     );
   }
+  if (error) return <ErrorState onRetry={retry} />;
+  if (inboxError) return <ErrorState onRetry={refreshInbox} />;
 
   const list = buckets[tab];
 
@@ -92,9 +105,14 @@ export function TeamFixtures() {
         <ResultSubmissionSheet
           open
           onClose={() => setActiveMatch(null)}
+          onComplete={() => {
+            retry();
+            void refreshInbox();
+          }}
           match={activeMatch}
           home={teamById.get(activeMatch.homeTeamId)}
           away={teamById.get(activeMatch.awayTeamId)}
+          myTeamId={team.id}
         />
       ) : null}
     </div>

@@ -26,9 +26,8 @@
     "functions:typecheck": "npm --prefix functions run typecheck",
     "clean:preview": "tsx scripts/clean-preview.ts",
     "clean:execute": "tsx scripts/clean-execute.ts",
-    "build:static": "NEXT_STATIC_EXPORT=true NEXT_PUBLIC_DATA_MODE=mock NEXT_PUBLIC_ENABLE_DEMO_LOGIN=true next build",
-    "deploy:staging:static": "npm run build:static && firebase deploy --project studio-534174814-9df36 --config firebase.static.json --only hosting",
-    "deploy:staging": "firebase deploy --project $GOALPLACE_STAGING_PROJECT --only firestore:fg256,functions",
+    "deploy:staging": "firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",
+    "deploy:staging:functions": "firebase deploy --project staging --config firebase.staging.json --only functions",
     "deploy:prod": "firebase deploy --project manifest-quasar-479416-s7 --only firestore:fg256,functions",
     "create:owner": "tsx scripts/create-owner.ts"
   },

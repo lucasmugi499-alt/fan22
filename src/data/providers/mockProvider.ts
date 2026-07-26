@@ -34,6 +34,7 @@ import {
   DataWriteResult,
   FollowTargetType,
   GoalPlaceDataProvider,
+  ResolveResultSubmissionInput,
   SaveTargetType,
 } from './types';
 import { feedPosts as feedPostStore } from '../mockFeedPosts';
@@ -41,10 +42,19 @@ import { supportPledges } from '../mockSupportPledges';
 import { walletTransactions as walletStore } from '../mockWalletTransactions';
 import { comments as commentStore } from '../mockComments';
 import { seasons } from '../mockSeasons';
-import { VerificationStatus } from '@/types';
+import { ResultSubmission, VerificationStatus } from '@/types';
+import {
+  canAcceptNewSubmission,
+  confirmationDeadlineFrom,
+} from '@/lib/resultSubmission';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
+const resultSubmissions = new Map<string, ResultSubmission>();
+const resultSubmissionListeners = new Map<
+  string,
+  Set<(submission: ResultSubmission | undefined) => void>
+>();
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -58,6 +68,13 @@ function demoToast(message: string) {
 function result(idValue: string, message = 'Demo action recorded. No real payment occurred.'): DataWriteResult {
   demoToast(message);
   return { ok: true, id: idValue, mode: 'mock', message };
+}
+
+function notifySubmission(matchId: string) {
+  const submission = resultSubmissions.get(matchId);
+  for (const listener of resultSubmissionListeners.get(matchId) ?? []) {
+    listener(submission);
+  }
 }
 
 export const mockProvider: GoalPlaceDataProvider = {
@@ -153,6 +170,23 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getVerifiedMatches() {
     return getVerifiedMatches();
   },
+  async getResultSubmission(matchId) {
+    return resultSubmissions.get(matchId);
+  },
+  async getTeamConfirmationInbox(teamId) {
+    return [...resultSubmissions.values()].filter(
+      (submission) =>
+        submission.opponentTeamId === teamId &&
+        ['pending_confirmation', 'confirmation_overdue'].includes(submission.status),
+    );
+  },
+  async getLeagueResultExceptions(leagueId) {
+    return [...resultSubmissions.values()].filter(
+      (submission) =>
+        submission.leagueId === leagueId &&
+        ['disputed', 'confirmation_overdue'].includes(submission.status),
+    );
+  },
   async createSupportPledge(data: CreateSupportPledgeInput) {
     const amount = data.amount;
     const platformFee = data.platformFee ?? Math.round(amount * 0.03);
@@ -221,5 +255,159 @@ export const mockProvider: GoalPlaceDataProvider = {
     const challenge = challenges.find((item) => item.id === challengeId);
     if (challenge) challenge.verificationStatus = status;
     return result(challengeId, `Demo challenge verification marked ${status}.`);
+  },
+  async createResultSubmission(data) {
+    const existing = resultSubmissions.get(data.match.id);
+    if (!canAcceptNewSubmission(existing)) {
+      throw new Error('This match already has an active result submission.');
+    }
+    const now = new Date().toISOString();
+    const opponentTeamId =
+      data.match.homeTeamId === data.submittedByTeamId
+        ? data.match.awayTeamId
+        : data.match.homeTeamId;
+    const submission: ResultSubmission = {
+      id: data.match.id,
+      matchId: data.match.id,
+      leagueId: data.match.leagueId,
+      seasonId: data.match.seasonId,
+      submittedByTeamId: data.submittedByTeamId,
+      opponentTeamId,
+      submittedByUserId: data.submittedByUserId,
+      homeScore: data.homeScore,
+      awayScore: data.awayScore,
+      scorers: data.scorers ?? [],
+      evidenceRefs: data.evidenceRefs ?? [],
+      evidenceNote: data.evidenceNote,
+      status: 'pending_confirmation',
+      revision: (existing?.revision ?? 0) + 1,
+      submittedAsFinal: true,
+      confirmationDeadline: confirmationDeadlineFrom(now),
+      resultVersion: existing?.resultVersion ?? 1,
+      submittedAt: now,
+    };
+    resultSubmissions.set(data.match.id, submission);
+    notifySubmission(data.match.id);
+    return result(data.match.id, 'Demo result submitted.');
+  },
+  async confirmResultSubmission(matchId, respondedByUserId) {
+    const submission = resultSubmissions.get(matchId);
+    if (!submission) throw new Error('Result submission not found.');
+    const now = new Date().toISOString();
+    const official: ResultSubmission = {
+      ...submission,
+      status: 'official',
+      respondedByUserId,
+      respondedAt: now,
+      resolution: 'opponent_confirmed',
+      finalizationSource: 'mutual_confirmation',
+      finalizationKey: `${matchId}:${matchId}:${submission.resultVersion}`,
+      finalizedAt: now,
+    };
+    resultSubmissions.set(matchId, official);
+    const match = matches.find((item) => item.id === matchId);
+    if (match) {
+      match.status = 'completed';
+      match.score = { home: official.homeScore, away: official.awayScore };
+      match.verificationStatus = 'verified';
+      match.officialResultVersion = official.resultVersion;
+    }
+    notifySubmission(matchId);
+    return result(matchId, 'Demo result confirmed and finalized.');
+  },
+  async disputeResultSubmission(matchId, respondedByUserId, reason) {
+    const submission = resultSubmissions.get(matchId);
+    if (!submission) throw new Error('Result submission not found.');
+    resultSubmissions.set(matchId, {
+      ...submission,
+      status: 'disputed',
+      respondedByUserId,
+      respondedAt: new Date().toISOString(),
+      disputeReason: reason,
+    });
+    notifySubmission(matchId);
+    return result(matchId, 'Demo dispute recorded.');
+  },
+  async finalizeResultSubmission(matchId) {
+    const submission = resultSubmissions.get(matchId);
+    if (!submission) throw new Error('Result submission not found.');
+    if (submission.status !== 'official') {
+      throw new Error('This result is not ready for finalization.');
+    }
+    return result(matchId, 'Demo result is official.');
+  },
+  async resolveDisputedSubmission(data: ResolveResultSubmissionInput) {
+    const submission = resultSubmissions.get(data.matchId);
+    if (!submission) throw new Error('Result submission not found.');
+    const now = new Date().toISOString();
+    if (data.decision === 'reject') {
+      resultSubmissions.set(data.matchId, {
+        ...submission,
+        status: 'rejected',
+        resolvedByUserId: data.resolvedByUserId,
+        resolvedAt: now,
+        finalDecisionNote: data.note,
+      });
+      notifySubmission(data.matchId);
+      return result(data.matchId, 'Demo result rejected.');
+    }
+    const resolution =
+      submission.status === 'confirmation_overdue'
+        ? 'league_confirmed_unresponsive'
+        : data.decision === 'correct'
+          ? 'league_corrected'
+          : 'league_upheld';
+    const updated: ResultSubmission = {
+      ...submission,
+      status: 'official',
+      resolution,
+      resolvedByUserId: data.resolvedByUserId,
+      resolvedAt: now,
+      finalDecisionNote: data.note,
+      correctedHomeScore: data.correctedScore?.home,
+      correctedAwayScore: data.correctedScore?.away,
+      finalizationSource:
+        resolution === 'league_confirmed_unresponsive'
+          ? 'league_admin_nonresponse_confirmation'
+          : 'league_admin_dispute_resolution',
+      finalizationKey: `${data.matchId}:${data.matchId}:${submission.resultVersion}`,
+      finalizedAt: now,
+    };
+    resultSubmissions.set(data.matchId, updated);
+    const match = matches.find((item) => item.id === data.matchId);
+    if (match) {
+      match.status = 'completed';
+      match.score = {
+        home: updated.correctedHomeScore ?? updated.homeScore,
+        away: updated.correctedAwayScore ?? updated.awayScore,
+      };
+      match.verificationStatus = 'verified';
+      match.officialResultVersion = updated.resultVersion;
+    }
+    notifySubmission(data.matchId);
+    return result(data.matchId, 'Demo dispute resolved and finalized.');
+  },
+  async requestResultCorrection(matchId, requestedByUserId, reason) {
+    const submission = resultSubmissions.get(matchId);
+    if (!submission) throw new Error('Result submission not found.');
+    resultSubmissions.set(matchId, {
+      ...submission,
+      correctionReason: reason,
+      correctionRequestedBy: requestedByUserId,
+    });
+    notifySubmission(matchId);
+    return result(matchId, 'Demo correction request recorded.');
+  },
+  subscribeToResultSubmission(matchId, listener) {
+    const listeners =
+      resultSubmissionListeners.get(matchId) ??
+      new Set<(submission: ResultSubmission | undefined) => void>();
+    listeners.add(listener);
+    resultSubmissionListeners.set(matchId, listeners);
+    listener(resultSubmissions.get(matchId));
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) resultSubmissionListeners.delete(matchId);
+    };
   },
 };

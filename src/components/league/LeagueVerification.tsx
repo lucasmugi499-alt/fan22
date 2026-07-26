@@ -7,9 +7,10 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyLeague, exceptionQueue } from '@/lib/league/leagueContext';
 import { STATE } from '@/lib/statusSystem';
 import { QueueItem } from '@/components/core/QueueItem';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LeagueResolveSheet } from '@/components/league/LeagueResolveSheet';
+import { useLeagueResultExceptions } from '@/lib/resultSubmissionQueues';
 import type { LeagueException } from '@/lib/league/leagueContext';
 import type { Match } from '@/types';
 
@@ -27,14 +28,32 @@ const KIND_META: Record<LeagueException['kind'], string> = {
 
 export function LeagueVerification({ compact = false }: { compact?: boolean }) {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, loading } = useGoalPlaceData({
+  const { leagues, teams, matches, loading, retry } = useGoalPlaceData({
     collections: ['leagues', 'teams', 'matches'],
   });
   const [active, setActive] = useState<Match | null>(null);
 
   const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const queue = useMemo(() => (league ? exceptionQueue(league.id, matches) : []), [league, matches]);
+  const { items: submissionExceptions, error: queueError, refresh: refreshExceptions } =
+    useLeagueResultExceptions(league?.id);
+  const queue = useMemo(() => {
+    if (!league) return [];
+    const byMatchId = new Map(matches.map((match) => [match.id, match]));
+    const resultQueue: LeagueException[] = submissionExceptions.flatMap((submission) => {
+      const match = byMatchId.get(submission.matchId);
+      if (!match) return [];
+      return [{
+        match,
+        kind: submission.status === 'disputed' ? 'disputed' : 'awaiting',
+      }];
+    });
+    const resultIds = new Set(resultQueue.map((item) => item.match.id));
+    const liveQueue = exceptionQueue(league.id, matches).filter(
+      (item) => item.kind === 'live' && !resultIds.has(item.match.id)
+    );
+    return [...resultQueue, ...liveQueue];
+  }, [league, matches, submissionExceptions]);
 
   if (loading) {
     return (
@@ -45,6 +64,7 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
       </div>
     );
   }
+  if (queueError) return <ErrorState onRetry={refreshExceptions} />;
 
   const list = compact ? queue.slice(0, 3) : queue;
 
@@ -88,6 +108,10 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
         <LeagueResolveSheet
           open
           onClose={() => setActive(null)}
+          onComplete={() => {
+            retry();
+            void refreshExceptions();
+          }}
           match={active}
           home={teamById.get(active.homeTeamId)}
           away={teamById.get(active.awayTeamId)}

@@ -174,14 +174,15 @@ so a retried trigger and the reconciliation sweep cannot double-apply a result. 
 returns `noop / mismatched_parents` if the submission's match, league or season does not
 match the target — a submission can never be finalized onto the wrong fixture.
 
-The decision logic is a **pure function**; the Cloud Function applies its plan inside one
-transaction and does nothing else. That keeps the correctness-critical part testable
-without Firestore, which matters because Cloud Functions are the hardest thing here to test.
+The decision logic is a **pure function**; shared server code applies its plan inside one
+transaction and does nothing else. Both the Cloud Function and the authenticated App Hosting
+route use that same executor.
 
-> This choice supersedes the earlier recommendation of a Next route handler. It is the more
-> robust option — execution no longer depends on the client completing a call — at the cost
-> of a new deploy surface. **Note that Cloud Functions require the Firebase Blaze plan**,
-> which the project does not appear to be on yet.
+Staging is currently on Spark, which cannot deploy the v2 trigger. The hosted staging build
+therefore calls the App Hosting route after a valid opponent or league decision. The route
+verifies the staging ID token, verifies that the caller settled the submission, and uses the
+managed App Hosting identity to transact against `fg256`. No service-account private key is
+shipped. The Cloud Function remains the preferred automatic trigger once staging uses Blaze.
 
 Standings need no work in the finalizer: they are derived and `buildLeagueStandings` already
 gates on `isOfficialMatch`. Athlete statistics remain out of scope until the athlete stats
@@ -224,14 +225,18 @@ Done:
   transaction that applies the result.
 - Security rules suite (`npm run test:rules`) covering the create/answer/adjudicate matrix
   and the trust boundary.
+- Team Admin submit, confirm and dispute UI backed by provider transactions and live
+  submission listeners.
+- League Admin uphold, correct and reject UI backed by the same workflow.
+- Authenticated App Hosting finalization route sharing the Cloud Function transaction code.
+- Candidate rules deployed to staging through `firebase.staging.json`.
 
 Outstanding:
 
-1. **Install a JDK and run the rules suite.** The pending rules matrix still needs emulator
-   verification before promotion.
-   `brew install --cask temurin`, then `npm run test:rules`.
-2. Reminder dispatch at 24h/48h. `dueReminders()` computes what is owed; nothing sends yet.
-3. UI: submit / confirm / dispute / league resolution, and the correction request form.
+1. Reminder dispatch at 24h/48h. `dueReminders()` computes what is owed; nothing sends yet.
+2. Correction approval and replacement-version UI.
+3. Re-run the investor seed after the free-tier read quota resets so the 756 existing
+   events move from the obsolete root collection into submission subcollections.
 4. Run the full Team Admin A -> Team Admin B -> finalizer -> standings workflow in staging,
    including duplicate-trigger and stale-version cases.
 
@@ -245,5 +250,5 @@ this project. It would deploy cleanly, report healthy, and never fire.
 ```bash
 npm run functions:build      # compile, including the shared pure logic
 npm run test:rules           # needs a JDK
-GOALPLACE_STAGING_PROJECT=studio-534174814-9df36 npm run deploy:staging
+npm run deploy:staging       # candidate rules only, explicit staging config
 ```

@@ -236,6 +236,19 @@ export function canAcceptNewSubmission(existing?: Pick<ResultSubmission, 'status
   return REPLACEABLE_STATUSES.includes(existing.status);
 }
 
+/** Who may ask trusted compute to apply an already-settled submission. */
+export function canRequestTrustedFinalization(
+  submission: Pick<ResultSubmission, 'respondedByUserId' | 'resolvedByUserId'>,
+  actor: { uid: string; role?: string }
+): boolean {
+  return (
+    submission.respondedByUserId === actor.uid ||
+    submission.resolvedByUserId === actor.uid ||
+    actor.role === 'platform_admin' ||
+    actor.role === 'super_admin'
+  );
+}
+
 /** A match is eligible for a result once it has been played and is not already official. */
 export function canSubmitResultFor(match: Pick<Match, 'status' | 'verificationStatus'>): boolean {
   return (
@@ -305,6 +318,22 @@ export function finalizationSourceFor(input: {
   }
   if (input.previousStatus === 'disputed') return 'league_admin_dispute_resolution';
   return 'league_admin_nonresponse_confirmation';
+}
+
+/** Derive trusted provenance from the human decision already recorded on the claim. */
+export function finalizationSourceFromResolution(
+  resolution: ResultSubmission['resolution']
+): FinalizationSource {
+  switch (resolution) {
+    case 'opponent_confirmed':
+      return 'mutual_confirmation';
+    case 'league_upheld':
+    case 'league_corrected':
+      return 'league_admin_dispute_resolution';
+    case 'league_confirmed_unresponsive':
+    default:
+      return 'league_admin_nonresponse_confirmation';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +439,7 @@ export function planFinalization(input: {
         status: 'official',
         finalizationSource:
           submission.finalizationSource ??
-          finalizationSourceFor({ previousStatus: 'confirmed', actor: 'league_admin' }),
+          finalizationSourceFromResolution(submission.resolution),
         finalizedAt: now,
       },
       resultVersion: submission.resultVersion,

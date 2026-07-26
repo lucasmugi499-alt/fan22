@@ -219,7 +219,9 @@ async function apiRequest<T>(
   const text = await response.text();
   const body = text ? (JSON.parse(text) as T) : ({} as T);
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    throw new Error(
+      `${response.status} ${response.statusText} for ${options.method ?? 'GET'} ${url}: ${text}`,
+    );
   }
   return body;
 }
@@ -228,34 +230,20 @@ function firestoreBase(projectId: string, databaseId: string) {
   return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
 }
 
-async function listCollectionIds(token: string, projectId: string, databaseId: string) {
-  const ids: string[] = [];
-  let pageToken: string | undefined;
-  do {
-    const response = await apiRequest<{ collectionIds?: string[]; nextPageToken?: string }>(
-      token,
-      `${firestoreBase(projectId, databaseId)}:listCollectionIds`,
-      {
-        method: 'POST',
-        body: pageToken ? { pageSize: 1000, pageToken } : { pageSize: 1000 },
-      },
-    );
-    ids.push(...(response.collectionIds ?? []));
-    pageToken = response.nextPageToken;
-  } while (pageToken);
-  return ids.sort();
-}
-
 async function listDocuments(
   token: string,
   projectId: string,
   databaseId: string,
-  collection: string,
+  collectionPath: string,
 ) {
   const documents: { name: string; fields?: Record<string, JsonValue> }[] = [];
   let pageToken: string | undefined;
   do {
-    const url = new URL(`${firestoreBase(projectId, databaseId)}/${encodeURIComponent(collection)}`);
+    const encodedPath = collectionPath
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    const url = new URL(`${firestoreBase(projectId, databaseId)}/${encodedPath}`);
     url.searchParams.set('pageSize', '300');
     if (pageToken) url.searchParams.set('pageToken', pageToken);
     const response = await apiRequest<{
@@ -266,6 +254,30 @@ async function listDocuments(
     pageToken = response.nextPageToken;
   } while (pageToken);
   return documents;
+}
+
+async function listResultSubmissionEvents(
+  token: string,
+  projectId: string,
+  databaseId: string,
+) {
+  const response = await apiRequest<
+    { document?: { name: string; fields?: Record<string, JsonValue> } }[]
+  >(
+    token,
+    `${firestoreBase(projectId, databaseId)}:runQuery`,
+    {
+      method: 'POST',
+      body: {
+        structuredQuery: {
+          from: [{ collectionId: 'events', allDescendants: true }],
+        },
+      },
+    },
+  );
+  return response
+    .flatMap((item) => (item.document ? [item.document] : []))
+    .filter((document) => document.name.includes('/documents/resultSubmissions/'));
 }
 
 async function listAuthUsers(token: string, projectId: string) {
@@ -304,12 +316,34 @@ async function takeBackup(token: string, projectId: string, databaseId: string) 
   fs.mkdirSync(firestoreDir, { recursive: true });
 
   const manifest: Record<string, number> = {};
-  for (const collection of await listCollectionIds(token, projectId, databaseId)) {
+  const rootCollections = Object.keys(EXPECTED_COUNTS).filter(
+    (collection) => collection !== 'resultSubmissionEvents',
+  );
+  for (const collection of rootCollections) {
     const documents = await listDocuments(token, projectId, databaseId, collection);
     manifest[collection] = documents.length;
     fs.writeFileSync(
       path.join(firestoreDir, `${collection}.json`),
       JSON.stringify(documents, null, 2),
+    );
+  }
+  const obsoleteRootEvents = await listDocuments(
+    token,
+    projectId,
+    databaseId,
+    'resultSubmissionEvents',
+  );
+  manifest.resultSubmissionEventsRoot = obsoleteRootEvents.length;
+  fs.writeFileSync(
+    path.join(firestoreDir, 'resultSubmissionEventsRoot.json'),
+    JSON.stringify(obsoleteRootEvents, null, 2),
+  );
+  if (manifest.resultSubmissions) {
+    const events = await listResultSubmissionEvents(token, projectId, databaseId);
+    manifest.resultSubmissionEventsNested = events.length;
+    fs.writeFileSync(
+      path.join(firestoreDir, 'resultSubmissionEventsNested.json'),
+      JSON.stringify(events, null, 2),
     );
   }
 
@@ -356,17 +390,28 @@ function firestoreValue(value: JsonValue): Record<string, unknown> {
 function firestoreDocument(
   projectId: string,
   databaseId: string,
-  collection: string,
+  documentPath: string,
   row: JsonRecord,
 ) {
   return {
     name:
       `projects/${projectId}/databases/${databaseId}/documents/` +
-      `${collection}/${encodeURIComponent(row.id)}`,
+      documentPath
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/'),
     fields: Object.fromEntries(
       Object.entries(row).map(([key, value]) => [key, firestoreValue(value)]),
     ),
   };
+}
+
+function firestoreDocumentPath(collection: string, row: JsonRecord) {
+  if (collection !== 'resultSubmissionEvents') return `${collection}/${row.id}`;
+  if (typeof row.submissionId !== 'string' || !row.submissionId) {
+    throw new Error(`Result submission event ${row.id} has no submissionId.`);
+  }
+  return `resultSubmissions/${row.submissionId}/events/${row.id}`;
 }
 
 async function writeDatabase(
@@ -378,7 +423,12 @@ async function writeDatabase(
   for (const [collection, rows] of collectionEntries(database)) {
     for (let offset = 0; offset < rows.length; offset += 400) {
       const writes = rows.slice(offset, offset + 400).map((row) => ({
-        update: firestoreDocument(projectId, databaseId, collection, row),
+        update: firestoreDocument(
+          projectId,
+          databaseId,
+          firestoreDocumentPath(collection, row),
+          row,
+        ),
       }));
       const response = await apiRequest<{ status?: { code?: number; message?: string }[] }>(
         token,
@@ -392,6 +442,31 @@ async function writeDatabase(
     }
     console.log(`Wrote ${rows.length} ${collection} documents.`);
   }
+}
+
+function deleteSeedCollections(projectId: string, databaseId: string) {
+  const rootCollections = [
+    ...Object.keys(EXPECTED_COUNTS).filter(
+      (collection) => collection !== 'resultSubmissionEvents',
+    ),
+    // Remove the obsolete location after its records have been backed up separately.
+    'resultSubmissionEvents',
+  ];
+  for (const collection of rootCollections) {
+    runFirebase([
+      'firestore:delete',
+      collection,
+      '--recursive',
+      '--force',
+      '--project',
+      projectId,
+      '--database',
+      databaseId,
+    ]);
+  }
+  console.log(
+    `Deleted ${rootCollections.length} known seed collections; unrelated staging data was preserved.`,
+  );
 }
 
 async function deleteAuthUsers(token: string, projectId: string) {
@@ -472,11 +547,28 @@ async function verifyCounts(
   expectedAuthUsers: number,
 ) {
   const actual: Record<string, number> = {};
-  for (const collection of await listCollectionIds(token, projectId, databaseId)) {
+  const rootCollections = Object.keys(expected).filter(
+    (collection) => collection !== 'resultSubmissionEvents',
+  );
+  for (const collection of rootCollections) {
     actual[collection] = (
       await listDocuments(token, projectId, databaseId, collection)
     ).length;
   }
+  const obsoleteRootEvents = await listDocuments(
+    token,
+    projectId,
+    databaseId,
+    'resultSubmissionEvents',
+  );
+  if (obsoleteRootEvents.length) {
+    throw new Error(
+      'Post-seed verification found the obsolete top-level resultSubmissionEvents collection.',
+    );
+  }
+  actual.resultSubmissionEvents = (
+    await listResultSubmissionEvents(token, projectId, databaseId)
+  ).length;
   for (const [collection, count] of Object.entries(expected)) {
     if (actual[collection] !== count) {
       throw new Error(
@@ -532,15 +624,7 @@ async function main() {
   const backupDir = await takeBackup(token, projectId, databaseId);
   console.log(`Backup written to ${backupDir}`);
 
-  runFirebase([
-    'firestore:delete',
-    '--all-collections',
-    '--force',
-    '--project',
-    projectId,
-    '--database',
-    databaseId,
-  ]);
+  deleteSeedCollections(projectId, databaseId);
   await writeDatabase(token, projectId, databaseId, database);
 
   if (args.createAuth && password) {

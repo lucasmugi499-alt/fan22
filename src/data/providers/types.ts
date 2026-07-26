@@ -8,6 +8,8 @@ import {
   Match,
   Notification,
   Report,
+  ResultSubmission,
+  ScorerEntry,
   Season,
   Sport,
   Sponsor,
@@ -59,6 +61,32 @@ export type CreateCommentInput = Omit<Comment, 'id' | 'createdAt' | 'status'> & 
   status?: Comment['status'];
 };
 
+export type CreateResultSubmissionInput = {
+  match: Pick<
+    Match,
+    'id' | 'leagueId' | 'seasonId' | 'homeTeamId' | 'awayTeamId'
+  >;
+  submittedByTeamId: string;
+  submittedByUserId: string;
+  homeScore: number;
+  awayScore: number;
+  scorers?: ScorerEntry[];
+  evidenceRefs?: string[];
+  evidenceNote?: string;
+};
+
+export type ResolveResultSubmissionInput = {
+  matchId: string;
+  resolvedByUserId: string;
+  decision: 'uphold' | 'correct' | 'reject';
+  correctedScore?: { home: number; away: number };
+  note?: string;
+};
+
+export type ResultSubmissionListener = (
+  submission: ResultSubmission | undefined,
+) => void;
+
 export interface GoalPlaceDataProvider {
   mode: DataProviderMode;
   getSports(): Promise<Sport[]>;
@@ -90,6 +118,9 @@ export interface GoalPlaceDataProvider {
   getTopPointsAthletes(limit?: number): Promise<Athlete[]>;
   getActiveChallenges(): Promise<Challenge[]>;
   getVerifiedMatches(): Promise<Match[]>;
+  getResultSubmission(matchId: string): Promise<ResultSubmission | undefined>;
+  getTeamConfirmationInbox(teamId: string): Promise<ResultSubmission[]>;
+  getLeagueResultExceptions(leagueId: string): Promise<ResultSubmission[]>;
   createSupportPledge(data: CreateSupportPledgeInput): Promise<DataWriteResult>;
   createWalletTransaction(data: CreateWalletTransactionInput): Promise<DataWriteResult>;
   createFeedPost(data: CreateFeedPostInput): Promise<DataWriteResult>;
@@ -98,4 +129,23 @@ export interface GoalPlaceDataProvider {
   toggleSave(userId: string, targetType: SaveTargetType, targetId: string): Promise<DataWriteResult>;
   updateMatchVerification(matchId: string, status: VerificationStatus): Promise<DataWriteResult>;
   updateChallengeVerification(challengeId: string, status: VerificationStatus): Promise<DataWriteResult>;
+  createResultSubmission(data: CreateResultSubmissionInput): Promise<DataWriteResult>;
+  confirmResultSubmission(matchId: string, respondedByUserId: string): Promise<DataWriteResult>;
+  disputeResultSubmission(
+    matchId: string,
+    respondedByUserId: string,
+    reason: string,
+  ): Promise<DataWriteResult>;
+  finalizeResultSubmission(matchId: string): Promise<DataWriteResult>;
+  resolveDisputedSubmission(data: ResolveResultSubmissionInput): Promise<DataWriteResult>;
+  requestResultCorrection(
+    matchId: string,
+    requestedByUserId: string,
+    reason: string,
+  ): Promise<DataWriteResult>;
+  subscribeToResultSubmission(
+    matchId: string,
+    listener: ResultSubmissionListener,
+    onError?: (error: Error) => void,
+  ): () => void;
 }

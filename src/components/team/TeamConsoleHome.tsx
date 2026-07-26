@@ -32,6 +32,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { MatchCard } from '@/components/core/MatchCard';
 import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
+import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import type { Match, Team } from '@/types';
@@ -69,9 +70,12 @@ export function TeamConsoleHome() {
 
   const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
+  const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
+    useTeamConfirmationInbox(team?.id);
 
   if (loading) return <TeamConsoleHomeSkeleton />;
   if (error) return <ErrorState onRetry={retry} />;
+  if (inboxError) return <ErrorState onRetry={refreshInbox} />;
 
   if (!team) {
     return (
@@ -87,7 +91,10 @@ export function TeamConsoleHome() {
   const upcoming = upcomingForTeam(team.id, matches).slice(0, 4);
   const roster = rosterForTeam(team.id, athletes);
   const form = recentForm(team.id, matches);
-  const top = actions[0];
+  const confirmationIds = new Set(confirmationInbox.map((item) => item.matchId));
+  const top =
+    actions.find((action) => confirmationIds.has(action.match.id)) ??
+    actions[0];
 
   return (
     <div className="space-y-5">
@@ -190,9 +197,14 @@ export function TeamConsoleHome() {
         <ResultSubmissionSheet
           open
           onClose={() => setReviewMatch(null)}
+          onComplete={() => {
+            retry();
+            void refreshInbox();
+          }}
           match={reviewMatch}
           home={teamById.get(reviewMatch.homeTeamId)}
           away={teamById.get(reviewMatch.awayTeamId)}
+          myTeamId={team.id}
         />
       ) : null}
     </div>
