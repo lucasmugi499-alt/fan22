@@ -193,7 +193,6 @@ export function TeamConsoleHome() {
           match={reviewMatch}
           home={teamById.get(reviewMatch.homeTeamId)}
           away={teamById.get(reviewMatch.awayTeamId)}
-          myTeamId={team.id}
         />
       ) : null}
     </div>

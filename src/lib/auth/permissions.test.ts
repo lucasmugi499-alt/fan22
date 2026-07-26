@@ -3,6 +3,7 @@ import { AppRole } from '@/types';
 import { MOCK_PROFILES } from './mockAuth';
 import {
   AuthState,
+  PUBLIC_DISCOVERY_ROUTES,
   PUBLIC_ROUTES,
   canAccessAdmin,
   canAccessRoute,
@@ -84,13 +85,13 @@ describe('canSupport', () => {
 });
 
 describe('canRegisterAsRole', () => {
-  it('only allows self-service signup for fan, athlete and league admin', () => {
+  it('only allows self-service signup for fans', () => {
     expect(canRegisterAsRole('fan')).toBe(true);
-    expect(canRegisterAsRole('athlete')).toBe(true);
-    expect(canRegisterAsRole('league_admin')).toBe(true);
   });
 
   it('keeps privileged roles invite-only', () => {
+    expect(canRegisterAsRole('athlete')).toBe(false);
+    expect(canRegisterAsRole('league_admin')).toBe(false);
     expect(canRegisterAsRole('team_admin')).toBe(false);
     expect(canRegisterAsRole('platform_admin')).toBe(false);
     expect(canRegisterAsRole('super_admin')).toBe(false);
@@ -100,6 +101,11 @@ describe('canRegisterAsRole', () => {
 describe('canAccessRoute', () => {
   it.each(PUBLIC_ROUTES)('serves %s to logged-out visitors', (route) => {
     expect(canAccessRoute(LOGGED_OUT, route)).toBe(true);
+  });
+
+  it.each(PUBLIC_DISCOVERY_ROUTES)('serves %s and its detail pages to logged-out visitors', (route) => {
+    expect(canAccessRoute(LOGGED_OUT, route)).toBe(true);
+    expect(canAccessRoute(LOGGED_OUT, `${route}/demo-id`)).toBe(true);
   });
 
   it('denies every protected route to logged-out visitors', () => {

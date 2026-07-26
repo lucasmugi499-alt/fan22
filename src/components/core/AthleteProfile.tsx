@@ -63,6 +63,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
         eyebrow={team?.name}
         title={athlete.name}
         verified={athlete.verified}
+        followable={false}
         meta={
           <>
             <span>{athlete.position}</span>

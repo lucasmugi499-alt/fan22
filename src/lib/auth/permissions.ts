@@ -106,7 +106,7 @@ export function canCreateChallenge(auth: AuthState): boolean {
 }
 
 export function canRegisterAsRole(role: AppRole): boolean {
-  return ['fan', 'athlete', 'league_admin'].includes(role);
+  return role === 'fan';
 }
 
 // Verifications
@@ -166,9 +166,24 @@ export const PUBLIC_ROUTES = [
   '/login'
 ];
 
+export const PUBLIC_DISCOVERY_ROUTES = [
+  '/leagues',
+  '/teams',
+  '/athletes',
+  '/matches',
+];
+
+export function isPublicRoute(pathname: string): boolean {
+  return (
+    PUBLIC_ROUTES.includes(pathname) ||
+    PUBLIC_DISCOVERY_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+  );
+}
+
 export function canAccessRoute(auth: AuthState, pathname: string): boolean {
-  // Public routes check
-  if (PUBLIC_ROUTES.includes(pathname) || pathname === '/') {
+  if (isPublicRoute(pathname)) {
     return true;
   }
 
@@ -194,7 +209,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);
   }
 
-  // All other protected routes like /home, /feed, /profile, /settings, /sports, /matches, /athletes, /teams, /leagues, /awards, /notifications are accessible to any logged in user
+  // All other shared surfaces are accessible to any logged-in user.
   return true;
 }
 

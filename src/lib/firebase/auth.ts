@@ -34,25 +34,22 @@ export async function registerAccount({
   email,
   password,
   name,
-  role,
 }: {
   email: string;
   password: string;
   name: string;
-  role: AppRole;
 }) {
   const { auth, db } = requireFirebaseClient();
   const credential = await createUserWithEmailAndPassword(auth, email, password);
 
   await updateProfile(credential.user, { displayName: name });
 
-  const pendingRoles: AppRole[] = ['athlete', 'team_admin', 'league_admin'];
   const profile: Omit<UserProfile, 'id'> = {
     uid: credential.user.uid,
     email,
     name,
-    role,
-    status: pendingRoles.includes(role) ? 'pending' : 'active',
+    role: 'fan',
+    status: 'active',
     points: 0,
     walletBalance: 0,
     followedAthletes: [],
@@ -108,13 +105,4 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
   }
 
   return profile?.role ?? null;
-}
-
-export function routeForAppRole(role?: AppRole | null) {
-  if (role === 'athlete') return '/athlete-dashboard';
-  if (role === 'team_admin') return '/team-admin';
-  if (role === 'league_admin') return '/league-admin';
-  if (role === 'sponsor') return '/sponsors';
-  if (role === 'platform_admin' || role === 'super_admin') return '/admin';
-  return '/home';
 }

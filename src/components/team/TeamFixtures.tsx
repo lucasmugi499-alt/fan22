@@ -95,7 +95,6 @@ export function TeamFixtures() {
           match={activeMatch}
           home={teamById.get(activeMatch.homeTeamId)}
           away={teamById.get(activeMatch.awayTeamId)}
-          myTeamId={team.id}
         />
       ) : null}
     </div>

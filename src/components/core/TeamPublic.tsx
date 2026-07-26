@@ -62,6 +62,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
         eyebrow={league?.name}
         title={team.name}
         verified={team.verified}
+        followable={false}
         meta={
           <>
             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {team.city}</span>

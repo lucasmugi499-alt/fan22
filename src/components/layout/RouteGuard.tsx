@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, SpinnerGap } from '@phosphor-icons/react';
@@ -20,19 +20,18 @@ import { Button } from '@/components/ui/Button';
 export function RouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const router = useRouter();
   const { authStatus, userProfile, role, loading } = useAuth();
-  const [redirecting, setRedirecting] = useState(false);
 
   const allowed = canAccessRoute({ authStatus, userProfile, role }, pathname);
   const home = getDefaultRouteForRole(role);
   // A signed-in user sent to their own dashboard; a visitor sent to sign in.
   const target = authStatus === 'logged_in' && home !== pathname ? home : '/login';
+  const redirecting = !loading && !allowed && target !== pathname;
 
   useEffect(() => {
     if (loading || allowed) return;
     // Only auto-redirect when there is somewhere useful to go, so a deliberate forbidden
     // URL surfaces the denial instead of bouncing the user in circles.
     if (target === pathname) return;
-    setRedirecting(true);
     router.replace(target);
   }, [loading, allowed, target, pathname, router]);
 

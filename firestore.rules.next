@@ -7,7 +7,7 @@ service cloud.firestore {
     }
 
     function role() {
-      return signedIn() ? request.auth.token.role : null;
+      return signedIn() ? request.auth.token.get('role', null) : null;
     }
 
     function isPlatformAdmin() {
@@ -84,30 +84,52 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+      allow create: if isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role == 'fan' &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.points == 0 &&
+        request.resource.data.walletBalance == 0;
       allow read: if isOwner(uid) || isPlatformAdmin();
-      allow update: if isOwner(uid) || isPlatformAdmin();
+      allow update: if isPlatformAdmin() ||
+        (isOwner(uid) && changedKeysWithin([
+          'name', 'displayName', 'city', 'avatarUrl', 'photoURL',
+          'followedAthletes', 'followedTeams', 'followedLeagues',
+          'sportPreferences', 'notificationPreferences', 'updatedAt'
+        ]));
       allow delete: if isSuperAdmin();
     }
 
     match /athletes/{athleteId} {
       allow read: if true;
-      allow create: if isPlatformAdmin() || isOwner(request.resource.data.userId);
-      allow update: if isPlatformAdmin() || isOwner(resource.data.userId);
+      allow create: if isPlatformAdmin();
+      allow update: if isPlatformAdmin() ||
+        (isOwner(resource.data.userId) && changedKeysWithin([
+          'name', 'bio', 'city', 'avatarUrl', 'avatarURL',
+          'coverUrl', 'coverURL', 'impactNeeds', 'updatedAt'
+        ]));
       allow delete: if isSuperAdmin();
     }
 
     match /teams/{teamId} {
       allow read: if true;
-      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
-      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow create: if isPlatformAdmin();
+      allow update: if isPlatformAdmin() ||
+        (uidInAdminList(resource.data) && changedKeysWithin([
+          'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
+          'teamAdminName', 'teamAdminEmail', 'lastUpdated', 'updatedAt'
+        ]));
       allow delete: if isSuperAdmin();
     }
 
     match /leagues/{leagueId} {
       allow read: if true;
-      allow create: if isPlatformAdmin() || uidInAdminList(request.resource.data);
-      allow update: if isPlatformAdmin() || uidInAdminList(resource.data);
+      allow create: if isPlatformAdmin();
+      allow update: if isPlatformAdmin() ||
+        (uidInAdminList(resource.data) && changedKeysWithin([
+          'name', 'city', 'description', 'logoUrl', 'logoURL',
+          'currentSeasonId', 'verificationRules', 'updatedAt'
+        ]));
       allow delete: if isSuperAdmin();
     }
 
@@ -125,8 +147,15 @@ service cloud.firestore {
 
     match /matches/{matchId} {
       allow read: if true;
-      allow create: if canManageLeagueById(request.resource.data.leagueId);
-      allow update: if canManageLeagueById(resource.data.leagueId);
+      allow create: if canManageLeagueById(request.resource.data.leagueId) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.score.home == null &&
+        request.resource.data.score.away == null &&
+        !('officialResultVersion' in request.resource.data);
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        changedKeysWithin([
+          'scheduledAt', 'date', 'venue', 'city', 'publicNotes', 'status', 'updatedAt'
+        ]);
       allow delete: if isSuperAdmin();
     }
 

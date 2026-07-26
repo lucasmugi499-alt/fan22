@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowRight } from '@phosphor-icons/react/dist/ssr';
+import { MarketingMobileMenu } from '@/components/marketing/MarketingMobileMenu';
 
 const FOOTER_LINKS = [
   {
@@ -91,21 +92,21 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             </Link>
             <Link
               href="/login"
-              className="hidden rounded-sm px-3 py-2 font-medium text-muted transition hover:text-text-strong sm:block"
+              className="hidden rounded-sm px-3 py-2 font-medium text-muted transition hover:text-text-strong lg:block"
             >
               Sign in
             </Link>
             <Link
               href="/login"
-              className="group ml-1 inline-flex h-10 items-center gap-2 rounded-sm bg-brand px-3.5 font-bold text-on-brand transition hover:bg-brand-hover active:translate-y-px sm:px-4"
+              className="group ml-1 hidden h-10 items-center gap-2 rounded-sm bg-brand px-4 font-bold text-on-brand transition hover:bg-brand-hover active:translate-y-px lg:inline-flex"
             >
-              <span className="sm:hidden">Explore</span>
-              <span className="hidden sm:inline">Explore GoalPlace256</span>
+              Explore GoalPlace256
               <ArrowRight
                 className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
                 weight="bold"
               />
             </Link>
+            <MarketingMobileMenu />
           </nav>
         </div>
       </header>

@@ -28,6 +28,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
  */
 
 const PROJECT_ID = 'goalplace256-rules-test';
+const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? 'firestore.rules.next';
 
 let testEnv: RulesTestEnvironment;
 
@@ -66,7 +67,7 @@ beforeAll(async () => {
       // production (the known-good baseline). The new authorization matrix lives in
       // firestore.rules.next until this suite passes against it in staging — so an
       // accidental `firebase deploy` can only ever redeploy the validated baseline.
-      rules: readFileSync('firestore.rules.next', 'utf8'),
+      rules: readFileSync(RULES_FILE, 'utf8'),
       host: '127.0.0.1',
       port: 8080,
     },
@@ -85,6 +86,33 @@ beforeEach(async () => {
     await setDoc(doc(db, 'teams/team_a'), { name: 'Team A', adminUserIds: [TEAM_A_ADMIN] });
     await setDoc(doc(db, 'teams/team_b'), { name: 'Team B', adminUserIds: [TEAM_B_ADMIN] });
     await setDoc(doc(db, 'leagues/league_001'), { name: 'League', adminUserIds: [LEAGUE_ADMIN] });
+    await setDoc(doc(db, `users/${OUTSIDER}`), {
+      uid: OUTSIDER,
+      email: 'fan@example.com',
+      name: 'Fan',
+      role: 'fan',
+      status: 'active',
+      points: 0,
+      walletBalance: 0,
+      followedAthletes: [],
+      followedTeams: [],
+      followedLeagues: [],
+    });
+    await setDoc(doc(db, 'athletes/athlete_001'), {
+      userId: OUTSIDER,
+      name: 'Demo Athlete',
+      bio: 'Original bio',
+      city: 'Kampala',
+      teamId: 'team_a',
+      leagueId: 'league_001',
+      verified: true,
+      verificationStatus: 'verified',
+      totalSupport: 1000,
+      supportersCount: 2,
+      goalPlacePoints: 10,
+      stats: { appearances: 3 },
+      impactNeeds: [],
+    });
     await setDoc(doc(db, 'matches/match_001'), {
       leagueId: 'league_001',
       seasonId: 'season_001',
@@ -152,7 +180,7 @@ describe('result submission: creating a claim', () => {
 });
 
 describe('result submission: answering a claim', () => {
-  beforeEach(seedSubmission);
+  beforeEach(() => seedSubmission());
 
   it('lets the opponent confirm', async () => {
     await assertSucceeds(
@@ -237,6 +265,123 @@ describe('the trust boundary: nobody can author an official result', () => {
       })
     );
   });
+
+  it('refuses to let a league admin score or verify the match directly', async () => {
+    await assertFails(
+      updateDoc(doc(asUser(LEAGUE_ADMIN), 'matches/match_001'), {
+        score: { home: 2, away: 1 },
+        verificationStatus: 'verified',
+      })
+    );
+  });
+
+  it('still lets the league admin maintain fixture details', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asUser(LEAGUE_ADMIN), 'matches/match_001'), {
+        venue: 'Nakivubo Stadium',
+        scheduledAt: '2026-03-08T15:00:00.000Z',
+      })
+    );
+  });
+});
+
+describe('profile and assignment integrity', () => {
+  it('lets a new user create only a fan profile for themselves', async () => {
+    const newFan = 'new_fan';
+    const profile = {
+      uid: newFan,
+      email: 'new@example.com',
+      name: 'New Fan',
+      role: 'fan',
+      status: 'active',
+      points: 0,
+      walletBalance: 0,
+      followedAthletes: [],
+      followedTeams: [],
+      followedLeagues: [],
+    };
+
+    await assertSucceeds(setDoc(doc(asUser(newFan), `users/${newFan}`), profile));
+    await assertFails(
+      setDoc(doc(asUser('new_admin'), 'users/new_admin'), {
+        ...profile,
+        uid: 'new_admin',
+        role: 'league_admin',
+      })
+    );
+  });
+
+  it('lets a user edit profile fields but not role, status, points, or balance', async () => {
+    const profileRef = doc(asUser(OUTSIDER), `users/${OUTSIDER}`);
+
+    await assertSucceeds(updateDoc(profileRef, {
+      city: 'Jinja',
+      followedLeagues: ['league_001'],
+    }));
+
+    for (const protectedUpdate of [
+      { role: 'league_admin' },
+      { status: 'suspended' },
+      { points: 9999 },
+      { walletBalance: 9999 },
+    ]) {
+      await assertFails(updateDoc(profileRef, protectedUpdate));
+    }
+  });
+
+  it('lets an athlete edit their story but not official sporting fields', async () => {
+    const athleteRef = doc(asUser(OUTSIDER), 'athletes/athlete_001');
+
+    await assertSucceeds(updateDoc(athleteRef, {
+      bio: 'Updated athlete story',
+      impactNeeds: ['Training boots'],
+    }));
+
+    for (const protectedUpdate of [
+      { teamId: 'team_b' },
+      { verified: false },
+      { verificationStatus: 'pending' },
+      { stats: { appearances: 99 } },
+      { totalSupport: 9999 },
+      { goalPlacePoints: 9999 },
+    ]) {
+      await assertFails(updateDoc(athleteRef, protectedUpdate));
+    }
+  });
+
+  it('prevents self-assignment when creating athletes, teams, and leagues', async () => {
+    await assertFails(
+      setDoc(doc(asUser(OUTSIDER), 'athletes/self_created'), {
+        userId: OUTSIDER,
+        name: 'Self Created Athlete',
+      })
+    );
+    await assertFails(
+      setDoc(doc(asUser(OUTSIDER), 'teams/self_created'), {
+        name: 'Self Created Team',
+        adminUserIds: [OUTSIDER],
+      })
+    );
+    await assertFails(
+      setDoc(doc(asUser(OUTSIDER), 'leagues/self_created'), {
+        name: 'Self Created League',
+        adminUserIds: [OUTSIDER],
+      })
+    );
+  });
+
+  it('lets assigned admins edit public details but not their authority or official metrics', async () => {
+    const teamRef = doc(asUser(TEAM_A_ADMIN), 'teams/team_a');
+    const leagueRef = doc(asUser(LEAGUE_ADMIN), 'leagues/league_001');
+
+    await assertSucceeds(updateDoc(teamRef, { description: 'Community team profile' }));
+    await assertSucceeds(updateDoc(leagueRef, { description: 'Community competition profile' }));
+
+    await assertFails(updateDoc(teamRef, { adminUserIds: [TEAM_A_ADMIN, OUTSIDER] }));
+    await assertFails(updateDoc(teamRef, { leaguePoints: 100 }));
+    await assertFails(updateDoc(leagueRef, { adminUserIds: [LEAGUE_ADMIN, OUTSIDER] }));
+    await assertFails(updateDoc(leagueRef, { verified: true }));
+  });
 });
 
 describe('league adjudication', () => {
@@ -282,7 +427,7 @@ describe('league adjudication', () => {
 });
 
 describe('audit trail is append-only', () => {
-  beforeEach(seedSubmission);
+  beforeEach(() => seedSubmission());
 
   it('allows appending an event', async () => {
     await assertSucceeds(

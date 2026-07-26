@@ -52,6 +52,7 @@ const DISCOVERY_FEATURES = [
 
 const LEAGUES = [
   {
+    id: 'league_football_kampala',
     name: 'Kampala Metro Community Football League',
     sport: 'Football',
     location: 'Kampala',
@@ -62,6 +63,18 @@ const LEAGUES = [
     icon: SoccerBall,
   },
   {
+    id: 'league_football_eastern',
+    name: 'Eastern Uganda Regional Development League',
+    sport: 'Football',
+    location: 'Mbale',
+    season: '2026 season',
+    teams: 10,
+    matches: 45,
+    accent: 'from-green-950 via-teal-950 to-surface-1',
+    icon: SoccerBall,
+  },
+  {
+    id: 'league_basketball_kampala',
     name: 'Kampala Metropolitan Basketball League',
     sport: 'Basketball',
     location: 'Kampala',
@@ -72,6 +85,18 @@ const LEAGUES = [
     icon: Basketball,
   },
   {
+    id: 'league_basketball_north',
+    name: 'Northern Uganda Community Basketball League',
+    sport: 'Basketball',
+    location: 'Gulu',
+    season: '2026 season',
+    teams: 10,
+    matches: 45,
+    accent: 'from-red-950 via-orange-950 to-surface-1',
+    icon: Basketball,
+  },
+  {
+    id: 'league_rugby_kampala',
     name: 'Kampala Community Rugby Championship',
     sport: 'Rugby',
     location: 'Kampala',
@@ -81,10 +106,22 @@ const LEAGUES = [
     accent: 'from-blue-950 via-cyan-950 to-surface-1',
     icon: FlagCheckered,
   },
+  {
+    id: 'league_rugby_eastern',
+    name: 'Nile and Eastern Rugby Development League',
+    sport: 'Rugby',
+    location: 'Jinja',
+    season: '2026 season',
+    teams: 10,
+    matches: 45,
+    accent: 'from-indigo-950 via-sky-950 to-surface-1',
+    icon: FlagCheckered,
+  },
 ];
 
 const ATHLETES = [
   {
+    id: 'ath_football_01_06_07',
     name: 'Daniel Aciro',
     team: 'Luzira Athletic',
     league: 'Kampala Metro Community Football League',
@@ -95,6 +132,7 @@ const ATHLETES = [
     initials: 'AN',
   },
   {
+    id: 'ath_basketball_04_03_11',
     name: 'Peter Namanya',
     team: 'Kitgum Warriors',
     league: 'Northern Uganda Community Basketball League',
@@ -105,6 +143,7 @@ const ATHLETES = [
     initials: 'BO',
   },
   {
+    id: 'ath_rugby_05_07_05',
     name: 'Trevor Kalema',
     team: 'Lubowa Harriers',
     league: 'Kampala Community Rugby Championship',
@@ -223,7 +262,7 @@ export function Landing() {
               Grassroots sport. One trusted home.
             </div>
             <h1 className="landing-rise landing-delay-2 mt-6 max-w-4xl text-balance font-display text-5xl font-semibold leading-[0.96] text-white sm:text-6xl lg:text-8xl">
-              Follow the leagues shaping African sport.
+              Follow the leagues shaping Africa&apos;s sporting future, starting in Uganda.
             </h1>
             <p className="landing-rise landing-delay-3 mt-6 max-w-2xl text-pretty text-base leading-7 text-slate-200 sm:text-lg">
               Fixtures, verified results, rising athletes, and the teams your community cares
@@ -359,7 +398,7 @@ export function Landing() {
             <TextLink href="/leagues">View all leagues</TextLink>
           </div>
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {LEAGUES.map(({ name, sport, location, season, teams, matches, accent, icon: Icon }) => (
+            {LEAGUES.map(({ id, name, sport, location, season, teams, matches, accent, icon: Icon }) => (
               <article
                 key={name}
                 className={`group relative flex min-h-96 flex-col overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br ${accent} p-6 transition duration-300 hover:-translate-y-1 hover:border-white/20`}
@@ -394,10 +433,10 @@ export function Landing() {
                     </div>
                   </div>
                   <Link
-                    href="/leagues"
+                    href={`/leagues/${id}`}
                     className="mt-5 inline-flex h-11 w-full items-center justify-between rounded-sm bg-white px-4 text-sm font-bold text-surface-0 transition hover:bg-brand active:translate-y-px"
                   >
-                    Follow league
+                    View league
                     <CaretRight className="h-4 w-4" weight="bold" />
                   </Link>
                 </div>
@@ -544,16 +583,10 @@ export function Landing() {
                     <Heart className="mt-0.5 h-4 w-4 shrink-0 text-brand-2" weight="fill" />
                     <p className="text-sm leading-5 text-muted">{athlete.note}</p>
                   </div>
-                  <div className="mt-5 grid grid-cols-2 gap-2">
+                  <div className="mt-5">
                     <Link
-                      href="/athletes"
-                      className="inline-flex h-11 items-center justify-center rounded-sm bg-brand text-sm font-bold text-on-brand transition hover:bg-brand-hover active:translate-y-px"
-                    >
-                      Follow
-                    </Link>
-                    <Link
-                      href="/athletes"
-                      className="inline-flex h-11 items-center justify-center rounded-sm border border-border-strong text-sm font-semibold text-text-strong transition hover:bg-surface-2 active:translate-y-px"
+                      href={`/athletes/${athlete.id}`}
+                      className="inline-flex h-11 w-full items-center justify-center rounded-sm bg-brand text-sm font-bold text-on-brand transition hover:bg-brand-hover active:translate-y-px"
                     >
                       View profile
                     </Link>

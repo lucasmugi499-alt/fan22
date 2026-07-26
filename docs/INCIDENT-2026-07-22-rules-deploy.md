@@ -106,3 +106,13 @@ The matrix returns to production only after all of:
    including duplicate-trigger and stale-version cases.
 4. `firestore.rules.next` is promoted to `firestore.rules` in a reviewed commit.
 5. Deployed with an explicit `--project`.
+
+## Follow-up: 2026-07-26
+
+- A project-local Temurin 21 JDK is available under the ignored `.tools/` directory.
+- `npm run test:rules` passes all 30 authorization tests against `firestore.rules.next`.
+- The active rules pass 10 focused profile, assignment, and official-result integrity tests.
+- The staging project and named `fg256` database now exist.
+- The full two-team submission, trusted finalizer, duplicate-trigger, stale-version, and
+  standings workflow is still outstanding. The candidate matrix therefore remains in
+  `firestore.rules.next` and must not be promoted yet.

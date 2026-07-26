@@ -27,8 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/pilot') ||
     pathname.startsWith('/verification') ||
     pathname.startsWith('/sponsors') ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/register');
+    pathname.startsWith('/login');
 
   if (isMarketing) {
     return <div className="min-h-dvh">{children}</div>;

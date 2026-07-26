@@ -9,8 +9,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".firebase/**",
+    ".pnpm-store/**",
     "out/**",
     "build/**",
+    ".tools/**",
+    "functions/lib/**",
+    "functions/node_modules/**",
+    "coverage/**",
     "next-env.d.ts",
   ]),
 ]);

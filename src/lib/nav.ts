@@ -17,6 +17,8 @@ import {
   Coins,
   Gavel,
   SlidersHorizontal,
+  SignIn,
+  Info,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -52,6 +54,21 @@ const COMMON_MORE: NavDestination[] = [
 ];
 
 export const ROLE_NAV: Record<string, RoleNav> = {
+  guest: {
+    workspace: 'Explore GoalPlace',
+    primary: [
+      { name: 'Leagues', href: '/leagues', icon: Buildings },
+      { name: 'Matches', href: '/matches', icon: Calendar },
+      { name: 'Athletes', href: '/athletes', icon: Users },
+      { name: 'Teams', href: '/teams', icon: SoccerBall },
+    ],
+    more: [
+      { name: 'How it works', href: '/how-it-works', icon: Info },
+      { name: 'Verification', href: '/verification', icon: ShieldCheck },
+      { name: 'Sponsors', href: '/sponsors', icon: Coins },
+      { name: 'Sign in', href: '/login', icon: SignIn },
+    ],
+  },
   fan: {
     workspace: 'GoalPlace',
     primary: [
@@ -127,6 +144,8 @@ export const ROLE_NAV: Record<string, RoleNav> = {
 };
 
 export function navForRole(role: AppRole | null | undefined): RoleNav {
+  if (!role) return ROLE_NAV.guest;
+  if (role === 'super_admin') return ROLE_NAV.platform_admin;
   if (role && ROLE_NAV[role]) return ROLE_NAV[role];
-  return ROLE_NAV.fan;
+  return ROLE_NAV.guest;
 }

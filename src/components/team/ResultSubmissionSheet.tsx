@@ -25,14 +25,12 @@ export function ResultSubmissionSheet({
   match,
   home,
   away,
-  myTeamId,
 }: {
   open: boolean;
   onClose: () => void;
   match: Match;
   home?: Team;
   away?: Team;
-  myTeamId: string;
 }) {
   const updateDemoMatch = useAppStore((s) => s.updateDemoMatch);
   const [homeScore, setHomeScore] = useState<string>(match.score.home?.toString() ?? '');
@@ -41,7 +39,6 @@ export function ResultSubmissionSheet({
 
   const hasScore = match.score.home !== null && match.score.away !== null;
   const official = isOfficialMatch(match);
-  const iAmHome = match.homeTeamId === myTeamId;
   // Demo framing: if my team submitted, I am awaiting the opponent; otherwise it is my turn
   // to respond. We approximate "submitter" as the home team when no submission record exists.
   const mode: 'submit' | 'respond' | 'view' = official

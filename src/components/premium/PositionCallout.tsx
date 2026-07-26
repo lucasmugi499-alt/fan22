@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { CaretUp, CaretDown, Minus } from '@phosphor-icons/react/dist/ssr';
 import type { LeagueStanding } from '@/lib/leagueModel';
-import type { Team } from '@/types';
 import { Crest } from '@/components/premium/Crest';
 import { cn } from '@/lib/utils';
 

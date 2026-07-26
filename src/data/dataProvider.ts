@@ -5,7 +5,9 @@ import { mockProvider } from './providers/mockProvider';
 export const dataMode = process.env.NEXT_PUBLIC_DATA_MODE === 'firebase' ? 'firebase' : 'mock';
 
 if (dataMode === 'firebase' && !isFirebaseConfigured) {
-  console.warn('NEXT_PUBLIC_DATA_MODE=firebase is set, but Firebase env variables are missing. GoalPlace256 will use mock mode.');
+  throw new Error(
+    'GoalPlace256 is configured for Firebase, but the Firebase client environment is incomplete.',
+  );
 }
 
-export const dataProvider = dataMode === 'firebase' && isFirebaseConfigured ? firebaseProvider : mockProvider;
+export const dataProvider = dataMode === 'firebase' ? firebaseProvider : mockProvider;
