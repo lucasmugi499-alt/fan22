@@ -16,6 +16,8 @@ const CATEGORY: Record<string, string> = {
  */
 export function NewsRow({ title, posts, badge, seeAllHref = '/feed' }: { title: string; posts: FeedPost[]; badge?: React.ReactNode; seeAllHref?: string }) {
   if (!posts.length) return null;
+  const stories = posts.slice(0, 3);
+
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
@@ -27,24 +29,37 @@ export function NewsRow({ title, posts, badge, seeAllHref = '/feed' }: { title: 
           See all <CaretRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {posts.slice(0, 3).map((p) => {
-          const cat = CATEGORY[p.type] ?? 'News';
-          const media = p.mediaUrl || p.mediaURL || bannerImage(p.id, cat);
-          return (
-            <Link key={p.id} href="/feed" className="group overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
-              <div className="aspect-[16/10] w-full overflow-hidden bg-surface-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={media} alt="" className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-fluid)] group-hover:scale-105" loading="lazy" />
-              </div>
-              <div className="p-3.5">
-                <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-strong">{p.caption}</p>
-                <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand">{cat}</p>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="sm:hidden">
+        <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)]">
+          {stories.map((post) => <NewsCard key={post.id} post={post} mobile />)}
+        </div>
+      </div>
+      <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
+        {stories.map((post) => <NewsCard key={post.id} post={post} />)}
       </div>
     </section>
+  );
+}
+
+function NewsCard({ post, mobile = false }: { post: FeedPost; mobile?: boolean }) {
+  const category = CATEGORY[post.type] ?? 'News';
+  const media = post.mediaUrl || post.mediaURL || bannerImage(post.id, category);
+
+  return (
+    <Link
+      href="/feed"
+      className={`group overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core ${
+        mobile ? 'snap-item w-[82vw] max-w-80' : 'min-w-0'
+      }`}
+    >
+      <div className="aspect-[16/10] w-full overflow-hidden bg-surface-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={media} alt="" className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-fluid)] group-hover:scale-105" loading="lazy" />
+      </div>
+      <div className="p-3.5">
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-strong">{post.caption}</p>
+        <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand">{category}</p>
+      </div>
+    </Link>
   );
 }

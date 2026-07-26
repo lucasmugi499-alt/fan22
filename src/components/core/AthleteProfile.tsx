@@ -82,8 +82,8 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-5">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
           {nextMatch ? <NextMatchCard match={nextMatch} home={teamById.get(nextMatch.homeTeamId)} away={teamById.get(nextMatch.awayTeamId)} /> : null}
           <PeopleCarousel title="Teammates" athletes={teammates} />
           <NewsRow title="From the club" posts={news} />
