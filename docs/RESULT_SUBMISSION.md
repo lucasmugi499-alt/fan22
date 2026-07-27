@@ -249,6 +249,8 @@ On July 26, 2026:
 - A duplicate finalization request returned `already_finalized`.
 - Official Kampala basketball matches increased from 40 to 41, and the affected standings
   row advanced from eight to nine matches played.
+- The canonical package was reseeded after the test and re-verified at its original
+  baseline of 240 official results and 23 demo accounts.
 
 Stale-version refusal remains covered by the pure finalizer unit suite; producing a stale
 version through client credentials is intentionally impossible.
