@@ -147,10 +147,6 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
     }
 
-    function nonNegativeAmount() {
-      return request.resource.data.amount is number && request.resource.data.amount > 0;
-    }
-
     match /sports/{sportId} {
       allow read: if true;
       allow create, update: if isPlatformAdmin();
