@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { UserSwitch, Check, SignOut } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
+import { isPublicRoute } from '@/lib/auth/permissions';
 import type { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -23,10 +24,11 @@ const DEMO_ROLES: { role: AppRole; label: string }[] = [
 
 export function DemoRoleSwitcher() {
   const router = useRouter();
+  const pathname = usePathname();
   const { role, setDemoRole } = useAuth();
   const [open, setOpen] = useState(false);
 
-  if (!isDemoModeEnabled) return null;
+  if (!isDemoModeEnabled || (pathname !== '/login' && isPublicRoute(pathname))) return null;
 
   const currentLabel = DEMO_ROLES.find((r) => r.role === role)?.label ?? 'Guest';
 
@@ -39,7 +41,7 @@ export function DemoRoleSwitcher() {
   }
 
   return (
-    <div className="fixed left-3 z-50 bottom-[calc(var(--nav-h)+var(--safe-bottom)+12px)] md:bottom-4">
+    <div className="fixed left-3 z-50 bottom-[calc(var(--nav-h)+var(--safe-bottom)+68px)] md:bottom-4">
       {open ? (
         <div
           role="menu"

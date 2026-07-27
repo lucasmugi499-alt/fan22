@@ -7,17 +7,26 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import {
   AppRole,
   Athlete,
+  AdminAuditEvent,
   Challenge,
+  FinalizationRecord,
   FeedPost,
   League,
+  LeagueAdminApplication,
+  LeagueNotice,
   Match,
+  Notification,
   Report,
+  Roster,
   Season,
+  SponsorReport,
+  Sponsor,
   SportSlug,
   SportType,
+  StoredStanding,
+  SupportNeed,
   Team,
   Verification,
-  WalletTransaction,
 } from '@/types';
 import { useAuth } from '@/context/AuthProvider';
 import { useAppStore } from '@/lib/store';
@@ -27,6 +36,9 @@ import {
   normalizeMatchVerification,
   normalizeVerificationStatus,
 } from '@/lib/status';
+import { cacheData, readCachedData } from '@/lib/offline';
+import type { Contribution } from '@/types/money';
+import type { DataQueryOptions } from '@/data/providers/types';
 
 function toSportName(sport?: SportSlug | SportType): SportType {
   if (sport === 'basketball' || sport === 'Basketball') return 'Basketball';
@@ -127,6 +139,7 @@ export function adaptChallenge(challenge: Challenge): Challenge {
     sport: toSportName(challenge.sport),
     targetDescription: challenge.targetDescription ?? challenge.description,
     status: normalizeChallengeStatus(challenge.status),
+    fundingModel: challenge.fundingModel ?? 'non_cash',
     verificationStatus: normalizeVerificationStatus(challenge.verificationStatus),
   };
 }
@@ -163,6 +176,15 @@ const initialData = {
   reports: [] as Report[],
   seasons: [] as Season[],
   verifications: [] as Verification[],
+  rosters: [] as Roster[],
+  storedStandings: [] as StoredStanding[],
+  sponsorReports: [] as SponsorReport[],
+  leagueNotices: [] as LeagueNotice[],
+  finalizations: [] as FinalizationRecord[],
+  supportNeeds: [] as SupportNeed[],
+  leagueAdminApplications: [] as LeagueAdminApplication[],
+  adminAuditEvents: [] as AdminAuditEvent[],
+  sponsors: [] as Sponsor[],
 };
 
 export type GoalPlaceDataCollection = keyof typeof initialData;
@@ -183,12 +205,16 @@ export async function loadGoalPlaceData(
     athleteRanking,
     athleteLimit,
     feedLimit,
+    scope,
+    recordLimit,
   }: {
     role?: AppRole | null;
     collections?: readonly GoalPlaceDataCollection[];
     athleteRanking?: 'support' | 'points';
     athleteLimit?: number;
     feedLimit?: number;
+    scope?: DataQueryOptions;
+    recordLimit?: number;
   } = {}
 ) {
   const requested = new Set(collections);
@@ -198,24 +224,66 @@ export async function loadGoalPlaceData(
     if (!shouldLoad('athletes')) return Promise.resolve([] as Athlete[]);
     if (athleteRanking === 'support') return provider.getTopSupportedAthletes(athleteLimit);
     if (athleteRanking === 'points') return provider.getTopPointsAthletes(athleteLimit);
-    return provider.getAthletes();
+    return provider.getAthletes({ ...scope, limit: athleteLimit ?? recordLimit });
   };
-  const [athletes, teams, leagues, seasons, matches, challenges, feedPosts, reports, verifications] = await Promise.all([
+  const [
+    athletes,
+    teams,
+    leagues,
+    seasons,
+    matches,
+    challenges,
+    feedPosts,
+    reports,
+    verifications,
+    rosters,
+    storedStandings,
+    sponsorReports,
+    leagueNotices,
+    finalizations,
+    supportNeeds,
+    leagueAdminApplications,
+    adminAuditEvents,
+    sponsors,
+  ] = await Promise.all([
     loadAthletes(),
-    shouldLoad('teams') ? provider.getTeams() : Promise.resolve([] as Team[]),
+    shouldLoad('teams') ? provider.getTeams({ ...scope, limit: recordLimit }) : Promise.resolve([] as Team[]),
     shouldLoad('leagues') ? provider.getLeagues() : Promise.resolve([] as League[]),
     shouldLoad('seasons') ? provider.getSeasons() : Promise.resolve([] as Season[]),
-    shouldLoad('matches') ? provider.getMatches() : Promise.resolve([] as Match[]),
-    shouldLoad('challenges') ? provider.getChallenges() : Promise.resolve([] as Challenge[]),
+    shouldLoad('matches') ? provider.getMatches({ ...scope, limit: recordLimit }) : Promise.resolve([] as Match[]),
+    shouldLoad('challenges') ? provider.getChallenges({ ...scope, limit: recordLimit }) : Promise.resolve([] as Challenge[]),
     shouldLoad('feedPosts')
       ? feedLimit
         ? provider.getLatestFeedPosts(feedLimit)
-        : provider.getFeedPosts()
+        : provider.getFeedPosts({ ...scope, limit: recordLimit })
       : Promise.resolve([] as FeedPost[]),
     shouldLoad('reports') && shouldLoadPlatformCollections ? provider.getReports() : Promise.resolve([] as Report[]),
     shouldLoad('verifications') && shouldLoadPlatformCollections
       ? provider.getVerifications()
       : Promise.resolve([] as Verification[]),
+    shouldLoad('rosters') ? provider.getRosters({ ...scope, limit: recordLimit }) : Promise.resolve([] as Roster[]),
+    shouldLoad('storedStandings')
+      ? provider.getStoredStandings()
+      : Promise.resolve([] as StoredStanding[]),
+    shouldLoad('sponsorReports')
+      ? provider.getSponsorReports()
+      : Promise.resolve([] as SponsorReport[]),
+    shouldLoad('leagueNotices')
+      ? provider.getLeagueNotices({ ...scope, limit: recordLimit })
+      : Promise.resolve([] as LeagueNotice[]),
+    shouldLoad('finalizations')
+      ? provider.getFinalizations()
+      : Promise.resolve([] as FinalizationRecord[]),
+    shouldLoad('supportNeeds')
+      ? provider.getSupportNeeds({ ...scope, limit: recordLimit })
+      : Promise.resolve([] as SupportNeed[]),
+    shouldLoad('leagueAdminApplications') && shouldLoadPlatformCollections
+      ? provider.getLeagueAdminApplications()
+      : Promise.resolve([] as LeagueAdminApplication[]),
+    shouldLoad('adminAuditEvents') && shouldLoadPlatformCollections
+      ? provider.getAdminAuditEvents()
+      : Promise.resolve([] as AdminAuditEvent[]),
+    shouldLoad('sponsors') ? provider.getSponsors() : Promise.resolve([] as Sponsor[]),
   ]);
 
   return {
@@ -228,6 +296,15 @@ export async function loadGoalPlaceData(
     feedPosts: feedPosts.map(adaptFeedPost),
     reports,
     verifications: verifications.map(adaptVerification),
+    rosters,
+    storedStandings,
+    sponsorReports,
+    leagueNotices,
+    finalizations,
+    supportNeeds,
+    leagueAdminApplications,
+    adminAuditEvents,
+    sponsors,
   };
 }
 
@@ -236,21 +313,35 @@ export function useGoalPlaceData({
   athleteRanking,
   athleteLimit,
   feedLimit,
+  scope,
+  recordLimit,
 }: {
   collections?: readonly GoalPlaceDataCollection[];
   athleteRanking?: 'support' | 'points';
   athleteLimit?: number;
   feedLimit?: number;
+  scope?: DataQueryOptions;
+  recordLimit?: number;
 } = {}) {
   const { role } = useAuth();
-  const collectionKey = [...collections].sort().join(',');
+  const collectionListKey = [...collections].sort().join(',');
+  const scopeKey = `${scope?.leagueId ?? ''}:${scope?.teamId ?? ''}:${scope?.athleteId ?? ''}:${scope?.matchId ?? ''}:${recordLimit ?? ''}`;
+  const collectionKey = `${collectionListKey}|${scopeKey}`;
+  const stableScope = useMemo<DataQueryOptions>(() => ({
+    leagueId: scope?.leagueId,
+    teamId: scope?.teamId,
+    athleteId: scope?.athleteId,
+    matchId: scope?.matchId,
+  }), [scope?.athleteId, scope?.leagueId, scope?.matchId, scope?.teamId]);
   const selectedCollections = useMemo(
-    () => collectionKey.split(',').filter(Boolean) as GoalPlaceDataCollection[],
-    [collectionKey]
+    () => collectionListKey.split(',').filter(Boolean) as GoalPlaceDataCollection[],
+    [collectionListKey]
   );
   const [items, setItems] = useState(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string>();
   const [attempt, setAttempt] = useState(0);
 
   /** Lets an error surface offer retry without a full page reload. */
@@ -269,9 +360,14 @@ export function useGoalPlaceData({
           athleteRanking,
           athleteLimit,
           feedLimit,
+          scope: stableScope,
+          recordLimit,
         });
         if (cancelled) return;
         setItems(nextItems);
+        setOffline(false);
+        setCachedAt(undefined);
+        void cacheData(collectionKey, nextItems);
       } catch (cause) {
         if (cancelled) return;
         // A platform whose product is trusted records must never quietly replace live data
@@ -279,7 +375,15 @@ export function useGoalPlaceData({
         // failure stays a failure, keeping whatever real snapshot we already hold. Mock
         // mode has no fallback to make, so the error surfaces there too.
         console.error('GoalPlace256: failed to load data from the', dataMode, 'provider', cause);
-        setError(cause instanceof Error ? cause : new Error('Failed to load data'));
+        const cached = await readCachedData<typeof initialData>(collectionKey).catch(() => undefined);
+        if (cached && !cancelled) {
+          setItems(cached.value);
+          setOffline(true);
+          setCachedAt(cached.cachedAt);
+          setError(null);
+        } else {
+          setError(cause instanceof Error ? cause : new Error('Failed to load data'));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -290,7 +394,17 @@ export function useGoalPlaceData({
     return () => {
       cancelled = true;
     };
-  }, [attempt, role, selectedCollections, athleteRanking, athleteLimit, feedLimit]);
+  }, [
+    attempt,
+    role,
+    selectedCollections,
+    athleteRanking,
+    athleteLimit,
+    collectionKey,
+    feedLimit,
+    recordLimit,
+    stableScope,
+  ]);
 
   const store = useAppStore();
 
@@ -328,59 +442,77 @@ export function useGoalPlaceData({
       feedPosts: items.feedPosts,
       reports: items.reports,
       verifications: items.verifications,
+      rosters: items.rosters,
+      storedStandings: items.storedStandings,
+      sponsorReports: items.sponsorReports,
+      leagueNotices: items.leagueNotices,
+      finalizations: items.finalizations,
+      supportNeeds: items.supportNeeds,
+      leagueAdminApplications: items.leagueAdminApplications,
+      adminAuditEvents: items.adminAuditEvents,
+      sponsors: items.sponsors,
       loading,
       error,
       retry,
       source: dataMode,
+      offline,
+      cachedAt,
     };
-  }, [items, loading, error, retry, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
+  }, [items, loading, error, retry, offline, cachedAt, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
 }
 
-export function useUserWalletTransactions(userId?: string | null) {
-  const [items, setItems] = useState<WalletTransaction[]>([]);
+export function useUserNotifications(userId?: string | null) {
+  const { isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const [items, setItems] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(Boolean(userId));
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) return;
+    provider.getNotificationsByUser(userId)
+      .then((notifications) => {
+        if (!cancelled) setItems(notifications.sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)));
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, provider, userId]);
+
+  return { items: userId ? items : [], loading: userId ? loading : false, retry };
+}
+
+export function useUserContributions(userId?: string | null) {
+  const { isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const [items, setItems] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(Boolean(userId));
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadDemoWallet() {
-      const users = await mockProvider.getUsers();
-      const candidates = [...users.filter((user) => user.role === 'fan'), ...users];
-
-      for (const user of candidates) {
-        const transactions = await mockProvider.getWalletTransactionsByUser(user.id);
-        if (transactions.length) return transactions;
-      }
-
-      return [];
-    }
-
-    async function load() {
-      if (!userId) {
-        setItems(dataProvider.mode === 'mock' ? await loadDemoWallet() : []);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      const nextItems = await dataProvider.getWalletTransactionsByUser(userId);
-      if (!cancelled) {
-        setItems(nextItems.length || dataProvider.mode === 'firebase' ? nextItems : await loadDemoWallet());
-        setLoading(false);
-      }
-    }
-
-    load().catch(async () => {
-      if (!cancelled) {
-        setItems(dataProvider.mode === 'mock' ? await loadDemoWallet() : []);
-        setLoading(false);
-      }
-    });
-
+    if (!userId) return;
+    provider.getContributionsByUser(userId)
+      .then((contributions) => {
+        if (!cancelled) setItems(contributions);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [provider, userId]);
 
-  return { items, loading };
+  return { items: userId ? items : [], loading: userId ? loading : false };
 }

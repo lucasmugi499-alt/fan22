@@ -1,26 +1,44 @@
 import {
+  AdminAuditEvent,
+  Athlete,
+  AwardCategory,
   Challenge,
   Comment,
   FeedPost,
-  Athlete,
-  AwardCategory,
+  FinalizationRecord,
   League,
+  LeagueAdminApplication,
+  LeagueNotice,
   Match,
   Notification,
+  NotificationPreferences,
   Report,
   ResultSubmission,
+  ResultSubmissionEvent,
+  Roster,
   ScorerEntry,
   Season,
   Sport,
+  SportSlug,
   Sponsor,
-  SupportPledge,
+  SponsorReport,
+  StoredStanding,
+  SupportNeed,
   Team,
+  TeamAssignment,
   User,
   Verification,
   VerificationStatus,
-  WalletTransaction,
 } from '@/types';
 import { StandingRow } from '../mockDatabase';
+import type {
+  Allocation,
+  ComplianceCase,
+  Contribution,
+  ContributionPurpose,
+  PointsEvent,
+} from '@/types/money';
+import type { ChallengeAction } from '@/lib/challenge';
 
 export type DataProviderMode = 'mock' | 'firebase';
 
@@ -34,16 +52,24 @@ export type DataWriteResult = {
 export type FollowTargetType = 'athlete' | 'team' | 'league';
 export type SaveTargetType = 'athlete' | 'team' | 'league' | 'match' | 'feedPost';
 
-export type CreateSupportPledgeInput = Omit<SupportPledge, 'id' | 'createdAt' | 'platformFee' | 'netAmount'> & {
-  id?: string;
-  createdAt?: string;
-  platformFee?: number;
-  netAmount?: number;
+export type DataQueryOptions = {
+  leagueId?: string;
+  teamId?: string;
+  athleteId?: string;
+  matchId?: string;
+  afterId?: string;
+  limit?: number;
 };
 
-export type CreateWalletTransactionInput = Omit<WalletTransaction, 'id' | 'createdAt'> & {
-  id?: string;
-  createdAt?: string;
+export type CreateContributionIntentInput = {
+  supporterUserId: string;
+  purpose: ContributionPurpose;
+  recipientType: 'athlete' | 'team' | 'league' | 'programme';
+  recipientId: string;
+  supportNeedId?: string;
+  supportAmountMinor: number;
+  message?: string;
+  idempotencyKey: string;
 };
 
 export type CreateFeedPostInput = Omit<FeedPost, 'id' | 'createdAt' | 'likesCount' | 'commentsCount' | 'sharesCount' | 'status'> & {
@@ -83,6 +109,73 @@ export type ResolveResultSubmissionInput = {
   note?: string;
 };
 
+export type ApproveResultCorrectionInput = {
+  matchId: string;
+  actorUserId: string;
+  homeScore: number;
+  awayScore: number;
+  reason: string;
+};
+
+export type TransitionChallengeInput = {
+  challengeId: string;
+  actorUserId: string;
+  action: ChallengeAction;
+  note?: string;
+  evidenceRefs?: string[];
+};
+
+export type RecordPointsActionInput = {
+  userId: string;
+  actionType: Exclude<PointsEvent['actionType'], 'verified_need_supported'>;
+  relatedEntityId?: string;
+};
+
+export type ReviewSupportNeedInput = {
+  supportNeedId: string;
+  actorUserId: string;
+  action: 'team_verify' | 'team_reject' | 'league_approve' | 'league_reject';
+  note?: string;
+};
+
+export type CompleteSupportNeedInput = {
+  supportNeedId: string;
+  actorUserId: string;
+  note: string;
+};
+
+export type EditableUserProfile = {
+  name?: string;
+  displayName?: string;
+  city?: string;
+  avatarUrl?: string;
+  sportPreferences?: SportSlug[];
+  notificationPreferences?: NotificationPreferences;
+  lowDataMode?: boolean;
+  onboardingCompletedAt?: string;
+};
+
+export type EditableAthleteProfile = Pick<
+  Athlete,
+  'name' | 'bio' | 'city' | 'avatarUrl' | 'coverUrl' | 'impactNeeds'
+>;
+
+export type EditableTeamProfile = Pick<
+  Team,
+  'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail'
+>;
+
+export type CreateLeagueNoticeInput = Omit<LeagueNotice, 'id' | 'createdAt'> & {
+  id?: string;
+};
+
+export type CreateSupportNeedInput = Omit<
+  SupportNeed,
+  'id' | 'raisedAmount' | 'recipientUpdates' | 'createdAt' | 'updatedAt'
+> & {
+  id?: string;
+};
+
 export type ResultSubmissionListener = (
   submission: ResultSubmission | undefined,
 ) => void;
@@ -97,22 +190,35 @@ export interface GoalPlaceDataProvider {
   getLeagues(): Promise<League[]>;
   getSeasons(): Promise<Season[]>;
   getLeagueById(id: string): Promise<League | undefined>;
-  getTeams(): Promise<Team[]>;
+  getTeams(options?: DataQueryOptions): Promise<Team[]>;
   getTeamById(id: string): Promise<Team | undefined>;
-  getAthletes(): Promise<Athlete[]>;
+  getAthletes(options?: DataQueryOptions): Promise<Athlete[]>;
   getAthleteById(id: string): Promise<Athlete | undefined>;
-  getMatches(): Promise<Match[]>;
+  getMatches(options?: DataQueryOptions): Promise<Match[]>;
   getMatchById(id: string): Promise<Match | undefined>;
-  getChallenges(): Promise<Challenge[]>;
+  getChallenges(options?: DataQueryOptions): Promise<Challenge[]>;
   getChallengeById(id: string): Promise<Challenge | undefined>;
-  getFeedPosts(): Promise<FeedPost[]>;
+  getFeedPosts(options?: DataQueryOptions): Promise<FeedPost[]>;
   getLatestFeedPosts(limit?: number): Promise<FeedPost[]>;
   getFeedPostById(id: string): Promise<FeedPost | undefined>;
   getCommentsByPost(postId: string): Promise<Comment[]>;
-  getWalletTransactionsByUser(userId: string): Promise<WalletTransaction[]>;
   getNotificationsByUser(userId: string): Promise<Notification[]>;
   getReports(): Promise<Report[]>;
   getVerifications(): Promise<Verification[]>;
+  getTeamAssignments(): Promise<TeamAssignment[]>;
+  getTeamAssignmentById(id: string): Promise<TeamAssignment | undefined>;
+  getRosters(options?: DataQueryOptions): Promise<Roster[]>;
+  getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
+  getStoredStandings(): Promise<StoredStanding[]>;
+  getSponsorReports(): Promise<SponsorReport[]>;
+  getLeagueNotices(options?: DataQueryOptions): Promise<LeagueNotice[]>;
+  getFinalizations(): Promise<FinalizationRecord[]>;
+  getSupportNeeds(options?: DataQueryOptions): Promise<SupportNeed[]>;
+  getLeagueAdminApplications(): Promise<LeagueAdminApplication[]>;
+  getAdminAuditEvents(): Promise<AdminAuditEvent[]>;
+  getContributionsByUser(userId: string): Promise<Contribution[]>;
+  getAllocations(): Promise<Allocation[]>;
+  getComplianceCases(): Promise<ComplianceCase[]>;
   getStandingsByLeague(leagueId: string): Promise<StandingRow[]>;
   getTopSupportedAthletes(limit?: number): Promise<Athlete[]>;
   getTopPointsAthletes(limit?: number): Promise<Athlete[]>;
@@ -121,12 +227,48 @@ export interface GoalPlaceDataProvider {
   getResultSubmission(matchId: string): Promise<ResultSubmission | undefined>;
   getTeamConfirmationInbox(teamId: string): Promise<ResultSubmission[]>;
   getLeagueResultExceptions(leagueId: string): Promise<ResultSubmission[]>;
-  createSupportPledge(data: CreateSupportPledgeInput): Promise<DataWriteResult>;
-  createWalletTransaction(data: CreateWalletTransactionInput): Promise<DataWriteResult>;
+  createContributionIntent(data: CreateContributionIntentInput): Promise<DataWriteResult>;
+  recordPointsAction(data: RecordPointsActionInput): Promise<DataWriteResult>;
   createFeedPost(data: CreateFeedPostInput): Promise<DataWriteResult>;
   createComment(data: CreateCommentInput): Promise<DataWriteResult>;
   toggleFollow(userId: string, targetType: FollowTargetType, targetId: string): Promise<DataWriteResult>;
   toggleSave(userId: string, targetType: SaveTargetType, targetId: string): Promise<DataWriteResult>;
+  updateUserProfile(userId: string, data: EditableUserProfile): Promise<DataWriteResult>;
+  updateAthleteProfile(athleteId: string, data: Partial<EditableAthleteProfile>): Promise<DataWriteResult>;
+  updateTeamProfile(teamId: string, data: Partial<EditableTeamProfile>): Promise<DataWriteResult>;
+  saveRoster(roster: Roster): Promise<DataWriteResult>;
+  createChallenge(data: Omit<Challenge, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
+  transitionChallenge(data: TransitionChallengeInput): Promise<DataWriteResult>;
+  createLeagueNotice(data: CreateLeagueNoticeInput): Promise<DataWriteResult>;
+  createSeason(data: Omit<Season, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
+  createTeams(teams: Team[]): Promise<DataWriteResult>;
+  createFixtures(fixtures: Match[]): Promise<DataWriteResult>;
+  createTeamAdminInvitation(data: TeamAssignment): Promise<DataWriteResult>;
+  acceptTeamAdminInvitation(assignmentId: string, userId: string): Promise<DataWriteResult>;
+  markNotificationRead(notificationId: string, read?: boolean): Promise<DataWriteResult>;
+  createSupportNeed(data: CreateSupportNeedInput): Promise<DataWriteResult>;
+  addSupportNeedUpdate(
+    needId: string,
+    input: { message: string; evidenceUrl?: string },
+  ): Promise<DataWriteResult>;
+  reviewSupportNeed(data: ReviewSupportNeedInput): Promise<DataWriteResult>;
+  completeSupportNeed(data: CompleteSupportNeedInput): Promise<DataWriteResult>;
+  createLeagueAdminApplication(
+    data: Omit<LeagueAdminApplication, 'id' | 'status' | 'createdAt'> & { id?: string },
+  ): Promise<DataWriteResult>;
+  reviewApproval(input: {
+    targetCollection: 'athletes' | 'leagues' | 'leagueAdminApplications';
+    targetId: string;
+    actorUserId: string;
+    decision: 'approved' | 'rejected' | 'requested_information';
+    note?: string;
+  }): Promise<DataWriteResult>;
+  resolveReport(input: {
+    reportId: string;
+    actorUserId: string;
+    decision: 'resolved' | 'dismissed';
+    note?: string;
+  }): Promise<DataWriteResult>;
   updateMatchVerification(matchId: string, status: VerificationStatus): Promise<DataWriteResult>;
   updateChallengeVerification(challengeId: string, status: VerificationStatus): Promise<DataWriteResult>;
   createResultSubmission(data: CreateResultSubmissionInput): Promise<DataWriteResult>;
@@ -143,6 +285,7 @@ export interface GoalPlaceDataProvider {
     requestedByUserId: string,
     reason: string,
   ): Promise<DataWriteResult>;
+  approveResultCorrection(data: ApproveResultCorrectionInput): Promise<DataWriteResult>;
   subscribeToResultSubmission(
     matchId: string,
     listener: ResultSubmissionListener,

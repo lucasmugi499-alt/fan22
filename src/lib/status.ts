@@ -14,13 +14,20 @@ import { ChallengeStatus, Match, MatchStatus, VerificationStatus } from '@/types
 const VERIFICATION_STATUSES: VerificationStatus[] = ['pending', 'verified', 'rejected', 'disputed'];
 const MATCH_STATUSES: MatchStatus[] = ['scheduled', 'live', 'completed', 'cancelled'];
 const CHALLENGE_STATUSES: ChallengeStatus[] = [
-  'open',
-  'locked',
+  'draft',
+  'proposed',
+  'team_approved',
+  'league_approved',
+  'funding_open',
+  'funding_locked',
+  'in_progress',
+  'evidence_submitted',
+  'under_review',
   'achieved',
-  'failed',
-  'paid',
-  'refunded',
-  'disputed',
+  'not_achieved',
+  'void',
+  'allocation_pending',
+  'settled',
 ];
 
 function canonical(value: unknown): string {
@@ -66,8 +73,13 @@ export function normalizeChallengeStatus(value: unknown): ChallengeStatus {
   const key = canonical(value);
   const match = CHALLENGE_STATUSES.find((status) => status === key);
   if (match) return match;
-  if (key === 'active') return 'open';
-  return 'open';
+  if (key === 'active' || key === 'open') return 'in_progress';
+  if (key === 'locked') return 'funding_locked';
+  if (key === 'failed') return 'not_achieved';
+  if (key === 'paid') return 'settled';
+  if (key === 'refunded') return 'void';
+  if (key === 'disputed') return 'under_review';
+  return 'proposed';
 }
 
 /**
@@ -106,14 +118,31 @@ const MATCH_LABELS: Record<MatchStatus, string> = {
 };
 
 const CHALLENGE_LABELS: Record<ChallengeStatus, string> = {
-  open: 'Active',
-  locked: 'Locked',
+  draft: 'Draft',
+  proposed: 'Proposed',
+  team_approved: 'Team approved',
+  league_approved: 'League approved',
+  funding_open: 'Funding open',
+  funding_locked: 'Funding locked',
+  in_progress: 'In progress',
+  evidence_submitted: 'Evidence submitted',
+  under_review: 'Under review',
   achieved: 'Achieved',
-  failed: 'Failed',
-  paid: 'Paid',
-  refunded: 'Refunded',
-  disputed: 'Disputed',
+  not_achieved: 'Not achieved',
+  void: 'Void',
+  allocation_pending: 'Allocation pending',
+  settled: 'Settled',
 };
+
+export function isActiveChallenge(status: ChallengeStatus): boolean {
+  return [
+    'funding_open',
+    'funding_locked',
+    'in_progress',
+    'evidence_submitted',
+    'under_review',
+  ].includes(status);
+}
 
 export function verificationLabel(status: VerificationStatus): string {
   return VERIFICATION_LABELS[status];

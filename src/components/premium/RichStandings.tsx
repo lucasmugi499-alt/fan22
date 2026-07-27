@@ -4,6 +4,7 @@ import type { Match, Team } from '@/types';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { Crest } from '@/components/premium/Crest';
 import { cn } from '@/lib/utils';
+import { getSportTheme } from '@/lib/sportThemes';
 
 type FormResult = 'W' | 'D' | 'L';
 
@@ -45,14 +46,17 @@ export function RichStandings({
   matches,
   teamById,
   sportById,
+  sport,
   highlightTeamId,
 }: {
   rows: LeagueStanding[];
   matches: Match[];
   teamById: Map<string, Team>;
   sportById?: (teamId: string) => string | undefined;
+  sport?: string;
   highlightTeamId?: string;
 }) {
+  const tableLabels = getSportTheme(sport).tableLabels;
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
       <div className="grid grid-cols-[28px_1fr_repeat(2,26px)_38px] items-center gap-2 border-b border-border px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-subtle sm:grid-cols-[28px_1fr_repeat(7,30px)_44px_110px_46px]">
@@ -62,9 +66,9 @@ export function RichStandings({
         <Cell className="hidden sm:block">W</Cell>
         <Cell className="hidden sm:block">D</Cell>
         <Cell className="hidden sm:block">L</Cell>
-        <Cell className="hidden sm:block">GF</Cell>
-        <Cell>GA</Cell>
-        <Cell className="hidden sm:block">GD</Cell>
+        <Cell className="hidden sm:block">{tableLabels.for}</Cell>
+        <Cell>{tableLabels.against}</Cell>
+        <Cell className="hidden sm:block">{tableLabels.difference}</Cell>
         <Cell>Pts</Cell>
         <Cell className="hidden sm:block">Form</Cell>
         <Cell className="hidden sm:block">Next</Cell>

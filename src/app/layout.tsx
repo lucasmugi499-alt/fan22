@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark h-full antialiased">
+    <html lang="en" data-scroll-behavior="smooth" className="dark h-full antialiased">
       <body
         className={`min-h-full ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}
       >

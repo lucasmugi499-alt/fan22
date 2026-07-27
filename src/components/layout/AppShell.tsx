@@ -8,6 +8,8 @@ import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { DesktopRail } from './DesktopRail';
 import { RouteGuard } from './RouteGuard';
+import { ConnectivityBanner } from './ConnectivityBanner';
+import { DemoDataNote } from '@/components/ui/DemoDataNote';
 
 /**
  * The application frame. Two chromes, one system:
@@ -40,8 +42,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <DesktopRail nav={nav} />
       <div className="md:pl-60">
         <TopBar nav={nav} role={role} />
+        <ConnectivityBanner />
         <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-[calc(var(--nav-h)+var(--safe-bottom)+16px)] pt-4 md:px-6 md:pb-12">
-          <RouteGuard pathname={pathname}>{children}</RouteGuard>
+          <RouteGuard pathname={pathname}>
+            <DemoDataNote className="mb-4" />
+            {children}
+          </RouteGuard>
         </main>
       </div>
       <BottomNav nav={nav} />

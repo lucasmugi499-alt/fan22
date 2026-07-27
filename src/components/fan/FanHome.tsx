@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { ArrowRight, Broadcast, CaretRight, Fire } from '@phosphor-icons/react';
+import { useCallback, useMemo, useState } from 'react';
+import { ArrowRight, Broadcast, CaretRight, Fire, MapPin, SlidersHorizontal, Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useAuth } from '@/context/AuthProvider';
 import { isUpcomingMatch } from '@/lib/status';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
@@ -15,6 +16,9 @@ import { MatchCard } from '@/components/core/MatchCard';
 import { AthleteCard } from '@/components/core/EntityCards';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/EmptyState';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { FanOnboarding } from '@/components/fan/FanOnboarding';
 import type { Match } from '@/types';
 
 function dayLabel(iso: string): string {
@@ -22,6 +26,10 @@ function dayLabel(iso: string): string {
 }
 
 export function FanHome() {
+  const { userProfile } = useAuth();
+  const [onboardingOpen, setOnboardingOpen] = useState(
+    () => Boolean(userProfile && !userProfile.onboardingCompletedAt),
+  );
   const { matches, teams, athletes, leagues, seasons, feedPosts, loading, error, retry } = useGoalPlaceData({
     collections: ['matches', 'teams', 'athletes', 'leagues', 'seasons', 'feedPosts'],
     athleteRanking: 'support',
@@ -30,23 +38,42 @@ export function FanHome() {
   });
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
-  const live = useMemo(() => matches.filter((m) => m.status === 'live'), [matches]);
+  const followedLeagueIds = useMemo(() => userProfile?.followedLeagues ?? [], [userProfile?.followedLeagues]);
+  const followedTeamIds = useMemo(() => userProfile?.followedTeams ?? [], [userProfile?.followedTeams]);
+  const followedAthleteIds = useMemo(() => userProfile?.followedAthletes ?? [], [userProfile?.followedAthletes]);
+  const preferredMatch = useCallback((match: Match) =>
+    (!followedLeagueIds.length && !followedTeamIds.length) ||
+    followedLeagueIds.includes(match.leagueId) ||
+    followedTeamIds.includes(match.homeTeamId) ||
+    followedTeamIds.includes(match.awayTeamId), [followedLeagueIds, followedTeamIds]);
+
+  const live = useMemo(() => matches.filter((m) => m.status === 'live' && preferredMatch(m)), [matches, preferredMatch]);
   const upcoming = useMemo(
-    () => matches.filter(isUpcomingMatch).filter((m) => m.status !== 'live').sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 6),
-    [matches]
+    () => matches.filter(isUpcomingMatch).filter((m) => m.status !== 'live' && preferredMatch(m)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 6),
+    [matches, preferredMatch]
   );
-  const topAthletes = useMemo(() => [...athletes].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0)).slice(0, 8), [athletes]);
+  const topAthletes = useMemo(() => {
+    const followed = athletes.filter((athlete) => followedAthleteIds.includes(athlete.id));
+    return (followed.length ? followed : [...athletes].sort((a, b) => (b.goalPlacePoints ?? 0) - (a.goalPlacePoints ?? 0))).slice(0, 8);
+  }, [athletes, followedAthleteIds]);
   const news = useMemo(
-    () => [...feedPosts].filter((p) => p.status !== 'hidden').sort((a, b) => +new Date(b.createdAt || b.timestamp || 0) - +new Date(a.createdAt || a.timestamp || 0)),
-    [feedPosts]
+    () => [...feedPosts].filter((post) =>
+      post.status !== 'hidden' &&
+      ((!followedLeagueIds.length && !followedTeamIds.length && !followedAthleteIds.length) ||
+        (post.relatedLeagueId && followedLeagueIds.includes(post.relatedLeagueId)) ||
+        (post.relatedTeamId && followedTeamIds.includes(post.relatedTeamId)) ||
+        (post.relatedAthleteId && followedAthleteIds.includes(post.relatedAthleteId))),
+    ).sort((a, b) => +new Date(b.createdAt || b.timestamp || 0) - +new Date(a.createdAt || a.timestamp || 0)),
+    [feedPosts, followedAthleteIds, followedLeagueIds, followedTeamIds]
   );
 
   // Featured league table: the busiest league.
   const featured = useMemo(() => {
     if (!leagues.length) return null;
+    const followedLeague = leagues.find((league) => followedLeagueIds.includes(league.id));
     const count = new Map<string, number>();
     for (const m of matches) count.set(m.leagueId, (count.get(m.leagueId) ?? 0) + 1);
-    const league = [...leagues].sort((a, b) => (count.get(b.id) ?? 0) - (count.get(a.id) ?? 0))[0];
+    const league = followedLeague ?? [...leagues].sort((a, b) => (count.get(b.id) ?? 0) - (count.get(a.id) ?? 0))[0];
     const lTeams = teams.filter((t) => t.leagueId === league.id);
     const season = currentSeasonFor(seasons, league.id, league.currentSeasonId);
     const rows = buildLeagueStandings(lTeams, matches.filter((m) => m.leagueId === league.id), {
@@ -54,7 +81,7 @@ export function FanHome() {
       scoring: season ? scoringForSeason(season, league.sport) : undefined,
     });
     return { league, rows };
-  }, [leagues, teams, matches, seasons]);
+  }, [leagues, teams, matches, seasons, followedLeagueIds]);
 
   if (loading) return <FanHomeSkeleton />;
   if (error) return <ErrorState onRetry={retry} />;
@@ -69,20 +96,32 @@ export function FanHome() {
   return (
     <div className="space-y-6">
       <GradientBanner
-        title="Match day"
-        subtitle="Verified grassroots sport across Uganda. Back the athletes behind the game."
+        title={`Your ${userProfile?.city ?? 'Uganda'} sports today`}
+        subtitle="Fixtures, official results, athletes, and league updates from the people you follow."
         variant="pitch"
       >
         <Link
-          href="/athletes"
+          href="/discover"
           className="group inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] bg-white pl-5 pr-1.5 text-sm font-semibold text-black"
         >
-          Discover athletes
+          Discover
           <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 transition-transform duration-[var(--dur-micro)] ease-[var(--ease-fluid)] group-hover:translate-x-0.5">
             <ArrowRight className="h-4 w-4" weight="bold" />
           </span>
         </Link>
       </GradientBanner>
+
+      <section className="grid grid-cols-3 gap-2.5">
+        <TodayMetric icon={Broadcast} value={String(live.length)} label="Live" />
+        <TodayMetric icon={MapPin} value={String(upcoming.length)} label="Coming up" />
+        <TodayMetric icon={Trophy} value={String(news.length)} label="New updates" />
+      </section>
+
+      <div className="flex justify-end">
+        <Button size="sm" variant="secondary" icon={SlidersHorizontal} onClick={() => setOnboardingOpen(true)}>
+          Tune my home
+        </Button>
+      </div>
 
       {/* Fixtures rail grouped by day */}
       <section className="space-y-3">
@@ -143,10 +182,29 @@ export function FanHome() {
             matches={matches}
             teamById={teamById}
             sportById={(id) => String(teamById.get(id)?.sport ?? '')}
+            sport={String(featured.league.sport)}
           />
         </section>
       ) : null}
+
+      <FanOnboarding
+        open={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+        leagues={leagues}
+        teams={teams}
+        athletes={athletes}
+      />
     </div>
+  );
+}
+
+function TodayMetric({ icon: Icon, value, label }: { icon: typeof Broadcast; value: string; label: string }) {
+  return (
+    <Card className="p-3">
+      <Icon className="h-4 w-4 text-brand" weight="bold" />
+      <p data-numeric className="mt-2 text-xl font-bold text-text-strong">{value}</p>
+      <p className="text-[11px] text-muted">{label}</p>
+    </Card>
   );
 }
 

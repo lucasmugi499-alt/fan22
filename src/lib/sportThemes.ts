@@ -18,6 +18,14 @@ export interface SportTheme {
   statLabels: string[];
   challengeExamples: string[];
   image: string;
+  scoringNoun: string;
+  tableLabels: {
+    for: string;
+    against: string;
+    difference: string;
+  };
+  periodLabel: string;
+  fieldLabel: string;
 }
 
 export const sportThemes: Record<SportType, SportTheme> = {
@@ -34,6 +42,10 @@ export const sportThemes: Record<SportType, SportTheme> = {
     statLabels: ['Goals', 'Assists', 'Clean sheets', 'Matches'],
     challengeExamples: ['score 1 goal', 'provide 1 assist', 'keep a clean sheet'],
     image: '/placeholders/football-gradient.svg',
+    scoringNoun: 'goals',
+    tableLabels: { for: 'GF', against: 'GA', difference: 'GD' },
+    periodLabel: 'Half',
+    fieldLabel: 'Pitch',
   },
   Basketball: {
     name: 'Basketball',
@@ -48,6 +60,10 @@ export const sportThemes: Record<SportType, SportTheme> = {
     statLabels: ['Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'],
     challengeExamples: ['reach 20 points', 'get 10 rebounds', 'make 5 assists'],
     image: '/placeholders/basketball-gradient.svg',
+    scoringNoun: 'points',
+    tableLabels: { for: 'PF', against: 'PA', difference: 'PD' },
+    periodLabel: 'Quarter',
+    fieldLabel: 'Court',
   },
   Rugby: {
     name: 'Rugby',
@@ -62,14 +78,18 @@ export const sportThemes: Record<SportType, SportTheme> = {
     statLabels: ['Tries', 'Tackles', 'Carries', 'Conversions'],
     challengeExamples: ['score a try', 'make 8 tackles', 'complete the match'],
     image: '/placeholders/rugby-gradient.svg',
+    scoringNoun: 'match points',
+    tableLabels: { for: 'PF', against: 'PA', difference: 'PD' },
+    periodLabel: 'Half',
+    fieldLabel: 'Field',
   },
 };
 
 export const sports = Object.values(sportThemes);
 
 export function getSportTheme(sport?: SportType | string): SportTheme {
-  if (sport === 'Basketball') return sportThemes.Basketball;
-  if (sport === 'Rugby') return sportThemes.Rugby;
+  if (sport?.toLowerCase() === 'basketball') return sportThemes.Basketball;
+  if (sport?.toLowerCase() === 'rugby') return sportThemes.Rugby;
   return sportThemes.Football;
 }
 

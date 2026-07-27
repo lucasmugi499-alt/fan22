@@ -79,9 +79,9 @@ describe('normalizeMatchVerification', () => {
 
 describe('normalizeChallengeStatus', () => {
   it('maps the display value back to the stored one', () => {
-    expect(normalizeChallengeStatus('Active')).toBe('open');
+    expect(normalizeChallengeStatus('Active')).toBe('in_progress');
     expect(normalizeChallengeStatus('Achieved')).toBe('achieved');
-    expect(normalizeChallengeStatus('Failed')).toBe('failed');
+    expect(normalizeChallengeStatus('Failed')).toBe('not_achieved');
   });
 });
 
@@ -111,6 +111,6 @@ describe('labels', () => {
     expect(matchLabel('scheduled')).toBe('Upcoming');
     expect(matchLabel('completed')).toBe('Completed');
     expect(verificationLabel('verified')).toBe('Verified');
-    expect(challengeLabel('open')).toBe('Active');
+    expect(challengeLabel('in_progress')).toBe('In progress');
   });
 });

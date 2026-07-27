@@ -15,7 +15,6 @@ import {
   getTopSupportedAthletes,
   getUserById,
   getVerifiedMatches,
-  getWalletByUser,
   leagues,
   matches,
   reports,
@@ -24,33 +23,61 @@ import {
   teams,
   users,
   awards,
+  comments,
+  finalizations,
+  leagueNotices,
+  notifications,
+  resultSubmissionEvents,
+  resultSubmissions as seededResultSubmissions,
+  rosters,
+  seasons,
+  sponsorReports,
+  standings,
+  teamAssignments,
   verifications,
 } from '../mockDatabase';
 import {
   CreateCommentInput,
+  CreateContributionIntentInput,
   CreateFeedPostInput,
-  CreateSupportPledgeInput,
-  CreateWalletTransactionInput,
   DataWriteResult,
   FollowTargetType,
   GoalPlaceDataProvider,
   ResolveResultSubmissionInput,
+  RecordPointsActionInput,
+  ReviewSupportNeedInput,
   SaveTargetType,
+  TransitionChallengeInput,
 } from './types';
-import { feedPosts as feedPostStore } from '../mockFeedPosts';
-import { supportPledges } from '../mockSupportPledges';
-import { walletTransactions as walletStore } from '../mockWalletTransactions';
-import { comments as commentStore } from '../mockComments';
-import { seasons } from '../mockSeasons';
-import { ResultSubmission, VerificationStatus } from '@/types';
+import { investorDemoRuntime } from '../investorDemo';
+import {
+  AdminAuditEvent,
+  Challenge,
+  LeagueAdminApplication,
+  ResultSubmission,
+  SupportNeed,
+  VerificationStatus,
+} from '@/types';
 import {
   canAcceptNewSubmission,
   confirmationDeadlineFrom,
 } from '@/lib/resultSubmission';
+import {
+  buildContributionSettlement,
+  cappedPointsAward,
+  contributionQuote,
+  pointsForAction,
+  pointsIdempotencyKey,
+} from '@/lib/money';
+import type { Contribution, PaymentIntent, PointsEvent } from '@/types/money';
+import { challengeNextStatus } from '@/lib/challenge';
+import { normalizeChallengeStatus } from '@/lib/status';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
-const resultSubmissions = new Map<string, ResultSubmission>();
+const resultSubmissions = new Map<string, ResultSubmission>(
+  seededResultSubmissions.map((submission) => [submission.id, submission]),
+);
 const resultSubmissionListeners = new Map<
   string,
   Set<(submission: ResultSubmission | undefined) => void>
@@ -75,6 +102,27 @@ function notifySubmission(matchId: string) {
   for (const listener of resultSubmissionListeners.get(matchId) ?? []) {
     listener(submission);
   }
+}
+
+function replaceById<T extends { id: string }>(items: T[], value: T) {
+  const index = items.findIndex((item) => item.id === value.id);
+  if (index >= 0) items[index] = value;
+  else items.unshift(value);
+}
+
+function take<T extends { id?: string }>(items: T[], limit?: number, afterId?: string) {
+  const start = afterId ? Math.max(0, items.findIndex((item) => item.id === afterId) + 1) : 0;
+  return limit ? items.slice(start, start + limit) : items.slice(start);
+}
+
+function audit(input: Omit<AdminAuditEvent, 'id' | 'createdAt'>) {
+  const event: AdminAuditEvent = {
+    ...input,
+    id: id('audit'),
+    createdAt: new Date().toISOString(),
+  };
+  investorDemoRuntime.adminAuditEvents.unshift(event);
+  return event;
 }
 
 export const mockProvider: GoalPlaceDataProvider = {
@@ -103,32 +151,59 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getLeagueById(idValue) {
     return getLeagueById(idValue);
   },
-  async getTeams() {
-    return teams;
+  async getTeams(options) {
+    return take(
+      teams.filter((team) =>
+        (!options?.teamId || team.id === options.teamId) &&
+        (!options?.leagueId || team.leagueId === options.leagueId)
+      ),
+      options?.limit,
+    );
   },
   async getTeamById(idValue) {
     return getTeamById(idValue);
   },
-  async getAthletes() {
-    return athletes;
+  async getAthletes(options) {
+    return take(athletes
+      .filter((athlete) =>
+        (!options?.athleteId || athlete.id === options.athleteId) &&
+        (!options?.teamId || athlete.teamId === options.teamId) &&
+        (!options?.leagueId || athlete.leagueId === options.leagueId)
+      ), options?.limit, options?.afterId);
   },
   async getAthleteById(idValue) {
     return getAthleteById(idValue);
   },
-  async getMatches() {
-    return matches;
+  async getMatches(options) {
+    return take(matches
+      .filter((match) =>
+        (!options?.matchId || match.id === options.matchId) &&
+        (!options?.leagueId || match.leagueId === options.leagueId) &&
+        (!options?.teamId ||
+          match.homeTeamId === options.teamId ||
+          match.awayTeamId === options.teamId)
+      ), options?.limit, options?.afterId);
   },
   async getMatchById(idValue) {
     return getMatchById(idValue);
   },
-  async getChallenges() {
-    return challenges;
+  async getChallenges(options) {
+    return take(challenges
+      .filter((challenge) =>
+        (!options?.athleteId || challenge.athleteId === options.athleteId) &&
+        (!options?.leagueId || challenge.leagueId === options.leagueId)
+      ), options?.limit, options?.afterId);
   },
   async getChallengeById(idValue) {
     return challenges.find((challenge) => challenge.id === idValue);
   },
-  async getFeedPosts() {
-    return feedPosts;
+  async getFeedPosts(options) {
+    return take(feedPosts
+      .filter((post) =>
+        (!options?.athleteId || post.relatedAthleteId === options.athleteId) &&
+        (!options?.teamId || post.relatedTeamId === options.teamId) &&
+        (!options?.leagueId || post.relatedLeagueId === options.leagueId)
+      ), options?.limit, options?.afterId);
   },
   async getLatestFeedPosts(limit = 50) {
     return [...feedPosts]
@@ -141,9 +216,6 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getCommentsByPost(postId) {
     return getCommentsByPost(postId);
   },
-  async getWalletTransactionsByUser(userId) {
-    return getWalletByUser(userId);
-  },
   async getNotificationsByUser(userId) {
     return getNotificationsByUser(userId);
   },
@@ -152,6 +224,60 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getVerifications() {
     return verifications;
+  },
+  async getTeamAssignments() {
+    return teamAssignments;
+  },
+  async getTeamAssignmentById(idValue) {
+    return teamAssignments.find((assignment) => assignment.id === idValue);
+  },
+  async getRosters(options) {
+    return take(rosters
+      .filter((roster) =>
+        (!options?.teamId || roster.teamId === options.teamId) &&
+        (!options?.leagueId || roster.leagueId === options.leagueId)
+      ), options?.limit);
+  },
+  async getResultSubmissionEvents(matchId) {
+    return resultSubmissionEvents.filter((event) => event.submissionId === matchId);
+  },
+  async getStoredStandings() {
+    return standings;
+  },
+  async getSponsorReports() {
+    return sponsorReports;
+  },
+  async getLeagueNotices(options) {
+    return take(
+      leagueNotices.filter((notice) => !options?.leagueId || notice.leagueId === options.leagueId),
+      options?.limit,
+    );
+  },
+  async getFinalizations() {
+    return finalizations;
+  },
+  async getSupportNeeds(options) {
+    return take(investorDemoRuntime.supportNeeds
+      .filter((need) =>
+        (!options?.athleteId || need.athleteId === options.athleteId) &&
+        (!options?.teamId || need.teamId === options.teamId) &&
+        (!options?.leagueId || need.leagueId === options.leagueId)
+      ), options?.limit);
+  },
+  async getLeagueAdminApplications() {
+    return investorDemoRuntime.leagueAdminApplications;
+  },
+  async getAdminAuditEvents() {
+    return investorDemoRuntime.adminAuditEvents;
+  },
+  async getContributionsByUser(userId) {
+    return investorDemoRuntime.contributions.filter((item) => item.supporterUserId === userId);
+  },
+  async getAllocations() {
+    return investorDemoRuntime.allocations;
+  },
+  async getComplianceCases() {
+    return investorDemoRuntime.complianceCases;
   },
   async getStandingsByLeague(leagueId) {
     return getStandingsByLeague(leagueId);
@@ -184,32 +310,146 @@ export const mockProvider: GoalPlaceDataProvider = {
     return [...resultSubmissions.values()].filter(
       (submission) =>
         submission.leagueId === leagueId &&
-        ['disputed', 'confirmation_overdue'].includes(submission.status),
+        (
+          ['disputed', 'confirmation_overdue'].includes(submission.status) ||
+          (
+            submission.status === 'official' &&
+            Boolean(submission.correctionReason) &&
+            !submission.correctionApprovedBy
+          )
+        ),
     );
   },
-  async createSupportPledge(data: CreateSupportPledgeInput) {
-    const amount = data.amount;
-    const platformFee = data.platformFee ?? Math.round(amount * 0.03);
-    const pledge = {
-      ...data,
-      id: data.id ?? id('supportPledge'),
-      currency: data.currency ?? 'UGX',
-      platformFee,
-      netAmount: data.netAmount ?? amount - platformFee,
-      createdAt: data.createdAt ?? new Date().toISOString(),
+  async createContributionIntent(data: CreateContributionIntentInput) {
+    const existing = investorDemoRuntime.paymentIntents.find(
+      (item) => item.idempotencyKey === data.idempotencyKey,
+    );
+    if (existing) return result(existing.id, 'This demo contribution was already recorded.');
+    const quote = contributionQuote(data.supportAmountMinor);
+    const now = new Date().toISOString();
+    const intentId = id('payment_intent');
+    const contributionId = id('contribution');
+    const intent: PaymentIntent = {
+      id: intentId,
+      supporterUserId: data.supporterUserId,
+      purpose: data.purpose,
+      recipientType: data.recipientType,
+      recipientId: data.recipientId,
+      supportNeedId: data.supportNeedId,
+      supportAmountMinor: quote.supportAmountMinor,
+      platformFeeMinor: quote.platformFeeMinor,
+      totalAmountMinor: quote.totalAmountMinor,
+      currency: quote.currency,
+      provider: 'synthetic_demo',
+      providerReference: `demo_${intentId}`,
+      status: 'settled',
+      idempotencyKey: data.idempotencyKey,
+      createdAt: now,
+      updatedAt: now,
     };
-    supportPledges.unshift(pledge);
-    return result(pledge.id, 'Demo support recorded. Real payments are not enabled yet.');
+    const contribution: Contribution = {
+      id: contributionId,
+      paymentIntentId: intent.id,
+      supporterUserId: data.supporterUserId,
+      purpose: data.purpose,
+      recipientType: data.recipientType,
+      recipientId: data.recipientId,
+      supportNeedId: data.supportNeedId,
+      supportAmountMinor: quote.supportAmountMinor,
+      platformFeeMinor: quote.platformFeeMinor,
+      totalAmountMinor: quote.totalAmountMinor,
+      currency: quote.currency,
+      status: 'allocated',
+      message: data.message,
+      idempotencyKey: data.idempotencyKey,
+      createdAt: now,
+      settledAt: now,
+    };
+    const journal = buildContributionSettlement({
+      transactionId: id('ledger_transaction'),
+      contributionId,
+      supportAmountMinor: quote.supportAmountMinor,
+      platformFeeMinor: quote.platformFeeMinor,
+      createdAt: now,
+    });
+    investorDemoRuntime.paymentIntents.unshift(intent);
+    investorDemoRuntime.contributions.unshift(contribution);
+    investorDemoRuntime.ledgerTransactions.unshift(journal.transaction);
+    investorDemoRuntime.ledgerEntries.unshift(...journal.entries);
+    investorDemoRuntime.allocations.unshift({
+      id: `allocation_${contributionId}`,
+      contributionId,
+      recipientType: data.recipientType,
+      recipientId: data.recipientId,
+      supportNeedId: data.supportNeedId,
+      amountMinor: quote.supportAmountMinor,
+      currency: quote.currency,
+      destinationType: data.supportNeedId
+        ? investorDemoRuntime.supportNeeds.find((item) => item.id === data.supportNeedId)
+          ?.preferredPayoutDestination
+        : undefined,
+      status: 'pending_review',
+      createdAt: now,
+    });
+    if (data.supportNeedId) {
+      const need = investorDemoRuntime.supportNeeds.find((item) => item.id === data.supportNeedId);
+      if (need) {
+        need.raisedAmount = Math.min(need.targetAmount, need.raisedAmount + quote.supportAmountMinor);
+        if (need.raisedAmount >= need.targetAmount) need.status = 'funded';
+        need.updatedAt = now;
+      }
+      const points: PointsEvent = {
+        id: id('points'),
+        userId: data.supporterUserId,
+        actionType: 'verified_need_supported',
+        relatedEntityId: data.supportNeedId,
+        points: pointsForAction('verified_need_supported', data.supportAmountMinor),
+        idempotencyKey: `verified_need_supported:${contributionId}`,
+        status: 'confirmed',
+        createdAt: now,
+      };
+      investorDemoRuntime.pointsEvents.unshift(points);
+    }
+    return result(intent.id, 'Synthetic PSP settlement recorded. No real money moved.');
   },
-  async createWalletTransaction(data: CreateWalletTransactionInput) {
-    const transaction = {
-      ...data,
-      id: data.id ?? id('walletTransaction'),
-      currency: data.currency ?? 'UGX',
-      createdAt: data.createdAt ?? new Date().toISOString(),
+  async recordPointsAction(data: RecordPointsActionInput) {
+    const idempotencyKey = pointsIdempotencyKey(
+      data.userId,
+      data.actionType,
+      data.relatedEntityId,
+    );
+    const existing = investorDemoRuntime.pointsEvents.find(
+      (item) => item.idempotencyKey === idempotencyKey,
+    );
+    if (existing) return result(existing.id, 'Recognition was already recorded.');
+    const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const confirmed = investorDemoRuntime.pointsEvents.filter(
+      (item) => item.userId === data.userId && item.status === 'confirmed',
+    );
+    const dailyTotal = confirmed
+      .filter((item) => new Date(item.createdAt) >= dayStart)
+      .reduce((sum, item) => sum + item.points, 0);
+    const weeklyTotal = confirmed
+      .filter((item) => new Date(item.createdAt) >= weekStart)
+      .reduce((sum, item) => sum + item.points, 0);
+    const points = cappedPointsAward(data.actionType, dailyTotal, weeklyTotal);
+    const event: PointsEvent = {
+      id: id('points'),
+      userId: data.userId,
+      actionType: data.actionType,
+      relatedEntityId: data.relatedEntityId,
+      points,
+      idempotencyKey,
+      status: points > 0 ? 'confirmed' : 'reversed',
+      createdAt: now.toISOString(),
     };
-    walletStore.unshift(transaction);
-    return result(transaction.id, 'Demo wallet transaction recorded.');
+    investorDemoRuntime.pointsEvents.unshift(event);
+    return result(event.id, points > 0 ? `${points} participation points recorded.` : 'Points cap reached.');
   },
   async createFeedPost(data: CreateFeedPostInput) {
     const post = {
@@ -221,7 +461,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       status: data.status ?? 'active',
       createdAt: data.createdAt ?? new Date().toISOString(),
     };
-    feedPostStore.unshift(post);
+    feedPosts.unshift(post);
     return result(post.id, 'Demo post created.');
   },
   async createComment(data: CreateCommentInput) {
@@ -231,13 +471,39 @@ export const mockProvider: GoalPlaceDataProvider = {
       status: data.status ?? 'published',
       createdAt: data.createdAt ?? new Date().toISOString(),
     };
-    commentStore.push(comment);
+    comments.push(comment);
     return result(comment.id, 'Demo comment added.');
   },
   async toggleFollow(userId: string, targetType: FollowTargetType, targetId: string) {
     const key = `${userId}:${targetType}:${targetId}`;
     if (followed.has(key)) followed.delete(key);
     else followed.add(key);
+    const user = users.find((item) => item.id === userId);
+    if (user) {
+      const field = targetType === 'athlete'
+        ? 'followedAthletes'
+        : targetType === 'team'
+          ? 'followedTeams'
+          : 'followedLeagues';
+      const current = new Set(user[field] ?? []);
+      if (followed.has(key)) current.add(targetId);
+      else current.delete(targetId);
+      user[field] = [...current];
+    }
+    if (followed.has(key) && targetType === 'league') {
+      await mockProvider.recordPointsAction({
+        userId,
+        actionType: 'first_league_followed',
+        relatedEntityId: targetId,
+      });
+    }
+    if (followed.has(key) && targetType === 'team') {
+      await mockProvider.recordPointsAction({
+        userId,
+        actionType: 'team_followed',
+        relatedEntityId: targetId,
+      });
+    }
     return result(key, followed.has(key) ? 'Demo follow saved.' : 'Demo follow removed.');
   },
   async toggleSave(userId: string, targetType: SaveTargetType, targetId: string) {
@@ -245,6 +511,241 @@ export const mockProvider: GoalPlaceDataProvider = {
     if (saved.has(key)) saved.delete(key);
     else saved.add(key);
     return result(key, saved.has(key) ? 'Demo save added.' : 'Demo save removed.');
+  },
+  async updateUserProfile(userId, data) {
+    const user = users.find((item) => item.id === userId);
+    if (!user) throw new Error('User profile not found.');
+    Object.assign(user, data);
+    if (data.onboardingCompletedAt) {
+      await mockProvider.recordPointsAction({
+        userId,
+        actionType: 'fan_onboarding_completed',
+      });
+    }
+    return result(userId, 'Profile updated.');
+  },
+  async updateAthleteProfile(athleteId, data) {
+    const athlete = athletes.find((item) => item.id === athleteId);
+    if (!athlete) throw new Error('Athlete profile not found.');
+    Object.assign(athlete, data);
+    return result(athleteId, 'Athlete profile updated.');
+  },
+  async updateTeamProfile(teamId, data) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) throw new Error('Team profile not found.');
+    Object.assign(team, data);
+    return result(teamId, 'Team profile updated.');
+  },
+  async saveRoster(roster) {
+    replaceById(rosters, { ...roster, updatedAt: new Date().toISOString() });
+    return result(roster.id, 'Roster saved.');
+  },
+  async createChallenge(data) {
+    const challenge: Challenge = {
+      ...data,
+      id: data.id ?? id('challenge'),
+      createdAt: new Date().toISOString(),
+    };
+    challenges.unshift(challenge);
+    return result(challenge.id, 'Challenge proposal created.');
+  },
+  async transitionChallenge(data: TransitionChallengeInput) {
+    const challenge = challenges.find((item) => item.id === data.challengeId);
+    if (!challenge) throw new Error('Challenge not found.');
+    const nextStatus = challengeNextStatus(normalizeChallengeStatus(challenge.status), data.action);
+    challenge.status = nextStatus;
+    challenge.actionHistory = [
+      ...(challenge.actionHistory ?? []),
+      `${data.action.replaceAll('_', ' ')} by ${data.actorUserId}${data.note ? `: ${data.note}` : ''}`,
+    ];
+    if (data.action === 'team_approve') challenge.teamApprovedByUserId = data.actorUserId;
+    if (data.action === 'league_approve') challenge.leagueApprovedByUserId = data.actorUserId;
+    if (data.action === 'submit_evidence') challenge.evidenceRefs = data.evidenceRefs ?? [];
+    if (['mark_achieved', 'mark_not_achieved', 'mark_void'].includes(data.action)) {
+      challenge.outcomeVerifiedByUserId = data.actorUserId;
+      challenge.outcomeNote = data.note;
+      challenge.verificationStatus = data.action === 'mark_achieved' ? 'verified' : 'rejected';
+    }
+    if (data.action === 'open_funding') challenge.termsLockedAt = new Date().toISOString();
+    return result(challenge.id, `Challenge moved to ${nextStatus.replaceAll('_', ' ')}.`);
+  },
+  async createLeagueNotice(data) {
+    const notice = {
+      ...data,
+      id: data.id ?? id('notice'),
+      createdAt: new Date().toISOString(),
+    };
+    leagueNotices.unshift(notice);
+    return result(notice.id, 'League notice published.');
+  },
+  async createSeason(data) {
+    const season = {
+      ...data,
+      id: data.id ?? id('season'),
+      createdAt: new Date().toISOString(),
+    };
+    seasons.unshift(season);
+    return result(season.id, 'Season created.');
+  },
+  async createTeams(nextTeams) {
+    for (const team of nextTeams) replaceById(teams, team);
+    return result(nextTeams[0]?.id ?? id('team_batch'), `${nextTeams.length} teams imported.`);
+  },
+  async createFixtures(fixtures) {
+    for (const fixture of fixtures) replaceById(matches, fixture);
+    return result(fixtures[0]?.id ?? id('fixture_batch'), `${fixtures.length} fixtures created.`);
+  },
+  async createTeamAdminInvitation(data) {
+    replaceById(teamAssignments, data);
+    audit({
+      actorUserId: data.invitedByUserId ?? data.userId,
+      action: 'invited',
+      targetCollection: 'teamAssignments',
+      targetId: data.id,
+    });
+    return result(data.id, 'Team Admin invitation created.');
+  },
+  async acceptTeamAdminInvitation(assignmentId, userId) {
+    const assignment = teamAssignments.find((item) => item.id === assignmentId);
+    if (!assignment || (assignment.userId && assignment.userId !== userId)) throw new Error('Invitation not found.');
+    assignment.userId = userId;
+    assignment.status = 'active';
+    assignment.acceptedAt = new Date().toISOString();
+    audit({
+      actorUserId: userId,
+      action: 'accepted',
+      targetCollection: 'teamAssignments',
+      targetId: assignmentId,
+    });
+    return result(assignmentId, 'Team Admin invitation accepted.');
+  },
+  async markNotificationRead(notificationId, read = true) {
+    const notification = notifications.find((item) => item.id === notificationId);
+    if (!notification) throw new Error('Notification not found.');
+    notification.read = read;
+    return result(notificationId, read ? 'Notification read.' : 'Notification marked unread.');
+  },
+  async createSupportNeed(data) {
+    const need: SupportNeed = {
+      ...data,
+      id: data.id ?? id('support_need'),
+      raisedAmount: 0,
+      recipientUpdates: [],
+      createdAt: new Date().toISOString(),
+    };
+    investorDemoRuntime.supportNeeds.unshift(need);
+    return result(need.id, 'Support need published.');
+  },
+  async addSupportNeedUpdate(needId, input) {
+    const need = investorDemoRuntime.supportNeeds.find((item) => item.id === needId);
+    if (!need) throw new Error('Support need not found.');
+    need.recipientUpdates.unshift({
+      id: id('need_update'),
+      message: input.message,
+      evidenceUrl: input.evidenceUrl,
+      createdAt: new Date().toISOString(),
+    });
+    need.updatedAt = new Date().toISOString();
+    return result(needId, 'Support update published.');
+  },
+  async reviewSupportNeed(data: ReviewSupportNeedInput) {
+    const need = investorDemoRuntime.supportNeeds.find(
+      (item) => item.id === data.supportNeedId,
+    );
+    if (!need) throw new Error('Support need not found.');
+    if (data.action === 'team_verify') {
+      if (need.approvalStatus !== 'proposed') throw new Error('This need is not awaiting team review.');
+      need.approvalStatus = 'team_verified';
+      need.teamVerifiedByUserId = data.actorUserId;
+    } else if (data.action === 'league_approve') {
+      if (need.approvalStatus !== 'team_verified') throw new Error('Team verification is required first.');
+      need.approvalStatus = 'league_approved';
+      need.verificationStatus = 'verified';
+      need.leagueApprovedByUserId = data.actorUserId;
+    } else {
+      need.approvalStatus = 'rejected';
+      need.verificationStatus = 'rejected';
+      need.status = 'cancelled';
+    }
+    need.updatedAt = new Date().toISOString();
+    return result(need.id, `Support need ${need.approvalStatus.replaceAll('_', ' ')}.`);
+  },
+  async completeSupportNeed(data) {
+    const need = investorDemoRuntime.supportNeeds.find((item) => item.id === data.supportNeedId);
+    if (!need) throw new Error('Support need not found.');
+    if (need.status !== 'funded') throw new Error('Only a funded need can be completed.');
+    if (!need.recipientUpdates.some((update) => Boolean(update.evidenceUrl))) {
+      throw new Error('Completion evidence is required.');
+    }
+    need.status = 'completed';
+    need.updatedAt = new Date().toISOString();
+    audit({
+      actorUserId: data.actorUserId,
+      action: 'approved',
+      targetCollection: 'supportNeeds',
+      targetId: need.id,
+      note: data.note,
+    });
+    return result(need.id, 'Support need marked completed.');
+  },
+  async createLeagueAdminApplication(data) {
+    const application: LeagueAdminApplication = {
+      ...data,
+      id: data.id ?? id('league_application'),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    investorDemoRuntime.leagueAdminApplications.unshift(application);
+    return result(application.id, 'League Admin application submitted.');
+  },
+  async reviewApproval(input) {
+    if (input.targetCollection === 'athletes') {
+      const athlete = athletes.find((item) => item.id === input.targetId);
+      if (!athlete) throw new Error('Athlete not found.');
+      athlete.verificationStatus = input.decision === 'approved' ? 'verified' : 'pending';
+      athlete.verified = input.decision === 'approved';
+    } else if (input.targetCollection === 'leagues') {
+      const league = leagues.find((item) => item.id === input.targetId);
+      if (!league) throw new Error('League not found.');
+      league.status = input.decision === 'approved' ? 'verified' : 'draft';
+      league.verified = input.decision === 'approved';
+    } else {
+      const application = investorDemoRuntime.leagueAdminApplications.find(
+        (item) => item.id === input.targetId,
+      );
+      if (!application) throw new Error('Application not found.');
+      application.status = input.decision === 'requested_information'
+        ? 'needs_information'
+        : input.decision;
+      application.reviewedByUserId = input.actorUserId;
+      application.updatedAt = new Date().toISOString();
+    }
+    audit({
+      actorUserId: input.actorUserId,
+      action: input.decision,
+      targetCollection: input.targetCollection,
+      targetId: input.targetId,
+      note: input.note,
+    });
+    return result(input.targetId, 'Approval decision recorded.');
+  },
+  async resolveReport(input) {
+    const report = reports.find((item) => item.id === input.reportId);
+    if (!report) throw new Error('Report not found.');
+    report.status = input.decision;
+    report.updatedAt = new Date().toISOString();
+    report.actionHistory = [
+      ...(report.actionHistory ?? []),
+      input.note || (input.decision === 'resolved' ? 'Case resolved' : 'Case dismissed'),
+    ];
+    audit({
+      actorUserId: input.actorUserId,
+      action: input.decision,
+      targetCollection: 'reports',
+      targetId: input.reportId,
+      note: input.note,
+    });
+    return result(input.reportId, 'Trust decision recorded.');
   },
   async updateMatchVerification(matchId: string, status: VerificationStatus) {
     const match = matches.find((item) => item.id === matchId);
@@ -287,6 +788,15 @@ export const mockProvider: GoalPlaceDataProvider = {
       submittedAt: now,
     };
     resultSubmissions.set(data.match.id, submission);
+    resultSubmissionEvents.unshift({
+      id: id('result_event'),
+      submissionId: data.match.id,
+      from: existing?.status ?? null,
+      to: 'pending_confirmation',
+      actor: 'submitting_team',
+      actorUserId: data.submittedByUserId,
+      createdAt: now,
+    });
     notifySubmission(data.match.id);
     return result(data.match.id, 'Demo result submitted.');
   },
@@ -305,6 +815,15 @@ export const mockProvider: GoalPlaceDataProvider = {
       finalizedAt: now,
     };
     resultSubmissions.set(matchId, official);
+    resultSubmissionEvents.unshift({
+      id: id('result_event'),
+      submissionId: matchId,
+      from: submission.status,
+      to: 'official',
+      actor: 'system',
+      actorUserId: 'goalplace-finalizer',
+      createdAt: now,
+    });
     const match = matches.find((item) => item.id === matchId);
     if (match) {
       match.status = 'completed';
@@ -324,6 +843,16 @@ export const mockProvider: GoalPlaceDataProvider = {
       respondedByUserId,
       respondedAt: new Date().toISOString(),
       disputeReason: reason,
+    });
+    resultSubmissionEvents.unshift({
+      id: id('result_event'),
+      submissionId: matchId,
+      from: submission.status,
+      to: 'disputed',
+      actor: 'opponent_team',
+      actorUserId: respondedByUserId,
+      note: reason,
+      createdAt: new Date().toISOString(),
     });
     notifySubmission(matchId);
     return result(matchId, 'Demo dispute recorded.');
@@ -397,6 +926,40 @@ export const mockProvider: GoalPlaceDataProvider = {
     });
     notifySubmission(matchId);
     return result(matchId, 'Demo correction request recorded.');
+  },
+  async approveResultCorrection(data) {
+    const submission = resultSubmissions.get(data.matchId);
+    if (!submission || submission.status !== 'official') {
+      throw new Error('Only an official result can be corrected.');
+    }
+    const now = new Date().toISOString();
+    const version = submission.resultVersion + 1;
+    const updated: ResultSubmission = {
+      ...submission,
+      homeScore: data.homeScore,
+      awayScore: data.awayScore,
+      correctedHomeScore: undefined,
+      correctedAwayScore: undefined,
+      status: 'official',
+      revision: submission.revision + 1,
+      resultVersion: version,
+      correctionReason: data.reason,
+      correctionApprovedBy: data.actorUserId,
+      resolvedByUserId: data.actorUserId,
+      resolution: 'league_corrected',
+      finalDecisionNote: data.reason,
+      finalizationKey: `${data.matchId}:${data.matchId}:${version}`,
+      finalizedAt: now,
+    };
+    resultSubmissions.set(data.matchId, updated);
+    const match = matches.find((item) => item.id === data.matchId);
+    if (match) {
+      match.score = { home: data.homeScore, away: data.awayScore };
+      match.officialResultVersion = version;
+      match.verificationStatus = 'verified';
+    }
+    notifySubmission(data.matchId);
+    return result(data.matchId, `Official result updated to version ${version}.`);
   },
   subscribeToResultSubmission(matchId, listener) {
     const listeners =

@@ -169,6 +169,11 @@ function requireSafeTarget(args: Args) {
       `Refusing target "${args.project}". This importer only accepts the staging alias "${staging}".`,
     );
   }
+  if (args.database !== 'fg256') {
+    throw new Error(
+      `Refusing database "${args.database}". This importer only accepts the isolated staging database "fg256".`,
+    );
+  }
   if (args.execute) {
     if (!args.reset) throw new Error('Execute requires --reset so package counts remain exact.');
     if (args.confirm !== REQUIRED_CONFIRMATION) {

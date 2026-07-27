@@ -2,9 +2,7 @@
 
 import { useMemo } from 'react';
 import { DownloadSimple, Buildings, Users, ShieldCheck, CalendarCheck, Coins } from '@phosphor-icons/react';
-import { toast } from 'sonner';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { isOfficialMatch } from '@/lib/status';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -17,21 +15,44 @@ function ugx(n: number): string {
 }
 
 export function PlatformReports() {
-  const { leagues, teams, athletes, matches, loading } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'athletes', 'matches'],
+  const { leagues, sponsorReports, loading } = useGoalPlaceData({
+    collections: ['leagues', 'sponsorReports'],
   });
   const stats = useMemo(() => {
-    const played = matches.filter((m) => m.status === 'completed');
-    const official = played.filter(isOfficialMatch).length;
+    const reportedOfficial = sponsorReports.reduce((sum, report) => sum + report.verifiedMatches, 0);
+    const reportedMatches = leagues.reduce((sum, league) => sum + league.matchesCount, 0);
+    const weightedVerified = leagues.reduce(
+      (sum, league) => sum + league.matchesCount * league.verifiedResultsRate,
+      0,
+    );
     return {
       leagues: leagues.length,
-      teams: teams.length,
-      athletes: athletes.length,
-      official,
-      rate: played.length ? Math.round((official / played.length) * 100) : 0,
-      support: teams.reduce((s, t) => s + (t.totalSupport ?? 0), 0),
+      teams: leagues.reduce((sum, league) => sum + league.teamsCount, 0),
+      athletes: leagues.reduce((sum, league) => sum + league.athletesCount, 0),
+      official: reportedOfficial,
+      rate: reportedMatches ? Math.round(weightedVerified / reportedMatches) : 0,
+      support: leagues.reduce((sum, league) => sum + league.totalSupport, 0),
     };
-  }, [leagues, teams, athletes, matches]);
+  }, [leagues, sponsorReports]);
+
+  function exportReport() {
+    const rows = [
+      ['Metric', 'Value'],
+      ['Leagues', stats.leagues],
+      ['Teams', stats.teams],
+      ['Athletes', stats.athletes],
+      ['Official matches', stats.official],
+      ['Verified rate', `${stats.rate}%`],
+      ['Support raised UGX', stats.support],
+    ];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `goalplace256-platform-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (loading) return <div className="space-y-3"><Skeleton className="h-8 w-40" /><Skeleton className="h-48 w-full rounded-[var(--radius-lg)]" /></div>;
 
@@ -42,7 +63,7 @@ export function PlatformReports() {
           <h1 className="text-xl font-semibold text-text-strong">Platform reports</h1>
           <p className="text-sm text-muted">Health of the whole network.</p>
         </div>
-        <Button size="sm" variant="secondary" icon={DownloadSimple} onClick={() => toast('Report export arrives in the next build step.')}>Export</Button>
+        <Button size="sm" variant="secondary" icon={DownloadSimple} onClick={exportReport}>Export</Button>
       </div>
 
       <DemoDataNote />

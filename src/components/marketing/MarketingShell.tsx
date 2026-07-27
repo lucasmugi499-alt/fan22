@@ -24,7 +24,7 @@ const FOOTER_LINKS = [
     title: 'Account',
     links: [
       ['Sign in', '/login'],
-      ['Create fan account', '/login'],
+      ['Create fan account', '/register'],
       ['League application', '/pilot'],
       ['Team Admin invitation', '/login'],
     ],

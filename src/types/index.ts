@@ -89,13 +89,22 @@ export type MatchStatus = "scheduled" | "live" | "completed" | "cancelled";
 export type VerificationStatus = "pending" | "verified" | "rejected" | "disputed";
 
 export type ChallengeStatus =
-  | "open"
-  | "locked"
+  | "draft"
+  | "proposed"
+  | "team_approved"
+  | "league_approved"
+  | "funding_open"
+  | "funding_locked"
+  | "in_progress"
+  | "evidence_submitted"
+  | "under_review"
   | "achieved"
-  | "failed"
-  | "paid"
-  | "refunded"
-  | "disputed";
+  | "not_achieved"
+  | "void"
+  | "allocation_pending"
+  | "settled";
+
+export type ChallengeFundingModel = "non_cash" | "sponsor_grant";
 
 /**
  * Result submission lifecycle.
@@ -293,6 +302,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   name: string;
+  displayName?: string;
   role: AppRole;
   status: ProfileStatus;
   avatarUrl?: string;
@@ -301,8 +311,22 @@ export interface UserProfile {
   followedAthletes: string[];
   followedTeams: string[];
   followedLeagues: string[];
+  city?: string;
+  sportPreferences?: SportSlug[];
+  notificationPreferences?: NotificationPreferences;
+  lowDataMode?: boolean;
+  onboardingCompletedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface NotificationPreferences {
+  matchday: boolean;
+  athletes: boolean;
+  support: boolean;
+  teamOperations: boolean;
+  leagueOperations: boolean;
+  platformOperations: boolean;
 }
 
 export interface GoalPlaceIndexSignals {
@@ -417,6 +441,52 @@ export interface Team {
   createdAt: string;
 }
 
+export interface TeamAssignment {
+  id: string;
+  userId: string;
+  teamId: string;
+  leagueId: string;
+  seasonId: string;
+  role: "team_admin";
+  status: "invited" | "active" | "revoked";
+  invitedByUserId?: string;
+  invitedEmail?: string;
+  acceptedAt?: string;
+  createdAt: string;
+}
+
+export interface Roster {
+  id: string;
+  leagueId: string;
+  seasonId: string;
+  teamId: string;
+  athleteIds: string[];
+  status: "draft" | "submitted" | "confirmed" | "returned";
+  completeness: number;
+  submittedByUserId?: string;
+  approvedByUserId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface StoredStanding {
+  id: string;
+  leagueId: string;
+  seasonId: string;
+  sport: SportSlug;
+  teamId: string;
+  teamName: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  difference: number;
+  points: number;
+  rank: number;
+}
+
 export interface Athlete {
   id: string;
   userId?: string;
@@ -491,7 +561,7 @@ export interface MatchEvent {
 export interface Challenge {
   id: string;
   athleteId: string;
-  matchId: string;
+  matchId?: string;
   leagueId: string;
   seasonId: string;
   sport: SportSlug | SportType;
@@ -502,11 +572,31 @@ export interface Challenge {
   totalPledged: number;
   supportersCount: number;
   status: ChallengeStatus;
+  fundingModel: ChallengeFundingModel;
+  sponsorId?: string;
+  sponsorGrantAmountMinor?: number;
+  termsLockedAt?: string;
+  evidenceRefs?: string[];
+  outcomeNote?: string;
+  teamApprovedByUserId?: string;
+  leagueApprovedByUserId?: string;
+  outcomeVerifiedByUserId?: string;
   verificationStatus: VerificationStatus;
   submittedBy?: string;
   evidenceStatus?: string;
   amountAffected?: number;
   actionHistory?: string[];
+  createdAt: string;
+}
+
+export interface ChallengeApproval {
+  id: string;
+  challengeId: string;
+  stage: "team_feasibility" | "league_rules" | "outcome" | "platform_review";
+  decision: "approved" | "rejected" | "achieved" | "not_achieved" | "void";
+  actorUserId: string;
+  actorRole: "team_admin" | "league_admin" | "platform_admin";
+  note?: string;
   createdAt: string;
 }
 
@@ -517,6 +607,7 @@ export interface SupportPledge {
   teamId?: string;
   leagueId?: string;
   challengeId?: string;
+  supportNeedId?: string;
   amount: number;
   currency: Currency;
   type: SupportType;
@@ -595,6 +686,55 @@ export interface Sponsor {
   active: boolean;
 }
 
+export interface SponsorReport {
+  id: string;
+  leagueId: string;
+  seasonId: string;
+  period: string;
+  verifiedMatches: number;
+  verifiedAthletes: number;
+  teamAdminActivityRate: number;
+  resultReportingCompliance: number;
+  fanProfiles: number;
+  supportTransactions: number;
+  supportValueUGX: number;
+  storiesGenerated: number;
+  evidenceItems: number;
+  status: "draft" | "generated" | "shared";
+  generatedAt: string;
+}
+
+export interface LeagueNotice {
+  id: string;
+  leagueId: string;
+  seasonId: string;
+  type:
+    | "fixture_update"
+    | "postponement"
+    | "result_announcement"
+    | "disciplinary"
+    | "registration"
+    | "verification_reminder"
+    | "sponsor_message"
+    | "emergency";
+  title: string;
+  message: string;
+  audience: "public" | "all_teams" | "team_admins" | "athletes";
+  priority: "normal" | "important" | "urgent";
+  publishedByUserId: string;
+  createdAt: string;
+}
+
+export interface FinalizationRecord {
+  id: string;
+  matchId: string;
+  submissionId: string;
+  resultVersion: number;
+  status: "applied" | "skipped" | "failed";
+  appliedAt: string;
+  source: FinalizationSource;
+}
+
 export interface AwardCategory {
   id: string;
   name: string;
@@ -650,8 +790,14 @@ export interface Notification {
     | "support_received"
     | "pledge_created"
     | "challenge_verified"
-    | "match_result_verified"
-    | "athlete_followed"
+      | "match_result_verified"
+      | "fixture_reminder"
+      | "venue_changed"
+      | "result_confirmation_required"
+      | "result_disputed"
+      | "league_notice"
+      | "support_need_funded"
+      | "athlete_followed"
     | "sponsor_campaign_update"
     | "awards_ranking_update";
   title: string;
@@ -659,6 +805,84 @@ export interface Notification {
   read: boolean;
   href?: string;
   createdAt?: string;
+}
+
+export interface AdminAuditEvent {
+  id: string;
+  actorUserId: string;
+  action:
+    | "approved"
+    | "rejected"
+    | "requested_information"
+    | "resolved"
+    | "dismissed"
+    | "invited"
+    | "accepted";
+  targetCollection: string;
+  targetId: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface LeagueAdminApplication {
+  id: string;
+  userId: string;
+  leagueName: string;
+  sport: SportSlug;
+  city: string;
+  evidenceNote: string;
+  status: "pending" | "approved" | "rejected" | "needs_information";
+  reviewedByUserId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SupportNeed {
+  id: string;
+  athleteId?: string;
+  teamId?: string;
+  leagueId: string;
+  title: string;
+  story: string;
+  targetAmount: number;
+  raisedAmount: number;
+  status: "open" | "funded" | "completed" | "cancelled";
+  approvalStatus: "proposed" | "team_verified" | "league_approved" | "rejected";
+  verificationStatus: VerificationStatus;
+  preferredPayoutDestination:
+    | "approved_vendor"
+    | "verified_team"
+    | "verified_academy"
+    | "adult_athlete"
+    | "verified_guardian"
+    | "evidence_reimbursement";
+  payoutDestinationStatus: "pending_verification" | "verified" | "suspended";
+  recipientIsMinor?: boolean;
+  guardianConsentVerified?: boolean;
+  teamVerifiedByUserId?: string;
+  leagueApprovedByUserId?: string;
+  recipientUpdates: Array<{
+    id: string;
+    message: string;
+    evidenceUrl?: string;
+    createdAt: string;
+  }>;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SupportNeedApproval {
+  id: string;
+  supportNeedId: string;
+  athleteId?: string;
+  teamId?: string;
+  leagueId: string;
+  stage: "team_verification" | "league_publication";
+  decision: "approved" | "rejected";
+  actorUserId: string;
+  note?: string;
+  createdAt: string;
 }
 
 export interface Report {

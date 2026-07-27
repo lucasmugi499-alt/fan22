@@ -24,13 +24,19 @@ type Tab = (typeof TABS)[number];
 
 export function TeamFixtures() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, loading, error, retry } = useGoalPlaceData({
-    collections: ['teams', 'matches'],
+  const catalog = useGoalPlaceData({ collections: ['teams'] });
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const detail = useGoalPlaceData({
+    collections: ['matches'],
+    scope: { teamId: team?.id ?? '__pending__' },
+    recordLimit: 250,
   });
+  const teams = catalog.teams;
+  const { matches, error, retry } = detail;
+  const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [tab, setTab] = useState<Tab>('Needs action');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
     useTeamConfirmationInbox(team?.id);

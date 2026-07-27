@@ -1,88 +1,86 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { HandHeart, Coins } from '@phosphor-icons/react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthProvider';
-import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import type { Athlete, SupportPledge } from '@/types';
+import type { Athlete } from '@/types';
+import type { SupportNeed } from '@/types';
+import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
+import { contributionQuote } from '@/lib/money';
 
 const PRESETS = [5_000, 10_000, 25_000, 50_000];
-/** Platform fee on direct support; the rest reaches the athlete. */
-const FEE_RATE = 0.05;
 
 /**
- * The fan-side value loop: pick an amount, see exactly what reaches the athlete, and pledge.
- * In demo mode this moves local state only (wallet down, athlete support up, pledge into
- * history) via the same override pattern as the result flow; nothing here writes anything
- * official.
+ * Starts a provider-owned contribution. Mock mode records a synthetic settlement; real
+ * mode remains disabled until a licensed PSP is configured.
  */
 export function SupportSheet({
   open,
   onClose,
   athlete,
+  need,
 }: {
   open: boolean;
   onClose: () => void;
   athlete: Athlete;
+  need?: SupportNeed;
 }) {
-  const { userProfile } = useAuth();
-  const { demoWalletSpent, addDemoPledge, addDemoWalletSpend, updateDemoAthlete } = useAppStore();
+  const { currentUser, userProfile, isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
   const [amount, setAmount] = useState<number>(PRESETS[1]);
   const [custom, setCustom] = useState<string>('');
   const [message, setMessage] = useState('');
 
-  const userId = userProfile?.id ?? userProfile?.uid ?? 'guest';
-  const balance = (userProfile?.walletBalance ?? 0) - (demoWalletSpent[userId] ?? 0);
+  const userId = currentUser?.uid ?? userProfile?.uid ?? userProfile?.id ?? 'guest';
   const chosen = custom !== '' ? Number(custom) : amount;
-  const fee = Math.round(chosen * FEE_RATE);
-  const net = chosen - fee;
+  const quote = Number.isSafeInteger(chosen) && chosen > 0 ? contributionQuote(chosen) : null;
   const firstName = athlete.name.split(' ')[0];
 
   const valid = Number.isFinite(chosen) && chosen >= 1_000;
-  const affordable = chosen <= balance;
+  const paymentsAvailable = isDemoMode || process.env.NEXT_PUBLIC_PAYMENTS_MODE === 'psp';
+  const disabledReason = !valid
+    ? 'Minimum support is UGX 1,000'
+    : !paymentsAvailable
+      ? 'Real payments are disabled until a licensed payment provider is configured'
+      : null;
 
-  const disabledReason = useMemo(() => {
-    if (!valid) return 'Minimum pledge is UGX 1,000';
-    if (!affordable) return 'Not enough in your wallet for this amount';
-    return null;
-  }, [valid, affordable]);
-
-  function pledge() {
+  async function pledge() {
     if (disabledReason) return;
-    const now = new Date().toISOString();
-    const record: SupportPledge = {
-      id: `pledge_${Date.now()}`,
-      fanId: userId,
-      athleteId: athlete.id,
-      amount: chosen,
-      currency: 'UGX',
-      type: 'direct_support',
-      status: 'held',
-      platformFee: fee,
-      netAmount: net,
-      message: message.trim() || undefined,
-      createdAt: now,
-    };
-    addDemoPledge(record);
-    addDemoWalletSpend(userId, chosen);
-    updateDemoAthlete(athlete.id, {
-      totalSupport: (athlete.totalSupport ?? 0) + net,
-      supportersCount: (athlete.supportersCount ?? 0) + 1,
-    });
-    toast.success(`You backed ${firstName} with UGX ${chosen.toLocaleString()}.`);
-    onClose();
+    if (!currentUser && !isDemoMode) {
+      toast.error('Sign in to support this athlete.');
+      return;
+    }
+    try {
+      await provider.createContributionIntent({
+        supporterUserId: userId,
+        purpose: need ? 'verified_support_need' : 'direct_athlete_support',
+        recipientType: 'athlete',
+        recipientId: athlete.id,
+        supportNeedId: need?.id,
+        supportAmountMinor: chosen,
+        message: message.trim() || undefined,
+        idempotencyKey: `support:${userId}:${need?.id ?? athlete.id}:${Date.now()}`,
+      });
+      toast.success(isDemoMode
+        ? `Synthetic support of UGX ${chosen.toLocaleString()} recorded. No money moved.`
+        : 'Continue with the licensed payment provider.');
+      onClose();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'This support pledge could not be recorded.');
+    }
   }
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title={`Back ${firstName}`}
-      description={`${athlete.name} · ${athlete.position}`}
+      title={need ? need.title : `Back ${firstName}`}
+      description={need ? `${athlete.name} · verified need` : `${athlete.name} · ${athlete.position}`}
       footer={
         <div className="space-y-2">
           {disabledReason ? <p className="text-center text-xs text-[var(--state-pending)]">{disabledReason}</p> : null}
@@ -139,16 +137,16 @@ export function SupportSheet({
 
         {/* Breakdown */}
         <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm">
-          <Row label={`Reaches ${firstName}`} value={`UGX ${Number.isFinite(net) ? net.toLocaleString() : 0}`} strong />
-          <Row label="Platform fee (5%)" value={`UGX ${Number.isFinite(fee) ? fee.toLocaleString() : 0}`} />
+          <Row label={`Allocated to ${firstName}`} value={`UGX ${quote?.recipientAllocationMinor.toLocaleString() ?? 0}`} strong />
+          <Row label="GoalPlace service fee (5%)" value={`UGX ${quote?.platformFeeMinor.toLocaleString() ?? 0}`} />
+          <Row label="Payment-provider fee" value="Shown at PSP checkout" />
           <div className="my-2 h-px bg-border" />
-          <Row label="Your wallet after" value={`UGX ${Math.max(0, balance - (Number.isFinite(chosen) ? chosen : 0)).toLocaleString()}`} />
+          <Row label="Total before PSP fee" value={`UGX ${quote?.totalAmountMinor.toLocaleString() ?? 0}`} />
         </div>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
           <Coins className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand-2)]" weight="bold" />
-          Funds are held until activity is verified, then released. In this demonstration build
-          the pledge moves demo balances only.
+          GoalPlace256 does not hold a reusable cash balance. A licensed PSP collects and settles each payment. In demo mode no money moves.
         </p>
       </div>
     </Sheet>

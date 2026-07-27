@@ -4,7 +4,12 @@ import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-import { finalizeSubmission, sweepOverdueConfirmations, retryStalledFinalizations } from './finalize';
+import {
+  finalizeSubmission,
+  retryStalledFinalizations,
+  sendDueConfirmationReminders,
+  sweepOverdueConfirmations,
+} from './finalize';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -75,10 +80,12 @@ export const reconcileResultSubmissions = onSchedule(
     timeoutSeconds: 300,
   },
   async () => {
+    const reminders = await sendDueConfirmationReminders(db);
     const escalated = await sweepOverdueConfirmations(db);
     const retried = await retryStalledFinalizations(db);
     logger.info('Reconciliation sweep complete', {
       escalated: escalated.length,
+      reminders: reminders.length,
       retried: retried.length,
     });
   }

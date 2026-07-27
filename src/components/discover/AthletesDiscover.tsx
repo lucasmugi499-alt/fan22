@@ -1,20 +1,52 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Users } from '@phosphor-icons/react';
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { adaptAthlete } from '@/lib/firebase/useGoalPlaceData';
+import { dataProvider } from '@/data/dataProvider';
 import { GradientBanner } from '@/components/premium/GradientBanner';
 import { AthleteCard } from '@/components/core/EntityCards';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/EmptyState';
+import type { Athlete } from '@/types';
 
 const SPORTS = ['All', 'Football', 'Basketball', 'Rugby'] as const;
 type SportFilter = (typeof SPORTS)[number];
 
 export function AthletesDiscover() {
-  const { athletes, loading } = useGoalPlaceData({ collections: ['athletes'] });
+  const [athletes, setAthletes] = useState<Athlete[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<Error>();
   const [sport, setSport] = useState<SportFilter>('All');
+  const pageSize = 48;
+
+  const loadPage = useCallback(async (afterId?: string) => {
+    if (afterId) setLoadingMore(true);
+    else setLoading(true);
+    setError(undefined);
+    try {
+      const page = (await dataProvider.getAthletes({ limit: pageSize, afterId })).map(adaptAthlete);
+      setAthletes((current) => afterId
+        ? [...new Map([...current, ...page].map((athlete) => [athlete.id, athlete])).values()]
+        : page);
+      setHasMore(page.length === pageSize);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error('Athletes could not be loaded.'));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadPage(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPage]);
 
   const list = useMemo(() => {
     const sorted = [...athletes].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0));
@@ -29,6 +61,7 @@ export function AthletesDiscover() {
       </div>
     );
   }
+  if (error && !athletes.length) return <ErrorState description={error.message} onRetry={() => void loadPage()} />;
 
   return (
     <div className="space-y-4">
@@ -50,11 +83,25 @@ export function AthletesDiscover() {
       </div>
 
       {list.length ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {list.map((a) => <AthleteCard key={a.id} athlete={a} />)}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {list.map((a) => <AthleteCard key={a.id} athlete={a} />)}
+          </div>
+          {hasMore ? (
+            <div className="flex justify-center pt-2">
+              <Button variant="secondary" disabled={loadingMore} onClick={() => void loadPage(athletes.at(-1)?.id)}>
+                {loadingMore ? 'Loading...' : 'Load more athletes'}
+              </Button>
+            </div>
+          ) : null}
+        </>
       ) : (
-        <EmptyState icon={Users} title="No athletes here yet" description="Try a different sport, or check back as more athletes join." />
+        <EmptyState
+          icon={Users}
+          title="No athletes in this loaded page"
+          description={hasMore ? 'Load more records to continue exploring this sport.' : 'Try a different sport, or check back as more athletes join.'}
+          action={hasMore ? <Button size="sm" variant="secondary" onClick={() => void loadPage(athletes.at(-1)?.id)}>Load more</Button> : undefined}
+        />
       )}
     </div>
   );

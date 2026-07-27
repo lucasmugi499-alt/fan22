@@ -102,7 +102,7 @@ export function canCreateFixture(auth: AuthState): boolean {
 }
 
 export function canCreateChallenge(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+  return hasAnyRole(auth, ['athlete', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
 export function canRegisterAsRole(role: AppRole): boolean {
@@ -163,7 +163,9 @@ export const PUBLIC_ROUTES = [
   '/verification',
   '/sponsors',
   '/pilot',
-  '/login'
+  '/login',
+  '/register',
+  '/apply/league-admin',
 ];
 
 export const PUBLIC_DISCOVERY_ROUTES = [
@@ -171,11 +173,15 @@ export const PUBLIC_DISCOVERY_ROUTES = [
   '/teams',
   '/athletes',
   '/matches',
+  '/discover',
+  '/map',
+  '/support',
 ];
 
 export function isPublicRoute(pathname: string): boolean {
   return (
     PUBLIC_ROUTES.includes(pathname) ||
+    pathname.startsWith('/invitations/team/') ||
     PUBLIC_DISCOVERY_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     )
@@ -205,14 +211,6 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
   if (pathname.startsWith('/team-admin')) {
     return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
   }
-  if (pathname.startsWith('/sponsor-dashboard')) {
-    return hasAnyRole(auth, ['platform_admin', 'super_admin']);
-  }
-
   // All other shared surfaces are accessible to any logged-in user.
   return true;
-}
-
-export function routeForAppRole(role: AppRole): string {
-  return getDefaultRouteForRole(role);
 }

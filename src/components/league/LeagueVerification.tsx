@@ -12,7 +12,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { LeagueResolveSheet } from '@/components/league/LeagueResolveSheet';
 import { useLeagueResultExceptions } from '@/lib/resultSubmissionQueues';
 import type { LeagueException } from '@/lib/league/leagueContext';
-import type { Match } from '@/types';
+import type { Match, ResultSubmission } from '@/types';
+import { ChallengeWorkflow } from '@/components/core/ChallengeWorkflow';
+import { SupportNeedWorkflow } from '@/components/core/SupportNeedWorkflow';
+import { ResultCorrectionSheet } from '@/components/league/ResultCorrectionSheet';
 
 const KIND_STATE = {
   disputed: STATE.disputed,
@@ -28,12 +31,18 @@ const KIND_META: Record<LeagueException['kind'], string> = {
 
 export function LeagueVerification({ compact = false }: { compact?: boolean }) {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, loading, retry } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'matches'],
+  const catalog = useGoalPlaceData({ collections: ['leagues'] });
+  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
+  const detail = useGoalPlaceData({
+    collections: ['teams', 'matches'],
+    scope: { leagueId: league?.id ?? '__pending__' },
+    recordLimit: 250,
   });
+  const { teams, matches, retry } = detail;
+  const loading = catalog.loading || (Boolean(league) && detail.loading);
   const [active, setActive] = useState<Match | null>(null);
+  const [activeCorrection, setActiveCorrection] = useState<ResultSubmission | null>(null);
 
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const { items: submissionExceptions, error: queueError, refresh: refreshExceptions } =
     useLeagueResultExceptions(league?.id);
@@ -41,6 +50,7 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
     if (!league) return [];
     const byMatchId = new Map(matches.map((match) => [match.id, match]));
     const resultQueue: LeagueException[] = submissionExceptions.flatMap((submission) => {
+      if (submission.status === 'official' && submission.correctionReason) return [];
       const match = byMatchId.get(submission.matchId);
       if (!match) return [];
       return [{
@@ -54,6 +64,14 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
     );
     return [...resultQueue, ...liveQueue];
   }, [league, matches, submissionExceptions]);
+  const corrections = useMemo(
+    () => submissionExceptions.filter((submission) =>
+      submission.status === 'official' &&
+      Boolean(submission.correctionReason) &&
+      !submission.correctionApprovedBy,
+    ),
+    [submissionExceptions],
+  );
 
   if (loading) {
     return (
@@ -96,13 +114,37 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
             );
           })}
         </div>
-      ) : (
+      ) : corrections.length ? null : (
         <EmptyState
           icon={ShieldCheck}
           title="Queue is clear"
           description="No disputes or pending confirmations right now. Confirmed results are finalized automatically."
         />
       )}
+
+      {corrections.length ? (
+        <div className="space-y-2.5">
+          <h2 className="text-sm font-semibold text-text-strong">Official corrections</h2>
+          {corrections.map((submission) => {
+            const match = matches.find((candidate) => candidate.id === submission.matchId);
+            const home = match ? teamById.get(match.homeTeamId) : undefined;
+            const away = match ? teamById.get(match.awayTeamId) : undefined;
+            return (
+              <QueueItem
+                key={`correction-${submission.id}`}
+                state={STATE.pending}
+                title={`${home?.name ?? 'Home'} vs ${away?.name ?? 'Away'}`}
+                subtitle={submission.correctionReason ?? 'Official correction requested'}
+                meta={`Version ${submission.resultVersion}`}
+                onClick={() => setActiveCorrection(submission)}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
+      {league ? <ChallengeWorkflow scope="league" targetId={league.id} compact={compact} /> : null}
+      {league ? <SupportNeedWorkflow scope="league" targetId={league.id} compact={compact} /> : null}
 
       {active ? (
         <LeagueResolveSheet
@@ -117,6 +159,17 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
           away={teamById.get(active.awayTeamId)}
         />
       ) : null}
+      <ResultCorrectionSheet
+        submission={activeCorrection}
+        match={activeCorrection ? matches.find((candidate) => candidate.id === activeCorrection.matchId) : undefined}
+        home={activeCorrection ? teamById.get(matches.find((candidate) => candidate.id === activeCorrection.matchId)?.homeTeamId ?? '') : undefined}
+        away={activeCorrection ? teamById.get(matches.find((candidate) => candidate.id === activeCorrection.matchId)?.awayTeamId ?? '') : undefined}
+        onClose={() => setActiveCorrection(null)}
+        onComplete={() => {
+          retry();
+          void refreshExceptions();
+        }}
+      />
     </div>
   );
 }

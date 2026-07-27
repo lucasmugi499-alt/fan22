@@ -1,5 +1,5 @@
 import { MatchDetail } from '@/components/core/MatchDetail';
-import { matches } from '@/data/mockMatches';
+import { matches } from '@/data/mockDatabase';
 
 export function generateStaticParams() {
   if (process.env.NEXT_STATIC_EXPORT !== 'true') return [];
@@ -8,9 +8,12 @@ export function generateStaticParams() {
 
 export default async function MatchDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ matchId: string }>;
+  searchParams: Promise<{ attendance?: string }>;
 }) {
   const { matchId } = await params;
-  return <MatchDetail matchId={matchId} />;
+  const { attendance } = await searchParams;
+  return <MatchDetail matchId={matchId} attendanceToken={attendance} />;
 }

@@ -1,8 +1,9 @@
 # Result Submission Workflow
 
-Status: **designed and decided; not yet wired to any UI.** The state machine, ownership
-model, Firestore rule matrix, evidence storage path and finalization planner are in place
-and tested. The Cloud Functions package and the UI are not — see Remaining work.
+Status: **implemented locally and candidate-rules tested; staging end-to-end QA pending.**
+The state machine, ownership model, provider methods, mobile field report, opponent
+confirmation, league adjudication, evidence storage, trusted finalizer, and immutable
+provenance UI are wired.
 
 Implements §8 of the product definition: Team Admin A submits, Team Admin B confirms or
 disputes, League Admin handles only the exceptions.
@@ -78,7 +79,7 @@ survive. `finalScore()` returns the adjudicated score when present.
 
 ## Ownership and rules
 
-`firestore.rules`, using a new `canManageTeamById()` mirroring `canManageLeagueById()`.
+`firestore.rules.next`, using `canManageTeamById()` mirroring `canManageLeagueById()`.
 
 | Actor | May do | Cannot |
 |---|---|---|
@@ -93,11 +94,10 @@ Claim fields are pinned by `claimUnchanged()`; each actor's writable fields are 
 `changedKeysWithin()`. The `events` subcollection is append-only (`allow update: if false`)
 so the history of a disputed result cannot be rewritten after the fact.
 
-> **Not yet verified by compilation.** The rules could not be compiled locally — the
-> Firestore emulator needs Java, which is not installed here. Braces balance and the one
-> non-existent construct (`request.resource.id`) was removed, but **run
-> `firebase emulators:start --only firestore` before deploying**, ideally with rules unit
-> tests via `@firebase/rules-unit-testing`.
+The candidate rules compile and pass the Firestore emulator suite. On July 26, 2026 the
+suite passed 65 tests, including direct official-result writes, role escalation, athlete
+official-stat edits, financial forgeries, support-need self-approval, support-completion
+forgery, attendance forgery, and feed-counter tampering.
 
 ## Evidence storage
 
@@ -229,16 +229,19 @@ Done:
   submission listeners.
 - League Admin uphold, correct and reject UI backed by the same workflow.
 - Authenticated App Hosting finalization route sharing the Cloud Function transaction code.
-- Candidate rules deployed to staging through `firebase.staging.json`.
+- Candidate rules are selected by `firebase.staging.json`; the latest local candidate must
+  pass the final gate before deployment.
 
 Outstanding:
 
-1. Reminder dispatch at 24h/48h. `dueReminders()` computes what is owed; nothing sends yet.
-2. Correction approval and replacement-version UI.
-3. Re-run the investor seed after the free-tier read quota resets so the 756 existing
-   events move from the obsolete root collection into submission subcollections.
-4. Run the full Team Admin A -> Team Admin B -> finalizer -> standings workflow in staging,
-   including duplicate-trigger and stale-version cases.
+1. Run the staging seed so the 756 existing events are written into submission
+   subcollections and the obsolete root collection is removed.
+2. Run the full Team Admin A -> Team Admin B -> finalizer -> standings workflow against
+   the deployed staging environment, including duplicate-trigger and stale-version cases.
+
+The hourly function now dispatches deterministic 24h/48h opponent reminders. League and
+Platform correction review creates an immutable replacement version and supersedes the
+previous official record through the trusted finalizer.
 
 ### Deploy notes
 

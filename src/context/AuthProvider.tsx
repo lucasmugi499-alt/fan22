@@ -20,6 +20,7 @@ type AuthContextValue = {
   firebaseReady: boolean;
   isDemoMode: boolean;
   setDemoRole: (role: AppRole | null) => void;
+  updateLocalProfile: (updates: Partial<UserProfile>) => void;
   logout: () => Promise<void>;
 };
 
@@ -105,6 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseLogout();
   }, [isDemoMode, setDemoRole]);
 
+  const updateLocalProfile = useCallback((updates: Partial<UserProfile>) => {
+    setUserProfile((profile) => (profile ? { ...profile, ...updates } : profile));
+  }, []);
+
   useEffect(() => {
     const restoreDemoRole = window.setTimeout(() => {
       const storedDemoRole = getStoredDemoRole();
@@ -153,6 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [isDemoMode, storageChecked]);
 
+  useEffect(() => {
+    document.documentElement.dataset.lowData = userProfile?.lowDataMode ? 'true' : 'false';
+  }, [userProfile?.lowDataMode]);
+
   const value = useMemo(
     () => ({
       authStatus,
@@ -163,9 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firebaseReady: isFirebaseConfigured,
       isDemoMode,
       setDemoRole,
+      updateLocalProfile,
       logout: handleLogout,
     }),
-    [authStatus, currentUser, userProfile, role, isDemoMode, setDemoRole, handleLogout]
+    [authStatus, currentUser, userProfile, role, isDemoMode, setDemoRole, updateLocalProfile, handleLogout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

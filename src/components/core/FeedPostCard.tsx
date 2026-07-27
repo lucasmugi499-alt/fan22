@@ -5,6 +5,7 @@ import { Heart, ChatCircle, ShareFat, SealCheck } from '@phosphor-icons/react';
 import { athletePhoto } from '@/lib/media';
 import type { FeedPost } from '@/types';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthProvider';
 
 function timeAgo(iso?: string): string {
   if (!iso) return '';
@@ -35,6 +36,7 @@ const ROLE_LABEL: Record<string, string> = {
  * so the stream feels alive without a backend round-trip in demo mode.
  */
 export function FeedPostCard({ post }: { post: FeedPost }) {
+  const { userProfile } = useAuth();
   const [liked, setLiked] = useState(false);
   const likes = (post.likesCount ?? post.likes ?? 0) + (liked ? 1 : 0);
   const comments = post.commentsCount ?? post.comments ?? 0;
@@ -68,7 +70,7 @@ export function FeedPostCard({ post }: { post: FeedPost }) {
             </div>
           ) : null}
 
-          {media ? (
+          {media && !userProfile?.lowDataMode ? (
             <div className="mt-3 overflow-hidden rounded-[var(--radius-md)] border border-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={media} alt="" className="max-h-80 w-full object-cover" loading="lazy" />

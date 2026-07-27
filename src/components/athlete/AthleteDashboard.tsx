@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { SealCheck, PencilSimple, Coins, Users, Star, Target, Question } from '@phosphor-icons/react';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react';
+import { SealCheck, PencilSimple, Coins, Users, Star, Target, Question, Camera, Heart, CalendarBlank, CheckCircle } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyAthlete } from '@/lib/athlete/athleteContext';
@@ -15,6 +14,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { NoAssignment } from '@/components/ui/NoAssignment';
 import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
+import {
+  AthleteManageSheet,
+  type AthleteManageMode,
+} from '@/components/athlete/AthleteManageSheet';
+import { SupportNeedUpdateSheet } from '@/components/athlete/SupportNeedUpdateSheet';
+import type { SupportNeed } from '@/types';
 
 function ugx(n: number): string {
   if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
@@ -24,15 +29,25 @@ function ugx(n: number): string {
 
 export function AthleteDashboard() {
   const { userProfile, isDemoMode } = useAuth();
-  const { athletes, teams, challenges, loading } = useGoalPlaceData({
-    collections: ['athletes', 'teams', 'challenges'],
+  const { athletes, teams, challenges, matches, supportNeeds, loading, retry } = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'challenges', 'matches', 'supportNeeds'],
   });
+  const [manageMode, setManageMode] = useState<AthleteManageMode | null>(null);
+  const [activeNeed, setActiveNeed] = useState<SupportNeed | null>(null);
 
   const athlete = useMemo(() => resolveMyAthlete(userProfile, athletes, isDemoMode), [userProfile, athletes, isDemoMode]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);
   const myChallenges = useMemo(
     () => (athlete ? challenges.filter((c) => c.athleteId === athlete.id) : []),
     [challenges, athlete]
+  );
+  const nextMatch = useMemo(
+    () => athlete
+      ? matches
+        .filter((match) => (match.homeTeamId === athlete.teamId || match.awayTeamId === athlete.teamId) && match.status === 'scheduled')
+        .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0]
+      : undefined,
+    [athlete, matches],
   );
 
   if (loading) return <AthleteDashboardSkeleton />;
@@ -63,7 +78,7 @@ export function AthleteDashboard() {
               <p className="truncate text-sm text-muted">{athlete.position} · {team?.name ?? athlete.city}</p>
               <div className="mt-2"><VerificationBadge status={vs} size="sm" /></div>
             </div>
-            <Button size="sm" variant="secondary" icon={PencilSimple} onClick={() => toast('Editing your profile arrives in the next build step.')}>
+            <Button size="sm" variant="secondary" icon={PencilSimple} onClick={() => setManageMode('profile')}>
               Edit
             </Button>
           </div>
@@ -76,6 +91,27 @@ export function AthleteDashboard() {
         <Metric icon={Users} label="Supporters" value={String(athlete.supportersCount)} accent="text-text-strong" />
         <Metric icon={Star} label="GP Points" value={String(athlete.goalPlacePoints)} accent="text-brand" />
       </div>
+
+      <Card className="p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <TodayItem
+            icon={CalendarBlank}
+            label={nextMatch ? 'Next match' : 'Match schedule'}
+            value={nextMatch ? new Date(nextMatch.scheduledAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No fixture published'}
+          />
+          <TodayItem
+            icon={PencilSimple}
+            label="Profile task"
+            value={athlete.bio && athlete.impactNeeds?.length ? 'Profile is ready' : 'Complete your career story'}
+          />
+          <TodayItem
+            icon={myChallenges.length ? Target : CheckCircle}
+            label="Challenge progress"
+            value={myChallenges.length ? `${myChallenges.filter((challenge) => !['achieved', 'not_achieved', 'void', 'settled'].includes(normalizeChallengeStatus(challenge.status))).length} active milestones` : 'No active milestones'}
+          />
+        </div>
+      </Card>
 
       {/* Official (non-editable) stats */}
       <OfficialStats stats={athlete.stats} verified={athlete.verified} />
@@ -96,6 +132,31 @@ export function AthleteDashboard() {
           </div>
         ) : null}
       </Card>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Action icon={Heart} label="Add need" onClick={() => setManageMode('support')} />
+        <Action icon={Target} label="Challenge" onClick={() => setManageMode('challenge')} />
+        <Action icon={Camera} label="Highlight" onClick={() => setManageMode('highlight')} />
+      </div>
+
+      {supportNeeds.some((need) => need.athleteId === athlete.id && ['open', 'funded'].includes(need.status)) ? (
+        <Card className="p-4">
+          <p className="text-[11px] font-semibold uppercase text-subtle">Active support needs</p>
+          <div className="mt-2 space-y-2">
+            {supportNeeds.filter((need) => need.athleteId === athlete.id && ['open', 'funded'].includes(need.status)).map((need) => (
+              <div key={need.id} className="flex items-center justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <span className="block truncate text-text-strong">{need.title}</span>
+                  <span data-numeric className="text-xs text-muted">{ugx(need.raisedAmount)} / {ugx(need.targetAmount)}</span>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setActiveNeed(need)}>
+                  {need.status === 'funded' ? 'Add evidence' : 'Post update'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       {/* Challenges */}
       <section className="space-y-2.5">
@@ -128,6 +189,36 @@ export function AthleteDashboard() {
           </Card>
         )}
       </section>
+
+      <AthleteManageSheet
+        athlete={athlete}
+        matches={matches.filter((match) => match.homeTeamId === athlete.teamId || match.awayTeamId === athlete.teamId)}
+        mode={manageMode}
+        onClose={() => setManageMode(null)}
+        onSaved={retry}
+      />
+      <SupportNeedUpdateSheet need={activeNeed} onClose={() => setActiveNeed(null)} onSaved={retry} />
+    </div>
+  );
+}
+
+function Action({ icon: Icon, label, onClick }: { icon: typeof Heart; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex min-h-16 flex-col items-center justify-center rounded-[var(--radius-md)] border border-border bg-surface-1 px-2 text-xs font-semibold text-muted transition-colors hover:border-brand hover:text-brand">
+      <Icon className="mb-1 h-5 w-5" weight="duotone" />
+      {label}
+    </button>
+  );
+}
+
+function TodayItem({ icon: Icon, label, value }: { icon: typeof Heart; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-start gap-3 rounded-[var(--radius-md)] bg-surface-2 p-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-brand" weight="bold" />
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase text-subtle">{label}</p>
+        <p className="mt-1 text-sm font-medium text-text-strong">{value}</p>
+      </div>
     </div>
   );
 }

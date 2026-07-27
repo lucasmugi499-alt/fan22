@@ -1,5 +1,5 @@
-import { WalletScreen } from "@/components/account/WalletScreen";
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <WalletScreen />;
+  redirect('/contributions');
 }

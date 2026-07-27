@@ -1,5 +1,5 @@
 import { LeaguePublic } from "@/components/core/LeaguePublic";
-import { leagues } from "@/data/mockLeagues";
+import { leagues } from "@/data/mockDatabase";
 
 export function generateStaticParams() {
   if (process.env.NEXT_STATIC_EXPORT !== "true") return [];

@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   // to the bottom-right in development so it never covers a real destination.
   devIndicators: { position: "bottom-right" },
   images: {
+    // The current Next stable line still pins a vulnerable sharp release. The public
+    // build serves trusted source images directly until Next ships the patched runtime.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

@@ -1,23 +1,55 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarBlank } from '@phosphor-icons/react';
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { adaptMatch, adaptTeam } from '@/lib/firebase/useGoalPlaceData';
+import { dataProvider } from '@/data/dataProvider';
 import { isUpcomingMatch } from '@/lib/status';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { GradientBanner } from '@/components/premium/GradientBanner';
 import { MatchCard } from '@/components/core/MatchCard';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import type { Match } from '@/types';
+import { Button } from '@/components/ui/Button';
+import type { Match, Team } from '@/types';
 
 const TABS = ['Live', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function MatchesBrowser() {
-  const { matches, teams, loading } = useGoalPlaceData({
-    collections: ['matches', 'teams'],
-  });
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<Error>();
+  const pageSize = 48;
+  const loadPage = useCallback(async (afterId?: string) => {
+    if (afterId) setLoadingMore(true);
+    else setLoading(true);
+    setError(undefined);
+    try {
+      const [page, teamPage] = await Promise.all([
+        dataProvider.getMatches({ limit: pageSize, afterId }),
+        afterId ? Promise.resolve([]) : dataProvider.getTeams({ limit: 100 }),
+      ]);
+      const adapted = page.map(adaptMatch);
+      setMatches((current) => afterId
+        ? [...new Map([...current, ...adapted].map((match) => [match.id, match])).values()]
+        : adapted);
+      if (teamPage.length) setTeams(teamPage.map(adaptTeam));
+      setHasMore(page.length === pageSize);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error('Matches could not be loaded.'));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadPage(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPage]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
   const buckets = useMemo(() => {
@@ -33,6 +65,7 @@ export function MatchesBrowser() {
   if (loading) {
     return <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-28 w-full rounded-[var(--radius-lg)]" /><Skeleton className="h-28 w-full rounded-[var(--radius-lg)]" /></div>;
   }
+  if (error && !matches.length) return <ErrorState description={error.message} onRetry={() => void loadPage()} />;
   const list = buckets[tab];
 
   return (
@@ -45,13 +78,27 @@ export function MatchesBrowser() {
       </div>
       <div className="px-[var(--gutter)] md:px-0">
         {list.length ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {list.map((m) => (
-              <MatchCard key={m.id} match={m} home={teamById.get(m.homeTeamId)} away={teamById.get(m.awayTeamId)} href={`/matches/${m.id}`} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {list.map((m) => (
+                <MatchCard key={m.id} match={m} home={teamById.get(m.homeTeamId)} away={teamById.get(m.awayTeamId)} href={`/matches/${m.id}`} />
+              ))}
+            </div>
+            {hasMore ? (
+              <div className="flex justify-center pt-4">
+                <Button variant="secondary" disabled={loadingMore} onClick={() => void loadPage(matches.at(-1)?.id)}>
+                  {loadingMore ? 'Loading...' : 'Load more matches'}
+                </Button>
+              </div>
+            ) : null}
+          </>
         ) : (
-          <EmptyState icon={CalendarBlank} title={`No ${tab.toLowerCase()} matches`} description={tab === 'Live' ? 'No matches are being played right now. Check the upcoming fixtures.' : 'Nothing here yet. Check back soon.'} />
+          <EmptyState
+            icon={CalendarBlank}
+            title={`No ${tab.toLowerCase()} matches in this page`}
+            description={hasMore ? 'Load more fixtures to continue browsing this category.' : tab === 'Live' ? 'No matches are being played right now. Check the upcoming fixtures.' : 'Nothing here yet. Check back soon.'}
+            action={hasMore ? <Button size="sm" variant="secondary" onClick={() => void loadPage(matches.at(-1)?.id)}>Load more</Button> : undefined}
+          />
         )}
       </div>
     </div>

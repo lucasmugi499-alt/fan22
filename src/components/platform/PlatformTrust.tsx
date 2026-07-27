@@ -13,13 +13,46 @@ import { Button } from '@/components/ui/Button';
 import { AuditTimeline, type AuditStep } from '@/components/core/AuditTimeline';
 import { STATE } from '@/lib/statusSystem';
 import type { Report } from '@/types';
+import { useAuth } from '@/context/AuthProvider';
+import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
+import { ChallengeWorkflow } from '@/components/core/ChallengeWorkflow';
 
 const SEVERITY_STATE = { Critical: STATE.disputed, High: STATE.disputed, Medium: STATE.overdue, Low: STATE.pending } as const;
 
 export function PlatformTrust() {
-  const { reports, loading } = useGoalPlaceData({ collections: ['reports'] });
+  const { currentUser, userProfile, isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const { reports, loading, retry } = useGoalPlaceData({ collections: ['reports'] });
   const list = useMemo(() => openReports(reports), [reports]);
   const [active, setActive] = useState<Report | null>(null);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function decide(decision: 'resolved' | 'dismissed') {
+    const actorUserId = currentUser?.uid ?? userProfile?.uid;
+    if (!active || !actorUserId) {
+      toast.error('Your Platform Admin account is not ready.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await provider.resolveReport({
+        reportId: active.id,
+        actorUserId,
+        decision,
+        note: note.trim() || undefined,
+      });
+      toast.success(decision === 'resolved' ? 'Case resolved.' : 'Case dismissed.');
+      setActive(null);
+      setNote('');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'The case decision could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return <div className="space-y-3"><Skeleton className="h-8 w-48" /><Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" /><Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" /></div>;
@@ -49,6 +82,8 @@ export function PlatformTrust() {
         <EmptyState icon={ShieldCheck} title="No open cases" description="Reports and escalations appear here with their full history." />
       )}
 
+      <ChallengeWorkflow scope="platform" />
+
       {active ? (
         <Sheet
           open
@@ -57,8 +92,8 @@ export function PlatformTrust() {
           description={active.summary}
           footer={
             <div className="flex gap-2">
-              <Button block variant="secondary" icon={XCircle} onClick={() => { toast('Case dismissed.'); setActive(null); }}>Dismiss</Button>
-              <Button block icon={CheckCircle} onClick={() => { toast.success('Case resolved.'); setActive(null); }}>Resolve</Button>
+              <Button block variant="secondary" icon={XCircle} onClick={() => decide('dismissed')} disabled={saving}>Dismiss</Button>
+              <Button block icon={CheckCircle} onClick={() => decide('resolved')} disabled={saving}>Resolve</Button>
             </div>
           }
         >
@@ -75,6 +110,10 @@ export function PlatformTrust() {
               </p>
               <AuditTimeline steps={reportProvenance(active)} />
             </div>
+            <label className="block text-xs font-semibold uppercase text-subtle">
+              Decision note
+              <textarea className="field mt-2 min-h-24 py-3 normal-case" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Reason for the decision and any follow-up." />
+            </label>
           </div>
         </Sheet>
       ) : null}

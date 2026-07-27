@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -26,6 +28,9 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 
 import { MarketingShell } from '@/components/marketing/MarketingShell';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { isActiveChallenge, isOfficialMatch } from '@/lib/status';
+import type { League, Match, Team } from '@/types';
 
 const DISCOVERY_FEATURES = [
   {
@@ -47,111 +52,6 @@ const DISCOVERY_FEATURES = [
     icon: PersonSimpleRun,
     title: 'Athletes worth knowing',
     description: 'Discover talent through verified performances, achievements, and stories.',
-  },
-];
-
-const LEAGUES = [
-  {
-    id: 'league_football_kampala',
-    name: 'Kampala Metro Community Football League',
-    sport: 'Football',
-    location: 'Kampala',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-emerald-950 via-emerald-900 to-surface-1',
-    icon: SoccerBall,
-  },
-  {
-    id: 'league_football_eastern',
-    name: 'Eastern Uganda Regional Development League',
-    sport: 'Football',
-    location: 'Mbale',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-green-950 via-teal-950 to-surface-1',
-    icon: SoccerBall,
-  },
-  {
-    id: 'league_basketball_kampala',
-    name: 'Kampala Metropolitan Basketball League',
-    sport: 'Basketball',
-    location: 'Kampala',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-orange-950 via-amber-950 to-surface-1',
-    icon: Basketball,
-  },
-  {
-    id: 'league_basketball_north',
-    name: 'Northern Uganda Community Basketball League',
-    sport: 'Basketball',
-    location: 'Gulu',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-red-950 via-orange-950 to-surface-1',
-    icon: Basketball,
-  },
-  {
-    id: 'league_rugby_kampala',
-    name: 'Kampala Community Rugby Championship',
-    sport: 'Rugby',
-    location: 'Kampala',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-blue-950 via-cyan-950 to-surface-1',
-    icon: FlagCheckered,
-  },
-  {
-    id: 'league_rugby_eastern',
-    name: 'Nile and Eastern Rugby Development League',
-    sport: 'Rugby',
-    location: 'Jinja',
-    season: '2026 season',
-    teams: 10,
-    matches: 45,
-    accent: 'from-indigo-950 via-sky-950 to-surface-1',
-    icon: FlagCheckered,
-  },
-];
-
-const ATHLETES = [
-  {
-    id: 'ath_football_01_06_07',
-    name: 'Daniel Aciro',
-    team: 'Luzira Athletic',
-    league: 'Kampala Metro Community Football League',
-    position: 'Defensive midfielder',
-    stat: '8 apps',
-    note: 'Training boots and strength equipment',
-    color: 'bg-emerald-400',
-    initials: 'AN',
-  },
-  {
-    id: 'ath_basketball_04_03_11',
-    name: 'Peter Namanya',
-    team: 'Kitgum Warriors',
-    league: 'Northern Uganda Community Basketball League',
-    position: 'Guard',
-    stat: '32 pts',
-    note: 'Registration fees',
-    color: 'bg-orange-400',
-    initials: 'BO',
-  },
-  {
-    id: 'ath_rugby_05_07_05',
-    name: 'Trevor Kalema',
-    team: 'Lubowa Harriers',
-    league: 'Kampala Community Rugby Championship',
-    position: 'Lock',
-    stat: '52 tackles',
-    note: 'Recovery support',
-    color: 'bg-sky-400',
-    initials: 'SN',
   },
 ];
 
@@ -236,7 +136,85 @@ function TextLink({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
+function sportCardMeta(sport: League['sport']) {
+  const key = String(sport).toLowerCase();
+  if (key === 'basketball') {
+    return {
+      icon: Basketball,
+      accent: 'from-orange-950 via-amber-950 to-surface-1',
+      athleteColor: 'bg-orange-400',
+    };
+  }
+  if (key === 'rugby') {
+    return {
+      icon: FlagCheckered,
+      accent: 'from-blue-950 via-cyan-950 to-surface-1',
+      athleteColor: 'bg-sky-400',
+    };
+  }
+  return {
+    icon: SoccerBall,
+    accent: 'from-emerald-950 via-emerald-900 to-surface-1',
+    athleteColor: 'bg-emerald-400',
+  };
+}
+
+function initials(name?: string) {
+  return (name ?? 'GP')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function matchLabel(match: Match, home?: Team, away?: Team) {
+  if (match.status === 'live') {
+    return `Live: ${home?.name ?? 'Home'} ${match.score.home ?? 0} - ${match.score.away ?? 0} ${away?.name ?? 'Away'}`;
+  }
+  if (isOfficialMatch(match)) {
+    return `Official: ${home?.name ?? 'Home'} ${match.score.home ?? 0} - ${match.score.away ?? 0} ${away?.name ?? 'Away'}`;
+  }
+  return `${home?.name ?? 'Home'} vs ${away?.name ?? 'Away'} at ${match.venue}`;
+}
+
 export function Landing() {
+  const { leagues, teams, athletes, matches, challenges } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'athletes', 'matches', 'challenges'],
+    athleteRanking: 'points',
+    athleteLimit: 12,
+    recordLimit: 60,
+  });
+  const teamById = new Map(teams.map((team) => [team.id, team]));
+  const leagueById = new Map(leagues.map((league) => [league.id, league]));
+  const featuredLeagues = leagues.slice(0, 6);
+  const featuredAthletes = athletes.slice(0, 3);
+  const orderedMatches = [...matches].sort(
+    (a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt),
+  );
+  const liveMatch = orderedMatches.find((match) => match.status === 'live');
+  const upcomingMatches = orderedMatches
+    .filter((match) => match.status === 'scheduled')
+    .slice(0, 2);
+  const recentOfficial = [...matches]
+    .filter(isOfficialMatch)
+    .sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt))
+    .slice(0, 2);
+  const spotlightMatch = liveMatch ?? upcomingMatches[0] ?? recentOfficial[0];
+  const spotlightHome = spotlightMatch ? teamById.get(spotlightMatch.homeTeamId) : undefined;
+  const spotlightAway = spotlightMatch ? teamById.get(spotlightMatch.awayTeamId) : undefined;
+  const spotlightLeague = spotlightMatch ? leagueById.get(spotlightMatch.leagueId) : undefined;
+  const activeChallenge = challenges.find((challenge) => isActiveChallenge(challenge.status));
+  const challengeAthlete = activeChallenge
+    ? athletes.find((athlete) => athlete.id === activeChallenge.athleteId)
+    : undefined;
+  const tickerItems = [
+    ...recentOfficial.slice(0, 2).map((match) =>
+      matchLabel(match, teamById.get(match.homeTeamId), teamById.get(match.awayTeamId))),
+    `${leagues.length} active leagues across Uganda`,
+    `${leagues.reduce((total, league) => total + league.athletesCount, 0).toLocaleString()} athlete profiles in this demonstration`,
+  ];
+
   return (
     <MarketingShell>
       <section
@@ -303,34 +281,44 @@ export function Landing() {
             <div className="landing-score-card overflow-hidden rounded-lg border border-white/15 bg-black/55 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs">
                 <span className="flex items-center gap-2 font-semibold text-white">
-                  <span className="animate-live-ring h-2 w-2 rounded-full bg-live" />
-              Live in Kampala
+                  <span className={spotlightMatch?.status === 'live' ? 'animate-live-ring h-2 w-2 rounded-full bg-live' : 'h-2 w-2 rounded-full bg-pending'} />
+                  {spotlightMatch?.status === 'live' ? `Live in ${spotlightMatch.city}` : 'Featured match'}
                 </span>
-                <span className="font-mono text-slate-400">68:24</span>
+                <span className="font-mono text-slate-400">
+                  {spotlightMatch?.status === 'live'
+                    ? 'LIVE'
+                    : spotlightMatch
+                      ? new Date(spotlightMatch.scheduledAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                      : '2026'}
+                </span>
               </div>
               <div className="px-5 py-5">
-              <p className="text-xs text-slate-400">Kampala Metro Community Football League</p>
+                <p className="text-xs text-slate-400">{spotlightLeague?.name ?? 'GoalPlace256 competition'}</p>
                 <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                   <div>
                     <span className="grid h-11 w-11 place-items-center rounded-md bg-emerald-400 text-sm font-black text-emerald-950">
-                      LA
+                      {initials(spotlightHome?.name)}
                     </span>
-                    <p className="mt-2 text-sm font-semibold text-white">Luzira Athletic</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{spotlightHome?.name ?? 'Home team'}</p>
                   </div>
-                  <div className="font-mono text-3xl font-bold text-white">2:4</div>
+                  <div className="font-mono text-3xl font-bold text-white">
+                    {spotlightMatch?.status === 'scheduled'
+                      ? 'VS'
+                      : `${spotlightMatch?.score.home ?? 0}:${spotlightMatch?.score.away ?? 0}`}
+                  </div>
                   <div className="text-right">
                     <span className="ml-auto grid h-11 w-11 place-items-center rounded-md bg-amber-400 text-sm font-black text-amber-950">
-                      NE
+                      {initials(spotlightAway?.name)}
                     </span>
-                    <p className="mt-2 text-sm font-semibold text-white">Ntinda Eagles</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{spotlightAway?.name ?? 'Away team'}</p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between bg-white/[0.04] px-4 py-3 text-xs">
-                <span className="text-slate-400">Luzira Sports Park</span>
+                <span className="text-slate-400">{spotlightMatch?.venue ?? 'Uganda'}</span>
                 <span className="flex items-center gap-1.5 font-semibold text-brand">
                   <Eye className="h-3.5 w-3.5" weight="bold" />
-                  53 following
+                  {spotlightMatch?.supportersCount ?? 0} following
                 </span>
               </div>
             </div>
@@ -342,12 +330,7 @@ export function Landing() {
         <div className="landing-ticker-track flex w-max items-center py-3 text-xs font-bold">
           {[0, 1].map((copy) => (
             <div key={copy} className="flex items-center">
-              {[
-                'Official: Kisenyi United 3 - 3 Kyambogo Rangers',
-                'Kampala Hoops: next round ready',
-                '45 fixtures remain in each league',
-                'Daniel Aciro profile verified',
-              ].map((item) => (
+              {tickerItems.map((item) => (
                 <span key={`${copy}-${item}`} className="flex items-center whitespace-nowrap px-6">
                   <Lightning className="mr-2 h-4 w-4" weight="fill" />
                   {item}
@@ -398,9 +381,14 @@ export function Landing() {
             <TextLink href="/leagues">View all leagues</TextLink>
           </div>
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {LEAGUES.map(({ id, name, sport, location, season, teams, matches, accent, icon: Icon }) => (
+            {featuredLeagues.map((league) => {
+              const { icon: Icon, accent } = sportCardMeta(league.sport);
+              const upcomingCount = matches.filter(
+                (match) => match.leagueId === league.id && match.status === 'scheduled',
+              ).length;
+              return (
               <article
-                key={name}
+                key={league.id}
                 className={`group relative flex min-h-96 flex-col overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br ${accent} p-6 transition duration-300 hover:-translate-y-1 hover:border-white/20`}
               >
                 <div className="landing-card-grid absolute inset-0 opacity-25" />
@@ -415,25 +403,25 @@ export function Landing() {
                 </div>
                 <div className="relative mt-auto pt-16">
                   <p className="text-xs font-medium text-slate-300">
-                    {sport} / {season}
+                    {String(league.sport)} / {league.season || '2026 season'}
                   </p>
-                  <h3 className="mt-2 text-2xl font-semibold text-white">{name}</h3>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">{league.name}</h3>
                   <p className="mt-3 flex items-center gap-1.5 text-sm text-slate-300">
                     <MapPin className="h-4 w-4" weight="fill" />
-                    {location}
+                    {league.city}
                   </p>
                   <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
                     <div>
-                      <p className="font-mono text-lg font-bold text-white">{teams}</p>
+                      <p className="font-mono text-lg font-bold text-white">{league.teamsCount}</p>
                       <p className="text-xs text-slate-400">teams</p>
                     </div>
                     <div>
-                      <p className="font-mono text-lg font-bold text-white">{matches}</p>
+                      <p className="font-mono text-lg font-bold text-white">{upcomingCount}</p>
                       <p className="text-xs text-slate-400">upcoming</p>
                     </div>
                   </div>
                   <Link
-                    href={`/leagues/${id}`}
+                    href={`/leagues/${league.id}`}
                     className="mt-5 inline-flex h-11 w-full items-center justify-between rounded-sm bg-white px-4 text-sm font-bold text-surface-0 transition hover:bg-brand active:translate-y-px"
                   >
                     View league
@@ -441,7 +429,8 @@ export function Landing() {
                   </Link>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -476,60 +465,93 @@ export function Landing() {
           <div className="overflow-hidden rounded-lg border border-border bg-surface-1">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <span className="flex items-center gap-2 text-sm font-semibold text-text-strong">
-                <span className="animate-live-pulse h-2 w-2 rounded-full bg-live" />
-                Live now
+                <span className={spotlightMatch?.status === 'live' ? 'animate-live-pulse h-2 w-2 rounded-full bg-live' : 'h-2 w-2 rounded-full bg-pending'} />
+                {spotlightMatch?.status === 'live'
+                  ? 'Live now'
+                  : spotlightMatch?.status === 'scheduled'
+                    ? 'Next match'
+                    : 'Recently official'}
               </span>
-                <span className="font-mono text-xs text-subtle">KMCFL / ROUND 09</span>
+              <span className="font-mono text-xs text-subtle">
+                {spotlightLeague?.name.split(/\s+/).map((word) => word[0]).join('').slice(0, 6).toUpperCase() ?? 'GP256'}
+              </span>
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-8 sm:px-8">
               <div>
                 <span className="grid h-12 w-12 place-items-center rounded-md bg-emerald-400 font-mono text-sm font-bold text-emerald-950">
-                  LA
+                  {initials(spotlightHome?.name)}
                 </span>
-                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Luzira Athletic</p>
+                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">{spotlightHome?.name ?? 'Home team'}</p>
               </div>
               <div className="text-center">
-                <p className="font-mono text-3xl font-bold text-text-strong sm:text-4xl">2 - 4</p>
-                <p className="mt-2 font-mono text-xs text-live">68:24</p>
+                <p className="font-mono text-3xl font-bold text-text-strong sm:text-4xl">
+                  {spotlightMatch?.status === 'scheduled'
+                    ? 'VS'
+                    : `${spotlightMatch?.score.home ?? 0} - ${spotlightMatch?.score.away ?? 0}`}
+                </p>
+                <p className={`mt-2 font-mono text-xs ${spotlightMatch?.status === 'live' ? 'text-live' : 'text-muted'}`}>
+                  {spotlightMatch
+                    ? new Date(spotlightMatch.scheduledAt).toLocaleString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Schedule loading'}
+                </p>
               </div>
               <div className="text-right">
                 <span className="ml-auto grid h-12 w-12 place-items-center rounded-md bg-amber-400 font-mono text-sm font-bold text-amber-950">
-                  NE
+                  {initials(spotlightAway?.name)}
                 </span>
-                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">Ntinda Eagles</p>
+                <p className="mt-3 text-sm font-semibold text-text-strong sm:text-base">{spotlightAway?.name ?? 'Away team'}</p>
               </div>
             </div>
             <div className="grid gap-px bg-border sm:grid-cols-2">
               <div className="bg-surface-2 px-5 py-4">
                 <p className="flex items-center gap-2 text-xs text-muted">
                   <MapPin className="h-4 w-4 text-brand" weight="fill" />
-                  Luzira Sports Park
+                  {spotlightMatch?.venue ?? 'Venue to be confirmed'}
                 </p>
               </div>
               <div className="bg-surface-2 px-5 py-4 sm:text-right">
-                <p className="text-xs font-semibold text-pending">Confirmation opens at full time</p>
+                <p className="text-xs font-semibold text-pending">
+                  {spotlightMatch && isOfficialMatch(spotlightMatch)
+                    ? 'Confirmed and official'
+                    : 'Confirmation opens at full time'}
+                </p>
               </div>
             </div>
             <div className="space-y-px bg-border">
-              {[
-                ['Sat 11 Apr / 13:00', 'Kyambogo Rangers', 'Kisenyi United', 'Upcoming'],
-                ['Sat 07 Feb / FT', 'Makindye City', 'Mengo City', 'Official 0 - 1'],
-              ].map(([time, home, away, state]) => (
+              {[...upcomingMatches, ...recentOfficial]
+                .filter((match, index, rows) =>
+                  match.id !== spotlightMatch?.id &&
+                  rows.findIndex((item) => item.id === match.id) === index)
+                .slice(0, 2)
+                .map((match) => {
+                  const home = teamById.get(match.homeTeamId);
+                  const away = teamById.get(match.awayTeamId);
+                  return (
                 <Link
-                  href="/matches"
-                  key={`${home}-${away}`}
+                  href={`/matches/${match.id}`}
+                  key={match.id}
                   className="group grid gap-3 bg-surface-1 px-5 py-4 transition hover:bg-surface-2 sm:grid-cols-[9rem_1fr_auto] sm:items-center"
                 >
-                  <span className="font-mono text-xs text-subtle">{time}</span>
+                  <span className="font-mono text-xs text-subtle">
+                    {new Date(match.scheduledAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
                   <span className="text-sm font-semibold text-text-strong">
-                    {home} <span className="px-1 text-subtle">vs</span> {away}
+                    {home?.name ?? 'Home'} <span className="px-1 text-subtle">vs</span> {away?.name ?? 'Away'}
                   </span>
                   <span className="flex items-center gap-2 text-xs text-muted">
-                    {state}
+                    {isOfficialMatch(match)
+                      ? `Official ${match.score.home} - ${match.score.away}`
+                      : 'Upcoming'}
                     <CaretRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </span>
                 </Link>
-              ))}
+                  );
+                })}
             </div>
           </div>
         </div>
@@ -543,14 +565,19 @@ export function Landing() {
             copy="Discover local athletes through profiles built around verified competition records, achievements, stories, and development goals."
           />
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {ATHLETES.map((athlete, index) => (
+            {featuredAthletes.map((athlete, index) => {
+              const team = teamById.get(athlete.teamId);
+              const league = leagueById.get(athlete.leagueId);
+              const meta = sportCardMeta(league?.sport ?? athlete.sport);
+              const stat = Object.entries(athlete.stats).find(([, value]) => value > 0);
+              return (
               <article
-                key={athlete.name}
+                key={athlete.id}
                 className="group overflow-hidden rounded-lg border border-border bg-surface-1 transition duration-300 hover:-translate-y-1 hover:border-border-strong"
               >
                 <div className="relative flex aspect-[5/3] items-end overflow-hidden bg-surface-2 p-5">
                   <Image
-                    src="/images/goalplace256-hero.png"
+                    src={athlete.coverUrl || athlete.coverURL || '/images/goalplace256-hero.png'}
                     alt={`${athlete.name}, a featured grassroots athlete`}
                     fill
                     sizes="(min-width: 1024px) 33vw, 100vw"
@@ -559,9 +586,9 @@ export function Landing() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
                   <span
-                    className={`relative grid h-14 w-14 place-items-center rounded-md ${athlete.color} font-mono text-sm font-black text-surface-0 shadow-xl`}
+                    className={`relative grid h-14 w-14 place-items-center rounded-md ${meta.athleteColor} font-mono text-sm font-black text-surface-0 shadow-xl`}
                   >
-                    {athlete.initials}
+                    {initials(athlete.name)}
                   </span>
                   <span className="relative ml-auto flex items-center gap-1 rounded-sm bg-black/65 px-2.5 py-1.5 text-xs font-semibold text-verified backdrop-blur-md">
                     <SealCheck className="h-3.5 w-3.5" weight="fill" />
@@ -573,15 +600,19 @@ export function Landing() {
                     <div>
                       <h3 className="text-xl font-semibold text-text-strong">{athlete.name}</h3>
                       <p className="mt-1 text-sm text-muted">
-                        {athlete.position} / {athlete.team}
+                        {athlete.position} / {team?.name ?? athlete.city}
                       </p>
                     </div>
-                    <span className="font-mono text-sm font-bold text-brand">{athlete.stat}</span>
+                    <span className="font-mono text-sm font-bold text-brand">
+                      {stat ? `${stat[1]} ${stat[0]}` : `${athlete.goalPlacePoints} GP`}
+                    </span>
                   </div>
-                  <p className="mt-4 text-xs text-subtle">{athlete.league}</p>
+                  <p className="mt-4 text-xs text-subtle">{league?.name ?? 'GoalPlace256 athlete'}</p>
                   <div className="mt-5 flex items-start gap-3 border-t border-border pt-4">
                     <Heart className="mt-0.5 h-4 w-4 shrink-0 text-brand-2" weight="fill" />
-                    <p className="text-sm leading-5 text-muted">{athlete.note}</p>
+                    <p className="text-sm leading-5 text-muted">
+                      {athlete.impactNeeds?.[0] ?? 'Follow this athlete for verified career updates.'}
+                    </p>
                   </div>
                   <div className="mt-5">
                     <Link
@@ -593,7 +624,8 @@ export function Landing() {
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-8">
             <TextLink href="/athletes">Discover more athletes</TextLink>
@@ -639,7 +671,7 @@ export function Landing() {
               ))}
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-6">
-              <TextLink href="/login">View support needs</TextLink>
+              <TextLink href="/support">View support needs</TextLink>
               <p className="flex items-center gap-2 text-xs text-subtle">
                 <ShieldCheck className="h-4 w-4 text-verified" weight="fill" />
                 Support never affects official statistics.
@@ -655,26 +687,39 @@ export function Landing() {
                 <Target className="h-7 w-7 text-brand-2" weight="duotone" />
               </div>
               <h3 className="mt-8 max-w-md text-2xl font-semibold text-text-strong">
-                Back Daniel&apos;s verified assist goal
+                {activeChallenge
+                  ? `Back ${challengeAthlete?.name?.split(' ')[0] ?? 'this athlete'}'s verified goal`
+                  : 'Support a verified athlete development goal'}
               </h3>
               <p className="mt-3 max-w-lg text-sm leading-6 text-muted">
-                Support a six-assist development challenge approved by his Team Admin.
+                {activeChallenge?.description ?? 'Verified support needs appear here as athletes and teams publish them.'}
               </p>
               <div className="mt-8 h-2 overflow-hidden rounded-sm bg-surface-3">
-                <div className="landing-progress h-full w-[58%] bg-brand" />
+                <div
+                  className="landing-progress h-full bg-brand"
+                  style={{
+                    width: `${activeChallenge
+                      ? Math.min(100, Math.max(6, activeChallenge.totalPledged / 3000))
+                      : 0}%`,
+                  }}
+                />
               </div>
               <div className="mt-3 flex justify-between font-mono text-xs">
-                <span className="text-text-strong">UGX 175,000 pledged</span>
-                <span className="text-subtle">58%</span>
+                <span className="text-text-strong">
+                  UGX {(activeChallenge?.totalPledged ?? 0).toLocaleString()} pledged
+                </span>
+                <span className="text-subtle">
+                  {activeChallenge ? Math.min(100, Math.round(activeChallenge.totalPledged / 3000)) : 0}%
+                </span>
               </div>
               <div className="mt-8 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-3">
                 <div>
-                  <p className="font-mono text-lg font-bold text-text-strong">6</p>
+                  <p className="font-mono text-lg font-bold text-text-strong">{activeChallenge?.supportersCount ?? 0}</p>
                   <p className="text-xs text-subtle">supporters</p>
                 </div>
                 <div>
-                  <p className="font-mono text-lg font-bold text-text-strong">6</p>
-                  <p className="text-xs text-subtle">assist target</p>
+                  <p className="font-mono text-lg font-bold text-text-strong">{activeChallenge?.target ?? 0}</p>
+                  <p className="text-xs text-subtle">{activeChallenge?.type ?? 'target'}</p>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <p className="font-mono text-lg font-bold text-pending">Pending</p>
@@ -804,8 +849,8 @@ export function Landing() {
 
       <section className="relative -mx-[var(--gutter)] overflow-hidden border-y border-border px-[var(--gutter)] py-24 sm:py-32">
         <Image
-          src="/images/goalplace256-hero.png"
-          alt="Grassroots sport under floodlights in Uganda"
+          src="/images/goalplace256-uganda-vision.png"
+          alt="Community football at sunset in Kampala, Uganda"
           fill
           sizes="100vw"
           className="-z-20 object-cover object-bottom"

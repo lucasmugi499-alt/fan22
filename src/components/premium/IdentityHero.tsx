@@ -1,8 +1,4 @@
-'use client';
-
-import { useState } from 'react';
-import { Plus, Check, SealCheck } from '@phosphor-icons/react';
-import { cn } from '@/lib/utils';
+import { SealCheck } from '@phosphor-icons/react';
 
 const SPORT_GRAD: Record<string, string> = {
   football: 'var(--grad-football)',
@@ -27,7 +23,7 @@ export function IdentityHero({
   meta,
   verified = false,
   gradient,
-  followable = true,
+  action,
 }: {
   media: React.ReactNode;
   watermark?: React.ReactNode;
@@ -36,9 +32,8 @@ export function IdentityHero({
   meta?: React.ReactNode;
   verified?: boolean;
   gradient: string;
-  followable?: boolean;
+  action?: React.ReactNode;
 }) {
-  const [following, setFollowing] = useState(false);
   return (
     <div
       className="sheen relative overflow-hidden rounded-[var(--radius-xl)] shadow-e2"
@@ -46,18 +41,7 @@ export function IdentityHero({
     >
       {watermark ? <div className="watermark text-[220px] leading-none">{watermark}</div> : null}
 
-      {followable ? (
-        <button
-          onClick={() => setFollowing((v) => !v)}
-          className={cn(
-            'absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors',
-            following ? 'bg-white text-black' : 'bg-black/25 text-white hover:bg-black/35'
-          )}
-        >
-          {following ? <Check className="h-3.5 w-3.5" weight="bold" /> : <Plus className="h-3.5 w-3.5" weight="bold" />}
-          {following ? 'Following' : 'Follow'}
-        </button>
-      ) : null}
+      {action ? <div className="absolute right-4 top-4 z-10">{action}</div> : null}
 
       <div className="relative flex items-end gap-4 p-5">
         <div className="shrink-0">{media}</div>

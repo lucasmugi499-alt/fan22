@@ -19,6 +19,8 @@ import {
   SlidersHorizontal,
   SignIn,
   Info,
+  MapPin,
+  HandHeart,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -66,6 +68,8 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       { name: 'How it works', href: '/how-it-works', icon: Info },
       { name: 'Verification', href: '/verification', icon: ShieldCheck },
       { name: 'Sponsors', href: '/sponsors', icon: Coins },
+      { name: 'Local map', href: '/map', icon: MapPin },
+      { name: 'Support', href: '/support', icon: HandHeart },
       { name: 'Sign in', href: '/login', icon: SignIn },
     ],
   },
@@ -74,14 +78,16 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     primary: [
       { name: 'Home', href: '/home', icon: House },
       { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'Discover', href: '/athletes', icon: Users },
+      { name: 'Discover', href: '/discover', icon: Users },
       { name: 'Feed', href: '/feed', icon: ListBullets },
     ],
     more: [
       { name: 'Leagues', href: '/leagues', icon: Buildings },
       { name: 'Teams', href: '/teams', icon: SoccerBall },
       { name: 'Awards', href: '/awards', icon: Trophy },
-      { name: 'Wallet', href: '/wallet', icon: Wallet },
+      { name: 'Support activity', href: '/contributions', icon: Wallet },
+      { name: 'Local map', href: '/map', icon: MapPin },
+      { name: 'Support', href: '/support', icon: HandHeart },
       ...COMMON_MORE,
     ],
   },
@@ -90,7 +96,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     primary: [
       { name: 'Dashboard', href: '/athlete-dashboard', icon: SquaresFour },
       { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'Wallet', href: '/wallet', icon: Wallet },
+      { name: 'Support activity', href: '/contributions', icon: Wallet },
       { name: 'Profile', href: '/profile', icon: User },
     ],
     more: [
@@ -138,6 +144,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
     more: [
       { name: 'Sponsors', href: '/admin/sponsors', icon: Coins },
+      { name: 'Financial operations', href: '/admin/finance', icon: Wallet },
       ...COMMON_MORE,
     ],
   },

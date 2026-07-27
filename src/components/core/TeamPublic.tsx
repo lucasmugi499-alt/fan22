@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy } from '@phosphor-icons/react';
+import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy, Heart, Handshake } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { teamRecord } from '@/lib/team/teamContext';
 import { buildLeagueStandings } from '@/lib/leagueModel';
@@ -18,6 +18,7 @@ import { MatchCard } from '@/components/core/MatchCard';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FollowButton } from '@/components/core/FollowButton';
 
 function ugx(n: number): string {
   if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
@@ -26,8 +27,10 @@ function ugx(n: number): string {
 }
 
 export function TeamPublic({ teamId }: { teamId: string }) {
-  const { teams, athletes, matches, leagues, seasons, feedPosts, loading } = useGoalPlaceData({
-    collections: ['teams', 'athletes', 'matches', 'leagues', 'seasons', 'feedPosts'],
+  const { teams, athletes, matches, leagues, seasons, feedPosts, supportNeeds, sponsors, loading } = useGoalPlaceData({
+    collections: ['teams', 'athletes', 'matches', 'leagues', 'seasons', 'feedPosts', 'supportNeeds', 'sponsors'],
+    scope: { teamId },
+    recordLimit: 120,
   });
   const team = useMemo(() => teams.find((t) => t.id === teamId), [teams, teamId]);
   const league = useMemo(() => leagues.find((l) => l.id === team?.leagueId), [leagues, team]);
@@ -37,6 +40,8 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const nextMatch = useMemo(() => teamMatches.filter(isUpcomingMatch).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0], [teamMatches]);
   const results = useMemo(() => teamMatches.filter((m) => m.status === 'completed').sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedTeamId === teamId), [feedPosts, teamId]);
+  const needs = useMemo(() => supportNeeds.filter((need) => need.teamId === teamId), [supportNeeds, teamId]);
+  const partners = useMemo(() => sponsors.filter((sponsor) => sponsor.supportedTeamIds.includes(teamId)), [sponsors, teamId]);
 
   const standings = useMemo(() => {
     if (!league) return [];
@@ -62,7 +67,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
         eyebrow={league?.name}
         title={team.name}
         verified={team.verified}
-        followable={false}
+        action={<FollowButton targetType="team" targetId={team.id} label="Follow" />}
         meta={
           <>
             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {team.city}</span>
@@ -88,6 +93,26 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <PeopleCarousel title="Squad" athletes={roster} />
 
           <NewsRow title="From the club" posts={news} badge={<Crest name={team.name} sport={String(team.sport)} size={22} />} />
+
+          <Card className="p-4 md:p-5">
+            <h2 className="text-[15px] font-semibold text-text-strong">Our story</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{team.description}</p>
+            <p className="mt-3 flex items-center gap-2 text-sm text-muted"><MapPin className="h-4 w-4 text-brand" /> {team.location ?? team.city}</p>
+          </Card>
+
+          <Card className="p-4 md:p-5">
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><Heart className="h-4 w-4 text-brand-2" weight="fill" /> Development needs</h2>
+              <div className="mt-3 space-y-3">
+                {needs.map((need) => (
+                  <div key={need.id}>
+                    <div className="flex justify-between gap-3 text-sm"><span className="font-semibold text-text-strong">{need.title}</span><span className="text-brand-2">UGX {need.raisedAmount.toLocaleString()} / {need.targetAmount.toLocaleString()}</span></div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3"><div className="h-full bg-brand" style={{ width: `${Math.min(100, need.raisedAmount / need.targetAmount * 100)}%` }} /></div>
+                    <p className="mt-1 text-xs text-muted">{need.story}</p>
+                  </div>
+                ))}
+                {!needs.length ? <p className="text-sm text-muted">This team is preparing its next verified development update.</p> : null}
+              </div>
+          </Card>
         </div>
 
         <aside className="space-y-5">
@@ -99,6 +124,14 @@ export function TeamPublic({ teamId }: { teamId: string }) {
               <InfoRow icon={Trophy} label="League points" value={String(team.leaguePoints)} accent="text-brand" />
               <InfoRow icon={Users} label="Supporters" value={String(team.supportersCount)} />
               <InfoRow icon={Coins} label="Support raised" value={ugx(team.totalSupport)} accent="text-[var(--brand-2)]" />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><Handshake className="h-4 w-4 text-brand-2" /> Partners</h2>
+            <div className="mt-3 space-y-2">
+              {partners.map((partner) => <div key={partner.id} className="rounded-[var(--radius-md)] bg-surface-2 p-3"><p className="text-sm font-semibold text-text-strong">{partner.name}</p><p className="text-xs text-muted">{partner.impactSummary}</p></div>)}
+              {!partners.length ? <p className="text-sm text-muted">No active team partner is listed.</p> : null}
             </div>
           </Card>
         </aside>

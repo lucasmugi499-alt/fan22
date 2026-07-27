@@ -63,12 +63,18 @@ const FORM_STYLE: Record<FormResult, string> = {
 
 export function TeamConsoleHome() {
   const { userProfile, isDemoMode } = useAuth();
-  const { teams, matches, athletes, loading, error, retry } = useGoalPlaceData({
-    collections: ['teams', 'matches', 'athletes'],
+  const catalog = useGoalPlaceData({ collections: ['teams'] });
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const detail = useGoalPlaceData({
+    collections: ['matches', 'athletes'],
+    scope: { teamId: team?.id ?? '__pending__' },
+    recordLimit: 250,
   });
+  const { matches, athletes, error, retry } = detail;
+  const teams = catalog.teams;
+  const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
 
-  const team = useMemo(() => resolveMyTeam(userProfile, teams, matches, isDemoMode), [userProfile, teams, matches, isDemoMode]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
     useTeamConfirmationInbox(team?.id);
@@ -133,6 +139,7 @@ export function TeamConsoleHome() {
         </div>
       </header>
 
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
       {/* Priority: the one thing that needs the admin now */}
       {top ? (
         <PriorityCard action={top} teamById={teamById} onReview={() => setReviewMatch(top.match)} />

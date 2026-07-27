@@ -1,9 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, SignIn } from '@phosphor-icons/react';
+import { Bell, MagnifyingGlass, SignIn } from '@phosphor-icons/react';
 import type { AppRole } from '@/types';
 import type { RoleNav } from '@/lib/nav';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
+import { useAuth } from '@/context/AuthProvider';
+import { useUserNotifications } from '@/lib/firebase/useGoalPlaceData';
 
 const ROLE_LABEL: Record<string, string> = {
   fan: 'Fan',
@@ -20,7 +24,24 @@ const ROLE_LABEL: Record<string, string> = {
  * never primary navigation, which lives in the rail/bottom nav.
  */
 export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
+  const { currentUser, userProfile } = useAuth();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { items: notifications } = useUserNotifications(currentUser?.uid ?? userProfile?.uid);
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
+    <>
     <header className="glass sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between gap-3 border-b border-border px-[var(--gutter)]">
       <div className="flex min-w-0 items-center gap-2.5">
         <span
@@ -41,12 +62,21 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
 
       {role ? (
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-3 hover:text-text-strong"
+          >
+            <MagnifyingGlass className="h-5 w-5" />
+          </button>
           <Link
             href="/notifications"
             aria-label="Notifications"
-            className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-3 hover:text-text-strong"
+            className="relative grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-3 hover:text-text-strong"
           >
             <Bell className="h-5 w-5" />
+            {unreadCount ? <span className="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-[var(--state-error)] px-1 text-[9px] font-bold text-white">{Math.min(unreadCount, 99)}</span> : null}
           </Link>
           <Link
             href="/profile"
@@ -57,14 +87,26 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
           </Link>
         </div>
       ) : (
-        <Link
-          href="/login"
-          className="inline-flex h-10 items-center gap-2 rounded-sm bg-brand px-3.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
-        >
-          <SignIn className="h-4 w-4" weight="bold" />
-          Sign in
-        </Link>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-3 hover:text-text-strong"
+          >
+            <MagnifyingGlass className="h-5 w-5" />
+          </button>
+          <Link
+            href="/login"
+            className="inline-flex h-10 items-center gap-2 rounded-sm bg-brand px-3.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
+          >
+            <SignIn className="h-4 w-4" weight="bold" />
+            Sign in
+          </Link>
+        </div>
       )}
     </header>
+    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} role={role} />
+    </>
   );
 }

@@ -138,6 +138,10 @@ function asUser(uid: string) {
   return testEnv.authenticatedContext(uid).firestore();
 }
 
+function asUserWithClaims(uid: string, claims: Record<string, unknown>) {
+  return testEnv.authenticatedContext(uid, claims).firestore();
+}
+
 async function seedSubmission(overrides: Record<string, unknown> = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'resultSubmissions/match_001'), submissionDoc(overrides));
@@ -714,5 +718,398 @@ describe('seasons', () => {
         name: 'Not allowed',
       })
     );
+  });
+});
+
+describe('new operational write surfaces', () => {
+  it('allows only an athlete owner to propose an unfunded pending challenge', async () => {
+    const challenge = {
+      athleteId: 'athlete_001',
+      leagueId: 'league_001',
+      seasonId: 'season_001',
+      submittedBy: OUTSIDER,
+      status: 'proposed',
+      fundingModel: 'non_cash',
+      verificationStatus: 'pending',
+      totalPledged: 0,
+      supportersCount: 0,
+    };
+    await assertSucceeds(setDoc(doc(asUser(OUTSIDER), 'challenges/proposal'), challenge));
+    await assertFails(setDoc(doc(asUser(TEAM_A_ADMIN), 'challenges/spoofed'), {
+      ...challenge,
+      submittedBy: TEAM_A_ADMIN,
+    }));
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'challenges/pre_funded'), {
+      ...challenge,
+      totalPledged: 50000,
+    }));
+  });
+
+  it('prevents clients from approving or settling a challenge', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'challenges/review'), {
+        athleteId: 'athlete_001',
+        leagueId: 'league_001',
+        seasonId: 'season_001',
+        submittedBy: OUTSIDER,
+        status: 'proposed',
+        fundingModel: 'non_cash',
+        verificationStatus: 'pending',
+        totalPledged: 0,
+        supportersCount: 0,
+      });
+    });
+    await assertFails(updateDoc(
+      doc(asUser(TEAM_A_ADMIN), 'challenges/review'),
+      { status: 'team_approved', teamApprovedByUserId: TEAM_A_ADMIN },
+    ));
+    await assertFails(updateDoc(
+      doc(asUser(LEAGUE_ADMIN), 'challenges/review'),
+      { status: 'settled' },
+    ));
+  });
+
+  it('lets a team admin save its roster but not another team roster', async () => {
+    const roster = {
+      leagueId: 'league_001',
+      seasonId: 'season_001',
+      teamId: 'team_a',
+      athleteIds: ['athlete_001'],
+      status: 'draft',
+      completeness: 100,
+      submittedByUserId: TEAM_A_ADMIN,
+    };
+    await assertSucceeds(setDoc(doc(asUser(TEAM_A_ADMIN), 'rosters/team_a'), roster));
+    await assertFails(setDoc(doc(asUser(TEAM_B_ADMIN), 'rosters/spoofed'), {
+      ...roster,
+      submittedByUserId: TEAM_B_ADMIN,
+    }));
+  });
+
+  it('lets a league admin import unassigned pending teams only', async () => {
+    const team = {
+      leagueId: 'league_001',
+      name: 'Imported Team',
+      adminUserIds: [],
+      verified: false,
+    };
+    await assertSucceeds(setDoc(doc(asUser(LEAGUE_ADMIN), 'teams/imported'), team));
+    await assertFails(setDoc(doc(asUser(LEAGUE_ADMIN), 'teams/self_assigned'), {
+      ...team,
+      adminUserIds: [LEAGUE_ADMIN],
+    }));
+  });
+
+  it('binds team invitations to the league and recipient email', async () => {
+    const invitation = {
+      userId: '',
+      teamId: 'team_a',
+      leagueId: 'league_001',
+      seasonId: 'season_001',
+      role: 'team_admin',
+      status: 'invited',
+      invitedByUserId: LEAGUE_ADMIN,
+      invitedEmail: 'invitee@example.com',
+    };
+    await assertSucceeds(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'teamAssignments/invite'), invitation)
+    );
+    await assertSucceeds(
+      getDoc(doc(
+        asUserWithClaims('invitee', { email: 'invitee@example.com' }),
+        'teamAssignments/invite',
+      ))
+    );
+    await assertFails(
+      getDoc(doc(
+        asUserWithClaims('wrong_user', { email: 'wrong@example.com' }),
+        'teamAssignments/invite',
+      ))
+    );
+  });
+
+  it('allows a user to apply for League Admin without granting the role', async () => {
+    await assertSucceeds(
+      setDoc(doc(asUser(OUTSIDER), 'leagueAdminApplications/application'), {
+        userId: OUTSIDER,
+        leagueName: 'New League',
+        city: 'Jinja',
+        sport: 'football',
+        evidenceNote: 'Authorized operator',
+        status: 'pending',
+      })
+    );
+    await assertFails(
+      setDoc(doc(asUser(OUTSIDER), 'leagueAdminApplications/preapproved'), {
+        userId: OUTSIDER,
+        status: 'approved',
+      })
+    );
+  });
+
+  it('keeps admin audit events immutable and platform-admin only', async () => {
+    const platform = asUserWithClaims('platform', { role: 'platform_admin' });
+    await assertSucceeds(setDoc(doc(platform, 'adminAuditEvents/decision'), {
+      actorUserId: 'platform',
+      action: 'approved',
+      targetCollection: 'athletes',
+      targetId: 'athlete_001',
+    }));
+    await assertFails(updateDoc(doc(platform, 'adminAuditEvents/decision'), {
+      action: 'rejected',
+    }));
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'adminAuditEvents/decision')));
+  });
+
+  it('lets notification owners change only read state', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'notifications/notice'), {
+        userId: OUTSIDER,
+        title: 'Original title',
+        body: 'Original body',
+        read: false,
+      });
+    });
+    const ref = doc(asUser(OUTSIDER), 'notifications/notice');
+    await assertSucceeds(updateDoc(ref, { read: true }));
+    await assertFails(updateDoc(ref, { title: 'Spoofed' }));
+  });
+
+  it('lets athlete owners propose support needs but not self-approve or alter raised money', async () => {
+    const need = {
+      athleteId: 'athlete_001',
+      leagueId: 'league_001',
+      title: 'Transport',
+      story: 'Away fixtures',
+      targetAmount: 200000,
+      raisedAmount: 0,
+      status: 'open',
+      approvalStatus: 'proposed',
+      verificationStatus: 'pending',
+      preferredPayoutDestination: 'approved_vendor',
+      payoutDestinationStatus: 'pending_verification',
+      recipientUpdates: [],
+      createdByUserId: OUTSIDER,
+    };
+    const ref = doc(asUser(OUTSIDER), 'supportNeeds/need');
+    await assertSucceeds(setDoc(ref, need));
+    await assertFails(updateDoc(ref, {
+      recipientUpdates: [{ id: 'update', message: 'First update' }],
+    }));
+    await assertFails(updateDoc(ref, {
+      approvalStatus: 'league_approved',
+      verificationStatus: 'verified',
+    }));
+    await assertFails(updateDoc(ref, { raisedAmount: 200000 }));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'supportNeeds/need'), {
+        approvalStatus: 'league_approved',
+        verificationStatus: 'verified',
+      });
+    });
+    await assertSucceeds(updateDoc(ref, {
+      recipientUpdates: [{ id: 'update', message: 'First verified update' }],
+    }));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'supportNeeds/need'), {
+        status: 'completed',
+      });
+    });
+    await assertFails(updateDoc(ref, {
+      recipientUpdates: [{ id: 'replacement', message: 'Replaced after completion' }],
+    }));
+  });
+});
+
+describe('money and points trust boundary', () => {
+  const PLATFORM_ADMIN = 'user_platform';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'paymentIntents/pi_001'), {
+        supporterUserId: OUTSIDER,
+        supportAmountMinor: 10000,
+        platformFeeMinor: 500,
+        totalAmountMinor: 10500,
+        currency: 'UGX',
+        status: 'payment_pending',
+      });
+      await setDoc(doc(db, 'contributions/c_001'), {
+        supporterUserId: OUTSIDER,
+        supportAmountMinor: 10000,
+        status: 'allocated',
+      });
+      await setDoc(doc(db, 'pointsEvents/p_001'), {
+        userId: OUTSIDER,
+        actionType: 'verified_need_supported',
+        points: 10,
+        status: 'confirmed',
+      });
+      await setDoc(doc(db, 'ledgerTransactions/l_001'), {
+        type: 'contribution_settlement',
+        relatedEntityId: 'c_001',
+      });
+      await setDoc(doc(db, 'ledgerEntries/le_001'), {
+        transactionId: 'l_001',
+        accountCode: 'recipient_payable',
+        direction: 'credit',
+        amountMinor: 10000,
+      });
+    });
+  });
+
+  it('lets supporters read their payment activity but not another account', async () => {
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'paymentIntents/pi_001')));
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'contributions/c_001')));
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'pointsEvents/p_001')));
+    await assertFails(getDoc(doc(asUser(TEAM_A_ADMIN), 'contributions/c_001')));
+  });
+
+  it('keeps the ledger restricted to platform operators', async () => {
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'ledgerTransactions/l_001')));
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'ledgerEntries/le_001')));
+    await assertSucceeds(
+      getDoc(doc(
+        asUserWithClaims(PLATFORM_ADMIN, { role: 'platform_admin' }),
+        'ledgerTransactions/l_001',
+      )),
+    );
+  });
+
+  it('refuses financial and points writes from every client role', async () => {
+    for (const db of [
+      asUser(OUTSIDER),
+      asUser(LEAGUE_ADMIN),
+      asUserWithClaims(PLATFORM_ADMIN, { role: 'platform_admin' }),
+    ]) {
+      await assertFails(setDoc(doc(db, 'paymentIntents/forged'), {
+        supporterUserId: OUTSIDER,
+        totalAmountMinor: 1,
+        status: 'settled',
+      }));
+      await assertFails(setDoc(doc(db, 'contributions/forged'), {
+        supporterUserId: OUTSIDER,
+        status: 'allocated',
+      }));
+      await assertFails(setDoc(doc(db, 'ledgerEntries/forged'), {
+        direction: 'credit',
+        amountMinor: 500000,
+      }));
+      await assertFails(setDoc(doc(db, 'pointsEvents/forged'), {
+        userId: OUTSIDER,
+        points: 999999,
+        status: 'confirmed',
+      }));
+    }
+  });
+
+  it('refuses legacy wallet and pledge creation', async () => {
+    const db = asUser(OUTSIDER);
+    await assertFails(setDoc(doc(db, 'walletTransactions/deposit'), {
+      userId: OUTSIDER,
+      amount: 50000,
+      type: 'deposit',
+    }));
+    await assertFails(setDoc(doc(db, 'supportPledges/pledge'), {
+      fanId: OUTSIDER,
+      amount: 50000,
+      status: 'held',
+    }));
+  });
+});
+
+describe('trusted completion and attendance records', () => {
+  it('refuses support-completion records from every client role', async () => {
+    for (const db of [
+      asUser(OUTSIDER),
+      asUser(LEAGUE_ADMIN),
+      asUserWithClaims('platform', { role: 'platform_admin' }),
+    ]) {
+      await assertFails(setDoc(doc(db, 'supportNeedCompletions/forged'), {
+        supportNeedId: 'need_001',
+        athleteId: 'athlete_001',
+        leagueId: 'league_001',
+        reviewedByUserId: LEAGUE_ADMIN,
+        evidenceRefs: ['https://example.com/evidence.jpg'],
+        status: 'verified',
+      }));
+    }
+  });
+
+  it('refuses match attendance and attendance points from every client role', async () => {
+    for (const db of [
+      asUser(OUTSIDER),
+      asUser(LEAGUE_ADMIN),
+      asUserWithClaims('platform', { role: 'platform_admin' }),
+    ]) {
+      await assertFails(setDoc(doc(db, 'matchAttendance/forged'), {
+        matchId: 'match_001',
+        userId: OUTSIDER,
+        leagueId: 'league_001',
+      }));
+      await assertFails(setDoc(doc(db, 'pointsEvents/attendance_forged'), {
+        userId: OUTSIDER,
+        actionType: 'match_attended',
+        points: 15,
+        status: 'confirmed',
+      }));
+    }
+  });
+});
+
+describe('community publishing trust boundary', () => {
+  const fanPost = {
+    authorId: OUTSIDER,
+    caption: 'Looking forward to the weekend fixtures.',
+    status: 'active',
+    verified: false,
+    likesCount: 0,
+    commentsCount: 0,
+    sharesCount: 0,
+  };
+
+  it('allows a fan to publish an ordinary post', async () => {
+    await assertSucceeds(setDoc(doc(asUser(OUTSIDER), 'feedPosts/fan_post'), fanPost));
+  });
+
+  it('refuses verified posts and fabricated engagement from a fan', async () => {
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'feedPosts/verified_post'), {
+      ...fanPost,
+      verified: true,
+    }));
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'feedPosts/popular_post'), {
+      ...fanPost,
+      likesCount: 500,
+    }));
+  });
+
+  it('lets an owner edit copy but not official or engagement fields', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'feedPosts/fan_post'), fanPost);
+    });
+    const ref = doc(asUser(OUTSIDER), 'feedPosts/fan_post');
+    await assertSucceeds(updateDoc(ref, { caption: 'Updated fixture thoughts.' }));
+    await assertFails(updateDoc(ref, { verified: true }));
+    await assertFails(updateDoc(ref, { status: 'official' }));
+    await assertFails(updateDoc(ref, { likesCount: 1000 }));
+  });
+
+  it('keeps comment publication and moderation state separate', async () => {
+    const comment = {
+      authorId: OUTSIDER,
+      postId: 'fan_post',
+      text: 'Great match.',
+      status: 'published',
+    };
+    const ref = doc(asUser(OUTSIDER), 'comments/comment_001');
+    await assertSucceeds(setDoc(ref, comment));
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'comments/hidden_comment'), {
+      ...comment,
+      status: 'hidden',
+    }));
+    await assertSucceeds(updateDoc(ref, { text: 'Great official match.' }));
+    await assertFails(updateDoc(ref, { status: 'hidden' }));
   });
 });

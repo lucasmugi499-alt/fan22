@@ -48,12 +48,16 @@ export async function finalizeSubmission(
     }
 
     if (typeof plan.supersedesVersion === 'number') {
-      tx.create(submissionRef.collection('versions').doc(String(plan.supersedesVersion)), {
-        ...submissionSnap.data(),
-        status: 'superseded',
-        supersededBySubmissionId: submission.id,
-        supersededAt: plan.submission.finalizedAt,
-      });
+      const archivedRef = submissionRef.collection('versions').doc(String(plan.supersedesVersion));
+      const archivedSnapshot = await tx.get(archivedRef);
+      if (!archivedSnapshot.exists) {
+        tx.create(archivedRef, {
+          ...submissionSnap.data(),
+          status: 'superseded',
+          supersededBySubmissionId: submission.id,
+          supersededAt: plan.submission.finalizedAt,
+        });
+      }
     }
 
     tx.update(matchRef, {

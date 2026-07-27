@@ -1,5 +1,5 @@
 import { AthleteProfile } from "@/components/core/AthleteProfile";
-import { athletes } from "@/data/mockAthletes";
+import { athletes } from "@/data/mockDatabase";
 
 export function generateStaticParams() {
   if (process.env.NEXT_STATIC_EXPORT !== "true") return [];

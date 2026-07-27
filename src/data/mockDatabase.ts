@@ -1,20 +1,33 @@
-import { users } from "./mockUsers";
-import { sports } from "./mockSports";
-import { leagues } from "./mockLeagues";
-import { teams } from "./mockTeams";
-import { athletes } from "./mockAthletes";
-import { matches } from "./mockMatches";
-import { challenges } from "./mockChallenges";
-import { supportPledges } from "./mockSupportPledges";
-import { walletTransactions } from "./mockWalletTransactions";
-import { feedPosts } from "./mockFeedPosts";
-import { comments } from "./mockComments";
-import { sponsors } from "./mockSponsors";
-import { awards } from "./mockAwards";
-import { verifications } from "./mockVerifications";
-import { reports } from "./mockReports";
-import { notifications } from "./mockNotifications";
+import { investorDemo } from "./investorDemo";
 import { Match, SportSlug, Team } from "@/types";
+
+const {
+  users,
+  sports,
+  leagues,
+  teams,
+  athletes,
+  matches,
+  challenges,
+  supportPledges,
+  walletTransactions,
+  feedPosts,
+  comments,
+  sponsors,
+  awards,
+  verifications,
+  reports,
+  notifications,
+  seasons,
+  teamAssignments,
+  rosters,
+  resultSubmissions,
+  resultSubmissionEvents,
+  standings,
+  sponsorReports,
+  leagueNotices,
+  finalizations,
+} = investorDemo;
 
 export {
   users,
@@ -33,6 +46,15 @@ export {
   verifications,
   reports,
   notifications,
+  seasons,
+  teamAssignments,
+  rosters,
+  resultSubmissions,
+  resultSubmissionEvents,
+  standings,
+  sponsorReports,
+  leagueNotices,
+  finalizations,
 };
 
 export const mockDatabase = {
@@ -52,6 +74,15 @@ export const mockDatabase = {
   verifications,
   reports,
   notifications,
+  seasons,
+  teamAssignments,
+  rosters,
+  resultSubmissions,
+  resultSubmissionEvents,
+  standings,
+  sponsorReports,
+  leagueNotices,
+  finalizations,
 };
 
 // Helper Functions
@@ -187,7 +218,11 @@ export const getTopSupportedAthletes = (limit = 10) => {
 };
 
 export const getActiveChallenges = () =>
-  challenges.filter((c) => c.status === "open");
+  challenges.filter((challenge) =>
+    ['open', 'active', 'funding_open', 'funding_locked', 'in_progress'].includes(
+      String(challenge.status),
+    ),
+  );
 
 export const getVerifiedMatches = () =>
   matches.filter((m) => m.verificationStatus === "verified");

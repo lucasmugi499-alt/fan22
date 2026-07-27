@@ -1,5 +1,5 @@
 import { TeamPublic } from "@/components/core/TeamPublic";
-import { teams } from "@/data/mockTeams";
+import { teams } from "@/data/mockDatabase";
 
 export function generateStaticParams() {
   if (process.env.NEXT_STATIC_EXPORT !== "true") return [];

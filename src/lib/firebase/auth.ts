@@ -4,6 +4,8 @@ import {
   User,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -62,8 +64,18 @@ export async function registerAccount({
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  await sendEmailVerification(credential.user);
 
   return credential;
+}
+
+export async function requestPasswordReset(email: string) {
+  const { auth } = requireFirebaseClient();
+  return sendPasswordResetEmail(auth, email);
+}
+
+export async function resendEmailVerification(user: User) {
+  return sendEmailVerification(user);
 }
 
 export async function logout() {
@@ -96,13 +108,26 @@ export async function getUserRole(user: User | null, profile?: UserProfile | nul
   const token = await user.getIdTokenResult();
   const claimRole = token.claims.role;
 
-  if (claimRole === 'platform_admin' || claimRole === 'super_admin') {
-    return claimRole;
-  }
+  return resolveTrustedRole(
+    typeof claimRole === 'string' ? claimRole : null,
+    profile?.role ?? null,
+  );
+}
 
-  if (profile?.role === 'platform_admin' || profile?.role === 'super_admin') {
-    return null;
-  }
+const CLAIM_ROLES = new Set<AppRole>([
+  'athlete',
+  'team_admin',
+  'league_admin',
+  'sponsor',
+  'platform_admin',
+  'super_admin',
+]);
 
-  return profile?.role ?? null;
+export function resolveTrustedRole(
+  claimRole: string | null,
+  profileRole: AppRole | null,
+): AppRole | null {
+  if (claimRole && CLAIM_ROLES.has(claimRole as AppRole)) return claimRole as AppRole;
+  // Fan is the only role a user may obtain through a client-created profile.
+  return profileRole === 'fan' ? 'fan' : null;
 }

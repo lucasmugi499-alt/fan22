@@ -6,7 +6,14 @@ import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, ArrowRight, SignIn as 
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
-import { getUserProfile, getUserRole, isAuthAvailable, login } from '@/lib/firebase/auth';
+import {
+  getUserProfile,
+  getUserRole,
+  isAuthAvailable,
+  login,
+  registerAccount,
+  requestPasswordReset,
+} from '@/lib/firebase/auth';
 import { MarketingShell } from '@/components/marketing/MarketingShell';
 import { Button } from '@/components/ui/Button';
 import type { AppRole } from '@/types';
@@ -20,13 +27,18 @@ const ROLES: { role: AppRole; label: string; blurb: string; icon: IconComponent 
   { role: 'platform_admin', label: 'Platform Admin', blurb: 'Govern trust across the platform.', icon: Gavel },
 ];
 
-export function SignIn() {
+type AccountMode = 'signin' | 'register' | 'reset';
+
+export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }) {
   const router = useRouter();
   const { setDemoRole } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [mode, setMode] = useState<AccountMode>(initialMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   function enterAs(role: AppRole) {
     setDemoRole(role);
@@ -36,9 +48,31 @@ export function SignIn() {
   async function submitAccountSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
     setSubmitting(true);
 
     try {
+      if (mode === 'reset') {
+        await requestPasswordReset(email.trim());
+        setSuccess('Password reset email sent. Check your inbox.');
+        return;
+      }
+
+      if (mode === 'register') {
+        if (name.trim().length < 2) {
+          setError('Enter your full name.');
+          return;
+        }
+        if (password.length < 8) {
+          setError('Use at least eight characters for your password.');
+          return;
+        }
+        await registerAccount({ email: email.trim(), password, name: name.trim() });
+        setSuccess('Account created. Check your inbox to verify your email.');
+        router.push('/home');
+        return;
+      }
+
       const credential = await login(email.trim(), password);
       const profile = await getUserProfile(credential.user.uid);
       const role = await getUserRole(credential.user, profile);
@@ -101,7 +135,42 @@ export function SignIn() {
           </div>
         ) : (
           <form onSubmit={submitAccountSignIn} className="mx-auto mt-8 max-w-sm space-y-4 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-5">
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-surface-2 p-1">
+              {([
+                ['signin', 'Sign in'],
+                ['register', 'Create account'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setMode(value);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className={`h-10 rounded-[var(--radius-sm)] text-sm font-semibold ${mode === value ? 'bg-surface-3 text-text-strong' : 'text-muted'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {mode === 'register' ? (
+              <div className="space-y-1.5">
+                <label htmlFor="name" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
+                  Full name
+                </label>
+                <input
+                  id="name"
+                  autoComplete="name"
+                  required
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
+                  placeholder="Your name"
+                />
+              </div>
+            ) : null}
+            {mode !== 'reset' ? <div className="space-y-1.5">
               <label htmlFor="email" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
                 Email
               </label>
@@ -110,12 +179,13 @@ export function SignIn() {
                 type="email"
                 autoComplete="email"
                 required
+                minLength={mode === 'register' ? 8 : undefined}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
                 placeholder="you@example.com"
               />
-            </div>
+            </div> : null}
             <div className="space-y-1.5">
               <label htmlFor="password" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
                 Password
@@ -136,14 +206,38 @@ export function SignIn() {
                 {error}
               </p>
             ) : null}
+            {success ? (
+              <p className="rounded-[var(--radius-md)] border border-[color:var(--state-verified)] bg-[var(--state-verified-bg)] px-3 py-2 text-sm text-text-strong">
+                {success}
+              </p>
+            ) : null}
             {!isAuthAvailable() ? (
               <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-sm text-muted">
                 Firebase sign-in is not configured for this deployment.
               </p>
             ) : null}
             <Button type="submit" block icon={SignInIcon} disabled={submitting || !isAuthAvailable()}>
-              {submitting ? 'Signing in...' : 'Sign in'}
+              {submitting
+                ? 'Please wait...'
+                : mode === 'register'
+                  ? 'Create fan account'
+                  : mode === 'reset'
+                    ? 'Send reset email'
+                    : 'Sign in'}
             </Button>
+            {mode === 'signin' ? (
+              <button type="button" onClick={() => setMode('reset')} className="min-h-11 w-full text-sm font-medium text-muted hover:text-brand">
+                Forgot password?
+              </button>
+            ) : mode === 'reset' ? (
+              <button type="button" onClick={() => setMode('signin')} className="min-h-11 w-full text-sm font-medium text-muted hover:text-brand">
+                Back to sign in
+              </button>
+            ) : (
+              <p className="text-center text-xs leading-5 text-muted">
+                Fan accounts are self-service. Athlete, Team Admin, and League Admin access is granted through verification or invitation.
+              </p>
+            )}
           </form>
         )}
 

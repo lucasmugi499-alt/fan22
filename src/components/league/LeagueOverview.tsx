@@ -15,14 +15,20 @@ import { NoAssignment } from '@/components/ui/NoAssignment';
 import { RichStandings } from '@/components/premium/RichStandings';
 import { LeagueVerification } from '@/components/league/LeagueVerification';
 import { cn } from '@/lib/utils';
+import { LeagueOperations } from '@/components/league/LeagueOperations';
 
 export function LeagueOverview() {
   const { userProfile, isDemoMode } = useAuth();
-  const { leagues, teams, matches, seasons, loading, error, retry } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'matches', 'seasons'],
+  const catalog = useGoalPlaceData({ collections: ['leagues', 'seasons'] });
+  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
+  const detail = useGoalPlaceData({
+    collections: ['teams', 'matches'],
+    scope: { leagueId: league?.id ?? '__pending__' },
+    recordLimit: 250,
   });
-
-  const league = useMemo(() => resolveMyLeague(userProfile, leagues, matches, isDemoMode), [userProfile, leagues, matches, isDemoMode]);
+  const seasons = catalog.seasons;
+  const { teams, matches, error, retry } = detail;
+  const loading = catalog.loading || (Boolean(league) && detail.loading);
 
   const standings = useMemo(() => {
     if (!league) return [];
@@ -42,6 +48,7 @@ export function LeagueOverview() {
   const exceptions = exceptionQueue(league.id, matches);
   const rate = verifiedRate(league.id, matches);
   const lTeams = teamsInLeague(league.id, teams);
+  const activeSeason = currentSeasonFor(seasons, league.id, league.currentSeasonId);
 
   return (
     <div className="space-y-5">
@@ -58,12 +65,15 @@ export function LeagueOverview() {
         </div>
       </header>
 
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Metric icon={Warning} label="Exceptions" value={exceptions.length} tone={exceptions.length ? 'pending' : 'default'} />
         <Metric icon={Buildings} label="Teams" value={lTeams.length} />
         <Metric icon={ShieldCheck} label="Verified" value={`${rate}%`} tone="verified" />
         <Metric icon={ChartLineUp} label="Index" value={league.goalPlaceIndex} tone="brand" />
       </div>
+
+      <LeagueOperations league={league} seasonId={activeSeason?.id} onSaved={retry} />
 
       <section className="space-y-2.5">
         <div className="flex items-center justify-between">
@@ -88,6 +98,7 @@ export function LeagueOverview() {
             matches={matches}
             teamById={new Map(teams.map((t) => [t.id, t]))}
             sportById={(id) => String(teams.find((t) => t.id === id)?.sport ?? '')}
+            sport={String(league.sport)}
           />
         ) : (
           <Card className="p-4 text-sm text-muted">Standings appear once official results are recorded.</Card>

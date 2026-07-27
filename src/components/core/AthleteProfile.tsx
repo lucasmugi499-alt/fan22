@@ -17,6 +17,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FollowButton } from '@/components/core/FollowButton';
+import { CareerPassport } from '@/components/athlete/CareerPassport';
 
 function ugx(n: number): string {
   if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
@@ -25,12 +27,26 @@ function ugx(n: number): string {
 }
 
 export function AthleteProfile({ athleteId }: { athleteId: string }) {
-  const { athletes, teams, matches, feedPosts, loading } = useGoalPlaceData({
-    collections: ['athletes', 'teams', 'matches', 'feedPosts'],
+  const exact = useGoalPlaceData({
+    collections: ['athletes'],
+    scope: { athleteId },
   });
+  const athlete = exact.athletes[0];
+  const related = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'matches', 'feedPosts', 'leagues', 'seasons', 'supportNeeds'],
+    scope: { teamId: athlete?.teamId ?? '__pending__' },
+    recordLimit: 200,
+  });
+  const challengeData = useGoalPlaceData({
+    collections: ['challenges'],
+    scope: { athleteId },
+    recordLimit: 100,
+  });
+  const { athletes, teams, matches, feedPosts, leagues, seasons, supportNeeds } = related;
+  const challenges = challengeData.challenges;
+  const loading = exact.loading || (Boolean(athlete) && (related.loading || challengeData.loading));
   const { requireAuth } = useAuthGate();
   const [supporting, setSupporting] = useState(false);
-  const athlete = useMemo(() => athletes.find((a) => a.id === athleteId), [athletes, athleteId]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const teammates = useMemo(() => athletes.filter((a) => a.teamId === athlete?.teamId && a.id !== athleteId).slice(0, 10), [athletes, athlete, athleteId]);
@@ -39,6 +55,9 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
     [matches, athlete]
   );
   const news = useMemo(() => feedPosts.filter((p) => p.relatedTeamId === athlete?.teamId || p.relatedAthleteId === athleteId), [feedPosts, athlete, athleteId]);
+  const league = useMemo(() => leagues.find((item) => item.id === athlete?.leagueId), [athlete, leagues]);
+  const athleteChallenges = useMemo(() => challenges.filter((item) => item.athleteId === athleteId), [athleteId, challenges]);
+  const athleteNeeds = useMemo(() => supportNeeds.filter((item) => item.athleteId === athleteId), [athleteId, supportNeeds]);
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-36 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-40 w-full rounded-[var(--radius-lg)]" /></div>;
   if (!athlete) return <EmptyState icon={Warning} title="Athlete not found" description="This profile may have been removed, or the link is out of date." />;
@@ -63,7 +82,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
         eyebrow={team?.name}
         title={athlete.name}
         verified={athlete.verified}
-        followable={false}
+        action={<FollowButton targetType="athlete" targetId={athlete.id} label="Follow" />}
         meta={
           <>
             <span>{athlete.position}</span>
@@ -104,6 +123,16 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
           </Card>
         </aside>
       </div>
+
+      <CareerPassport
+        athlete={athlete}
+        team={team}
+        league={league}
+        seasons={seasons}
+        matches={matches}
+        challenges={athleteChallenges}
+        supportNeeds={athleteNeeds}
+      />
 
       <div className="sticky bottom-[calc(var(--nav-h)+var(--safe-bottom)+8px)] md:static">
         <Button block icon={HandHeart} onClick={() => requireAuth(() => setSupporting(true), 'Sign in to back this athlete.')}>

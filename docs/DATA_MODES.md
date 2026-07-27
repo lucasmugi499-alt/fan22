@@ -1,99 +1,76 @@
-# Data Modes
+# GoalPlace256 Data Modes
 
-GoalPlace256 runs through one data provider interface with mock, Firebase, and local emulator workflows.
+GoalPlace256 uses one `GoalPlaceDataProvider` contract with explicit mock and Firebase modes.
+The canonical synthetic package is `data/investor-demo/database.json`.
 
 ## Mock Mode
 
-`NEXT_PUBLIC_DATA_MODE=mock` is the default. It reads from `src/data/mockDatabase.ts` and uses in-memory demo writes for support, pledges, wallet transactions, feed posts, comments, follows, saves, and verification updates. No real payment is created.
-
-Run it with:
+`NEXT_PUBLIC_DATA_MODE=mock` reads the canonical investor package through
+`src/data/mockDatabase.ts`. In-memory writes support demonstrations, and every money action
+is labelled synthetic. No real payment moves.
 
 ```bash
-pnpm dev:mock
+npm run dev:mock
 ```
 
-Mock mode must not require Firebase environment variables.
+Mock mode does not require Firebase environment variables.
 
 ## Firebase Mode
 
-`NEXT_PUBLIC_DATA_MODE=firebase` reads and writes Firestore through the same provider interface. If Firebase public env vars are missing, the app falls back to mock mode instead of crashing.
-
-Run it with:
-
-```bash
-pnpm dev:firebase
-```
-
-Required public env vars:
+`NEXT_PUBLIC_DATA_MODE=firebase` requires the complete public Firebase client
+configuration. Missing configuration fails closed with a configuration error; Firebase
+mode never substitutes synthetic data.
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
-NEXT_PUBLIC_FIREBASE_DATABASE_ID=
-NEXT_PUBLIC_FIREBASE_DATABASE_URL=
+npm run dev:firebase
 ```
 
-Only the `NEXT_PUBLIC_` Firebase config belongs in browser code. Do not commit Firebase Admin service-account JSON, private keys, refresh tokens, `.env.local`, or any other server secret.
+Required values are listed in `.env.example`. Browser code receives only `NEXT_PUBLIC_*`
+Firebase values. Admin private keys, refresh tokens, service-account files, webhook secrets,
+and `.env.local` must never be committed or shipped to the browser.
 
-Admin scripts also need Firebase Admin service account env vars, or emulator hosts when seeding locally.
+Firebase reads use bounded and scoped queries for large collections. Public league and team
+hubs query their own records, while exact athlete and match deep links fetch the named
+document before loading related records.
 
 ## Emulator Mode
-
-The emulator uses the same mock seed source but writes to local Firebase emulators. Start the emulators in another terminal, then seed with:
-
-```bash
-pnpm seed:emulator
-```
-
-Typical emulator env vars:
 
 ```bash
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
+npm run seed:emulator
 ```
 
-## Seed And Backup
-
-Seed Firestore from the canonical mock database:
+Run rules tests with a JDK:
 
 ```bash
-pnpm seed:firebase
+npm run test:rules
 ```
 
-The Firestore seed uses `src/data/mockDatabase.ts` as the central source and writes deterministic document IDs for core collections, including:
+## Investor Staging Seed
 
-```text
-users/user_fan_001
-athletes/ath_football_001
-teams/team_football_001
-leagues/league_football_001
-```
+The staging importer:
 
-Seed the local emulator:
+- Accepts only the configured `staging` project alias and named `fg256` database
+- Requires explicit execute, reset, and confirmation flags
+- Refuses a package not marked synthetic
+- Validates package counts and references
+- Takes a Firestore/Auth backup before reset
+- Writes result events to `resultSubmissions/{matchId}/events/{eventId}`
+- Verifies document and Auth counts after import
+
+Preview the command before using its explicit execution flags:
 
 ```bash
-pnpm seed:emulator
+npm run seed:investor-demo -- --project <staging-project-id> --database fg256
 ```
 
-Export mock JSON:
+Do not seed production with synthetic investor data.
 
-```bash
-pnpm export:mock
-```
+## Payments
 
-Back up Firestore collections:
-
-```bash
-pnpm backup:firestore -- --project manifest-quasar-479416-s7 --database fg256 --env production
-```
-
-Backups require an explicit project, database and environment. For staging, pass the staging
-service-account key with `--credentials /secure/path/staging-sa.json`.
-
-Seeded collections: `users`, `sports`, `leagues`, `teams`, `athletes`, `matches`, `challenges`, `supportPledges`, `walletTransactions`, `feedPosts`, `comments`, `sponsors`, `awards`, `verifications`, `reports`, and `notifications`.
+Data mode and payment mode are separate. Firebase mode does not enable payments.
+`GOALPLACE_PAYMENTS_MODE=sandbox`, a provider identifier, and a server-only webhook secret
+are required before the sandbox payment endpoint responds. Real-money launch gates are in
+`docs/MONEY_ENGINE.md`.

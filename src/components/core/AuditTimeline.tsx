@@ -5,6 +5,7 @@ export interface AuditStep {
   label: string;
   actor: string;
   timestamp?: string;
+  note?: string;
   icon: IconComponent;
   tone?: 'brand' | 'verified' | 'pending' | 'disputed' | 'neutral';
 }
@@ -42,6 +43,7 @@ export function AuditTimeline({ steps }: { steps: AuditStep[] }) {
                 {step.actor}
                 {step.timestamp ? <span className="text-subtle"> · {step.timestamp}</span> : null}
               </p>
+              {step.note ? <p className="mt-1 text-xs leading-5 text-subtle">{step.note}</p> : null}
             </div>
           </li>
         );

@@ -228,6 +228,17 @@
 }
 
 @layer utilities {
+  .field {
+    min-height: var(--tap-min);
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    padding-inline: 0.75rem;
+    color: var(--text-strong);
+    font-size: 0.875rem;
+  }
+
   .tap {
     min-height: var(--tap-min);
     min-width: var(--tap-min);
@@ -393,4 +404,9 @@
     scroll-behavior: auto !important;
   }
   .reveal-up { opacity: 1; transform: none; filter: none; }
+}
+
+html[data-low-data='true'] video,
+html[data-low-data='true'] [data-optional-media='true'] {
+  display: none !important;
 }

@@ -119,7 +119,6 @@ describe('canAccessRoute', () => {
     ['/league-admin', ['league_admin', 'platform_admin', 'super_admin']],
     ['/team-admin', ['team_admin', 'league_admin', 'platform_admin', 'super_admin']],
     ['/athlete-dashboard', ['athlete', 'platform_admin', 'super_admin']],
-    ['/sponsor-dashboard', ['platform_admin', 'super_admin']],
     ['/wallet', ['fan', 'athlete', 'platform_admin', 'super_admin']],
   ];
 

@@ -1,7 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import { CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { bannerImage } from '@/lib/media';
 import type { FeedPost } from '@/types';
+import { useAuth } from '@/context/AuthProvider';
 
 const CATEGORY: Record<string, string> = {
   transfer: 'Transfers',
@@ -42,6 +45,7 @@ export function NewsRow({ title, posts, badge, seeAllHref = '/feed' }: { title: 
 }
 
 function NewsCard({ post, mobile = false }: { post: FeedPost; mobile?: boolean }) {
+  const { userProfile } = useAuth();
   const category = CATEGORY[post.type] ?? 'News';
   const media = post.mediaUrl || post.mediaURL || bannerImage(post.id, category);
 
@@ -52,10 +56,12 @@ function NewsCard({ post, mobile = false }: { post: FeedPost; mobile?: boolean }
         mobile ? 'snap-item w-[82vw] max-w-80' : 'min-w-0'
       }`}
     >
-      <div className="aspect-[16/10] w-full overflow-hidden bg-surface-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={media} alt="" className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-fluid)] group-hover:scale-105" loading="lazy" />
-      </div>
+      {!userProfile?.lowDataMode ? (
+        <div className="aspect-[16/10] w-full overflow-hidden bg-surface-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={media} alt="" className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-fluid)] group-hover:scale-105" loading="lazy" />
+        </div>
+      ) : null}
       <div className="p-3.5">
         <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-strong">{post.caption}</p>
         <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand">{category}</p>

@@ -34,6 +34,7 @@ export function PlatformControl() {
         </div>
       </header>
 
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Metric icon={CheckCircle} label="Approvals" value={approvals.length} tone={approvals.length ? 'pending' : 'default'} />
         <Metric icon={Flag} label="Open reports" value={reportsOpen.length} tone={reportsOpen.length ? 'disputed' : 'default'} />

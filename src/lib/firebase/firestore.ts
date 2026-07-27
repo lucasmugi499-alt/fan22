@@ -16,27 +16,50 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  AdminAuditEvent,
   AdminLog,
   Athlete,
   AwardCategory,
   Challenge,
   Comment,
   FeedPost,
+  FinalizationRecord,
   League,
+  LeagueAdminApplication,
+  LeagueNotice,
   Match,
   Notification,
   Report,
   ResultSubmission,
+  ResultSubmissionEvent,
+  Roster,
   Season,
   Sport,
   Sponsor,
+  SponsorReport,
+  StoredStanding,
+  SupportNeed,
   SupportPledge,
   Team,
+  TeamAssignment,
   User,
   UserProfile,
   Verification,
   WalletTransaction,
 } from '@/types';
+import type {
+  Contribution,
+  Allocation,
+  Chargeback,
+  ComplianceCase,
+  LedgerEntry,
+  LedgerTransaction,
+  PaymentIntent,
+  Payout,
+  PointsEvent,
+  Refund,
+  Settlement,
+} from '@/types/money';
 import { db, requireFirebaseClient } from './client';
 
 export type FirestoreCollectionMap = {
@@ -59,6 +82,27 @@ export type FirestoreCollectionMap = {
   reports: Report;
   resultSubmissions: ResultSubmission;
   adminLogs: AdminLog;
+  adminAuditEvents: AdminAuditEvent;
+  teamAssignments: TeamAssignment;
+  rosters: Roster;
+  standings: StoredStanding;
+  sponsorReports: SponsorReport;
+  leagueNotices: LeagueNotice;
+  finalizations: FinalizationRecord;
+  supportNeeds: SupportNeed;
+  leagueAdminApplications: LeagueAdminApplication;
+  resultSubmissionEvents: ResultSubmissionEvent;
+  paymentIntents: PaymentIntent;
+  contributions: Contribution;
+  ledgerTransactions: LedgerTransaction;
+  ledgerEntries: LedgerEntry;
+  pointsEvents: PointsEvent;
+  allocations: Allocation;
+  payouts: Payout;
+  refunds: Refund;
+  chargebacks: Chargeback;
+  settlements: Settlement;
+  complianceCases: ComplianceCase;
 };
 
 export type FirestoreCollectionName = keyof FirestoreCollectionMap;
@@ -72,17 +116,6 @@ export type PublicCollections = {
   matches: Match;
   challenges: Challenge;
   feedPosts: FeedPost;
-};
-
-export type SupportPledgeInput = {
-  fanId: string;
-  athleteId?: string;
-  teamId?: string;
-  leagueId?: string;
-  challengeId?: string;
-  amount: number;
-  type: 'direct_support' | 'performance_pledge' | 'team_pool' | 'league_campaign';
-  status: 'pending' | 'held' | 'released' | 'refunded' | 'failed';
 };
 
 export function collectionRef(name: FirestoreCollectionName) {
@@ -126,36 +159,6 @@ export function publicCollectionConstraints(name: keyof PublicCollections) {
   return [];
 }
 
-export async function createSupportPledge(input: SupportPledgeInput) {
-  const { db } = requireFirebaseClient();
-  const platformFee = Math.round(input.amount * 0.03);
-  const netAmount = input.amount - platformFee;
-
-  const pledge = {
-    ...input,
-    currency: 'UGX',
-    platformFee,
-    netAmount,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-
-  const pledgeRef = await addDoc(collection(db, 'supportPledges'), pledge);
-  await addDoc(collection(db, 'walletTransactions'), {
-    userId: input.fanId,
-    type: input.type === 'performance_pledge' ? 'Performance pledge' : 'Support',
-    label: input.athleteId ? `Support pledge for athlete ${input.athleteId}` : 'GoalPlace256 support',
-    amount: -input.amount,
-    currency: 'UGX',
-    status: input.status,
-    supportPledgeId: pledgeRef.id,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-
-  return pledgeRef.id;
-}
-
 export async function createFeedPost(input: {
   authorId: string;
   authorRole: string;
@@ -178,7 +181,8 @@ export async function createFeedPost(input: {
     shares: 0,
     likesCount: 0,
     commentsCount: 0,
-    status: 'published',
+    sharesCount: 0,
+    status: 'active',
     verified: input.type === 'VerifiedAchievement',
     timestamp: new Date().toISOString(),
     createdAt: serverTimestamp(),
