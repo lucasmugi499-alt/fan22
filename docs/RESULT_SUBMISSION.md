@@ -1,6 +1,6 @@
 # Result Submission Workflow
 
-Status: **implemented locally and candidate-rules tested; staging end-to-end QA pending.**
+Status: **implemented, candidate-rules tested, and staging end-to-end verified.**
 The state machine, ownership model, provider methods, mobile field report, opponent
 confirmation, league adjudication, evidence storage, trusted finalizer, and immutable
 provenance UI are wired.
@@ -232,16 +232,26 @@ Done:
 - Candidate rules are selected by `firebase.staging.json`; the latest local candidate must
   pass the final gate before deployment.
 
-Outstanding:
-
-1. Run the staging seed so the 756 existing events are written into submission
-   subcollections and the obsolete root collection is removed.
-2. Run the full Team Admin A -> Team Admin B -> finalizer -> standings workflow against
-   the deployed staging environment, including duplicate-trigger and stale-version cases.
-
 The hourly function now dispatches deterministic 24h/48h opponent reminders. League and
 Platform correction review creates an immutable replacement version and supersedes the
 previous official record through the trusted finalizer.
+
+### Staging verification
+
+On July 26, 2026:
+
+- The canonical seed wrote and verified 756 nested result events and removed the obsolete
+  root event collection.
+- The opponent Team Admin for `match_kmbl_09_01` confirmed the pending result through the
+  deployed Firestore rules.
+- The hosted finalizer promoted submission version 1 to `official` and updated the match
+  to `completed` / `verified`.
+- A duplicate finalization request returned `already_finalized`.
+- Official Kampala basketball matches increased from 40 to 41, and the affected standings
+  row advanced from eight to nine matches played.
+
+Stale-version refusal remains covered by the pure finalizer unit suite; producing a stale
+version through client credentials is intentionally impossible.
 
 ### Deploy notes
 

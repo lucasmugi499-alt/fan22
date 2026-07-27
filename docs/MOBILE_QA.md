@@ -35,8 +35,8 @@ dataset. Mobile checks used a 390 x 844 browser viewport; desktop checks used 14
 - Operational role switching remains a local demonstration control and is not shown on
   public discovery routes.
 
-## Remaining Staging Check
+## Staging Check
 
-After the local gate passes and staging is deployed, repeat the Team Admin A -> Team Admin
-B -> finalizer -> official standings workflow against Firebase. This is an environment
-integration check, not a replacement for the local browser and emulator suites.
+The deployed staging environment passed Firebase authentication, named-database reads,
+public provenance sanitization, opponent confirmation, trusted finalization, duplicate
+finalization, and derived standings verification.
