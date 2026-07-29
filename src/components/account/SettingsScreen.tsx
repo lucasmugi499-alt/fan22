@@ -46,6 +46,7 @@ export function SettingsScreen() {
       await provider.updateUserProfile(userId, { notificationPreferences: next });
     } catch {
       setPreferences(previous);
+      updateLocalProfile({ notificationPreferences: previous });
       toast.error('Notification preference could not be saved.');
     }
   }
@@ -57,13 +58,16 @@ export function SettingsScreen() {
   async function saveLowData(value: boolean) {
     const userId = currentUser?.uid ?? userProfile?.uid;
     if (!userId) return;
+    const previous = lowDataMode;
     setLowDataMode(value);
     updateLocalProfile({ lowDataMode: value });
     document.documentElement.dataset.lowData = value ? 'true' : 'false';
     try {
       await provider.updateUserProfile(userId, { lowDataMode: value });
     } catch {
-      setLowDataMode(!value);
+      setLowDataMode(previous);
+      updateLocalProfile({ lowDataMode: previous });
+      document.documentElement.dataset.lowData = previous ? 'true' : 'false';
       toast.error('Low-data preference could not be saved.');
     }
   }

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { BellSimple, SealCheck, HandCoins, Trophy, UserCirclePlus, Megaphone } from '@phosphor-icons/react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import type { IconComponent } from '@/lib/icons';
 import type { Notification } from '@/types';
@@ -11,6 +12,7 @@ import { useUserNotifications } from '@/lib/firebase/useGoalPlaceData';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
 
 const ICON: Record<string, IconComponent> = {
   support_received: HandCoins,
@@ -47,7 +49,8 @@ export function NotificationsList() {
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const userId = currentUser?.uid ?? userProfile?.uid;
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const { items: list, loading, retry } = useUserNotifications(userId);
+  const { items: list, loading, error, retry } = useUserNotifications(userId);
+  const [visible, setVisible] = useState(24);
 
   async function markRead(notification: Notification) {
     if (notification.read) return;
@@ -55,18 +58,29 @@ export function NotificationsList() {
     retry();
   }
 
+  async function markAllRead() {
+    if (!userId) return;
+    await provider.markAllNotificationsRead(userId);
+    retry();
+  }
+
   if (loading) {
     return <div className="space-y-3"><Skeleton className="h-8 w-48" />{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16 w-full rounded-[var(--radius-md)]" />)}</div>;
   }
+  if (error && !list.length) return <ErrorState description={error.message} onRetry={retry} />;
   const unreadCount = list.filter((notification) => !notification.read).length;
+  const visibleList = list.slice(0, visible);
   const grouped = GROUP_ORDER
-    .map((name) => ({ name, items: list.filter((notification) => notificationGroup(notification.type) === name) }))
+    .map((name) => ({ name, items: visibleList.filter((notification) => notificationGroup(notification.type) === name) }))
     .filter((group) => group.items.length);
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-text-strong">Notifications</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-text-strong">Notifications</h1>
+          {unreadCount ? <Button size="sm" variant="ghost" onClick={() => void markAllRead()}>Mark all read</Button> : null}
+        </div>
         <p className="text-sm text-muted">{unreadCount ? `${unreadCount} unread · ` : ''}Whose turn it is to act, and what changed.</p>
       </div>
 
@@ -100,6 +114,11 @@ export function NotificationsList() {
               </div>
             </section>
           ))}
+          {visible < list.length ? (
+            <Button variant="secondary" block onClick={() => setVisible((value) => value + 24)}>
+              Load more notifications
+            </Button>
+          ) : null}
         </div>
       ) : (
         <EmptyState icon={BellSimple} title="You are all caught up" description="New activity on your matches, support and verifications will show here." />

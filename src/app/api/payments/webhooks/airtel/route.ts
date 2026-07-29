@@ -1,10 +1,10 @@
-import { AirtelMoneyProvider, PaymentProviderConfigurationError } from '@/server/payments/providers';
+import { AirtelMoneyProvider, enabledPaymentProviders, PaymentProviderConfigurationError } from '@/server/payments/providers';
 import { processVerifiedPaymentEvent } from '@/server/payments/settlement';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  if (process.env.GOALPLACE_PAYMENT_PROVIDER !== 'airtel_money') return Response.json({ error: 'Airtel Money is not configured.' }, { status: 404 });
+  if (!enabledPaymentProviders().has('airtel_money')) return Response.json({ error: 'Airtel Money is not configured.' }, { status: 404 });
   try {
     const event = await new AirtelMoneyProvider().verifyCallback(request);
     if (!event) return Response.json({ error: 'Invalid Airtel Money callback.' }, { status: 401 });

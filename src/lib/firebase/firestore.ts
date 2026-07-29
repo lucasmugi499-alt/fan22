@@ -19,6 +19,7 @@ import {
   AdminAuditEvent,
   AdminLog,
   Athlete,
+  AthleteClaim,
   AwardCategory,
   Challenge,
   Comment,
@@ -36,6 +37,7 @@ import {
   Season,
   Sport,
   Sponsor,
+  SponsorCampaign,
   SponsorReport,
   StoredStanding,
   SupportNeed,
@@ -68,6 +70,7 @@ export type FirestoreCollectionMap = {
   users: User | UserProfile;
   sports: Sport;
   athletes: Athlete;
+  athleteClaims: AthleteClaim;
   teams: Team;
   leagues: League;
   seasons: Season;
@@ -89,6 +92,7 @@ export type FirestoreCollectionMap = {
   rosters: Roster;
   standings: StoredStanding;
   sponsorReports: SponsorReport;
+  sponsorCampaigns: SponsorCampaign;
   leagueNotices: LeagueNotice;
   finalizations: FinalizationRecord;
   supportNeeds: SupportNeed;

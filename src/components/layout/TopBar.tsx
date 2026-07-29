@@ -8,6 +8,8 @@ import type { RoleNav } from '@/lib/nav';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { useAuth } from '@/context/AuthProvider';
 import { useUserNotifications } from '@/lib/firebase/useGoalPlaceData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
 
 const ROLE_LABEL: Record<string, string> = {
   fan: 'Fan',
@@ -27,6 +29,19 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
   const { currentUser, userProfile } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const { items: notifications } = useUserNotifications(currentUser?.uid ?? userProfile?.uid);
+  const { teams, leagues } = useGoalPlaceData({
+    collections: role === 'team_admin'
+      ? ['teams']
+      : role === 'league_admin'
+        ? ['leagues']
+        : [],
+    recordLimit: 250,
+  });
+  const assignments = role === 'team_admin'
+    ? teams.filter((team) => team.adminUserIds?.includes(currentUser?.uid ?? userProfile?.uid ?? ''))
+    : role === 'league_admin'
+      ? leagues.filter((league) => league.adminUserIds?.includes(currentUser?.uid ?? userProfile?.uid ?? ''))
+      : [];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   useEffect(() => {
@@ -57,6 +72,21 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
             <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
             {ROLE_LABEL[role] ?? role}
           </span>
+        ) : null}
+        {assignments.length > 1 ? (
+          <select
+            aria-label={role === 'team_admin' ? 'Active team' : 'Active league'}
+            defaultValue=""
+            onChange={(event) => {
+              if (!event.target.value) return;
+              storeSelectedAssignmentId(role === 'team_admin' ? 'team' : 'league', event.target.value);
+              window.location.reload();
+            }}
+            className="hidden h-8 max-w-44 rounded-[var(--radius-sm)] border border-border bg-surface-2 px-2 text-xs text-text sm:block"
+          >
+            <option value="" disabled>Switch workspace</option>
+            {assignments.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignment.name}</option>)}
+          </select>
         ) : null}
       </div>
 

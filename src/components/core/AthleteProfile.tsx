@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { HandHeart, Warning, MapPin } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { athletePhoto } from '@/lib/media';
@@ -19,6 +20,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FollowButton } from '@/components/core/FollowButton';
 import { CareerPassport } from '@/components/athlete/CareerPassport';
+import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 
 function ugx(n: number): string {
   if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
@@ -27,6 +29,7 @@ function ugx(n: number): string {
 }
 
 export function AthleteProfile({ athleteId }: { athleteId: string }) {
+  const searchParams = useSearchParams();
   const exact = useGoalPlaceData({
     collections: ['athletes'],
     scope: { athleteId },
@@ -72,6 +75,11 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
 
   return (
     <div className="space-y-5">
+      {searchParams.get('claim') === '1' && !athlete.userId ? (
+        <Card className="p-4">
+          <AthleteClaiming athletes={[athlete]} />
+        </Card>
+      ) : null}
       <IdentityHero
         gradient={team ? clubColor(team.name).gradient : sportGradient(String(athlete.sport))}
         media={

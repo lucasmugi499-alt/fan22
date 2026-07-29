@@ -12,6 +12,11 @@ export type CollectionRequest = {
   description: string;
 };
 
+export type CollectionReferenceRecovery = Pick<
+  CollectionRequest,
+  'paymentIntentId' | 'idempotencyKey'
+>;
+
 export type DisbursementRequest = {
   payoutId: string;
   amountMinor: number;
@@ -22,7 +27,8 @@ export type DisbursementRequest = {
 };
 
 export type ProviderOperation = {
-  providerReference: string;
+  providerRequestReference: string;
+  providerFinancialReference?: string;
   status: PaymentIntentStatus;
   customerMessage: string;
   raw: Record<string, unknown>;
@@ -36,11 +42,25 @@ export type VerifiedProviderCallback = Omit<PaymentWebhookEvent, 'verifiedByStat
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   createCollection(input: CollectionRequest): Promise<ProviderOperation>;
+  recoverCollectionReference?(input: CollectionReferenceRecovery): string;
   getCollectionStatus(providerReference: string): Promise<ProviderOperation>;
   createDisbursement(input: DisbursementRequest): Promise<ProviderOperation>;
   getDisbursementStatus(providerReference: string): Promise<ProviderOperation>;
   requestRefund?(providerReference: string, amountMinor: number): Promise<ProviderOperation>;
   verifyCallback(request: Request): Promise<VerifiedProviderCallback | null>;
+}
+
+export type SettlementReportEntry = {
+  providerRequestReference: string;
+  providerFinancialReference?: string;
+  status: PaymentIntentStatus;
+  amountMinor: number;
+  currency: MoneyCurrency;
+  occurredAt: string;
+};
+
+export interface SettlementReportProvider {
+  getSettlementReport(from: Date, to: Date): Promise<SettlementReportEntry[]>;
 }
 
 export class PaymentProviderConfigurationError extends Error {

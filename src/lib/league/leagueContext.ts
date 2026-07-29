@@ -1,5 +1,6 @@
 import type { League, Match, Team, UserProfile } from '@/types';
 import { isOfficialMatch } from '@/lib/status';
+import { selectedAssignmentId } from '@/lib/auth/assignmentSelection';
 
 /**
  * Resolves which league the current admin runs, by `adminUserIds`.
@@ -16,9 +17,11 @@ export function resolveMyLeague(
 ): League | null {
   if (leagues.length === 0) return null;
   if (profile) {
-    const owned = leagues.find(
+    const ownedLeagues = leagues.filter(
       (l) => l.adminUserIds?.includes(profile.uid) || l.adminUserIds?.includes(profile.id)
     );
+    const selectedId = selectedAssignmentId('league');
+    const owned = ownedLeagues.find((league) => league.id === selectedId) ?? ownedLeagues[0];
     if (owned) return owned;
   }
   if (!isDemoMode) return null;

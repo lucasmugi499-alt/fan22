@@ -451,6 +451,9 @@ export interface TeamAssignment {
   status: "invited" | "active" | "revoked";
   invitedByUserId?: string;
   invitedEmail?: string;
+  tokenHash?: string;
+  expiresAt?: string;
+  revokedAt?: string;
   acceptedAt?: string;
   createdAt: string;
 }
@@ -511,6 +514,51 @@ export interface Athlete {
   goalPlacePoints: number;
   stats: Record<string, number>;
   impactNeeds: string[];
+  createdAt: string;
+}
+
+export interface AthleteClaim {
+  id: string;
+  athleteId: string;
+  teamId: string;
+  leagueId: string;
+  requesterUserId: string;
+  status: 'team_pending' | 'league_pending' | 'linked' | 'rejected';
+  teamReviewedByUserId?: string;
+  leagueReviewedByUserId?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AthleteSeasonStat {
+  id: string;
+  athleteId: string;
+  seasonId: string;
+  leagueId: string;
+  teamId: string;
+  stats: Record<string, number>;
+  officialMatchIds: string[];
+  verifiedAt: string;
+}
+
+export interface AthleteTeamHistory {
+  id: string;
+  athleteId: string;
+  teamId: string;
+  leagueId: string;
+  seasonId: string;
+  joinedAt: string;
+  leftAt?: string;
+  verified: boolean;
+}
+
+export interface AthleteVerificationRecord {
+  id: string;
+  athleteId: string;
+  type: 'identity' | 'team_affiliation' | 'season_stats' | 'award';
+  status: VerificationStatus;
+  verifiedByUserId?: string;
   createdAt: string;
 }
 
@@ -688,6 +736,7 @@ export interface Sponsor {
 
 export interface SponsorReport {
   id: string;
+  campaignId?: string;
   leagueId: string;
   seasonId: string;
   period: string;
@@ -702,6 +751,22 @@ export interface SponsorReport {
   evidenceItems: number;
   status: "draft" | "generated" | "shared";
   generatedAt: string;
+}
+
+export interface SponsorCampaign {
+  id: string;
+  sponsorId: string;
+  name: string;
+  objective: string;
+  budgetUGX: number;
+  supportedLeagueIds: string[];
+  supportedTeamIds: string[];
+  supportedAthleteIds: string[];
+  evidenceUrls: string[];
+  status: 'draft' | 'active' | 'completed' | 'archived';
+  startsAt: string;
+  endsAt?: string;
+  createdAt: string;
 }
 
 export interface LeagueNotice {
@@ -817,7 +882,8 @@ export interface AdminAuditEvent {
     | "resolved"
     | "dismissed"
     | "invited"
-    | "accepted";
+    | "accepted"
+    | "created";
   targetCollection: string;
   targetId: string;
   note?: string;

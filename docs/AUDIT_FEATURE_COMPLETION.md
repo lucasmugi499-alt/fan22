@@ -1,8 +1,12 @@
 # GoalPlace256 Audit And Feature Completion
 
-Status: core product and internal money architecture complete. Real-money provider
-integration, recipient KYC, payouts, refunds, chargebacks, reconciliation, production-rules
-promotion, and legal approval remain blocked. Payments must remain sandbox-only.
+Status: build 29 demo hardening and the internal money architecture are implemented and
+locally verified. Multi-provider selection, reconciliation, recipient controls, trusted
+audit writes, private cache isolation, athlete claims, field mode, campaign attribution,
+and candidate rules are present. This is not a real-money or pilot-production completion
+claim. Airtel's partner contract, provider certification, staging end-to-end validation,
+payout operations, production-rules promotion, and legal approval remain blocked.
+Payments remain sandbox-only.
 
 ## Scope
 
@@ -33,6 +37,8 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Immutable double-entry contribution settlement journal
 - [x] Signed, timestamp-validated, idempotent sandbox webhook boundary
 - [x] Provider-neutral sandbox/Airtel/MTN adapter contract with status-polled callback boundary
+- [x] Fan-selectable Airtel/MTN provider boundary with separate request and financial references
+- [x] Scheduled processing-payment reconciliation and late-settlement exception handling
 - [x] Terminal payment state transitions, support reservations, recipient eligibility gate, and points projection
 - [x] Flat, capped, non-cash GoalPlace Points
 - [x] Non-cash/sponsor-funded challenge lifecycle and role separation
@@ -48,6 +54,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] `/discover` with For You, Athletes, Teams, Leagues, Matches, and Challenges
 - [x] Discovery filters and official-activity rankings
 - [x] Universal search for athletes, teams, leagues, matches, venues, seasons, and actions
+- [x] Persistent reactions, comments, shares, reporting, moderation, and rollback
 - [x] Fan identity, participation history, and non-spend-based badges
 - [x] Public venue map/list experience without private athlete locations
 
@@ -70,6 +77,8 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Challenge proposal
 - [x] Highlight publishing
 - [x] Shareable verified athlete card with QR link
+- [x] Account-to-athlete claim with Team confirmation and League verification
+- [x] Season statistics, team history, and verification-record domain sources
 
 ## Team And League Operations
 
@@ -82,6 +91,11 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] League launch wizard and season creation
 - [x] Team import and Team Admin invitations
 - [x] Fixture generation and fixture management
+- [x] Fixture draft preview with venue and minimum-rest conflict checks
+- [x] CSV duplicate validation and preview
+- [x] Unique expiring Team Admin invitations written by the trusted server
+- [x] Invitation acceptance requires the generated token and preserves higher-trust roles
+- [x] Roster submission, return, approval, and season lock lifecycle
 - [x] League Communications Centre
 - [x] Persistent dispute decisions and correction requests
 
@@ -91,7 +105,9 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Persistent trust-case resolution with immutable audit events
 - [x] Transparent support needs, progress, recipient updates, and completion evidence
 - [x] Sponsor Proof Packet and report export
-- [x] Campaign story timeline and verified impact measures
+- [x] Campaign-specific proof from official matches, paid allocations, and evidence records
+- [x] Public league pages exclude restricted sponsor-report records
+- [x] Trust Command Centre backed by workflow, finalization, compliance, and audit records
 
 ## Authentication And Security
 
@@ -100,6 +116,9 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Team Admin invitation acceptance
 - [x] League Admin application and platform approval
 - [x] Assignment-aware client permissions
+- [x] Multi-team and multi-league context selector
+- [x] Server-only immutable admin audit records
+- [x] Private cache namespaces include project, database, mode, UID, role, assignment, and query version
 - [x] Candidate Firestore rules and tests for every new write surface
 
 ## Daily Use And Resilience
@@ -126,6 +145,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 
 - [ ] Airtel Money sandbox credentials, callback contract, collection/disbursement tests, and reconciliation certification
 - [ ] MTN MoMo sandbox credentials, collection/disbursement tests, callback status-polling tests, and reconciliation certification
+- [ ] Trusted API integration tests against staging Firebase Auth and Firestore
 - [ ] Staging payment egress IP provisioned and registered only after the provider adapter tests pass
 - [ ] Recipient KYC, guardian, and payout-destination operations
 - [ ] Payout, refund, chargeback, and daily reconciliation operations
@@ -138,9 +158,10 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Candidate Firestore rules tests pass
 - [x] Functions and application builds pass
 - [x] Lint passes
-- [x] Browser QA passes at mobile and desktop widths
+- [x] Browser QA passes at 390px mobile and 1440px desktop widths
 - [x] No broken public routes, console errors, image failures, or horizontal overflow
-- [x] Authenticated role workflow QA passes
+- [x] Demo-role workflow QA passes
+- [ ] Firebase-authenticated role workflow QA passes in staging
 - [x] Synthetic-data disclosure is present where required
 - [x] Current code review has no unresolved demo-environment high-severity findings
 - [ ] Only after the real-money blockers above are closed: enable provider collection or payout

@@ -2,7 +2,9 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { contributionQuote, requiresEnhancedReview } from '@/lib/money';
-import { paymentProviderFromEnvironment, providerCallbackPath, PaymentProviderConfigurationError } from '@/server/payments/providers';
+import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderConfigurationError } from '@/server/payments/providers';
+import { recordProviderAttempt } from '@/server/payments/providerAttempts';
+import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
 
 export const runtime = 'nodejs';
 
@@ -12,9 +14,11 @@ const intentSchema = z.object({
   recipientType: z.enum(['athlete', 'team', 'league', 'programme']),
   recipientId: z.string().min(1),
   supportNeedId: z.string().min(1).optional(),
+  campaignId: z.string().min(1).optional(),
   supportAmountMinor: z.number().int().positive(),
   message: z.string().max(240).optional(),
   customerPhone: z.string().regex(/^256\d{9}$/, 'Use an Uganda number in 2567XXXXXXXX format.').optional(),
+  provider: z.enum(['airtel_money', 'mtn_momo']),
   idempotencyKey: z.string().min(12).max(160),
 });
 
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
   if (input.supporterUserId !== actor.uid) return Response.json({ error: 'The supporter must be the signed-in account.' }, { status: 403 });
 
   try {
-    const provider = paymentProviderFromEnvironment();
+    const provider = paymentProviderFromEnvironment(input.provider);
     const actorRole = typeof actor.role === 'string' ? actor.role : 'fan';
     const isPlatform = actorRole === 'platform_admin' || actorRole === 'super_admin';
     const requiredRecipients: Partial<Record<typeof input.purpose, typeof input.recipientType>> = {
@@ -63,6 +67,9 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Only verified support needs may be linked to support-need contributions.' }, { status: 409 });
     }
     if (input.purpose === 'sponsor_grant' && !isPlatform) return Response.json({ error: 'Sponsor grants require Platform review.' }, { status: 403 });
+    if ((input.purpose === 'sponsor_grant') !== Boolean(input.campaignId)) {
+      return Response.json({ error: 'Sponsor grants must be attributed to one approved campaign.' }, { status: 409 });
+    }
     if (provider.name !== 'sandbox' && !input.customerPhone) {
       return Response.json({ error: 'A mobile-money number is required for this provider prompt.' }, { status: 400 });
     }
@@ -98,7 +105,15 @@ export async function POST(request: Request) {
     }
 
     const quote = contributionQuote(input.supportAmountMinor);
-    const intentId = `pi_${Buffer.from(input.idempotencyKey).toString('base64url').slice(0, 48)}`;
+    if (
+      provider.name === 'mtn_momo'
+      && (process.env.GOALPLACE_MTN_MOMO_CURRENCY ?? 'EUR') !== quote.currency
+    ) {
+      return Response.json({
+        error: 'This MTN sandbox profile uses a different test currency. It is isolated from UGX reporting until a Uganda UGX sandbox profile is configured.',
+      }, { status: 503 });
+    }
+    const intentId = paymentIntentIdFor(input.idempotencyKey);
     const intentRef = adminDb.collection('paymentIntents').doc(intentId);
     const contributionRef = adminDb.collection('contributions').doc(intentId);
     const reservationRef = adminDb.collection('supportReservations').doc(intentId);
@@ -114,10 +129,17 @@ export async function POST(request: Request) {
       const existing = await transaction.get(intentRef);
       if (existing.exists) {
         const previous = existing.data()!;
-        const sameRequest = ['supporterUserId', 'purpose', 'recipientType', 'recipientId', 'supportNeedId', 'supportAmountMinor']
-          .every((field) => (previous[field] ?? null) === (input[field as keyof typeof input] ?? null));
+        const sameRequest = checkoutRequestMatches(previous, input);
         if (!sameRequest) throw new Error('This checkout session was already used for a different contribution.');
-        return { created: false, status: previous.status as string, providerReference: previous.providerReference as string | undefined };
+        return {
+          created: false,
+          status: previous.status as string,
+          providerRequestReference: (previous.providerRequestReference ?? previous.providerReference) as string | undefined,
+          shouldCreateProviderRequest:
+            previous.status === 'payment_pending'
+            && !previous.providerRequestReference
+            && !previous.providerReference,
+        };
       }
       if (supportNeedRef && input.supportNeedId) {
         const currentNeedSnapshot = await transaction.get(supportNeedRef);
@@ -183,11 +205,22 @@ export async function POST(request: Request) {
           createdAt: FieldValue.serverTimestamp(),
         });
       }
-      return { created: true, status, providerReference: undefined };
+      return {
+        created: true,
+        status,
+        providerRequestReference: undefined,
+        shouldCreateProviderRequest: status === 'payment_pending',
+      };
     });
 
-    if (!persisted.created || persisted.status === 'held_for_review') {
-      return Response.json({ id: intentId, status: persisted.status, provider: provider.name, providerReference: persisted.providerReference, quote });
+    if (!persisted.shouldCreateProviderRequest || persisted.status === 'held_for_review') {
+      return Response.json({
+        id: intentId,
+        status: persisted.status,
+        provider: provider.name,
+        providerRequestReference: persisted.providerRequestReference,
+        quote,
+      });
     }
     try {
       const operation = await provider.createCollection({
@@ -195,21 +228,53 @@ export async function POST(request: Request) {
         amountMinor: quote.totalAmountMinor,
         currency: quote.currency,
         customerPhone: input.customerPhone ?? '256700000000',
-        callbackUrl: `${new URL(request.url).origin}${providerCallbackPath(provider.name)}`,
+        callbackUrl: providerCallbackUrl(provider.name),
         idempotencyKey: input.idempotencyKey,
         description: `GoalPlace256 support ${intentId}`,
       });
       await adminDb.runTransaction(async (transaction) => {
-        transaction.update(intentRef, { status: operation.status, providerReference: operation.providerReference, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(intentRef, {
+          status: operation.status,
+          providerRequestReference: operation.providerRequestReference,
+          providerFinancialReference: operation.providerFinancialReference ?? null,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
         transaction.update(contributionRef, { status: operation.status });
       });
-      return Response.json({ id: intentId, status: operation.status, provider: provider.name, providerReference: operation.providerReference, quote, nextStep: operation.customerMessage });
+      await recordProviderAttempt({
+        paymentIntentId: intentId,
+        provider: provider.name,
+        operation: 'collection_create',
+        result: operation,
+        responseStatus: operation.status,
+      }).catch((auditError) => {
+        console.error('Provider request succeeded but attempt audit failed', auditError);
+      });
+      return Response.json({
+        id: intentId,
+        status: operation.status,
+        provider: provider.name,
+        providerRequestReference: operation.providerRequestReference,
+        providerFinancialReference: operation.providerFinancialReference,
+        quote,
+        nextStep: operation.customerMessage,
+      });
     } catch (error) {
       await adminDb.runTransaction(async (transaction) => {
-        transaction.update(intentRef, { status: 'failed', updatedAt: FieldValue.serverTimestamp() });
-        transaction.update(contributionRef, { status: 'failed' });
-        if (input.supportNeedId) transaction.update(reservationRef, { status: 'released', updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(intentRef, {
+          status: 'payment_pending',
+          lastProviderErrorAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.update(contributionRef, { status: 'payment_pending' });
       });
+      await recordProviderAttempt({
+        paymentIntentId: intentId,
+        provider: provider.name,
+        operation: 'collection_create',
+        responseStatus: 'failed',
+        error,
+      }).catch(() => undefined);
       throw error;
     }
   } catch (error) {

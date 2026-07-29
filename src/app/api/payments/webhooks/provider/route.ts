@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { processVerifiedPaymentEvent } from '@/server/payments/settlement';
+import { enabledPaymentProviders } from '@/server/payments/providers';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +12,8 @@ const eventSchema = z.object({
   amountMinor: z.number().int().positive(),
   currency: z.literal('UGX'),
   occurredAt: z.string().datetime(),
-  providerReference: z.string().min(1),
+  providerRequestReference: z.string().min(1),
+  providerFinancialReference: z.string().min(1).optional(),
 });
 
 function validSignature(rawBody: string, supplied: string | null) {
@@ -25,7 +27,7 @@ function validSignature(rawBody: string, supplied: string | null) {
 
 /** Internal sandbox callback only. Airtel and MTN use their dedicated adapter routes. */
 export async function POST(request: Request) {
-  if (process.env.GOALPLACE_PAYMENT_PROVIDER !== 'sandbox') {
+  if (!enabledPaymentProviders().has('sandbox')) {
     return Response.json({ error: 'The generic callback is available only for the sandbox provider.' }, { status: 404 });
   }
   const rawBody = await request.text();

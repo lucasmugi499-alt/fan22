@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, UserPlus, Users as UsersIcon } from '@phosphor-icons/react';
+import { Check, Copy, UserPlus, Users as UsersIcon } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -15,6 +15,7 @@ import { normalizeVerificationStatus } from '@/lib/status';
 import { Sheet } from '@/components/ui/Sheet';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
+import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 
 export function TeamRoster() {
   const { userProfile, currentUser, isDemoMode } = useAuth();
@@ -33,6 +34,11 @@ export function TeamRoster() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [athleteName, setAthleteName] = useState('');
+  const [position, setPosition] = useState('');
+  const [ageGroup, setAgeGroup] = useState<'U18' | 'U21' | 'Senior'>('Senior');
+  const [claimLink, setClaimLink] = useState('');
 
   const teamAthletes = useMemo(() => (team ? rosterForTeam(team.id, athletes) : []), [team, athletes]);
   const season = team ? seasons.find((item) => item.id === teams.find((item) => item.id === team.id)?.leagueId) ?? seasons.find((item) => item.leagueId === team.leagueId && item.status !== 'completed') : undefined;
@@ -46,7 +52,7 @@ export function TeamRoster() {
     setEditing(true);
   }
 
-  async function saveRoster() {
+  async function saveRoster(status: 'draft' | 'submitted' = 'draft') {
     if (!team || !season) {
       toast.error('This team needs an active season before a roster can be saved.');
       return;
@@ -64,16 +70,42 @@ export function TeamRoster() {
         seasonId: season.id,
         teamId: team.id,
         athleteIds: selectedIds,
-        status: 'draft',
+        status,
         completeness: teamAthletes.length ? Math.round(selectedIds.length / teamAthletes.length * 100) : 0,
         submittedByUserId: actorUserId,
         createdAt: rosterRecord?.createdAt ?? new Date().toISOString(),
       });
-      toast.success('Competition roster saved.');
+      toast.success(status === 'submitted' ? 'Roster submitted to the League.' : 'Competition roster saved.');
       setEditing(false);
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'The roster could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createAthlete() {
+    if (!team || !athleteName.trim() || !position.trim()) {
+      toast.error('Add the athlete name and position.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await provider.createAthleteProfile({
+        teamId: team.id,
+        name: athleteName.trim(),
+        position: position.trim(),
+        ageGroup,
+      });
+      if (!created.id) throw new Error('The athlete profile was created without a claimable identifier.');
+      const link = `${window.location.origin}/athletes/${encodeURIComponent(created.id)}?claim=1`;
+      setClaimLink(link);
+      await navigator.clipboard.writeText(link).catch(() => undefined);
+      toast.success('Pending athlete created. Claim link copied.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'The athlete could not be created.');
     } finally {
       setSaving(false);
     }
@@ -97,11 +129,17 @@ export function TeamRoster() {
           <h1 className="text-xl font-semibold text-text-strong">Roster</h1>
           <p className="text-sm text-muted">
             <span className="tabular tabular-nums">{roster.length}</span> registered athletes
+            {rosterRecord ? ` / ${rosterRecord.status}` : ''}
           </p>
         </div>
-        <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>
-          Manage
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setCreating(true)}>
+            Add athlete
+          </Button>
+          <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>
+            Manage
+          </Button>
+        </div>
       </div>
 
       {roster.length ? (
@@ -133,13 +171,43 @@ export function TeamRoster() {
         />
       )}
 
+      {team ? <AthleteClaiming athletes={teamAthletes} scope="team" targetId={team.id} onChanged={retry} /> : null}
+
+      <Sheet
+        open={creating}
+        onClose={() => { setCreating(false); setClaimLink(''); }}
+        title="Create athlete profile"
+        description="Creates a pending team profile. The athlete claims it with their own verified account."
+        footer={claimLink
+          ? <Button block icon={Copy} onClick={() => { void navigator.clipboard.writeText(claimLink); toast.success('Claim link copied.'); }}>Copy claim link</Button>
+          : <Button block icon={UserPlus} onClick={createAthlete} disabled={saving}>{saving ? 'Creating...' : 'Create and invite'}</Button>}
+      >
+        {claimLink ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">Send this link privately to the athlete. Team confirmation and League verification are still required before the account is linked.</p>
+            <input className="field" readOnly value={claimLink} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <label className="block text-xs font-semibold uppercase text-subtle">Full name<input className="field mt-2 normal-case" value={athleteName} onChange={(event) => setAthleteName(event.target.value)} /></label>
+            <label className="block text-xs font-semibold uppercase text-subtle">Position<input className="field mt-2 normal-case" value={position} onChange={(event) => setPosition(event.target.value)} /></label>
+            <label className="block text-xs font-semibold uppercase text-subtle">Age group<select className="field mt-2 normal-case" value={ageGroup} onChange={(event) => setAgeGroup(event.target.value as typeof ageGroup)}><option>U18</option><option>U21</option><option>Senior</option></select></label>
+          </div>
+        )}
+      </Sheet>
+
       {team ? (
         <Sheet
           open={editing}
           onClose={() => setEditing(false)}
           title="Manage competition roster"
           description={season?.name ?? 'No active season'}
-          footer={<Button block icon={Check} onClick={saveRoster} disabled={saving || !season}>{saving ? 'Saving...' : 'Save roster'}</Button>}
+          footer={
+            <div className="grid grid-cols-2 gap-2">
+              <Button block variant="secondary" onClick={() => void saveRoster('draft')} disabled={saving || !season}>Save draft</Button>
+              <Button block icon={Check} onClick={() => void saveRoster('submitted')} disabled={saving || !season || !selectedIds.length}>Submit</Button>
+            </div>
+          }
         >
           <div className="space-y-2">
             {teamAthletes.map((athlete) => {

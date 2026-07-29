@@ -32,6 +32,7 @@ function providerWithCalls() {
     getRosters: empty,
     getStoredStandings: empty,
     getSponsorReports: empty,
+    getSponsorCampaigns: empty,
     getLeagueNotices: empty,
     getFinalizations: empty,
     getSupportNeeds: empty,
@@ -46,8 +47,6 @@ function providerWithCalls() {
     createComment: vi.fn(),
     toggleFollow: vi.fn(),
     toggleSave: vi.fn(),
-    updateMatchVerification: vi.fn(),
-    updateChallengeVerification: vi.fn(),
   } as unknown as GoalPlaceDataProvider;
 
   return provider;

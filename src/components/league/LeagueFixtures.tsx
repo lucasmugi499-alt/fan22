@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { currentSeasonFor } from '@/lib/season';
 import { teamsInLeague } from '@/lib/league/leagueContext';
-import { generateDoubleRoundRobinFixtures } from '@/lib/fixtureGenerator';
+import { generateDoubleRoundRobinFixtures, validateFixtureDraft } from '@/lib/fixtureGenerator';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 
@@ -57,9 +57,27 @@ export function LeagueFixtures() {
     } as Record<Tab, Match[]>;
   }, [league, matches]);
   const season = league ? currentSeasonFor(seasons, league.id, league.currentSeasonId) : undefined;
-  const leagueTeams = league ? teamsInLeague(league.id, teams) : [];
+  const leagueTeams = useMemo(
+    () => league ? teamsInLeague(league.id, teams) : [],
+    [league, teams],
+  );
   const existingSeasonFixtures = season ? matches.filter((match) => match.seasonId === season.id) : [];
   const previewCount = leagueTeams.length * Math.max(0, leagueTeams.length - 1);
+  const fixturePreview = useMemo(() => {
+    if (!league || !season || leagueTeams.length < 2) return [];
+    try {
+      return generateDoubleRoundRobinFixtures({
+        league,
+        season,
+        teams: leagueTeams,
+        firstKickoff: new Date(firstKickoff).toISOString(),
+        daysBetweenRounds: Number(daysBetweenRounds),
+      });
+    } catch {
+      return [];
+    }
+  }, [daysBetweenRounds, firstKickoff, league, leagueTeams, season]);
+  const fixtureConflicts = useMemo(() => validateFixtureDraft(fixturePreview), [fixturePreview]);
 
   async function generateFixtures() {
     if (!league || !season) {
@@ -68,15 +86,9 @@ export function LeagueFixtures() {
     }
     setSaving(true);
     try {
-      const fixtures = generateDoubleRoundRobinFixtures({
-        league,
-        season,
-        teams: leagueTeams,
-        firstKickoff: new Date(firstKickoff).toISOString(),
-        daysBetweenRounds: Number(daysBetweenRounds),
-      });
-      await provider.createFixtures(fixtures);
-      toast.success(`${fixtures.length} home-and-away fixtures created.`);
+      if (fixtureConflicts.length) throw new Error('Resolve the draft conflicts before publishing.');
+      await provider.createFixtures(fixturePreview);
+      toast.success(`${fixturePreview.length} home-and-away fixtures published.`);
       setGenerating(false);
       retry();
     } catch (cause) {
@@ -147,7 +159,7 @@ export function LeagueFixtures() {
         onClose={() => setGenerating(false)}
         title="Generate fixtures"
         description={season?.name ?? 'No active season'}
-        footer={<Button block icon={Check} onClick={generateFixtures} disabled={saving || !season || Boolean(existingSeasonFixtures.length)}>{saving ? 'Creating fixtures...' : `Create ${previewCount} fixtures`}</Button>}
+        footer={<Button block icon={Check} onClick={generateFixtures} disabled={saving || !season || Boolean(existingSeasonFixtures.length) || Boolean(fixtureConflicts.length)}>{saving ? 'Publishing fixtures...' : `Publish ${previewCount} fixtures`}</Button>}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted">A double round-robin schedule gives every team one home and one away match against every opponent.</p>
@@ -155,8 +167,14 @@ export function LeagueFixtures() {
           <label className="block text-xs font-semibold uppercase text-subtle">Days between rounds<input className="field mt-2 normal-case" type="number" min="1" value={daysBetweenRounds} onChange={(event) => setDaysBetweenRounds(event.target.value)} /></label>
           <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm text-muted">
             <strong className="text-text-strong">{leagueTeams.length} teams · {previewCount} fixtures</strong>
-            <p className="mt-1">Home venues come from each team profile. Dates can be adjusted individually after generation.</p>
+            <p className="mt-1">Draft preview checks venue collisions and gives each team at least 48 hours of rest before publication.</p>
           </div>
+          {fixturePreview.slice(0, 3).map((fixture) => (
+            <p key={fixture.id} className="text-xs text-muted">
+              {teamById.get(fixture.homeTeamId)?.name} vs {teamById.get(fixture.awayTeamId)?.name} / {new Date(fixture.scheduledAt).toLocaleString('en-GB')}
+            </p>
+          ))}
+          {fixtureConflicts.slice(0, 4).map((conflict) => <p key={`${conflict.matchId}-${conflict.message}`} className="text-sm text-[var(--state-error)]">{conflict.message}</p>)}
           {existingSeasonFixtures.length ? <p className="text-sm text-[var(--state-error)]">This season already has {existingSeasonFixtures.length} fixtures. Bulk generation is locked to prevent accidental duplicates.</p> : null}
         </div>
       </Sheet>

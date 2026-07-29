@@ -699,17 +699,25 @@ export function Landing() {
                   className="landing-progress h-full bg-brand"
                   style={{
                     width: `${activeChallenge
-                      ? Math.min(100, Math.max(6, activeChallenge.totalPledged / 3000))
+                      ? activeChallenge.fundingModel === 'non_cash'
+                        ? Math.min(100, Math.max(6, activeChallenge.supportersCount * 8))
+                        : Math.min(100, Math.max(6, activeChallenge.totalPledged / 3000))
                       : 0}%`,
                   }}
                 />
               </div>
               <div className="mt-3 flex justify-between font-mono text-xs">
                 <span className="text-text-strong">
-                  UGX {(activeChallenge?.totalPledged ?? 0).toLocaleString()} pledged
+                  {activeChallenge?.fundingModel === 'non_cash'
+                    ? `${activeChallenge.supportersCount} participants`
+                    : `UGX ${(activeChallenge?.totalPledged ?? 0).toLocaleString()} sponsor grant`}
                 </span>
                 <span className="text-subtle">
-                  {activeChallenge ? Math.min(100, Math.round(activeChallenge.totalPledged / 3000)) : 0}%
+                  {activeChallenge
+                    ? activeChallenge.fundingModel === 'non_cash'
+                      ? 'Non-cash'
+                      : `${Math.min(100, Math.round(activeChallenge.totalPledged / 3000))}%`
+                    : '0%'}
                 </span>
               </div>
               <div className="mt-8 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-3">

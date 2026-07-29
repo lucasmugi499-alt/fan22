@@ -3,6 +3,47 @@ import type { League, Match, Season, Team } from '@/types';
 
 const DAY = 24 * 60 * 60 * 1000;
 
+export interface FixtureConflict {
+  matchId: string;
+  message: string;
+}
+
+export function validateFixtureDraft(fixtures: Match[], minimumRestHours = 48): FixtureConflict[] {
+  const conflicts: FixtureConflict[] = [];
+  const byTeam = new Map<string, Match[]>();
+  const venueSlots = new Map<string, string>();
+  for (const fixture of fixtures) {
+    const slot = `${fixture.venue.trim().toLowerCase()}|${fixture.scheduledAt}`;
+    const existingAtVenue = venueSlots.get(slot);
+    if (existingAtVenue) {
+      conflicts.push({
+        matchId: fixture.id,
+        message: `${fixture.venue} is already used at this kickoff by ${existingAtVenue}.`,
+      });
+    } else {
+      venueSlots.set(slot, fixture.id);
+    }
+    for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+      byTeam.set(teamId, [...(byTeam.get(teamId) ?? []), fixture]);
+    }
+  }
+  for (const [teamId, teamFixtures] of byTeam) {
+    const ordered = [...teamFixtures].sort(
+      (left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt),
+    );
+    for (let index = 1; index < ordered.length; index += 1) {
+      const restHours = (Date.parse(ordered[index].scheduledAt) - Date.parse(ordered[index - 1].scheduledAt)) / 3_600_000;
+      if (restHours < minimumRestHours) {
+        conflicts.push({
+          matchId: ordered[index].id,
+          message: `${teamId} has only ${Math.round(restHours)} hours of rest.`,
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
 export function generateDoubleRoundRobinFixtures({
   league,
   season,

@@ -6,7 +6,7 @@ export class SandboxPaymentProvider implements PaymentProvider {
 
   async createCollection(input: CollectionRequest): Promise<ProviderOperation> {
     return {
-      providerReference: `sandbox_collection_${input.paymentIntentId}`,
+      providerRequestReference: `sandbox_collection_${input.paymentIntentId}`,
       status: 'payment_pending',
       customerMessage: 'Sandbox payment request created. No money has moved.',
       raw: { mode: 'sandbox', paymentIntentId: input.paymentIntentId },
@@ -14,12 +14,12 @@ export class SandboxPaymentProvider implements PaymentProvider {
   }
 
   async getCollectionStatus(providerReference: string): Promise<ProviderOperation> {
-    return { providerReference, status: 'payment_pending', customerMessage: 'Sandbox payment is pending.', raw: { mode: 'sandbox' } };
+    return { providerRequestReference: providerReference, status: 'payment_pending', customerMessage: 'Sandbox payment is pending.', raw: { mode: 'sandbox' } };
   }
 
   async createDisbursement(input: DisbursementRequest): Promise<ProviderOperation> {
     return {
-      providerReference: `sandbox_payout_${input.payoutId}`,
+      providerRequestReference: `sandbox_payout_${input.payoutId}`,
       status: 'payment_pending',
       customerMessage: 'Sandbox payout request created. No money has moved.',
       raw: { mode: 'sandbox', payoutId: input.payoutId },
@@ -27,7 +27,7 @@ export class SandboxPaymentProvider implements PaymentProvider {
   }
 
   async getDisbursementStatus(providerReference: string): Promise<ProviderOperation> {
-    return { providerReference, status: 'payment_pending', customerMessage: 'Sandbox payout is pending.', raw: { mode: 'sandbox' } };
+    return { providerRequestReference: providerReference, status: 'payment_pending', customerMessage: 'Sandbox payout is pending.', raw: { mode: 'sandbox' } };
   }
 
   async verifyCallback(request: Request): Promise<VerifiedProviderCallback | null> {

@@ -25,6 +25,7 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { uploadMatchEvidence } from '@/lib/firebase/storage';
 import {
   clearQueuedResultDraft,
+  privateCacheNamespace,
   queueResultDraft,
   readQueuedResultDraft,
 } from '@/lib/offline';
@@ -56,7 +57,7 @@ export function ResultSubmissionSheet({
   away?: Team;
   myTeamId: string;
 }) {
-  const { currentUser, userProfile, isDemoMode } = useAuth();
+  const { currentUser, userProfile, isDemoMode, role } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [homeScore, setHomeScore] = useState<string>(match.score.home?.toString() ?? '');
   const [awayScore, setAwayScore] = useState<string>(match.score.away?.toString() ?? '');
@@ -77,6 +78,15 @@ export function ResultSubmissionSheet({
     recordLimit: 100,
   });
   const actorUserId = currentUser?.uid ?? userProfile?.uid;
+  const draftNamespace = useMemo(() => privateCacheNamespace({
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
+    databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
+    dataMode: isDemoMode ? 'mock' : 'firebase',
+    uid: actorUserId ?? 'anonymous',
+    role: role ?? 'team_admin',
+    leagueId: match.leagueId,
+    teamId: myTeamId,
+  }), [actorUserId, isDemoMode, match.leagueId, myTeamId, role]);
 
   useEffect(
     () =>
@@ -104,7 +114,7 @@ export function ResultSubmissionSheet({
 
   useEffect(() => {
     let cancelled = false;
-    readQueuedResultDraft(match.id).then((draft) => {
+    readQueuedResultDraft(draftNamespace, match.id).then((draft) => {
       if (!draft || cancelled) return;
       setHomeScore(String(draft.input.homeScore));
       setAwayScore(String(draft.input.awayScore));
@@ -114,7 +124,7 @@ export function ResultSubmissionSheet({
       setQueued(true);
     });
     return () => { cancelled = true; };
-  }, [match.id]);
+  }, [draftNamespace, match.id]);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -132,7 +142,7 @@ export function ResultSubmissionSheet({
   useEffect(() => {
     async function syncQueuedDraft() {
       if (!navigator.onLine || !actorUserId) return;
-      const draft = await readQueuedResultDraft(match.id);
+      const draft = await readQueuedResultDraft(draftNamespace, match.id);
       if (!draft) return;
       try {
         const evidenceRefs = isDemoMode
@@ -147,7 +157,7 @@ export function ResultSubmissionSheet({
           ...draft.input,
           evidenceRefs,
         });
-        await clearQueuedResultDraft(match.id);
+        await clearQueuedResultDraft(draftNamespace, match.id);
         setQueued(false);
         toast.success('Your offline match report synced.');
         onComplete?.();
@@ -158,7 +168,7 @@ export function ResultSubmissionSheet({
     window.addEventListener('online', syncQueuedDraft);
     if (queued && navigator.onLine) void syncQueuedDraft();
     return () => window.removeEventListener('online', syncQueuedDraft);
-  }, [actorUserId, isDemoMode, match.id, myTeamId, onComplete, provider, queued]);
+  }, [actorUserId, draftNamespace, isDemoMode, match.id, myTeamId, onComplete, provider, queued]);
 
   const mode = useMemo<Mode>(() => {
     if (submission?.status === 'official' || (!submission && isOfficialMatch(match))) return 'view';
@@ -203,7 +213,7 @@ export function ResultSubmissionSheet({
         evidenceNote: evidenceNote.trim() || undefined,
       };
       if (!online) {
-        await queueResultDraft(match.id, {
+        await queueResultDraft(draftNamespace, match.id, {
           input,
           files: evidenceFiles,
           queuedAt: new Date().toISOString(),
@@ -225,7 +235,7 @@ export function ResultSubmissionSheet({
         ...input,
         evidenceRefs,
       });
-      await clearQueuedResultDraft(match.id);
+      await clearQueuedResultDraft(draftNamespace, match.id);
       setQueued(false);
       toast.success('Result submitted. The opposing team has 72 hours to respond.');
       onComplete?.();

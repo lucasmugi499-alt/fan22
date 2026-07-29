@@ -605,13 +605,13 @@ describe('league adjudication', () => {
     );
   });
 
-  it('binds correction-request attribution to the league admin', async () => {
+  it('requires correction requests to use the trusted server endpoint', async () => {
     await seedSubmission({
       status: 'official',
       finalizedAt: '2026-03-02T00:00:00.000Z',
     });
     const ref = doc(asUser(LEAGUE_ADMIN), 'resultSubmissions/match_001');
-    await assertSucceeds(
+    await assertFails(
       updateDoc(ref, {
         correctionReason: 'Referee report corrected the score.',
         correctionRequestedBy: LEAGUE_ADMIN,
@@ -811,9 +811,12 @@ describe('new operational write surfaces', () => {
       invitedByUserId: LEAGUE_ADMIN,
       invitedEmail: 'invitee@example.com',
     };
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(asUser(LEAGUE_ADMIN), 'teamAssignments/invite'), invitation)
     );
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'teamAssignments/invite'), invitation);
+    });
     await assertSucceeds(
       getDoc(doc(
         asUserWithClaims('invitee', { email: 'invitee@example.com' }),
@@ -849,7 +852,7 @@ describe('new operational write surfaces', () => {
 
   it('keeps admin audit events immutable and platform-admin only', async () => {
     const platform = asUserWithClaims('platform', { role: 'platform_admin' });
-    await assertSucceeds(setDoc(doc(platform, 'adminAuditEvents/decision'), {
+    await assertFails(setDoc(doc(platform, 'adminAuditEvents/decision'), {
       actorUserId: 'platform',
       action: 'approved',
       targetCollection: 'athletes',
@@ -1117,12 +1120,55 @@ describe('community publishing trust boundary', () => {
       status: 'published',
     };
     const ref = doc(asUser(OUTSIDER), 'comments/comment_001');
-    await assertSucceeds(setDoc(ref, comment));
+    await assertFails(setDoc(ref, comment));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'comments/comment_001'), comment);
+    });
     await assertFails(setDoc(doc(asUser(OUTSIDER), 'comments/hidden_comment'), {
       ...comment,
       status: 'hidden',
     }));
-    await assertSucceeds(updateDoc(ref, { text: 'Great official match.' }));
+    await assertFails(updateDoc(ref, { text: 'Great official match.' }));
     await assertFails(updateDoc(ref, { status: 'hidden' }));
+  });
+});
+
+describe('notice and sponsor-report visibility', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'leagueNotices/public_notice'), {
+        leagueId: 'league_001',
+        audience: 'public',
+        title: 'Public fixture notice',
+      });
+      await setDoc(doc(db, 'leagueNotices/admin_notice'), {
+        leagueId: 'league_001',
+        audience: 'team_admins',
+        title: 'Team Admin instructions',
+      });
+    });
+  });
+
+  it('exposes only public notices to logged-out and ordinary fan accounts', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(publicDb, 'leagueNotices/public_notice')));
+    await assertFails(getDoc(doc(publicDb, 'leagueNotices/admin_notice')));
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'leagueNotices/admin_notice')));
+    await assertSucceeds(getDoc(doc(asUser(LEAGUE_ADMIN), 'leagueNotices/admin_notice')));
+  });
+
+  it('requires sponsor reports to be written by trusted server code', async () => {
+    const report = {
+      leagueId: 'league_001',
+      seasonId: 'season_001',
+      campaignId: 'campaign_001',
+      verifiedMatches: 99,
+    };
+    await assertFails(setDoc(doc(asUser(LEAGUE_ADMIN), 'sponsorReports/forged'), report));
+    await assertFails(setDoc(
+      doc(asUserWithClaims('platform', { role: 'platform_admin' }), 'sponsorReports/forged'),
+      report,
+    ));
   });
 });

@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Basketball, Check, FlagCheckered, SoccerBall } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
 import { useAuth } from '@/context/AuthProvider';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +39,7 @@ export function FanOnboarding({
   athletes: Athlete[];
 }) {
   const { userProfile, isDemoMode, updateLocalProfile } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
   const [step, setStep] = useState(0);
   const [sports, setSports] = useState<SportSlug[]>(userProfile?.sportPreferences ?? []);
   const [city, setCity] = useState(userProfile?.city ?? 'Kampala');
@@ -45,6 +47,18 @@ export function FanOnboarding({
   const [teamIds, setTeamIds] = useState<string[]>(userProfile?.followedTeams ?? []);
   const [athleteIds, setAthleteIds] = useState<string[]>(userProfile?.followedAthletes ?? []);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !userProfile) return;
+    queueMicrotask(() => {
+      setSports(userProfile.sportPreferences ?? []);
+      setCity(userProfile.city ?? 'Kampala');
+      setLeagueIds(userProfile.followedLeagues ?? []);
+      setTeamIds(userProfile.followedTeams ?? []);
+      setAthleteIds(userProfile.followedAthletes ?? []);
+      setStep(0);
+    });
+  }, [open, userProfile]);
 
   const visibleLeagues = useMemo(
     () => leagues.filter((league) =>
@@ -78,31 +92,40 @@ export function FanOnboarding({
       followedAthletes: athleteIds,
       onboardingCompletedAt: completedAt,
     };
+    const previous = {
+      city: userProfile.city,
+      sportPreferences: userProfile.sportPreferences,
+      followedLeagues: userProfile.followedLeagues,
+      followedTeams: userProfile.followedTeams,
+      followedAthletes: userProfile.followedAthletes,
+      onboardingCompletedAt: userProfile.onboardingCompletedAt,
+    };
     updateLocalProfile(updates);
 
     try {
-      if (!isDemoMode) {
-        await dataProvider.updateUserProfile(userProfile.id, {
-          city,
-          sportPreferences: sports,
-          onboardingCompletedAt: completedAt,
-        });
-        const followActions = [
-          ...leagueIds
-            .filter((id) => !userProfile.followedLeagues.includes(id))
-            .map((id) => dataProvider.toggleFollow(userProfile.id, 'league', id)),
-          ...teamIds
-            .filter((id) => !userProfile.followedTeams.includes(id))
-            .map((id) => dataProvider.toggleFollow(userProfile.id, 'team', id)),
-          ...athleteIds
-            .filter((id) => !userProfile.followedAthletes.includes(id))
-            .map((id) => dataProvider.toggleFollow(userProfile.id, 'athlete', id)),
-        ];
-        await Promise.all(followActions);
-      }
+      await provider.updateUserProfile(userProfile.id, {
+        city,
+        sportPreferences: sports,
+        onboardingCompletedAt: completedAt,
+      });
+      const differences = [
+        ['league', userProfile.followedLeagues, leagueIds],
+        ['team', userProfile.followedTeams, teamIds],
+        ['athlete', userProfile.followedAthletes, athleteIds],
+      ] as const;
+      const followActions = differences.flatMap(([targetType, previousIds, nextIds]) => [
+        ...nextIds
+          .filter((id) => !previousIds.includes(id))
+          .map((id) => provider.toggleFollow(userProfile.id, targetType, id)),
+        ...previousIds
+          .filter((id) => !nextIds.includes(id))
+          .map((id) => provider.toggleFollow(userProfile.id, targetType, id)),
+      ]);
+      await Promise.all(followActions);
       toast.success('Your sports home is ready.');
       onClose();
     } catch (cause) {
+      updateLocalProfile(previous);
       toast.error(cause instanceof Error ? cause.message : 'Could not save your sports home.');
     } finally {
       setSaving(false);

@@ -100,7 +100,11 @@ export function CareerPassport({
             {challenges.slice(0, 3).map((challenge) => (
               <div key={challenge.id} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
                 <p className="text-sm font-semibold text-text-strong">{challenge.description}</p>
-                <p className="mt-1 text-xs text-muted">UGX {challenge.totalPledged.toLocaleString()} pledged / {challenge.supportersCount} supporters</p>
+                <p className="mt-1 text-xs text-muted">
+                  {challenge.fundingModel === 'non_cash'
+                    ? `Non-cash milestone / ${challenge.supportersCount} participants`
+                    : `Sponsor grant / UGX ${challenge.totalPledged.toLocaleString()} committed`}
+                </p>
                 <div className="mt-2"><VerificationBadge status={challenge.verificationStatus} size="sm" /></div>
               </div>
             ))}

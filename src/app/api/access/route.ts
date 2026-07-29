@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 
@@ -14,12 +15,17 @@ async function actorFor(request: Request) {
   return adminAuth.verifyIdToken(token).catch(() => null);
 }
 
+const PRIVILEGED_ROLES = ['league_admin', 'platform_admin', 'super_admin'];
+
 async function synchronizeRoleClaim(uid: string, role: 'team_admin' | 'league_admin') {
   const account = await adminAuth.getUser(uid);
+  const currentRole = typeof account.customClaims?.role === 'string' ? account.customClaims.role : 'fan';
+  const nextRole = role === 'team_admin' && PRIVILEGED_ROLES.includes(currentRole) ? currentRole : role;
   await adminAuth.setCustomUserClaims(uid, {
     ...(account.customClaims ?? {}),
-    role,
+    role: nextRole,
   });
+  return nextRole;
 }
 
 export async function POST(request: Request) {
@@ -29,6 +35,7 @@ export async function POST(request: Request) {
     action?: 'accept_team_invitation' | 'approve_league_admin';
     assignmentId?: string;
     applicationId?: string;
+    token?: string;
   };
 
   try {
@@ -36,18 +43,25 @@ export async function POST(request: Request) {
       if (actor.email_verified !== true) {
         return Response.json({ error: 'Verify your email address before accepting an invitation.' }, { status: 403 });
       }
-      if (!body.assignmentId) return Response.json({ error: 'Invitation is required.' }, { status: 400 });
+      if (!body.assignmentId || !body.token) return Response.json({ error: 'A complete invitation link is required.' }, { status: 400 });
       const assignmentRef = adminDb.collection('teamAssignments').doc(body.assignmentId);
       const assignment = await assignmentRef.get();
       if (!assignment.exists) return Response.json({ error: 'Invitation not found.' }, { status: 404 });
       const data = assignment.data()!;
+      const suppliedTokenHash = createHash('sha256').update(body.token).digest('hex');
+      if (!data.tokenHash || suppliedTokenHash !== data.tokenHash) {
+        return Response.json({ error: 'This invitation link is invalid.' }, { status: 403 });
+      }
+      if (data.expiresAt && Date.parse(data.expiresAt) <= Date.now()) {
+        return Response.json({ error: 'This invitation has expired. Ask the League Admin for a new one.' }, { status: 410 });
+      }
       if (data.userId && data.userId !== actor.uid) return Response.json({ error: 'This invitation belongs to another account.' }, { status: 403 });
       if (data.invitedEmail && data.invitedEmail.toLowerCase() !== actor.email?.toLowerCase()) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
       if (data.status === 'active' && data.userId === actor.uid) {
-        await synchronizeRoleClaim(actor.uid, 'team_admin');
-        return Response.json({ ok: true, role: 'team_admin' });
+        const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
+        return Response.json({ ok: true, role });
       }
       if (data.status !== 'invited') return Response.json({ error: 'Invitation is no longer active.' }, { status: 409 });
 
@@ -65,10 +79,12 @@ export async function POST(request: Request) {
           adminUserIds: FieldValue.arrayUnion(actor.uid),
           updatedAt: FieldValue.serverTimestamp(),
         });
-        transaction.set(adminDb.collection('users').doc(actor.uid), {
-          role: 'team_admin',
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        if (!PRIVILEGED_ROLES.includes(String(actor.role ?? ''))) {
+          transaction.set(adminDb.collection('users').doc(actor.uid), {
+            role: 'team_admin',
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
         transaction.set(adminDb.collection('adminAuditEvents').doc(), {
           actorUserId: actor.uid,
           action: 'accepted',
@@ -77,8 +93,8 @@ export async function POST(request: Request) {
           createdAt: FieldValue.serverTimestamp(),
         });
       });
-      await synchronizeRoleClaim(actor.uid, 'team_admin');
-      return Response.json({ ok: true, role: 'team_admin' });
+      const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
+      return Response.json({ ok: true, role });
     }
 
     if (body.action === 'approve_league_admin') {
@@ -131,7 +147,7 @@ export async function POST(request: Request) {
           verificationRules: {
             requiresLeagueAdminApproval: true,
             requiresRefereeConfirmation: false,
-            allowsPerformancePledges: true,
+            allowsPerformancePledges: false,
           },
           createdAt: FieldValue.serverTimestamp(),
         });

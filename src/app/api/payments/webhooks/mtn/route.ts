@@ -1,10 +1,10 @@
-import { MtnMomoProvider, PaymentProviderConfigurationError } from '@/server/payments/providers';
+import { enabledPaymentProviders, MtnMomoProvider, PaymentProviderConfigurationError } from '@/server/payments/providers';
 import { processVerifiedPaymentEvent } from '@/server/payments/settlement';
 
 export const runtime = 'nodejs';
 
 async function handle(request: Request) {
-  if (process.env.GOALPLACE_PAYMENT_PROVIDER !== 'mtn_momo') return Response.json({ error: 'MTN MoMo is not configured.' }, { status: 404 });
+  if (!enabledPaymentProviders().has('mtn_momo')) return Response.json({ error: 'MTN MoMo is not configured.' }, { status: 404 });
   try {
     const event = await new MtnMomoProvider().verifyCallback(request);
     if (!event) return Response.json({ error: 'Invalid MTN MoMo callback.' }, { status: 401 });

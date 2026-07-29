@@ -11,7 +11,7 @@ import { OfficialStats } from '@/components/athlete/OfficialStats';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { NoAssignment } from '@/components/ui/NoAssignment';
+import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
 import {
@@ -51,7 +51,7 @@ export function AthleteDashboard() {
   );
 
   if (loading) return <AthleteDashboardSkeleton />;
-  if (!athlete) return <NoAssignment kind="athlete" />;
+  if (!athlete) return <AthleteClaiming athletes={athletes} onChanged={retry} />;
 
   const cover = athlete.coverUrl || athlete.coverURL || bannerImage(athlete.teamId || athlete.id, athlete.position);
   const avatar = athletePhoto(athlete);
@@ -175,7 +175,11 @@ export function AthleteDashboard() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text-strong">{c.description || c.targetDescription || c.type}</p>
-                    <p className="text-xs text-muted">{challengeLabel(status)} · <span className="tabular tabular-nums">UGX {c.totalPledged.toLocaleString()}</span> pledged</p>
+                    <p className="text-xs text-muted">
+                      {challengeLabel(status)} · {c.fundingModel === 'non_cash'
+                        ? `${c.supportersCount} participants`
+                        : `Sponsor grant · UGX ${c.totalPledged.toLocaleString()}`}
+                    </p>
                   </div>
                   <VerificationBadge status={cvs} size="sm" />
                 </Card>
@@ -185,7 +189,7 @@ export function AthleteDashboard() {
         ) : (
           <Card className="flex items-center gap-3 p-4">
             <Question className="h-5 w-5 text-muted" />
-            <p className="text-sm text-muted">No challenges yet. Supporters can pledge toward a verified target you set.</p>
+            <p className="text-sm text-muted">No milestones yet. Propose a non-cash development target for Team and League review.</p>
           </Card>
         )}
       </section>

@@ -21,6 +21,7 @@ import {
   Info,
   MapPin,
   HandHeart,
+  DeviceMobile,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -115,6 +116,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       { name: 'Updates', href: '/team-admin/updates', icon: Megaphone },
     ],
     more: [
+      { name: 'Field mode', href: '/team-admin/field-mode', icon: DeviceMobile },
       { name: 'Team profile', href: '/team-admin/profile', icon: Buildings },
       { name: 'Matches', href: '/matches', icon: Calendar },
       ...COMMON_MORE,

@@ -1,5 +1,6 @@
 import type { Athlete, Match, Team, UserProfile } from '@/types';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { selectedAssignmentId } from '@/lib/auth/assignmentSelection';
 
 /**
  * Resolves which team the current admin operates, by `adminUserIds`.
@@ -20,7 +21,9 @@ export function resolveMyTeam(
 ): Team | null {
   if (teams.length === 0) return null;
   if (profile) {
-    const owned = teams.find((t) => t.adminUserIds?.includes(profile.uid) || t.adminUserIds?.includes(profile.id));
+    const ownedTeams = teams.filter((t) => t.adminUserIds?.includes(profile.uid) || t.adminUserIds?.includes(profile.id));
+    const selectedId = selectedAssignmentId('team');
+    const owned = ownedTeams.find((team) => team.id === selectedId) ?? ownedTeams[0];
     if (owned) return owned;
   }
   if (!isDemoMode) return null;

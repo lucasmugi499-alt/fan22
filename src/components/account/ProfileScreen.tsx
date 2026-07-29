@@ -12,6 +12,7 @@ import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { resendEmailVerification } from '@/lib/firebase/auth';
 import { toast } from 'sonner';
+import { uploadPublishedMedia } from '@/lib/firebase/storage';
 
 const ROLE_LABEL: Record<string, string> = {
   fan: 'Fan', athlete: 'Athlete', team_admin: 'Team Admin', league_admin: 'League Admin', platform_admin: 'Platform Admin', super_admin: 'Super Admin', sponsor: 'Sponsor',
@@ -26,6 +27,7 @@ export function ProfileScreen() {
   const [displayName, setDisplayName] = useState(userProfile?.displayName ?? userProfile?.name ?? '');
   const [city, setCity] = useState(userProfile?.city ?? '');
   const [avatarUrl, setAvatarUrl] = useState(userProfile?.avatarUrl ?? '');
+  const [avatarFile, setAvatarFile] = useState<File>();
   const name = userProfile?.name ?? 'Guest';
   const userId = userProfile?.id ?? userProfile?.uid ?? '';
   const followCount = (userProfile?.followedAthletes?.length ?? 0) +
@@ -36,6 +38,7 @@ export function ProfileScreen() {
     setDisplayName(userProfile?.displayName ?? userProfile?.name ?? '');
     setCity(userProfile?.city ?? '');
     setAvatarUrl(userProfile?.avatarUrl ?? '');
+    setAvatarFile(undefined);
     setEditing(true);
   }
 
@@ -50,7 +53,15 @@ export function ProfileScreen() {
     if (!userId || !displayName.trim()) return;
     setSaving(true);
     try {
-      const updates = { name: displayName.trim(), displayName: displayName.trim(), city: city.trim(), avatarUrl: avatarUrl.trim() };
+      const uploadedAvatarUrl = avatarFile && currentUser && !isDemoMode
+        ? await uploadPublishedMedia({
+            ownerType: 'user',
+            ownerId: userId,
+            userId: currentUser.uid,
+            file: avatarFile,
+          })
+        : avatarUrl;
+      const updates = { name: displayName.trim(), displayName: displayName.trim(), city: city.trim(), avatarUrl: uploadedAvatarUrl };
       await provider.updateUserProfile(userId, updates);
       if (updates.city && updates.avatarUrl) {
         await provider.recordPointsAction({
@@ -84,9 +95,14 @@ export function ProfileScreen() {
 
       <Card className="p-4">
         <div className="flex items-center gap-3.5">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand text-on-brand text-lg font-bold shadow-[var(--glow-brand)]">
-            {name.slice(0, 1).toUpperCase()}
-          </span>
+          {userProfile?.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={userProfile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand text-on-brand text-lg font-bold shadow-[var(--glow-brand)]">
+              {name.slice(0, 1).toUpperCase()}
+            </span>
+          )}
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold text-text-strong">{name}</h2>
             <p className="truncate text-sm text-muted">{userProfile?.email ?? 'Not signed in'}</p>
@@ -144,7 +160,17 @@ export function ProfileScreen() {
         <div className="space-y-4">
           <label className="block text-xs font-semibold uppercase text-subtle">Display name<input className="field mt-2 normal-case" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
           <label className="block text-xs font-semibold uppercase text-subtle">City or district<input className="field mt-2 normal-case" value={city} onChange={(event) => setCity(event.target.value)} placeholder="Kampala" /></label>
-          <label className="block text-xs font-semibold uppercase text-subtle">Profile photo URL<input className="field mt-2 normal-case" type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://..." /></label>
+          <label className="block text-xs font-semibold uppercase text-subtle">
+            Profile photo
+            <input
+              className="field mt-2 normal-case"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={isDemoMode}
+              onChange={(event) => setAvatarFile(event.target.files?.[0])}
+            />
+          </label>
+          {isDemoMode ? <p className="text-xs text-muted">Photo uploads are disabled in the synthetic demonstration.</p> : null}
         </div>
       </Sheet>
     </div>

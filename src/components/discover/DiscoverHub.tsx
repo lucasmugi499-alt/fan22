@@ -12,6 +12,7 @@ import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
 import type { Athlete, Challenge, League, Match, Team } from '@/types';
 
 const TABS = ['For You', 'Athletes', 'Teams', 'Leagues', 'Matches', 'Challenges'] as const;
@@ -21,7 +22,7 @@ export function DiscoverHub() {
   const { userProfile } = useAuth();
   const { athletes, teams, leagues, matches, challenges, loading } = useGoalPlaceData({
     collections: ['athletes', 'teams', 'leagues', 'matches', 'challenges'],
-    recordLimit: 100,
+    recordLimit: 1_200,
   });
   const [tab, setTab] = useState<Tab>('For You');
   const [sport, setSport] = useState('all');
@@ -37,8 +38,15 @@ export function DiscoverHub() {
     (!query || (item.name ?? '').toLowerCase().includes(query.toLowerCase())), [city, query, sport]);
 
   const filteredAthletes = useMemo(() => athletes
-    .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
-    .sort((a, b) => b.goalPlacePoints - a.goalPlacePoints), [athletes, matchesFilters, verifiedOnly]);
+    .filter((item) => {
+      const team = teamById.get(item.teamId);
+      const league = leagueById.get(item.leagueId);
+      const haystack = `${item.name} ${item.position} ${item.city} ${item.sport} ${team?.name ?? ''} ${league?.name ?? ''}`.toLowerCase();
+      return matchesFilters(item) &&
+        (!query || haystack.includes(query.toLowerCase())) &&
+        (!verifiedOnly || item.verified);
+    })
+    .sort((a, b) => b.goalPlacePoints - a.goalPlacePoints), [athletes, leagueById, matchesFilters, query, teamById, verifiedOnly]);
   const filteredTeams = useMemo(() => teams
     .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
     .sort((a, b) => b.leaguePoints - a.leaguePoints), [teams, matchesFilters, verifiedOnly]);
@@ -158,8 +166,12 @@ function Section({ title, copy, children }: { title: string; copy: string; child
 }
 
 function AthleteGrid({ items }: { items: Athlete[] }) {
+  const [visible, setVisible] = useState(60);
   return items.length
-    ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{items.map((item) => <AthleteCard key={item.id} athlete={item} />)}</div>
+    ? <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{items.slice(0, visible).map((item) => <AthleteCard key={item.id} athlete={item} />)}</div>
+        {visible < items.length ? <Button variant="secondary" block onClick={() => setVisible((value) => value + 60)}>Load more athletes</Button> : null}
+      </div>
     : <EmptyState icon={MagnifyingGlass} title="No athletes found" description="Try widening the filters." />;
 }
 function TeamGrid({ items }: { items: Team[] }) {
@@ -189,7 +201,12 @@ function ChallengeGrid({ items, athletes, leagueById }: { items: Challenge[]; at
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-text-strong">{item.description}</span>
                 <span className="mt-1 block text-xs text-muted">{athlete?.name ?? 'Athlete'} / {leagueById.get(item.leagueId)?.name ?? 'League'}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-2"><TrendUp className="h-3.5 w-3.5" /> UGX {item.totalPledged.toLocaleString()} pledged</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-2">
+                  <TrendUp className="h-3.5 w-3.5" />
+                  {item.fundingModel === 'non_cash'
+                    ? `${item.supportersCount} participants`
+                    : `UGX ${item.totalPledged.toLocaleString()} sponsor grant`}
+                </span>
               </span>
             </Card>
           </Link>

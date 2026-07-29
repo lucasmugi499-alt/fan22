@@ -7,13 +7,22 @@ import type { AppRole, ResultSubmission } from '@/types';
 
 export const runtime = 'nodejs';
 
-const bodySchema = z.object({
+const requestSchema = z.object({
+  action: z.literal('request'),
+  matchId: z.string().min(1),
+  actorUserId: z.string().min(1),
+  reason: z.string().trim().min(10).max(1500),
+});
+
+const approvalSchema = z.object({
+  action: z.literal('approve').optional(),
   matchId: z.string().min(1),
   actorUserId: z.string().min(1),
   homeScore: z.number().int().min(0).max(999),
   awayScore: z.number().int().min(0).max(999),
   reason: z.string().trim().min(10).max(1500),
 });
+const bodySchema = z.union([requestSchema, approvalSchema]);
 
 function bearerToken(request: Request) {
   const authorization = request.headers.get('authorization');
@@ -37,6 +46,45 @@ export async function POST(
 
   const submissionRef = adminDb.collection('resultSubmissions').doc(matchId);
   try {
+    if (input.action === 'request') {
+      await adminDb.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(submissionRef);
+        if (!snapshot.exists) throw new Error('Result submission not found.');
+        const submission = { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
+        if (submission.status !== 'official') throw new Error('Only an official result can enter correction review.');
+        const [leagueSnapshot, homeTeamSnapshot, awayTeamSnapshot] = await Promise.all([
+          transaction.get(adminDb.collection('leagues').doc(submission.leagueId)),
+          transaction.get(adminDb.collection('teams').doc(submission.submittedByTeamId)),
+          transaction.get(adminDb.collection('teams').doc(submission.opponentTeamId)),
+        ]);
+        const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
+        const isPlatform = role === 'platform_admin' || role === 'super_admin';
+        const managesLeague = Array.isArray(leagueSnapshot.data()?.adminUserIds)
+          && leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
+        const managesTeam = [homeTeamSnapshot, awayTeamSnapshot].some((team) =>
+          Array.isArray(team.data()?.adminUserIds) && team.data()!.adminUserIds.includes(actor.uid),
+        );
+        if (!isPlatform && !managesLeague && !managesTeam) {
+          throw new Error('Only an assigned Team, League, or Platform Admin can request a correction.');
+        }
+        transaction.update(submissionRef, {
+          correctionReason: input.reason,
+          correctionRequestedBy: actor.uid,
+          correctionRequestedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.create(submissionRef.collection('events').doc(), {
+          submissionId: matchId,
+          from: 'official',
+          to: 'official',
+          actor: isPlatform ? 'platform_admin' : managesLeague ? 'league_admin' : 'team_admin',
+          actorUserId: actor.uid,
+          note: `Correction requested: ${input.reason}`,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      });
+      return Response.json({ ok: true, requested: true });
+    }
+
     let version = 0;
     await adminDb.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(submissionRef);

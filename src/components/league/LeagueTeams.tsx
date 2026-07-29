@@ -19,6 +19,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import type { Team } from '@/types';
+import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 
 const TABS = ['Standings', 'All teams'] as const;
 type Tab = (typeof TABS)[number];
@@ -29,19 +30,43 @@ export function LeagueTeams() {
   const catalog = useGoalPlaceData({ collections: ['leagues', 'seasons'] });
   const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
   const detail = useGoalPlaceData({
-    collections: ['teams', 'matches'],
+    collections: ['teams', 'matches', 'athletes', 'rosters'],
     scope: { leagueId: league?.id ?? '__pending__' },
     recordLimit: 250,
   });
   const seasons = catalog.seasons;
-  const { teams, matches, retry } = detail;
+  const { teams, matches, athletes, rosters, retry } = detail;
   const loading = catalog.loading || (Boolean(league) && detail.loading);
   const [tab, setTab] = useState<Tab>('Standings');
   const [mode, setMode] = useState<'invite' | 'import' | null>(null);
   const [saving, setSaving] = useState(false);
   const [teamId, setTeamId] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
   const [importRows, setImportRows] = useState<Array<{ name: string; city?: string; venue?: string }>>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const submittedRosters = rosters.filter((roster) => roster.status === 'submitted');
+
+  async function reviewRoster(rosterId: string, decision: 'confirmed' | 'returned') {
+    const roster = rosters.find((item) => item.id === rosterId);
+    const actorUserId = currentUser?.uid ?? userProfile?.uid;
+    if (!roster || !actorUserId) return;
+    setSaving(true);
+    try {
+      await provider.saveRoster({
+        ...roster,
+        status: decision,
+        approvedByUserId: actorUserId,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success(decision === 'confirmed' ? 'Roster approved and locked.' : 'Roster returned to the team.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Roster review failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const lTeams = useMemo(() => (league ? teamsInLeague(league.id, teams) : []), [league, teams]);
   const standings = useMemo(() => {
@@ -64,7 +89,7 @@ export function LeagueTeams() {
     try {
       if (mode === 'invite') {
         if (!teamId || !inviteEmail.includes('@') || !activeSeason) throw new Error('Choose a team, valid email, and active season.');
-        await provider.createTeamAdminInvitation({
+        const invitation = await provider.createTeamAdminInvitation({
           id: `${teamId}_${inviteEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
           userId: '',
           teamId,
@@ -76,9 +101,14 @@ export function LeagueTeams() {
           invitedEmail: inviteEmail.trim().toLowerCase(),
           createdAt: new Date().toISOString(),
         });
-        toast.success('Team Admin invitation created.');
+        const link = invitation.actionUrl
+          ? `${window.location.origin}${invitation.actionUrl}`
+          : '';
+        setInviteLink(link);
+        if (link) await navigator.clipboard.writeText(link).catch(() => undefined);
+        toast.success(link ? 'Invitation link copied.' : 'Team Admin invitation created.');
       } else {
-        if (!importRows.length) throw new Error('Choose a CSV containing team names.');
+        if (!importRows.length || importErrors.length) throw new Error('Resolve the CSV validation errors first.');
         const now = new Date().toISOString();
         const imported: Team[] = importRows.map((row, index) => ({
           id: `${league.id}_${row.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || `team_${index + 1}`}`,
@@ -122,7 +152,19 @@ export function LeagueTeams() {
       skipEmptyLines: true,
       complete: ({ data, errors }) => {
         if (errors.length) toast.error(errors[0].message);
-        setImportRows(data.filter((row): row is { name: string; city?: string; venue?: string } => Boolean(row.name?.trim())));
+        const rows = data.filter((row): row is { name: string; city?: string; venue?: string } => Boolean(row.name?.trim()));
+        const existingNames = new Set(lTeams.map((team) => team.name.trim().toLowerCase()));
+        const seen = new Set<string>();
+        const validationErrors: string[] = [];
+        for (const row of rows) {
+          const normalized = row.name.trim().toLowerCase();
+          if (seen.has(normalized)) validationErrors.push(`Duplicate CSV team: ${row.name.trim()}`);
+          if (existingNames.has(normalized)) validationErrors.push(`Team already exists: ${row.name.trim()}`);
+          seen.add(normalized);
+        }
+        if (rows.length > 40) validationErrors.push('A single import is limited to 40 teams.');
+        setImportRows(rows);
+        setImportErrors(validationErrors);
       },
     });
   }
@@ -166,18 +208,51 @@ export function LeagueTeams() {
         )}
       </div>
 
+      {league ? (
+        <div className="mt-6 px-[var(--gutter)] md:px-0">
+          <AthleteClaiming athletes={athletes} scope="league" targetId={league.id} onChanged={retry} />
+        </div>
+      ) : null}
+
+      {submittedRosters.length ? (
+        <section className="mt-6 space-y-3 px-[var(--gutter)] md:px-0">
+          <div>
+            <h2 className="text-base font-semibold text-text-strong">Roster approvals</h2>
+            <p className="text-xs text-muted">Approval locks the submitted squad for this competition season.</p>
+          </div>
+          {submittedRosters.map((roster) => (
+            <div key={roster.id} className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border bg-surface-1 p-4">
+              <div>
+                <p className="text-sm font-semibold text-text-strong">{teams.find((team) => team.id === roster.teamId)?.name ?? roster.teamId}</p>
+                <p className="text-xs text-muted">{roster.athleteIds.length} athletes / {roster.completeness}% complete</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" onClick={() => void reviewRoster(roster.id, 'returned')} disabled={saving}>Return</Button>
+                <Button size="sm" icon={Check} onClick={() => void reviewRoster(roster.id, 'confirmed')} disabled={saving}>Approve</Button>
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
       <Sheet
         open={mode !== null}
         onClose={() => setMode(null)}
         title={mode === 'invite' ? 'Invite Team Admin' : 'Import teams'}
         description={mode === 'invite' ? 'Assignment is scoped to one team and season.' : 'CSV columns: name, city, venue'}
-        footer={<Button block icon={Check} onClick={saveOperation} disabled={saving}>{saving ? 'Saving...' : mode === 'invite' ? 'Create invitation' : `Import ${importRows.length} teams`}</Button>}
+        footer={<Button block icon={Check} onClick={saveOperation} disabled={saving || Boolean(importErrors.length)}>{saving ? 'Saving...' : mode === 'invite' ? 'Create invitation' : `Import ${importRows.length} teams`}</Button>}
       >
         {mode === 'invite' ? (
           <div className="space-y-4">
             <label className="block text-xs font-semibold uppercase text-subtle">Team<select className="field mt-2 normal-case" value={teamId} onChange={(event) => setTeamId(event.target.value)}><option value="">Choose team</option>{lTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
             <label className="block text-xs font-semibold uppercase text-subtle">Admin email<input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
             <p className="text-xs text-muted">The recipient signs in with this email and accepts the assignment. A trusted server then issues the Team Admin claim.</p>
+            {inviteLink ? (
+              <label className="block text-xs font-semibold uppercase text-subtle">
+                Expiring invitation link
+                <input className="field mt-2 normal-case" readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} />
+              </label>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-4">
@@ -188,6 +263,7 @@ export function LeagueTeams() {
               <input className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => readCsv(event.target.files?.[0])} />
             </label>
             {importRows.length ? <p className="text-sm text-muted">{importRows.length} valid teams ready: {importRows.slice(0, 3).map((row) => row.name).join(', ')}{importRows.length > 3 ? '...' : ''}</p> : null}
+            {importErrors.map((message) => <p key={message} className="text-sm text-[var(--state-error)]">{message}</p>)}
           </div>
         )}
       </Sheet>

@@ -2,6 +2,7 @@ import databaseJson from '../../data/investor-demo/database.json';
 import type {
   AdminAuditEvent,
   Athlete,
+  AthleteClaim,
   AwardCategory,
   Challenge,
   Comment,
@@ -18,6 +19,7 @@ import type {
   Roster,
   Season,
   Sponsor,
+  SponsorCampaign,
   SponsorReport,
   Sport,
   StoredStanding,
@@ -78,6 +80,7 @@ export const investorDemo = databaseJson as unknown as InvestorDemoDatabase;
 
 export const investorDemoRuntime = {
   adminAuditEvents: [] as AdminAuditEvent[],
+  athleteClaims: [] as AthleteClaim[],
   leagueAdminApplications: [] as LeagueAdminApplication[],
   supportNeeds: investorDemo.athletes.slice(0, 6).map((athlete, index): SupportNeed => ({
     id: `support_need_${index + 1}`,
@@ -110,6 +113,20 @@ export const investorDemoRuntime = {
   pointsEvents: [] as PointsEvent[],
   allocations: [] as Allocation[],
   complianceCases: [] as ComplianceCase[],
+  sponsorCampaigns: investorDemo.sponsorReports.map((report, index): SponsorCampaign => ({
+    id: report.campaignId ?? `campaign_${report.id}`,
+    sponsorId: investorDemo.sponsors[index % Math.max(1, investorDemo.sponsors.length)]?.id ?? 'sponsor_demo',
+    name: `${report.period} community sport programme`,
+    objective: 'Support verified participation and athlete development in the selected league.',
+    budgetUGX: Math.max(report.supportValueUGX, 5_000_000),
+    supportedLeagueIds: [report.leagueId],
+    supportedTeamIds: [],
+    supportedAthleteIds: [],
+    evidenceUrls: [],
+    status: report.status === 'shared' ? 'completed' : 'active',
+    startsAt: report.generatedAt,
+    createdAt: report.generatedAt,
+  })),
 };
 
 export const syntheticDataNotice = investorDemo.metadata.notice;

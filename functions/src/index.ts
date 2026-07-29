@@ -1,6 +1,7 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -37,6 +38,11 @@ export const DATABASE_ID = 'fg256';
 const db = getFirestore(DATABASE_ID);
 
 const REGION = 'us-central1';
+const paymentCallbackBaseUrl = defineString('GOALPLACE_PAYMENT_CALLBACK_BASE_URL', {
+  default: '',
+  description: 'Registered App Hosting HTTPS origin used by the sandbox reconciliation job.',
+});
+const paymentReconciliationSecret = defineSecret('GOALPLACE_RECONCILIATION_SECRET');
 
 /**
  * Fires whenever a submission changes. Finalization runs only when the document is in a
@@ -89,4 +95,35 @@ export const reconcileResultSubmissions = onSchedule(
       retried: retried.length,
     });
   }
+);
+
+/**
+ * Sandbox payment recovery path for callbacks that are delayed or never delivered.
+ * This only calls the App Hosting reconciliation boundary; provider credentials remain
+ * in the web runtime and no payout operation is exposed here.
+ */
+export const reconcilePaymentIntents = onSchedule(
+  {
+    schedule: 'every 10 minutes',
+    region: REGION,
+    timeoutSeconds: 300,
+    secrets: [paymentReconciliationSecret],
+  },
+  async () => {
+    const baseUrl = paymentCallbackBaseUrl.value();
+    if (!baseUrl.startsWith('https://')) {
+      logger.warn('Payment reconciliation skipped: callback base URL is not configured.');
+      return;
+    }
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/payments/reconcile`, {
+      method: 'POST',
+      headers: {
+        'x-goalplace-reconciliation-secret': paymentReconciliationSecret.value(),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Payment reconciliation endpoint returned ${response.status}.`);
+    }
+    logger.info('Payment reconciliation sweep complete', await response.json());
+  },
 );

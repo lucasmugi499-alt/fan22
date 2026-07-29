@@ -182,6 +182,29 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    match /athleteClaims/{claimId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.requesterUserId == request.auth.uid) ||
+        canManageTeamById(resource.data.teamId) ||
+        canManageLeagueById(resource.data.leagueId);
+      allow write: if false;
+    }
+
+    match /athleteSeasonStats/{recordId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /athleteTeamHistory/{recordId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /athleteVerificationRecords/{recordId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /teams/{teamId} {
       allow read: if true;
       allow create: if isPlatformAdmin() ||
@@ -216,7 +239,20 @@ service cloud.firestore {
       allow read: if true;
       allow create: if canManageLeagueById(request.resource.data.leagueId);
       allow update: if canManageLeagueById(resource.data.leagueId) &&
-        request.resource.data.leagueId == resource.data.leagueId;
+        request.resource.data.leagueId == resource.data.leagueId &&
+        (
+          request.resource.data.status == resource.data.status ||
+          (resource.data.status == 'draft' && request.resource.data.status == 'registration') ||
+          (resource.data.status == 'registration' && request.resource.data.status == 'active') ||
+          (resource.data.status == 'active' && request.resource.data.status == 'completed') ||
+          (resource.data.status == 'completed' && request.resource.data.status == 'archived')
+        ) &&
+        (
+          resource.data.status in ['draft', 'planned'] ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'leagueId', 'sport', 'scoring', 'competitionFormat'
+          ])
+        );
       allow delete: if isSuperAdmin();
     }
 
@@ -329,18 +365,6 @@ service cloud.firestore {
           )
         );
 
-      // Raising a correction against an official result. This only records the REQUEST —
-      // the version swap itself is done by the finalizer, which is why 'superseded' and
-      // 'official' remain unwritable from any client.
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
-        resource.data.status == 'official' &&
-        request.resource.data.status == 'official' &&
-        claimUnchanged() &&
-        request.resource.data.correctionReason is string &&
-        request.resource.data.correctionReason.size() > 0 &&
-        request.resource.data.correctionRequestedBy == request.auth.uid &&
-        changedKeysWithin(['correctionReason', 'correctionRequestedBy', 'correctionApprovedBy']);
-
       allow delete: if isSuperAdmin();
 
       // Append-only audit trail. Entries are never edited, so the history of a disputed
@@ -430,16 +454,29 @@ service cloud.firestore {
 
     match /rosters/{rosterId} {
       allow read: if true;
-      allow create: if
-        (canManageTeamById(request.resource.data.teamId) ||
-          canManageLeagueById(request.resource.data.leagueId)) &&
-        request.resource.data.submittedByUserId == request.auth.uid;
-      allow update: if
-        (canManageTeamById(resource.data.teamId) ||
-          canManageLeagueById(resource.data.leagueId)) &&
+      allow create: if canManageTeamById(request.resource.data.teamId) &&
+        request.resource.data.submittedByUserId == request.auth.uid &&
+        request.resource.data.status in ['draft', 'submitted'] &&
+        !('approvedByUserId' in request.resource.data);
+      allow update: if canManageTeamById(resource.data.teamId) &&
         request.resource.data.teamId == resource.data.teamId &&
         request.resource.data.leagueId == resource.data.leagueId &&
-        request.resource.data.seasonId == resource.data.seasonId;
+        request.resource.data.seasonId == resource.data.seasonId &&
+        resource.data.status in ['draft', 'returned'] &&
+        request.resource.data.status in ['draft', 'submitted'] &&
+        changedKeysWithin([
+          'athleteIds', 'status', 'completeness', 'submittedByUserId', 'updatedAt'
+        ]);
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.leagueId == resource.data.leagueId &&
+        request.resource.data.seasonId == resource.data.seasonId &&
+        request.resource.data.athleteIds == resource.data.athleteIds &&
+        request.resource.data.completeness == resource.data.completeness &&
+        resource.data.status == 'submitted' &&
+        request.resource.data.status in ['confirmed', 'returned'] &&
+        request.resource.data.approvedByUserId == request.auth.uid &&
+        changedKeysWithin(['status', 'approvedByUserId', 'updatedAt']);
       allow delete: if isSuperAdmin();
     }
 
@@ -455,19 +492,21 @@ service cloud.firestore {
           )
         ));
       allow list: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
-      allow create: if canManageLeagueById(request.resource.data.leagueId) &&
-        request.resource.data.invitedByUserId == request.auth.uid &&
-        request.resource.data.status == 'invited';
+      allow create: if false;
       // Acceptance and assignment changes are handled by the trusted access endpoint.
-      allow update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow update, delete: if false;
     }
 
     match /leagueNotices/{noticeId} {
-      allow read: if true;
+      allow read: if resource.data.audience == 'public' ||
+        isPlatformAdmin() ||
+        canManageLeagueById(resource.data.leagueId);
       allow create: if canManageLeagueById(request.resource.data.leagueId) &&
         request.resource.data.publishedByUserId == request.auth.uid;
-      allow update: if canManageLeagueById(resource.data.leagueId);
+      allow update: if canManageLeagueById(resource.data.leagueId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'leagueId', 'seasonId', 'publishedByUserId', 'createdAt'
+        ]);
       allow delete: if isSuperAdmin();
     }
 
@@ -539,16 +578,19 @@ service cloud.firestore {
     }
 
     match /adminAuditEvents/{eventId} {
-      allow read, create: if isPlatformAdmin();
-      allow update: if false;
-      allow delete: if isSuperAdmin();
+      allow read: if isPlatformAdmin();
+      allow write: if false;
     }
 
     match /sponsorReports/{reportId} {
+      allow read: if isPlatformAdmin() ||
+        canManageLeagueById(resource.data.leagueId);
+      allow write: if false;
+    }
+
+    match /sponsorCampaigns/{campaignId} {
       allow read: if true;
-      allow create, update: if isPlatformAdmin() ||
-        canManageLeagueById(request.resource.data.leagueId);
-      allow delete: if isSuperAdmin();
+      allow create, update, delete: if isPlatformAdmin();
     }
 
     match /standings/{standingId} {
@@ -557,7 +599,7 @@ service cloud.firestore {
     }
 
     match /finalizations/{finalizationId} {
-      allow read: if true;
+      allow read: if isPlatformAdmin();
       allow write: if false;
     }
 
@@ -596,19 +638,26 @@ service cloud.firestore {
     }
 
     match /comments/{commentId} {
-      allow read: if true;
-      allow create: if signedIn() &&
-        request.resource.data.authorId == request.auth.uid &&
-        request.resource.data.status == 'published';
-      allow update: if isPlatformAdmin() ||
-        (
-          signedIn() &&
-          resource.data.authorId == request.auth.uid &&
-          request.resource.data.authorId == resource.data.authorId &&
-          request.resource.data.status == resource.data.status &&
-          changedKeysWithin(['text', 'updatedAt'])
-        );
-      allow delete: if isPlatformAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow read: if resource.data.status == 'published' ||
+        isPlatformAdmin() ||
+        (signedIn() && resource.data.authorId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /feedReactions/{reactionId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /feedShares/{shareId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /engagementRateLimits/{limitId} {
+      allow read, write: if false;
     }
 
     match /supportPledges/{pledgeId} {
@@ -672,6 +721,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /paymentProviderAttempts/{attemptId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     match /allocations/{allocationId} {
       allow read: if isPlatformAdmin();
       allow write: if false;
@@ -721,7 +775,7 @@ service cloud.firestore {
 
     match /sponsors/{sponsorId} {
       allow read: if true;
-      allow create: if signedIn();
+      allow create: if isPlatformAdmin();
       allow update: if isPlatformAdmin() || (signedIn() && resource.data.adminUserIds is list && request.auth.uid in resource.data.adminUserIds);
       allow delete: if isSuperAdmin();
     }
@@ -740,9 +794,9 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
-      allow read, update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow write: if false;
     }
 
     match /adminLogs/{logId} {

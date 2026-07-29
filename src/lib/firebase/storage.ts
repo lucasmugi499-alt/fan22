@@ -40,7 +40,7 @@ export async function uploadPublishedMedia({
   userId,
   file,
 }: {
-  ownerType: 'athlete' | 'team' | 'league';
+  ownerType: 'user' | 'athlete' | 'team' | 'league';
   ownerId: string;
   userId: string;
   file: File;

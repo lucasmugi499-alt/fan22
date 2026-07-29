@@ -86,25 +86,26 @@ export function LeagueAdminApplicationForm() {
   );
 }
 
-export function TeamInvitationAcceptance({ assignmentId }: { assignmentId: string }) {
+export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId: string; token: string }) {
   const { authStatus, currentUser, userProfile } = useAuth();
   const [assignment, setAssignment] = useState<TeamAssignment>();
   const [loading, setLoading] = useState(true);
   const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
+    if (authStatus !== 'logged_in') return;
     let cancelled = false;
     dataProvider.getTeamAssignmentById(assignmentId)
       .then((item) => { if (!cancelled) setAssignment(item); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [assignmentId]);
+  }, [assignmentId, authStatus]);
 
   async function accept() {
     const userId = currentUser?.uid ?? userProfile?.uid;
     if (!userId) return;
     try {
-      await dataProvider.acceptTeamAdminInvitation(assignmentId, userId);
+      await dataProvider.acceptTeamAdminInvitation(assignmentId, userId, token);
       setAccepted(true);
       toast.success('Team Admin invitation accepted.');
     } catch (cause) {
@@ -112,6 +113,18 @@ export function TeamInvitationAcceptance({ assignmentId }: { assignmentId: strin
     }
   }
 
+  if (!token) return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation link is incomplete, expired, or has been revoked.</p></Card>;
+  if (authStatus !== 'logged_in') {
+    const next = `/invitations/team/${encodeURIComponent(assignmentId)}?token=${encodeURIComponent(token)}`;
+    return (
+      <Card className="mx-auto max-w-lg p-6 text-center">
+        <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
+        <h1 className="mt-3 text-xl font-semibold text-text-strong">Team Admin invitation</h1>
+        <p className="mt-2 text-sm text-muted">Sign in with the invited email address to review and accept this assignment.</p>
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in to accept</Link>
+      </Card>
+    );
+  }
   if (loading) return <Skeleton className="mx-auto h-64 max-w-lg rounded-[var(--radius-lg)]" />;
   if (!assignment) return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation may have expired or been revoked.</p></Card>;
 
@@ -124,7 +137,6 @@ export function TeamInvitationAcceptance({ assignmentId }: { assignmentId: strin
           ? 'Your assignment and trusted Team Admin access are active. Reopen the app to enter the Team Console.'
           : `You have been invited to administer team ${assignment.teamId} for the ${assignment.seasonId} season.`}
       </p>
-      {!accepted && authStatus !== 'logged_in' ? <Link href="/login" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in to accept</Link> : null}
       {!accepted && authStatus === 'logged_in' ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
     </Card>
   );

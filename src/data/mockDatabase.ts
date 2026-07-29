@@ -1,5 +1,6 @@
 import { investorDemo } from "./investorDemo";
-import { Match, SportSlug, Team } from "@/types";
+import { SportSlug } from "@/types";
+import { buildLeagueStandings } from "@/lib/leagueModel";
 
 const {
   users,
@@ -141,74 +142,11 @@ export type StandingRow = {
   points: number;
 };
 
-function emptyStanding(team: Team): StandingRow {
-  return {
-    teamId: team.id,
-    teamName: team.name,
-    played: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
-    pointsFor: 0,
-    pointsAgainst: 0,
-    difference: 0,
-    points: 0,
-  };
-}
-
-function hasResult(match: Match) {
-  return (
-    (match.status === "completed") &&
-    typeof match.score.home === "number" &&
-    typeof match.score.away === "number"
-  );
-}
-
 export const getStandingsByLeague = (leagueId: string) => {
-  const league = getLeagueById(leagueId);
-  const standings = new Map(teams.filter((team) => team.leagueId === leagueId).map((team) => [team.id, emptyStanding(team)]));
-
-  matches.filter((match) => match.leagueId === leagueId && hasResult(match)).forEach((match) => {
-    const home = standings.get(match.homeTeamId);
-    const away = standings.get(match.awayTeamId);
-    if (!home || !away || typeof match.score.home !== "number" || typeof match.score.away !== "number") return;
-
-    home.played += 1;
-    away.played += 1;
-    home.pointsFor += match.score.home;
-    home.pointsAgainst += match.score.away;
-    away.pointsFor += match.score.away;
-    away.pointsAgainst += match.score.home;
-
-    if (match.score.home > match.score.away) {
-      home.wins += 1;
-      away.losses += 1;
-      home.points += league?.sport === "football" ? 3 : 1;
-    } else if (match.score.home < match.score.away) {
-      away.wins += 1;
-      home.losses += 1;
-      away.points += league?.sport === "football" ? 3 : 1;
-    } else {
-      home.draws += 1;
-      away.draws += 1;
-      if (league?.sport === "football") {
-        home.points += 1;
-        away.points += 1;
-      }
-    }
-  });
-
-  return [...standings.values()]
-    .map((standing) => ({
-      ...standing,
-      difference: standing.pointsFor - standing.pointsAgainst,
-    }))
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.difference !== a.difference) return b.difference - a.difference;
-      if (b.pointsFor !== a.pointsFor) return b.pointsFor - a.pointsFor;
-      return a.teamName.localeCompare(b.teamName);
-    });
+  return buildLeagueStandings(
+    teams.filter((team) => team.leagueId === leagueId),
+    matches.filter((match) => match.leagueId === leagueId),
+  );
 };
 
 export const getTopSupportedAthletes = (limit = 10) => {

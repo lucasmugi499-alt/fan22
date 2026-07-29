@@ -14,6 +14,6 @@ describe('SandboxPaymentProvider', () => {
       description: 'GoalPlace256 support',
     });
     expect(operation.status).toBe('payment_pending');
-    expect(operation.providerReference).toBe('sandbox_collection_pi_001');
+    expect(operation.providerRequestReference).toBe('sandbox_collection_pi_001');
   });
 });

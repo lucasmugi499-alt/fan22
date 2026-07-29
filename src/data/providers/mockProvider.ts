@@ -41,6 +41,7 @@ import {
   CreateContributionIntentInput,
   CreateFeedPostInput,
   DataWriteResult,
+  FeedEngagementInput,
   FollowTargetType,
   GoalPlaceDataProvider,
   ResolveResultSubmissionInput,
@@ -56,7 +57,6 @@ import {
   LeagueAdminApplication,
   ResultSubmission,
   SupportNeed,
-  VerificationStatus,
 } from '@/types';
 import {
   canAcceptNewSubmission,
@@ -174,6 +174,13 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getAthleteById(idValue) {
     return getAthleteById(idValue);
   },
+  async getAthleteClaims(options) {
+    return investorDemoRuntime.athleteClaims.filter((claim) =>
+      (!options?.userId || claim.requesterUserId === options.userId) &&
+      (!options?.teamId || claim.teamId === options.teamId) &&
+      (!options?.leagueId || claim.leagueId === options.leagueId)
+    );
+  },
   async getMatches(options) {
     return take(matches
       .filter((match) =>
@@ -213,6 +220,9 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getFeedPostById(idValue) {
     return feedPosts.find((post) => post.id === idValue);
   },
+  async getFeedReaction(postId, userId) {
+    return followed.has(`reaction:${postId}:${userId}`);
+  },
   async getCommentsByPost(postId) {
     return getCommentsByPost(postId);
   },
@@ -247,9 +257,15 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getSponsorReports() {
     return sponsorReports;
   },
+  async getSponsorCampaigns() {
+    return investorDemoRuntime.sponsorCampaigns;
+  },
   async getLeagueNotices(options) {
     return take(
-      leagueNotices.filter((notice) => !options?.leagueId || notice.leagueId === options.leagueId),
+      leagueNotices.filter((notice) =>
+        (!options?.leagueId || notice.leagueId === options.leagueId)
+        && (!options?.audience || notice.audience === options.audience)
+      ),
       options?.limit,
     );
   },
@@ -336,6 +352,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       recipientType: data.recipientType,
       recipientId: data.recipientId,
       supportNeedId: data.supportNeedId,
+      campaignId: data.campaignId,
       supportAmountMinor: quote.supportAmountMinor,
       platformFeeMinor: quote.platformFeeMinor,
       totalAmountMinor: quote.totalAmountMinor,
@@ -355,6 +372,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       recipientType: data.recipientType,
       recipientId: data.recipientId,
       supportNeedId: data.supportNeedId,
+      campaignId: data.campaignId,
       supportAmountMinor: quote.supportAmountMinor,
       platformFeeMinor: quote.platformFeeMinor,
       totalAmountMinor: quote.totalAmountMinor,
@@ -382,6 +400,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       recipientType: data.recipientType,
       recipientId: data.recipientId,
       supportNeedId: data.supportNeedId,
+      campaignId: data.campaignId,
       amountMinor: quote.supportAmountMinor,
       currency: quote.currency,
       destinationType: data.supportNeedId
@@ -474,6 +493,49 @@ export const mockProvider: GoalPlaceDataProvider = {
     comments.push(comment);
     return result(comment.id, 'Demo comment added.');
   },
+  async engageFeedPost(data: FeedEngagementInput) {
+    const post = feedPosts.find((item) => item.id === data.postId);
+    if (!post) throw new Error('This post is not available.');
+    const key = `${data.action}:${data.postId}:${data.userId}`;
+    if (data.action === 'reaction') {
+      if (followed.has(key)) {
+        followed.delete(key);
+        post.likesCount = Math.max(0, post.likesCount - 1);
+        return result(key, 'Reaction removed.');
+      }
+      followed.add(key);
+      post.likesCount += 1;
+      return result(key, 'Reaction saved.');
+    }
+    if (data.action === 'share') {
+      if (!followed.has(key)) {
+        followed.add(key);
+        post.sharesCount += 1;
+      }
+      return result(key, 'Share recorded.');
+    }
+    if (data.action === 'comment') {
+      const created = await this.createComment({
+        postId: data.postId,
+        authorId: data.userId,
+        authorName: 'Demo fan',
+        text: data.text,
+      });
+      post.commentsCount += 1;
+      return created;
+    }
+    reports.unshift({
+      id: key,
+      reporterId: data.userId,
+      type: 'reported_feed_post',
+      targetId: data.postId,
+      summary: data.reason,
+      reportedEntity: data.postId,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    });
+    return result(key, 'Report sent to the trust team.');
+  },
   async toggleFollow(userId: string, targetType: FollowTargetType, targetId: string) {
     const key = `${userId}:${targetType}:${targetId}`;
     if (followed.has(key)) followed.delete(key);
@@ -529,6 +591,66 @@ export const mockProvider: GoalPlaceDataProvider = {
     if (!athlete) throw new Error('Athlete profile not found.');
     Object.assign(athlete, data);
     return result(athleteId, 'Athlete profile updated.');
+  },
+  async createAthleteProfile(data) {
+    const team = teams.find((item) => item.id === data.teamId);
+    if (!team) throw new Error('Team not found.');
+    const athleteId = id('athlete_demo');
+    athletes.unshift({
+      id: athleteId,
+      name: data.name,
+      sport: team.sport,
+      position: data.position,
+      teamId: team.id,
+      leagueId: team.leagueId,
+      city: team.city,
+      country: 'Uganda',
+      ageGroup: data.ageGroup,
+      bio: `${data.name} is building a verified sporting record with ${team.name}.`,
+      verified: false,
+      verificationStatus: 'pending',
+      totalSupport: 0,
+      supportersCount: 0,
+      goalPlacePoints: 0,
+      stats: {},
+      impactNeeds: [],
+      createdAt: new Date().toISOString(),
+    });
+    return result(athleteId, 'Pending athlete profile created.');
+  },
+  async requestAthleteClaim(athleteId, userId) {
+    const athlete = athletes.find((item) => item.id === athleteId);
+    if (!athlete) throw new Error('Athlete profile not found.');
+    if (athlete.userId) throw new Error('This athlete profile is already linked.');
+    const claim = {
+      id: id('athlete_claim'),
+      athleteId,
+      teamId: athlete.teamId,
+      leagueId: athlete.leagueId,
+      requesterUserId: userId,
+      status: 'team_pending' as const,
+      createdAt: new Date().toISOString(),
+    };
+    investorDemoRuntime.athleteClaims.unshift(claim);
+    return result(claim.id, claim.status);
+  },
+  async reviewAthleteClaim(claimId, actorUserId, action, reason) {
+    const claim = investorDemoRuntime.athleteClaims.find((item) => item.id === claimId);
+    if (!claim) throw new Error('Athlete claim not found.');
+    if (action === 'team_confirm') {
+      claim.status = 'league_pending';
+      claim.teamReviewedByUserId = actorUserId;
+    } else if (action === 'league_verify') {
+      claim.status = 'linked';
+      claim.leagueReviewedByUserId = actorUserId;
+      const athlete = athletes.find((item) => item.id === claim.athleteId);
+      if (athlete) athlete.userId = claim.requesterUserId;
+    } else {
+      claim.status = 'rejected';
+      claim.rejectionReason = reason;
+    }
+    claim.updatedAt = new Date().toISOString();
+    return result(claim.id, claim.status);
   },
   async updateTeamProfile(teamId, data) {
     const team = teams.find((item) => item.id === teamId);
@@ -587,6 +709,12 @@ export const mockProvider: GoalPlaceDataProvider = {
     seasons.unshift(season);
     return result(season.id, 'Season created.');
   },
+  async transitionSeason(seasonId, status) {
+    const season = seasons.find((item) => item.id === seasonId);
+    if (!season) throw new Error('Season not found.');
+    season.status = status;
+    return result(seasonId, `Season moved to ${status}.`);
+  },
   async createTeams(nextTeams) {
     for (const team of nextTeams) replaceById(teams, team);
     return result(nextTeams[0]?.id ?? id('team_batch'), `${nextTeams.length} teams imported.`);
@@ -603,9 +731,13 @@ export const mockProvider: GoalPlaceDataProvider = {
       targetCollection: 'teamAssignments',
       targetId: data.id,
     });
-    return result(data.id, 'Team Admin invitation created.');
+    return {
+      ...result(data.id, 'Team Admin invitation created.'),
+      actionUrl: `/invitations/team/${data.id}?token=demo`,
+    };
   },
-  async acceptTeamAdminInvitation(assignmentId, userId) {
+  async acceptTeamAdminInvitation(assignmentId, userId, token) {
+    if (!token) throw new Error('A complete invitation link is required.');
     const assignment = teamAssignments.find((item) => item.id === assignmentId);
     if (!assignment || (assignment.userId && assignment.userId !== userId)) throw new Error('Invitation not found.');
     assignment.userId = userId;
@@ -624,6 +756,15 @@ export const mockProvider: GoalPlaceDataProvider = {
     if (!notification) throw new Error('Notification not found.');
     notification.read = read;
     return result(notificationId, read ? 'Notification read.' : 'Notification marked unread.');
+  },
+  async markAllNotificationsRead(userId) {
+    const userNotifications = notifications.filter((item) => item.userId === userId);
+    userNotifications.forEach((item) => { item.read = true; });
+    return result(userId, `${userNotifications.length} notifications marked read.`);
+  },
+  subscribeToNotifications(userId, listener) {
+    listener(notifications.filter((item) => item.userId === userId));
+    return () => {};
   },
   async createSupportNeed(data) {
     const need: SupportNeed = {
@@ -746,16 +887,6 @@ export const mockProvider: GoalPlaceDataProvider = {
       note: input.note,
     });
     return result(input.reportId, 'Trust decision recorded.');
-  },
-  async updateMatchVerification(matchId: string, status: VerificationStatus) {
-    const match = matches.find((item) => item.id === matchId);
-    if (match) match.verificationStatus = status;
-    return result(matchId, `Demo match verification marked ${status}.`);
-  },
-  async updateChallengeVerification(challengeId: string, status: VerificationStatus) {
-    const challenge = challenges.find((item) => item.id === challengeId);
-    if (challenge) challenge.verificationStatus = status;
-    return result(challengeId, `Demo challenge verification marked ${status}.`);
   },
   async createResultSubmission(data) {
     const existing = resultSubmissions.get(data.match.id);

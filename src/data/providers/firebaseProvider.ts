@@ -4,7 +4,6 @@ import {
   DocumentData,
   DocumentSnapshot,
   QueryConstraint,
-  addDoc,
   arrayRemove,
   arrayUnion,
   collection,
@@ -14,6 +13,7 @@ import {
   limit as limitQuery,
   onSnapshot,
   orderBy,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -30,6 +30,7 @@ import {
   CreateContributionIntentInput,
   CreateFeedPostInput,
   DataWriteResult,
+  FeedEngagementInput,
   FollowTargetType,
   GoalPlaceDataProvider,
   ResolveResultSubmissionInput,
@@ -43,6 +44,7 @@ import {
   Comment,
   AdminAuditEvent,
   Athlete,
+  AthleteClaim,
   FinalizationRecord,
   LeagueAdminApplication,
   LeagueNotice,
@@ -55,12 +57,12 @@ import {
   ResultSubmissionStatus,
   Roster,
   SponsorReport,
+  SponsorCampaign,
   StoredStanding,
   SupportNeed,
   Team,
   TeamAssignment,
   Verification,
-  VerificationStatus,
 } from '@/types';
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
 import { buildLeagueStandings } from '@/lib/leagueModel';
@@ -94,6 +96,27 @@ async function writeResult(id: string, message?: string): Promise<DataWriteResul
   return { ok: true, id, mode: 'firebase', message };
 }
 
+async function requestTrustedAdminAction(payload: Record<string, unknown>) {
+  const { auth } = requireFirebaseClient();
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Sign in again before completing this action.');
+  const response = await fetch('/api/admin/actions', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${await currentUser.getIdToken()}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({})) as {
+    error?: string;
+    id?: string;
+    actionUrl?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? 'GoalPlace256 could not complete this action.');
+  return body;
+}
+
 async function requestTrustedFinalization(matchId: string) {
   const { auth } = requireFirebaseClient();
   const currentUser = auth.currentUser;
@@ -117,7 +140,7 @@ async function requestTrustedFinalization(matchId: string) {
 }
 
 async function requestTrustedAccess(
-  body: { action: 'accept_team_invitation'; assignmentId: string } |
+  body: { action: 'accept_team_invitation'; assignmentId: string; token: string } |
     { action: 'approve_league_admin'; applicationId: string },
 ) {
   const { auth } = requireFirebaseClient();
@@ -178,13 +201,6 @@ function requireActor(expectedUserId?: string) {
     throw new Error('This action must be attributed to the signed-in account.');
   }
   return actor;
-}
-
-function auditPayload(input: Omit<AdminAuditEvent, 'id' | 'createdAt'>) {
-  return {
-    ...input,
-    createdAt: serverTimestamp(),
-  };
 }
 
 function assertTransition(
@@ -257,6 +273,15 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async getAthleteById(id) {
     return isFirebaseConfigured ? readDoc('athletes', id) : mockProvider.getAthleteById(id);
   },
+  async getAthleteClaims(options) {
+    if (!isFirebaseConfigured) return mockProvider.getAthleteClaims(options);
+    const constraints: QueryConstraint[] = [];
+    if (options?.userId) constraints.push(where('requesterUserId', '==', options.userId));
+    else if (options?.teamId) constraints.push(where('teamId', '==', options.teamId));
+    else if (options?.leagueId) constraints.push(where('leagueId', '==', options.leagueId));
+    constraints.push(orderBy('createdAt', 'desc'), limitQuery(options?.limit ?? 100));
+    return readCollection<AthleteClaim>('athleteClaims', constraints);
+  },
   async getMatches(options) {
     if (!isFirebaseConfigured) return mockProvider.getMatches(options);
     if (options?.matchId) {
@@ -299,8 +324,12 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     if (options?.athleteId) constraints.push(where('relatedAthleteId', '==', options.athleteId));
     else if (options?.teamId) constraints.push(where('relatedTeamId', '==', options.teamId));
     else if (options?.leagueId) constraints.push(where('relatedLeagueId', '==', options.leagueId));
-    constraints.push(orderBy(documentId()));
-    if (options?.afterId) constraints.push(startAfter(options.afterId));
+    constraints.push(orderBy('createdAt', 'desc'), orderBy(documentId(), 'desc'));
+    if (options?.afterId) {
+      const { db } = requireFirebaseClient();
+      const cursor = await getDoc(doc(db, 'feedPosts', options.afterId));
+      if (cursor.exists()) constraints.push(startAfter(cursor));
+    }
     constraints.push(limitQuery(options?.limit ?? 50));
     return readCollection('feedPosts', constraints);
   },
@@ -311,9 +340,20 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async getFeedPostById(id) {
     return isFirebaseConfigured ? readDoc('feedPosts', id) : mockProvider.getFeedPostById(id);
   },
+  async getFeedReaction(postId, userId) {
+    if (!isFirebaseConfigured) return mockProvider.getFeedReaction(postId, userId);
+    requireActor(userId);
+    const { db } = requireFirebaseClient();
+    const snapshot = await getDoc(doc(db, 'feedReactions', `${postId}_${userId}`));
+    return snapshot.exists();
+  },
   async getCommentsByPost(postId) {
     if (!isFirebaseConfigured) return mockProvider.getCommentsByPost(postId);
-    return readCollection<Comment>('comments', [where('postId', '==', postId)]);
+    return readCollection<Comment>('comments', [
+      where('postId', '==', postId),
+      where('status', '==', 'published'),
+      orderBy('createdAt', 'asc'),
+    ]);
   },
   async getNotificationsByUser(userId) {
     if (!isFirebaseConfigured) return mockProvider.getNotificationsByUser(userId);
@@ -363,10 +403,16 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       ? readCollection<SponsorReport>('sponsorReports')
       : mockProvider.getSponsorReports();
   },
+  async getSponsorCampaigns() {
+    return isFirebaseConfigured
+      ? readCollection<SponsorCampaign>('sponsorCampaigns')
+      : mockProvider.getSponsorCampaigns();
+  },
   async getLeagueNotices(options) {
     if (!isFirebaseConfigured) return mockProvider.getLeagueNotices(options);
     const constraints: QueryConstraint[] = [];
     if (options?.leagueId) constraints.push(where('leagueId', '==', options.leagueId));
+    if (options?.audience) constraints.push(where('audience', '==', options.audience));
     constraints.push(limitQuery(options?.limit ?? 50));
     return readCollection<LeagueNotice>('leagueNotices', constraints);
   },
@@ -522,15 +568,32 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return writeResult(ref.id);
   },
   async createComment(data: CreateCommentInput) {
-    if (!isFirebaseConfigured) return mockProvider.createComment(data);
-    const { db } = requireFirebaseClient();
-    const ref = await addDoc(collection(db, 'comments'), {
-      ...data,
-      status: data.status ?? 'published',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    return this.engageFeedPost({
+      action: 'comment',
+      postId: data.postId,
+      userId: data.authorId,
+      text: data.text,
     });
-    return writeResult(ref.id);
+  },
+  async engageFeedPost(data: FeedEngagementInput) {
+    if (!isFirebaseConfigured) return mockProvider.engageFeedPost(data);
+    requireActor(data.userId);
+    const { auth } = requireFirebaseClient();
+    const response = await fetch(`/api/feed/${encodeURIComponent(data.postId)}/engagement`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    const body = await response.json().catch(() => ({})) as {
+      id?: string;
+      message?: string;
+      error?: string;
+    };
+    if (!response.ok) throw new Error(body.error ?? 'Feed action failed.');
+    return writeResult(body.id ?? data.postId, body.message);
   },
   async toggleFollow(userId: string, targetType: FollowTargetType, targetId: string) {
     if (!isFirebaseConfigured) return mockProvider.toggleFollow(userId, targetType, targetId);
@@ -598,6 +661,52 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       updatedAt: serverTimestamp(),
     });
     return writeResult(athleteId, 'Athlete profile updated.');
+  },
+  async createAthleteProfile(data) {
+    const { auth } = requireFirebaseClient();
+    const actor = auth.currentUser;
+    if (!actor) throw new Error('Sign in again before creating an athlete.');
+    const response = await fetch('/api/athletes', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await actor.getIdToken()}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    const body = await response.json().catch(() => ({})) as { error?: string; id?: string };
+    if (!response.ok || !body.id) throw new Error(body.error ?? 'The athlete profile could not be created.');
+    return writeResult(body.id, 'Pending athlete profile created.');
+  },
+  async requestAthleteClaim(athleteId, userId) {
+    requireActor(userId);
+    const { auth } = requireFirebaseClient();
+    const response = await fetch('/api/athlete-claims', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'request', athleteId }),
+    });
+    const body = await response.json().catch(() => ({})) as { id?: string; status?: string; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Athlete claim could not be requested.');
+    return writeResult(body.id ?? athleteId, body.status);
+  },
+  async reviewAthleteClaim(claimId, actorUserId, action, reason) {
+    requireActor(actorUserId);
+    const { auth } = requireFirebaseClient();
+    const response = await fetch('/api/athlete-claims', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ action, claimId, reason }),
+    });
+    const body = await response.json().catch(() => ({})) as { id?: string; status?: string; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Athlete claim review failed.');
+    return writeResult(body.id ?? claimId, body.status);
   },
   async updateTeamProfile(teamId, data) {
     requireActor();
@@ -673,6 +782,12 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     });
     return writeResult(ref.id, 'Season created.');
   },
+  async transitionSeason(seasonId, status) {
+    requireActor();
+    const { db } = requireFirebaseClient();
+    await updateDoc(doc(db, 'seasons', seasonId), { status, updatedAt: serverTimestamp() });
+    return writeResult(seasonId, `Season moved to ${status}.`);
+  },
   async createTeams(teams) {
     requireActor();
     if (!teams.length) throw new Error('Add at least one team.');
@@ -694,23 +809,22 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return writeResult(fixtures[0].id, `${fixtures.length} fixtures created.`);
   },
   async createTeamAdminInvitation(data) {
-    const actor = requireActor(data.invitedByUserId);
-    const { db } = requireFirebaseClient();
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'teamAssignments', data.id), data);
-    const auditRef = doc(collection(db, 'adminAuditEvents'));
-    batch.set(auditRef, auditPayload({
-      actorUserId: actor,
-      action: 'invited',
-      targetCollection: 'teamAssignments',
-      targetId: data.id,
-    }));
-    await batch.commit();
-    return writeResult(data.id, 'Team Admin invitation created.');
+    requireActor(data.invitedByUserId);
+    const result = await requestTrustedAdminAction({
+      action: 'create_team_invitation',
+      teamId: data.teamId,
+      leagueId: data.leagueId,
+      seasonId: data.seasonId,
+      invitedEmail: data.invitedEmail,
+    });
+    return {
+      ...(await writeResult(result.id ?? data.id, 'Team Admin invitation created.')),
+      actionUrl: result.actionUrl,
+    };
   },
-  async acceptTeamAdminInvitation(assignmentId, userId) {
+  async acceptTeamAdminInvitation(assignmentId, userId, token) {
     requireActor(userId);
-    await requestTrustedAccess({ action: 'accept_team_invitation', assignmentId });
+    await requestTrustedAccess({ action: 'accept_team_invitation', assignmentId, token });
     return writeResult(assignmentId, 'Team Admin invitation accepted.');
   },
   async markNotificationRead(notificationId, read = true) {
@@ -718,6 +832,35 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     const { db } = requireFirebaseClient();
     await updateDoc(doc(db, 'notifications', notificationId), { read });
     return writeResult(notificationId);
+  },
+  async markAllNotificationsRead(userId) {
+    requireActor(userId);
+    const { db } = requireFirebaseClient();
+    const unread = await getCollectionDocs<Notification>('notifications', [
+      where('userId', '==', userId),
+      where('read', '==', false),
+      limitQuery(250),
+    ]);
+    const batch = writeBatch(db);
+    for (const notification of unread) {
+      batch.update(doc(db, 'notifications', notification.id), { read: true });
+    }
+    await batch.commit();
+    return writeResult(userId, `${unread.length} notifications marked read.`);
+  },
+  subscribeToNotifications(userId, listener, onError) {
+    if (!isFirebaseConfigured) return mockProvider.subscribeToNotifications(userId, listener, onError);
+    const { db } = requireFirebaseClient();
+    return onSnapshot(
+      query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limitQuery(100),
+      ),
+      (snapshot) => listener(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Notification)),
+      (error) => onError?.(error),
+    );
   },
   async createSupportNeed(data) {
     const actor = requireActor(data.createdByUserId);
@@ -808,7 +951,7 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return writeResult(ref.id, 'League Admin application submitted.');
   },
   async reviewApproval(input) {
-    const actor = requireActor(input.actorUserId);
+    requireActor(input.actorUserId);
     if (
       input.targetCollection === 'leagueAdminApplications' &&
       input.decision === 'approved'
@@ -819,72 +962,13 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       });
       return writeResult(input.targetId, 'League Admin access granted.');
     }
-    const { db } = requireFirebaseClient();
-    const batch = writeBatch(db);
-    const targetRef = doc(db, input.targetCollection, input.targetId);
-    if (input.targetCollection === 'athletes') {
-      batch.update(targetRef, {
-        verified: input.decision === 'approved',
-        verificationStatus: input.decision === 'approved' ? 'verified' : 'pending',
-        updatedAt: serverTimestamp(),
-      });
-    } else if (input.targetCollection === 'leagues') {
-      batch.update(targetRef, {
-        verified: input.decision === 'approved',
-        status: input.decision === 'approved' ? 'verified' : 'draft',
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      batch.update(targetRef, {
-        status: input.decision === 'requested_information'
-          ? 'needs_information'
-          : input.decision,
-        reviewedByUserId: actor,
-        updatedAt: serverTimestamp(),
-      });
-    }
-    const auditRef = doc(collection(db, 'adminAuditEvents'));
-    batch.set(auditRef, auditPayload({
-      actorUserId: actor,
-      action: input.decision,
-      targetCollection: input.targetCollection,
-      targetId: input.targetId,
-      note: input.note,
-    }));
-    await batch.commit();
+    await requestTrustedAdminAction({ action: 'review_approval', ...input });
     return writeResult(input.targetId, 'Approval decision recorded.');
   },
   async resolveReport(input) {
-    const actor = requireActor(input.actorUserId);
-    const { db } = requireFirebaseClient();
-    const batch = writeBatch(db);
-    batch.update(doc(db, 'reports', input.reportId), {
-      status: input.decision,
-      updatedAt: serverTimestamp(),
-      ...(input.note ? { actionHistory: arrayUnion(input.note) } : {}),
-    });
-    const auditRef = doc(collection(db, 'adminAuditEvents'));
-    batch.set(auditRef, auditPayload({
-      actorUserId: actor,
-      action: input.decision,
-      targetCollection: 'reports',
-      targetId: input.reportId,
-      note: input.note,
-    }));
-    await batch.commit();
+    requireActor(input.actorUserId);
+    await requestTrustedAdminAction({ action: 'resolve_report', ...input });
     return writeResult(input.reportId, 'Trust decision recorded.');
-  },
-  async updateMatchVerification(matchId: string, status: VerificationStatus) {
-    if (!isFirebaseConfigured) return mockProvider.updateMatchVerification(matchId, status);
-    const { db } = requireFirebaseClient();
-    await updateDoc(doc(db, 'matches', matchId), { verificationStatus: status, updatedAt: serverTimestamp() });
-    return writeResult(matchId);
-  },
-  async updateChallengeVerification(challengeId: string, status: VerificationStatus) {
-    if (!isFirebaseConfigured) return mockProvider.updateChallengeVerification(challengeId, status);
-    const { db } = requireFirebaseClient();
-    await updateDoc(doc(db, 'challenges', challengeId), { verificationStatus: status, updatedAt: serverTimestamp() });
-    return writeResult(challengeId);
   },
   async createResultSubmission(data) {
     if (!isFirebaseConfigured) return mockProvider.createResultSubmission(data);
@@ -1080,12 +1164,26 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     }
     if (!reason.trim()) throw new Error('Add a reason for the correction request.');
 
-    const { auth, db } = requireFirebaseClient();
+    const { auth } = requireFirebaseClient();
     if (!auth.currentUser) throw new Error('Sign in again before requesting a correction.');
-    await updateDoc(doc(db, 'resultSubmissions', matchId), {
-      correctionReason: reason.trim(),
-      correctionRequestedBy: auth.currentUser.uid,
-    });
+    const response = await fetch(
+      `/api/result-submissions/${encodeURIComponent(matchId)}/correction`,
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${await auth.currentUser.getIdToken()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'request',
+          matchId,
+          actorUserId: requestedByUserId,
+          reason: reason.trim(),
+        }),
+      },
+    );
+    const body = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Correction request failed.');
     return writeResult(matchId, 'Correction request recorded for review.');
   },
   async approveResultCorrection(data: ApproveResultCorrectionInput) {

@@ -22,7 +22,7 @@ import type { Match } from '@/types';
 const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
-export function TeamFixtures() {
+export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
   const { userProfile, isDemoMode } = useAuth();
   const catalog = useGoalPlaceData({ collections: ['teams'] });
   const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
@@ -34,7 +34,7 @@ export function TeamFixtures() {
   const teams = catalog.teams;
   const { matches, error, retry } = detail;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
-  const [tab, setTab] = useState<Tab>('Needs action');
+  const [tab, setTab] = useState<Tab>(fieldMode ? 'Needs action' : 'Needs action');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
@@ -76,33 +76,51 @@ export function TeamFixtures() {
   const list = buckets[tab];
 
   return (
-    <div className="-mx-[var(--gutter)] md:mx-0">
+    <div className={fieldMode ? 'mx-auto max-w-2xl space-y-4' : '-mx-[var(--gutter)] md:mx-0'}>
       <div className="mb-4">
-        <h1 className="px-[var(--gutter)] pb-3 text-xl font-semibold text-text-strong md:px-0">Fixtures</h1>
-        <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
+        <h1 className="px-[var(--gutter)] pb-1 text-xl font-semibold text-text-strong md:px-0">
+          {fieldMode ? 'Matchday field mode' : 'Fixtures'}
+        </h1>
+        {fieldMode ? (
+          <p className="px-[var(--gutter)] text-sm text-muted md:px-0">
+            Low-data reporting with large controls. Drafts remain on this device until submission succeeds.
+          </p>
+        ) : (
+          <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
+        )}
       </div>
 
       <div className="px-[var(--gutter)] md:px-0">
-        {list.length ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {list.map((m) => {
+        {(fieldMode ? buckets['Needs action'] : list).length ? (
+          <div className={fieldMode ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 gap-3 md:grid-cols-2'}>
+            {(fieldMode ? buckets['Needs action'] : list).map((m) => {
               const actionable = m.status !== 'scheduled' && !isOfficialMatch(m);
               return (
-                <MatchCard
-                  key={m.id}
-                  match={m}
-                  home={teamById.get(m.homeTeamId)}
-                  away={teamById.get(m.awayTeamId)}
-                  onClick={actionable ? () => setActiveMatch(m) : undefined}
-                />
+                <div key={m.id} className={fieldMode ? 'rounded-[var(--radius-lg)] border border-brand/30 bg-surface-1 p-2' : ''}>
+                  <MatchCard
+                    match={m}
+                    home={teamById.get(m.homeTeamId)}
+                    away={teamById.get(m.awayTeamId)}
+                    onClick={actionable ? () => setActiveMatch(m) : undefined}
+                  />
+                  {fieldMode && actionable ? (
+                    <button
+                      type="button"
+                      className="mt-2 min-h-14 w-full rounded-[var(--radius-md)] bg-brand px-4 text-base font-semibold text-on-brand"
+                      onClick={() => setActiveMatch(m)}
+                    >
+                      Open match report
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
         ) : (
           <EmptyState
             icon={CalendarBlank}
-            title={emptyTitle(tab)}
-            description={emptyBody(tab)}
+            title={fieldMode ? 'No active match report' : emptyTitle(tab)}
+            description={fieldMode ? 'Live, completed, and confirmation requests appear here when field action is required.' : emptyBody(tab)}
           />
         )}
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Broadcast, CaretRight, Fire, MapPin, SlidersHorizontal, Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useAuth } from '@/context/AuthProvider';
@@ -30,6 +30,11 @@ export function FanHome() {
   const [onboardingOpen, setOnboardingOpen] = useState(
     () => Boolean(userProfile && !userProfile.onboardingCompletedAt),
   );
+  useEffect(() => {
+    if (userProfile && !userProfile.onboardingCompletedAt) {
+      queueMicrotask(() => setOnboardingOpen(true));
+    }
+  }, [userProfile]);
   const { matches, teams, athletes, leagues, seasons, feedPosts, loading, error, retry } = useGoalPlaceData({
     collections: ['matches', 'teams', 'athletes', 'leagues', 'seasons', 'feedPosts'],
     athleteRanking: 'support',

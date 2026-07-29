@@ -73,7 +73,7 @@ export function LeagueOverview() {
         <Metric icon={ChartLineUp} label="Index" value={league.goalPlaceIndex} tone="brand" />
       </div>
 
-      <LeagueOperations league={league} seasonId={activeSeason?.id} onSaved={retry} />
+      <LeagueOperations league={league} season={activeSeason} onSaved={retry} />
 
       <section className="space-y-2.5">
         <div className="flex items-center justify-between">

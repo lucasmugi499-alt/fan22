@@ -59,11 +59,11 @@ export function MatchDetail({ matchId, attendanceToken }: { matchId: string; att
   });
   const match = exact.matches[0];
   const related = useGoalPlaceData({
-    collections: ['teams', 'athletes', 'rosters', 'challenges'],
+    collections: ['leagues', 'teams', 'athletes', 'rosters', 'challenges'],
     scope: { leagueId: match?.leagueId ?? '__pending__' },
     recordLimit: 250,
   });
-  const { teams, athletes, rosters, challenges } = related;
+  const { leagues, teams, athletes, rosters, challenges } = related;
   const loading = exact.loading || (Boolean(match) && related.loading);
   const [submissionEvents, setSubmissionEvents] = useState<ResultSubmissionEvent[]>([]);
   const [correctionOpen, setCorrectionOpen] = useState(false);
@@ -111,6 +111,17 @@ export function MatchDetail({ matchId, attendanceToken }: { matchId: string; att
   const matchChallenges = challenges.filter((challenge) => challenge.matchId === match.id);
   const topPerformer = match.topPerformerId ? athleteById.get(match.topPerformerId) : undefined;
   const sportTheme = getSportTheme(match.sport);
+  const actorId = currentUser?.uid ?? userProfile?.uid;
+  const assignedTeamAdmin = role === 'team_admin' && [home, away].some(
+    (team) => team?.adminUserIds?.includes(actorId ?? ''),
+  );
+  const assignedLeagueAdmin = role === 'league_admin'
+    && leagues.some((league) => league.id === match.leagueId && league.adminUserIds?.includes(actorId ?? ''));
+  const canRequestCorrection = isOfficialMatch(match) && (
+    assignedTeamAdmin
+    || assignedLeagueAdmin
+    || ['platform_admin', 'super_admin'].includes(role ?? '')
+  );
 
   async function requestCorrection() {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
@@ -265,7 +276,12 @@ export function MatchDetail({ matchId, attendanceToken }: { matchId: string; att
                 {matchChallenges.map((challenge) => (
                   <Link key={challenge.id} href={`/athletes/${challenge.athleteId}`} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 hover:border-border-strong">
                     <p className="text-sm font-semibold text-text-strong">{challenge.description}</p>
-                    <p className="mt-1 text-xs text-muted">{athleteById.get(challenge.athleteId)?.name} / UGX {challenge.totalPledged.toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {athleteById.get(challenge.athleteId)?.name}
+                      {challenge.fundingModel === 'sponsor_grant'
+                        ? ` / Grant UGX ${challenge.totalPledged.toLocaleString()}`
+                        : ' / Non-cash milestone'}
+                    </p>
                   </Link>
                 ))}
               </div>
@@ -290,7 +306,7 @@ export function MatchDetail({ matchId, attendanceToken }: { matchId: string; att
           <Card className="p-4">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-subtle">Provenance</p>
             <AuditTimeline steps={submissionEvents.length ? eventProvenance(submissionEvents) : provenance(match, home, away)} />
-            {isOfficialMatch(match) && ['league_admin', 'platform_admin', 'super_admin'].includes(role ?? '') ? (
+            {canRequestCorrection ? (
               <Button className="mt-4" block size="sm" variant="secondary" icon={NotePencil} onClick={() => setCorrectionOpen(true)}>Request correction</Button>
             ) : null}
           </Card>

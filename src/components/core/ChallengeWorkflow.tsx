@@ -52,8 +52,8 @@ const ACTION_LABEL: Record<ChallengeAction, string> = {
   mark_achieved: 'Mark achieved',
   mark_not_achieved: 'Not achieved',
   mark_void: 'Void challenge',
-  prepare_allocation: 'Prepare settlement',
-  settle: 'Settle record',
+  prepare_allocation: 'Approve grant allocation',
+  settle: 'Mark grant paid',
   close_non_cash: 'Close challenge',
 };
 
@@ -210,7 +210,9 @@ export function ChallengeWorkflow({
             </label>
             <p className="flex gap-2 text-xs leading-relaxed text-muted">
               <Flag className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-              The proposer cannot approve feasibility, Team Admins cannot verify the final outcome, and settlement is a separate platform action.
+              {active.fundingModel === 'non_cash'
+                ? 'The proposer cannot approve feasibility, and Team Admins cannot verify the final outcome. Closing records the reviewed milestone; no money is involved.'
+                : 'The proposer cannot approve feasibility, Team Admins cannot verify the final outcome, and grant payment is a separate platform action.'}
             </p>
           </div>
         </Sheet>

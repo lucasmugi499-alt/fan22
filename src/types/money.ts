@@ -1,4 +1,5 @@
-export type MoneyCurrency = 'UGX';
+export type MoneyCurrency = 'UGX' | 'EUR';
+export type MobileMoneyProvider = 'airtel_money' | 'mtn_momo';
 
 export type PaymentIntentStatus =
   | 'created'
@@ -39,12 +40,18 @@ export interface PaymentIntent {
   recipientType: 'athlete' | 'team' | 'league' | 'programme';
   recipientId: string;
   supportNeedId?: string;
+  campaignId?: string;
   supportAmountMinor: number;
   platformFeeMinor: number;
   providerFeeMinor?: number;
   totalAmountMinor: number;
   currency: MoneyCurrency;
   provider: string;
+  /** Immutable provider request identifier used for status queries. */
+  providerRequestReference?: string;
+  /** Financial transaction identifier returned after provider processing. */
+  providerFinancialReference?: string;
+  /** @deprecated Read compatibility for pre-build-30 records. */
   providerReference?: string;
   status: PaymentIntentStatus;
   idempotencyKey: string;
@@ -60,6 +67,7 @@ export interface Contribution {
   recipientType: PaymentIntent['recipientType'];
   recipientId: string;
   supportNeedId?: string;
+  campaignId?: string;
   supportAmountMinor: number;
   platformFeeMinor: number;
   providerFeeMinor?: number;
@@ -136,7 +144,8 @@ export interface PaymentWebhookEvent {
   amountMinor: number;
   currency: MoneyCurrency;
   occurredAt: string;
-  providerReference: string;
+  providerRequestReference: string;
+  providerFinancialReference?: string;
   /** A callback is never trusted until the provider status endpoint confirms it. */
   verifiedByStatusQuery?: boolean;
 }
@@ -148,7 +157,7 @@ export interface SupportReservation {
   supporterUserId: string;
   amountMinor: number;
   currency: MoneyCurrency;
-  status: 'active' | 'settled' | 'released' | 'expired';
+  status: 'active' | 'settled' | 'released' | 'expired' | 'held_for_review';
   expiresAt: string;
   createdAt: string;
   updatedAt?: string;
@@ -174,6 +183,7 @@ export interface Allocation {
   recipientType: PaymentIntent['recipientType'];
   recipientId: string;
   supportNeedId?: string;
+  campaignId?: string;
   amountMinor: number;
   currency: MoneyCurrency;
   destinationType?:
@@ -183,7 +193,7 @@ export interface Allocation {
     | 'adult_athlete'
     | 'verified_guardian'
     | 'evidence_reimbursement';
-  status: 'pending_review' | 'eligible_for_payout' | 'payout_scheduled' | 'paid' | 'reversed';
+  status: 'pending_review' | 'held_for_review' | 'eligible_for_payout' | 'payout_scheduled' | 'paid' | 'reversed';
   createdAt: string;
 }
 
@@ -252,4 +262,17 @@ export interface ComplianceCase {
   assignedToUserId?: string;
   createdAt: string;
   resolvedAt?: string;
+}
+
+export interface PaymentProviderAttempt {
+  id: string;
+  paymentIntentId: string;
+  provider: PaymentWebhookEvent['provider'];
+  operation: 'collection_create' | 'collection_status' | 'callback_verify' | 'reconciliation';
+  providerRequestReference?: string;
+  providerFinancialReference?: string;
+  responseStatus: string;
+  redactedProviderResponse?: Record<string, unknown>;
+  attemptCount: number;
+  createdAt: string;
 }

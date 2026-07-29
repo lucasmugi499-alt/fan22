@@ -20,6 +20,7 @@ import {
   Roster,
   Season,
   SponsorReport,
+  SponsorCampaign,
   Sponsor,
   SportSlug,
   SportType,
@@ -36,7 +37,7 @@ import {
   normalizeMatchVerification,
   normalizeVerificationStatus,
 } from '@/lib/status';
-import { cacheData, readCachedData } from '@/lib/offline';
+import { cacheData, privateCacheNamespace, readCachedData } from '@/lib/offline';
 import type { Contribution } from '@/types/money';
 import type { DataQueryOptions } from '@/data/providers/types';
 
@@ -179,6 +180,7 @@ const initialData = {
   rosters: [] as Roster[],
   storedStandings: [] as StoredStanding[],
   sponsorReports: [] as SponsorReport[],
+  sponsorCampaigns: [] as SponsorCampaign[],
   leagueNotices: [] as LeagueNotice[],
   finalizations: [] as FinalizationRecord[],
   supportNeeds: [] as SupportNeed[],
@@ -239,6 +241,7 @@ export async function loadGoalPlaceData(
     rosters,
     storedStandings,
     sponsorReports,
+    sponsorCampaigns,
     leagueNotices,
     finalizations,
     supportNeeds,
@@ -268,6 +271,9 @@ export async function loadGoalPlaceData(
     shouldLoad('sponsorReports')
       ? provider.getSponsorReports()
       : Promise.resolve([] as SponsorReport[]),
+    shouldLoad('sponsorCampaigns')
+      ? provider.getSponsorCampaigns()
+      : Promise.resolve([] as SponsorCampaign[]),
     shouldLoad('leagueNotices')
       ? provider.getLeagueNotices({ ...scope, limit: recordLimit })
       : Promise.resolve([] as LeagueNotice[]),
@@ -299,6 +305,7 @@ export async function loadGoalPlaceData(
     rosters,
     storedStandings,
     sponsorReports,
+    sponsorCampaigns,
     leagueNotices,
     finalizations,
     supportNeeds,
@@ -323,10 +330,20 @@ export function useGoalPlaceData({
   scope?: DataQueryOptions;
   recordLimit?: number;
 } = {}) {
-  const { role } = useAuth();
+  const { currentUser, isDemoMode, role, userProfile } = useAuth();
   const collectionListKey = [...collections].sort().join(',');
   const scopeKey = `${scope?.leagueId ?? ''}:${scope?.teamId ?? ''}:${scope?.athleteId ?? ''}:${scope?.matchId ?? ''}:${recordLimit ?? ''}`;
-  const collectionKey = `${collectionListKey}|${scopeKey}`;
+  const uid = currentUser?.uid ?? userProfile?.uid ?? 'public';
+  const cacheNamespace = privateCacheNamespace({
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
+    databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
+    dataMode,
+    uid,
+    role: role ?? (isDemoMode ? 'demo' : 'public'),
+    leagueId: scope?.leagueId,
+    teamId: scope?.teamId,
+  });
+  const collectionKey = `${cacheNamespace}|${collectionListKey}|${scopeKey}`;
   const stableScope = useMemo<DataQueryOptions>(() => ({
     leagueId: scope?.leagueId,
     teamId: scope?.teamId,
@@ -445,6 +462,7 @@ export function useGoalPlaceData({
       rosters: items.rosters,
       storedStandings: items.storedStandings,
       sponsorReports: items.sponsorReports,
+      sponsorCampaigns: items.sponsorCampaigns,
       leagueNotices: items.leagueNotices,
       finalizations: items.finalizations,
       supportNeeds: items.supportNeeds,
@@ -462,32 +480,55 @@ export function useGoalPlaceData({
 }
 
 export function useUserNotifications(userId?: string | null) {
-  const { isDemoMode } = useAuth();
+  const { isDemoMode, role } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(Boolean(userId));
+  const [error, setError] = useState<Error>();
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     if (!userId) return;
-    provider.getNotificationsByUser(userId)
-      .then((notifications) => {
-        if (!cancelled) setItems(notifications.sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)));
-      })
-      .catch(() => {
-        if (!cancelled) setItems([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(undefined);
+      }
+    });
+    const cacheKey = `${privateCacheNamespace({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
+      databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
+      dataMode: isDemoMode ? 'mock' : 'firebase',
+      uid: userId,
+      role: role ?? 'fan',
+    })}|notifications`;
+    const unsubscribe = provider.subscribeToNotifications(
+      userId,
+      (notifications) => {
+        if (cancelled) return;
+        const sorted = [...notifications].sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0));
+        setItems(sorted);
+        setError(undefined);
+        setLoading(false);
+        void cacheData(cacheKey, sorted);
+      },
+      async (cause) => {
+        if (cancelled) return;
+        const cached = await readCachedData<Notification[]>(cacheKey).catch(() => undefined);
+        if (cached) setItems(cached.value);
+        else setError(cause);
+        setLoading(false);
+      },
+    );
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [attempt, provider, userId]);
+  }, [attempt, isDemoMode, provider, role, userId]);
 
-  return { items: userId ? items : [], loading: userId ? loading : false, retry };
+  return { items: userId ? items : [], loading: userId ? loading : false, error, retry };
 }
 
 export function useUserContributions(userId?: string | null) {

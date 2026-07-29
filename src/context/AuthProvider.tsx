@@ -8,6 +8,7 @@ import { AppRole, UserProfile } from '@/types';
 import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
+import { clearPrivateCaches } from '@/lib/offline';
 
 const demoRoleStorageKey = 'goalplace256.demoRole';
 
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogout = useCallback(async () => {
+    await clearPrivateCaches().catch(() => undefined);
     if (isDemoMode) {
       setDemoRole(null);
       return;
@@ -139,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(user);
 
       if (!user) {
+        void clearPrivateCaches();
         setUserProfile(null);
         setRole(null);
         setAuthStatus('logged_out');

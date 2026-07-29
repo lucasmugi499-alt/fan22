@@ -41,7 +41,7 @@ export function GlobalSearch({
 function GlobalSearchDialog({ onClose, role }: { onClose: () => void; role: AppRole | null }) {
   const { athletes, teams, leagues, matches, seasons, loading } = useGoalPlaceData({
     collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons'],
-    recordLimit: 100,
+    recordLimit: 1_200,
   });
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);

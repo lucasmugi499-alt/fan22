@@ -27,9 +27,9 @@ const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
 };
 
 export function LeaguePublic({ leagueId }: { leagueId: string }) {
-  const { leagues, teams, matches, seasons, feedPosts, athletes, leagueNotices, sponsorReports, loading } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'matches', 'seasons', 'feedPosts', 'athletes', 'leagueNotices', 'sponsorReports'],
-    scope: { leagueId },
+  const { leagues, teams, matches, seasons, feedPosts, athletes, leagueNotices, loading } = useGoalPlaceData({
+    collections: ['leagues', 'teams', 'matches', 'seasons', 'feedPosts', 'athletes', 'leagueNotices'],
+    scope: { leagueId, audience: 'public' },
     recordLimit: 120,
   });
   const league = useMemo(() => leagues.find((l) => l.id === leagueId), [leagues, leagueId]);
@@ -41,7 +41,6 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
   const official = useMemo(() => leagueMatches.filter(isOfficialMatch).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)), [leagueMatches]);
   const leaders = useMemo(() => athletes.filter((athlete) => athlete.leagueId === leagueId).sort((a, b) => b.goalPlacePoints - a.goalPlacePoints).slice(0, 4), [athletes, leagueId]);
   const notices = useMemo(() => leagueNotices.filter((notice) => notice.leagueId === leagueId).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 4), [leagueId, leagueNotices]);
-  const sponsorReport = sponsorReports.find((report) => report.leagueId === leagueId);
   const sportTheme = getSportTheme(league?.sport);
   const standings = useMemo(() => {
     if (!league) return [];
@@ -122,15 +121,12 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
           <LeagueNoticeList notices={notices} />
         </Card>
         <Card className="p-4">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><SealCheck className="h-4 w-4 text-verified" /> Sponsor proof</h2>
-          {sponsorReport ? (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Metric label="Verified athletes" value={String(sponsorReport.verifiedAthletes)} compact />
-              <Metric label="Evidence items" value={String(sponsorReport.evidenceItems)} compact />
-              <Metric label="Support value" value={`UGX ${(sponsorReport.supportValueUGX / 1_000_000).toFixed(1)}M`} compact />
-              <Metric label="Compliance" value={`${sponsorReport.resultReportingCompliance}%`} compact />
-            </div>
-          ) : <p className="mt-3 text-sm text-muted">The season proof packet is being prepared.</p>}
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><SealCheck className="h-4 w-4 text-verified" /> Public competition proof</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Metric label="Official results" value={String(official.length)} compact />
+            <Metric label="Verified rate" value={`${league.verifiedResultsRate}%`} compact />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted">Restricted sponsor evidence and allocation records remain inside authorized reporting workspaces.</p>
         </Card>
       </div>
 

@@ -75,6 +75,7 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
     let need: FirebaseFirestore.DocumentData | undefined;
     let needRef: FirebaseFirestore.DocumentReference | undefined;
     let raisedAmount: number | undefined;
+    let excessSupport = false;
     let points = 0;
     if (contribution.supportNeedId) {
       needRef = adminDb.collection('supportNeeds').doc(contribution.supportNeedId);
@@ -82,23 +83,28 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
       need = needSnapshot.data();
       if (!needSnapshot.exists || !need) throw new Error('Support need is no longer available.');
       const nextRaisedAmount = (need.raisedAmount ?? 0) + intent.supportAmountMinor;
-      raisedAmount = nextRaisedAmount;
-      if (nextRaisedAmount > need.targetAmount) throw new Error('Settled support exceeds the approved support-need target.');
-      const pointEvents = await transaction.get(
-        adminDb.collection('pointsEvents')
-          .where('userId', '==', intent.supporterUserId)
-          .where('status', '==', 'confirmed')
-          .where('createdAt', '>=', Timestamp.fromDate(period.weekStart)),
-      );
-      let dailyTotal = 0;
-      let weeklyTotal = 0;
-      for (const snapshot of pointEvents.docs) {
-        const data = snapshot.data();
-        weeklyTotal += data.points ?? 0;
-        const createdAt = data.createdAt?.toDate?.() as Date | undefined;
-        if (createdAt && createdAt >= period.dayStart) dailyTotal += data.points ?? 0;
+      excessSupport =
+        nextRaisedAmount > need.targetAmount ||
+        !reservationSnapshot.exists ||
+        reservationSnapshot.data()?.status !== 'active';
+      if (!excessSupport) {
+        raisedAmount = nextRaisedAmount;
+        const pointEvents = await transaction.get(
+          adminDb.collection('pointsEvents')
+            .where('userId', '==', intent.supporterUserId)
+            .where('status', '==', 'confirmed')
+            .where('createdAt', '>=', Timestamp.fromDate(period.weekStart)),
+        );
+        let dailyTotal = 0;
+        let weeklyTotal = 0;
+        for (const snapshot of pointEvents.docs) {
+          const data = snapshot.data();
+          weeklyTotal += data.points ?? 0;
+          const createdAt = data.createdAt?.toDate?.() as Date | undefined;
+          if (createdAt && createdAt >= period.dayStart) dailyTotal += data.points ?? 0;
+        }
+        points = cappedPointsAward('verified_need_supported', dailyTotal, weeklyTotal);
       }
-      points = cappedPointsAward('verified_need_supported', dailyTotal, weeklyTotal);
     }
     transaction.create(adminDb.collection('ledgerTransactions').doc(journal.transaction.id), {
       ...journal.transaction,
@@ -112,37 +118,43 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
     }
     transaction.update(intentRef, {
       status: 'settled',
-      providerReference: event.providerReference,
+      providerRequestReference: event.providerRequestReference,
+      providerFinancialReference: event.providerFinancialReference ?? null,
       updatedAt: FieldValue.serverTimestamp(),
     });
     transaction.update(contributionRef, {
-      status: 'allocated',
+      status: excessSupport ? 'held_for_review' : 'allocated',
       settledAt: Timestamp.fromDate(occurredAt),
     });
     if (reservationSnapshot.exists) {
-      transaction.update(reservationRef, { status: 'settled', updatedAt: FieldValue.serverTimestamp() });
+      transaction.update(reservationRef, {
+        status: excessSupport ? 'held_for_review' : 'settled',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
-    if (needRef && need && raisedAmount !== undefined) {
+    if (!excessSupport && needRef && need && raisedAmount !== undefined) {
       transaction.update(needRef, {
         raisedAmount,
         status: raisedAmount === need.targetAmount ? 'funded' : need.status,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      const pointsRef = adminDb.collection('pointsEvents').doc(`support_${event.paymentIntentId}`);
-      transaction.create(pointsRef, {
-        id: pointsRef.id,
-        userId: intent.supporterUserId,
-        actionType: 'verified_need_supported',
-        relatedEntityId: contribution.supportNeedId,
-        points,
-        idempotencyKey: `verified_need_supported:${event.paymentIntentId}`,
-        status: points > 0 ? 'confirmed' : 'cap_rejected',
-        periodDate: period.dateKey,
-        periodWeek: period.weekKey,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-      if (points > 0) {
-        transaction.update(adminDb.collection('users').doc(intent.supporterUserId), { points: FieldValue.increment(points) });
+      if (!excessSupport) {
+        const pointsRef = adminDb.collection('pointsEvents').doc(`support_${event.paymentIntentId}`);
+        transaction.create(pointsRef, {
+          id: pointsRef.id,
+          userId: intent.supporterUserId,
+          actionType: 'verified_need_supported',
+          relatedEntityId: contribution.supportNeedId,
+          points,
+          idempotencyKey: `verified_need_supported:${event.paymentIntentId}`,
+          status: points > 0 ? 'confirmed' : 'cap_rejected',
+          periodDate: period.dateKey,
+          periodWeek: period.weekKey,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        if (points > 0) {
+          transaction.update(adminDb.collection('users').doc(intent.supporterUserId), { points: FieldValue.increment(points) });
+        }
       }
     }
     transaction.create(eventRef, {
@@ -157,12 +169,40 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
       recipientType: contribution.recipientType,
       recipientId: contribution.recipientId,
       supportNeedId: contribution.supportNeedId ?? null,
+      campaignId: contribution.campaignId ?? null,
       amountMinor: intent.supportAmountMinor,
       currency: intent.currency,
       destinationType: need?.preferredPayoutDestination ?? null,
-      status: need?.payoutDestinationStatus === 'verified' ? 'eligible_for_payout' : 'pending_review',
+      status: excessSupport
+        ? 'held_for_review'
+        : need?.payoutDestinationStatus === 'verified'
+          ? 'eligible_for_payout'
+          : 'pending_review',
       createdAt: FieldValue.serverTimestamp(),
     });
+    if (excessSupport) {
+      const complianceRef = adminDb.collection('complianceCases').doc(`excess_${event.paymentIntentId}`);
+      transaction.create(complianceRef, {
+        id: complianceRef.id,
+        relatedEntityType: 'contribution',
+        relatedEntityId: event.paymentIntentId,
+        riskTier: 'enhanced',
+        reason: 'Provider settlement arrived after the support reservation expired or capacity was no longer available.',
+        status: 'open',
+        resolutionOptions: ['refund', 'supporter_redirection'],
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      const refundRef = adminDb.collection('refunds').doc(`excess_${event.paymentIntentId}`);
+      transaction.create(refundRef, {
+        id: refundRef.id,
+        contributionId: event.paymentIntentId,
+        amountMinor: intent.supportAmountMinor,
+        currency: intent.currency,
+        reason: 'invalid_campaign',
+        status: 'requested',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
     return { outcome: 'applied', status: 'settled' };
   });
 }

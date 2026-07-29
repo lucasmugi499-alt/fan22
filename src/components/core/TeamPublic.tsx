@@ -3,10 +3,9 @@
 import { useMemo } from 'react';
 import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy, Heart, Handshake } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { teamRecord } from '@/lib/team/teamContext';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
-import { isUpcomingMatch } from '@/lib/status';
+import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { clubColor } from '@/lib/clubColors';
 import { IdentityHero } from '@/components/premium/IdentityHero';
 import { NextMatchCard } from '@/components/premium/NextMatchCard';
@@ -38,7 +37,8 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const roster = useMemo(() => athletes.filter((a) => a.teamId === teamId), [athletes, teamId]);
   const teamMatches = useMemo(() => matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId), [matches, teamId]);
   const nextMatch = useMemo(() => teamMatches.filter(isUpcomingMatch).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0], [teamMatches]);
-  const results = useMemo(() => teamMatches.filter((m) => m.status === 'completed').sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
+  const results = useMemo(() => teamMatches.filter(isOfficialMatch).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
+  const pendingResults = useMemo(() => teamMatches.filter((m) => m.status === 'completed' && !isOfficialMatch(m)).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedTeamId === teamId), [feedPosts, teamId]);
   const needs = useMemo(() => supportNeeds.filter((need) => need.teamId === teamId), [supportNeeds, teamId]);
   const partners = useMemo(() => sponsors.filter((sponsor) => sponsor.supportedTeamIds.includes(teamId)), [sponsors, teamId]);
@@ -54,6 +54,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   }, [league, teams, matches, seasons]);
 
   const sportOf = useMemo(() => (id: string) => teamById.get(id)?.sport as string | undefined, [teamById]);
+  const officialRecord = standings.find((row) => row.teamId === teamId);
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-36 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-40 w-full rounded-[var(--radius-lg)]" /></div>;
   if (!team) return <EmptyState icon={Warning} title="Team not found" description="This team may have been removed, or the link is out of date." />;
@@ -72,7 +73,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <>
             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {team.city}</span>
             <span className="opacity-50">|</span>
-            <span className="tabular tabular-nums">{teamRecord(team)}</span>
+            <span className="tabular tabular-nums">{officialRecord ? `${officialRecord.wins}-${officialRecord.draws}-${officialRecord.losses}` : '0-0-0'}</span>
           </>
         }
       />
@@ -86,6 +87,16 @@ export function TeamPublic({ teamId }: { teamId: string }) {
               <h2 className="flex items-center gap-1.5 text-[15px] font-semibold text-text-strong"><CalendarBlank className="h-4 w-4 text-brand" weight="bold" /> Recent results</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {results.map((m) => <MatchCard key={m.id} match={m} home={teamById.get(m.homeTeamId)} away={teamById.get(m.awayTeamId)} href={`/matches/${m.id}`} />)}
+              </div>
+            </section>
+          ) : null}
+
+          {pendingResults.length ? (
+            <section className="space-y-2.5">
+              <h2 className="text-[15px] font-semibold text-text-strong">Awaiting verification</h2>
+              <p className="text-xs text-muted">Played scores stay separate until the result workflow finalizes them.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {pendingResults.map((m) => <MatchCard key={m.id} match={m} home={teamById.get(m.homeTeamId)} away={teamById.get(m.awayTeamId)} href={`/matches/${m.id}`} />)}
               </div>
             </section>
           ) : null}

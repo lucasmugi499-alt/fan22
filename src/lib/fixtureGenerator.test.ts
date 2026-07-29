@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateDoubleRoundRobinFixtures } from './fixtureGenerator';
+import { generateDoubleRoundRobinFixtures, validateFixtureDraft } from './fixtureGenerator';
 import type { League, Season, Team } from '@/types';
 
 const league = { id: 'league', sport: 'football' } as League;
@@ -24,5 +24,21 @@ describe('generateDoubleRoundRobinFixtures', () => {
       expect(fixtures.filter((match) => match.homeTeamId === team.id)).toHaveLength(9);
       expect(fixtures.filter((match) => match.awayTeamId === team.id)).toHaveLength(9);
     }
+  });
+});
+
+describe('validateFixtureDraft', () => {
+  it('finds venue collisions and insufficient team rest', () => {
+    const generated = generateDoubleRoundRobinFixtures({
+      league,
+      season,
+      teams,
+      firstKickoff: '2027-01-01T12:00:00.000Z',
+      daysBetweenRounds: 1,
+      venueForTeam: () => 'Shared ground',
+    });
+    const conflicts = validateFixtureDraft(generated, 48);
+    expect(conflicts.some((item) => item.message.includes('already used'))).toBe(true);
+    expect(conflicts.some((item) => item.message.includes('hours of rest'))).toBe(true);
   });
 });

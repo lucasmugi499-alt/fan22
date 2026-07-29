@@ -9,17 +9,17 @@ import { useAuth } from '@/context/AuthProvider';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { defaultScoringFor, toSportSlug } from '@/lib/season';
-import type { League } from '@/types';
+import type { CompetitionFormat, League, Season } from '@/types';
 
 type Mode = 'season' | 'notice' | null;
 
 export function LeagueOperations({
   league,
-  seasonId,
+  season,
   onSaved,
 }: {
   league: League;
-  seasonId?: string;
+  season?: Season;
   onSaved: () => void;
 }) {
   const { currentUser, userProfile, isDemoMode } = useAuth();
@@ -30,6 +30,11 @@ export function LeagueOperations({
   const [seasonName, setSeasonName] = useState('2027 Regular Season');
   const [startDate, setStartDate] = useState('2027-01-16');
   const [endDate, setEndDate] = useState('2027-11-30');
+  const [competitionFormat, setCompetitionFormat] = useState<CompetitionFormat>('league');
+  const defaults = defaultScoringFor(league.sport);
+  const [winPoints, setWinPoints] = useState(String(defaults.win));
+  const [drawPoints, setDrawPoints] = useState(defaults.draw === null ? '' : String(defaults.draw));
+  const [lossPoints, setLossPoints] = useState(String(defaults.loss));
   const [noticeType, setNoticeType] = useState<'fixture_update' | 'postponement' | 'registration' | 'verification_reminder' | 'sponsor_message' | 'emergency'>('fixture_update');
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
@@ -52,17 +57,21 @@ export function LeagueOperations({
           status: 'registration',
           startDate: new Date(`${startDate}T00:00:00Z`).toISOString(),
           endDate: endDate ? new Date(`${endDate}T23:59:59Z`).toISOString() : undefined,
-          competitionFormat: 'league',
-          scoring: defaultScoringFor(league.sport),
+          competitionFormat,
+          scoring: {
+            win: Number(winPoints),
+            draw: drawPoints === '' ? null : Number(drawPoints),
+            loss: Number(lossPoints),
+          },
         });
         toast.success('Season opened for registration.');
       } else {
-        if (!seasonId || !noticeTitle.trim() || !noticeMessage.trim()) {
+        if (!season?.id || !noticeTitle.trim() || !noticeMessage.trim()) {
           throw new Error('Add a title, message, and active season.');
         }
         await provider.createLeagueNotice({
           leagueId: league.id,
-          seasonId,
+          seasonId: season.id,
           type: noticeType,
           title: noticeTitle.trim(),
           message: noticeMessage.trim(),
@@ -81,12 +90,38 @@ export function LeagueOperations({
     }
   }
 
+  async function advanceSeason() {
+    if (!season) return;
+    const next = {
+      draft: 'registration',
+      registration: 'active',
+      active: 'completed',
+      completed: 'archived',
+      archived: 'archived',
+    }[season.status] as Season['status'];
+    setSaving(true);
+    try {
+      await provider.transitionSeason(season.id, next);
+      toast.success(`Season moved to ${next}.`);
+      onSaved();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Season status could not be changed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="secondary" icon={CalendarPlus} onClick={() => setMode('season')}>New season</Button>
         <Button variant="secondary" icon={Megaphone} onClick={() => setMode('notice')}>Publish notice</Button>
       </div>
+      {season && season.status !== 'archived' ? (
+        <Button block variant="secondary" onClick={() => void advanceSeason()} disabled={saving}>
+          {season.status === 'registration' ? 'Activate season' : season.status === 'active' ? 'Complete season' : season.status === 'completed' ? 'Archive season' : 'Open registration'}
+        </Button>
+      ) : null}
       <Sheet
         open={mode !== null}
         onClose={() => setMode(null)}
@@ -101,7 +136,13 @@ export function LeagueOperations({
               <Field label="Starts"><input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field>
               <Field label="Ends"><input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field>
             </div>
-            <p className="text-xs text-muted">Competition format is league play. The scoring rules are set from {String(league.sport)} defaults and can be reviewed before fixtures are generated.</p>
+            <Field label="Competition format"><select className="field" value={competitionFormat} onChange={(event) => setCompetitionFormat(event.target.value as CompetitionFormat)}><option value="league">League</option><option value="knockout">Knockout</option><option value="group_knockout">Groups and knockout</option></select></Field>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Win"><input className="field" type="number" min="0" value={winPoints} onChange={(event) => setWinPoints(event.target.value)} /></Field>
+              <Field label="Draw"><input className="field" type="number" min="0" value={drawPoints} onChange={(event) => setDrawPoints(event.target.value)} disabled={defaults.draw === null} placeholder="N/A" /></Field>
+              <Field label="Loss"><input className="field" type="number" min="0" value={lossPoints} onChange={(event) => setLossPoints(event.target.value)} /></Field>
+            </div>
+            <p className="text-xs text-muted">Format and scoring lock when the season becomes active. Cash performance challenges remain disabled for pilot leagues.</p>
           </div>
         ) : (
           <div className="space-y-4">

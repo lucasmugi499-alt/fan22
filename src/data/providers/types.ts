@@ -1,6 +1,7 @@
 import {
   AdminAuditEvent,
   Athlete,
+  AthleteClaim,
   AwardCategory,
   Challenge,
   Comment,
@@ -21,6 +22,7 @@ import {
   Sport,
   SportSlug,
   Sponsor,
+  SponsorCampaign,
   SponsorReport,
   StoredStanding,
   SupportNeed,
@@ -28,7 +30,6 @@ import {
   TeamAssignment,
   User,
   Verification,
-  VerificationStatus,
 } from '@/types';
 import { StandingRow } from '../mockDatabase';
 import type {
@@ -37,6 +38,7 @@ import type {
   Contribution,
   ContributionPurpose,
   PointsEvent,
+  MobileMoneyProvider,
 } from '@/types/money';
 import type { ChallengeAction } from '@/lib/challenge';
 
@@ -47,6 +49,7 @@ export type DataWriteResult = {
   id?: string;
   mode: DataProviderMode;
   message?: string;
+  actionUrl?: string;
 };
 
 export type FollowTargetType = 'athlete' | 'team' | 'league';
@@ -57,8 +60,10 @@ export type DataQueryOptions = {
   teamId?: string;
   athleteId?: string;
   matchId?: string;
+  userId?: string;
   afterId?: string;
   limit?: number;
+  audience?: LeagueNotice['audience'];
 };
 
 export type CreateContributionIntentInput = {
@@ -67,10 +72,12 @@ export type CreateContributionIntentInput = {
   recipientType: 'athlete' | 'team' | 'league' | 'programme';
   recipientId: string;
   supportNeedId?: string;
+  campaignId?: string;
   supportAmountMinor: number;
   message?: string;
   /** Collected only for a provider-owned mobile-money prompt; never stored in public data. */
   customerPhone?: string;
+  provider?: MobileMoneyProvider;
   idempotencyKey: string;
 };
 
@@ -88,6 +95,12 @@ export type CreateCommentInput = Omit<Comment, 'id' | 'createdAt' | 'status'> & 
   createdAt?: string;
   status?: Comment['status'];
 };
+
+export type FeedEngagementInput =
+  | { action: 'reaction'; postId: string; userId: string }
+  | { action: 'share'; postId: string; userId: string }
+  | { action: 'comment'; postId: string; userId: string; text: string }
+  | { action: 'report'; postId: string; userId: string; reason: string };
 
 export type CreateResultSubmissionInput = {
   match: Pick<
@@ -181,6 +194,7 @@ export type CreateSupportNeedInput = Omit<
 export type ResultSubmissionListener = (
   submission: ResultSubmission | undefined,
 ) => void;
+export type NotificationListener = (notifications: Notification[]) => void;
 
 export interface GoalPlaceDataProvider {
   mode: DataProviderMode;
@@ -196,6 +210,7 @@ export interface GoalPlaceDataProvider {
   getTeamById(id: string): Promise<Team | undefined>;
   getAthletes(options?: DataQueryOptions): Promise<Athlete[]>;
   getAthleteById(id: string): Promise<Athlete | undefined>;
+  getAthleteClaims(options?: DataQueryOptions): Promise<AthleteClaim[]>;
   getMatches(options?: DataQueryOptions): Promise<Match[]>;
   getMatchById(id: string): Promise<Match | undefined>;
   getChallenges(options?: DataQueryOptions): Promise<Challenge[]>;
@@ -203,6 +218,7 @@ export interface GoalPlaceDataProvider {
   getFeedPosts(options?: DataQueryOptions): Promise<FeedPost[]>;
   getLatestFeedPosts(limit?: number): Promise<FeedPost[]>;
   getFeedPostById(id: string): Promise<FeedPost | undefined>;
+  getFeedReaction(postId: string, userId: string): Promise<boolean>;
   getCommentsByPost(postId: string): Promise<Comment[]>;
   getNotificationsByUser(userId: string): Promise<Notification[]>;
   getReports(): Promise<Report[]>;
@@ -213,6 +229,7 @@ export interface GoalPlaceDataProvider {
   getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
   getStoredStandings(): Promise<StoredStanding[]>;
   getSponsorReports(): Promise<SponsorReport[]>;
+  getSponsorCampaigns(): Promise<SponsorCampaign[]>;
   getLeagueNotices(options?: DataQueryOptions): Promise<LeagueNotice[]>;
   getFinalizations(): Promise<FinalizationRecord[]>;
   getSupportNeeds(options?: DataQueryOptions): Promise<SupportNeed[]>;
@@ -233,21 +250,42 @@ export interface GoalPlaceDataProvider {
   recordPointsAction(data: RecordPointsActionInput): Promise<DataWriteResult>;
   createFeedPost(data: CreateFeedPostInput): Promise<DataWriteResult>;
   createComment(data: CreateCommentInput): Promise<DataWriteResult>;
+  engageFeedPost(data: FeedEngagementInput): Promise<DataWriteResult>;
   toggleFollow(userId: string, targetType: FollowTargetType, targetId: string): Promise<DataWriteResult>;
   toggleSave(userId: string, targetType: SaveTargetType, targetId: string): Promise<DataWriteResult>;
   updateUserProfile(userId: string, data: EditableUserProfile): Promise<DataWriteResult>;
   updateAthleteProfile(athleteId: string, data: Partial<EditableAthleteProfile>): Promise<DataWriteResult>;
+  createAthleteProfile(data: {
+    teamId: string;
+    name: string;
+    position: string;
+    ageGroup: Athlete['ageGroup'];
+  }): Promise<DataWriteResult>;
+  requestAthleteClaim(athleteId: string, userId: string): Promise<DataWriteResult>;
+  reviewAthleteClaim(
+    claimId: string,
+    actorUserId: string,
+    action: 'team_confirm' | 'league_verify' | 'reject',
+    reason?: string,
+  ): Promise<DataWriteResult>;
   updateTeamProfile(teamId: string, data: Partial<EditableTeamProfile>): Promise<DataWriteResult>;
   saveRoster(roster: Roster): Promise<DataWriteResult>;
   createChallenge(data: Omit<Challenge, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
   transitionChallenge(data: TransitionChallengeInput): Promise<DataWriteResult>;
   createLeagueNotice(data: CreateLeagueNoticeInput): Promise<DataWriteResult>;
   createSeason(data: Omit<Season, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
+  transitionSeason(seasonId: string, status: Season['status']): Promise<DataWriteResult>;
   createTeams(teams: Team[]): Promise<DataWriteResult>;
   createFixtures(fixtures: Match[]): Promise<DataWriteResult>;
   createTeamAdminInvitation(data: TeamAssignment): Promise<DataWriteResult>;
-  acceptTeamAdminInvitation(assignmentId: string, userId: string): Promise<DataWriteResult>;
+  acceptTeamAdminInvitation(assignmentId: string, userId: string, token: string): Promise<DataWriteResult>;
   markNotificationRead(notificationId: string, read?: boolean): Promise<DataWriteResult>;
+  markAllNotificationsRead(userId: string): Promise<DataWriteResult>;
+  subscribeToNotifications(
+    userId: string,
+    listener: NotificationListener,
+    onError?: (error: Error) => void,
+  ): () => void;
   createSupportNeed(data: CreateSupportNeedInput): Promise<DataWriteResult>;
   addSupportNeedUpdate(
     needId: string,
@@ -271,8 +309,6 @@ export interface GoalPlaceDataProvider {
     decision: 'resolved' | 'dismissed';
     note?: string;
   }): Promise<DataWriteResult>;
-  updateMatchVerification(matchId: string, status: VerificationStatus): Promise<DataWriteResult>;
-  updateChallengeVerification(challengeId: string, status: VerificationStatus): Promise<DataWriteResult>;
   createResultSubmission(data: CreateResultSubmissionInput): Promise<DataWriteResult>;
   confirmResultSubmission(matchId: string, respondedByUserId: string): Promise<DataWriteResult>;
   disputeResultSubmission(
