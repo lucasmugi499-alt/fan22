@@ -481,9 +481,9 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       },
       body: JSON.stringify(data),
     });
-    const body = await response.json().catch(() => ({})) as { id?: string; error?: string };
+    const body = await response.json().catch(() => ({})) as { id?: string; error?: string; nextStep?: string };
     if (!response.ok) throw new Error(body.error ?? 'Payment intent could not be created.');
-    return writeResult(body.id ?? data.idempotencyKey, 'Continue with the licensed payment provider.');
+    return writeResult(body.id ?? data.idempotencyKey, body.nextStep ?? 'Payment request created.');
   },
   async recordPointsAction(data: RecordPointsActionInput) {
     if (!isFirebaseConfigured) return mockProvider.recordPointsAction(data);

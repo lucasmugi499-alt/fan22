@@ -7,7 +7,8 @@ export type PaymentIntentStatus =
   | 'settled'
   | 'failed'
   | 'cancelled'
-  | 'held_for_review';
+  | 'held_for_review'
+  | 'chargeback';
 
 export type ContributionStatus =
   | 'created'
@@ -103,7 +104,7 @@ export interface LedgerTransaction {
   createdAt: string;
 }
 
-export type PointsEventStatus = 'pending' | 'confirmed' | 'reversed';
+export type PointsEventStatus = 'pending' | 'confirmed' | 'cap_rejected' | 'reversed';
 
 export interface PointsEvent {
   id: string;
@@ -122,10 +123,13 @@ export interface PointsEvent {
   points: number;
   idempotencyKey: string;
   status: PointsEventStatus;
+  periodDate?: string;
+  periodWeek?: string;
   createdAt: string;
 }
 
 export interface PaymentWebhookEvent {
+  provider: 'sandbox' | 'airtel_money' | 'mtn_momo';
   eventId: string;
   paymentIntentId: string;
   status: 'settled' | 'failed' | 'held_for_review';
@@ -133,6 +137,35 @@ export interface PaymentWebhookEvent {
   currency: MoneyCurrency;
   occurredAt: string;
   providerReference: string;
+  /** A callback is never trusted until the provider status endpoint confirms it. */
+  verifiedByStatusQuery?: boolean;
+}
+
+export interface SupportReservation {
+  id: string;
+  supportNeedId: string;
+  paymentIntentId: string;
+  supporterUserId: string;
+  amountMinor: number;
+  currency: MoneyCurrency;
+  status: 'active' | 'settled' | 'released' | 'expired';
+  expiresAt: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface RecipientEligibility {
+  id: string;
+  recipientType: PaymentIntent['recipientType'];
+  recipientId: string;
+  status: 'eligible' | 'pending_review' | 'blocked' | 'suspended';
+  verified: boolean;
+  supportEnabled: boolean;
+  complianceHold: boolean;
+  payoutDestinationStatus: 'pending_verification' | 'verified' | 'suspended';
+  recipientIsMinor?: boolean;
+  guardianConsentVerified?: boolean;
+  updatedAt: string;
 }
 
 export interface Allocation {

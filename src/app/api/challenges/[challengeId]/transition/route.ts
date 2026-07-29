@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   challengeNextStatus,
+  challengeActionMatchesFundingModel,
   roleCanTransitionChallenge,
   type ChallengeAction,
 } from '@/lib/challenge';
@@ -17,6 +18,8 @@ const bodySchema = z.object({
     'team_approve',
     'team_reject',
     'league_approve',
+    'activate_non_cash',
+    'commit_grant',
     'open_funding',
     'lock_funding',
     'start_challenge',
@@ -27,6 +30,7 @@ const bodySchema = z.object({
     'mark_void',
     'prepare_allocation',
     'settle',
+    'close_non_cash',
   ]),
   note: z.string().trim().max(1000).optional(),
   evidenceRefs: z.array(z.string().min(1).max(500)).max(12).optional(),
@@ -113,11 +117,16 @@ export async function POST(
     if (!roleCanTransitionChallenge(effectiveRole, input.action)) {
       return Response.json({ error: 'Your role cannot perform this challenge action.' }, { status: 403 });
     }
+    if (!challengeActionMatchesFundingModel(challenge.fundingModel, input.action)) {
+      return Response.json({ error: 'This action does not apply to this challenge funding model.' }, { status: 409 });
+    }
     if (input.action.startsWith('team_') && !isTeamAdmin && !isPlatform) {
       return Response.json({ error: 'Only this athlete’s Team Admin can review feasibility.' }, { status: 403 });
     }
     const leagueActions: ChallengeAction[] = [
       'league_approve',
+      'activate_non_cash',
+      'commit_grant',
       'open_funding',
       'lock_funding',
       'start_challenge',
@@ -132,7 +141,7 @@ export async function POST(
     if (input.action === 'submit_evidence' && !isAthlete && !isTeamAdmin && !isPlatform) {
       return Response.json({ error: 'Only the athlete or Team Admin can submit evidence.' }, { status: 403 });
     }
-    if (['prepare_allocation', 'settle'].includes(input.action) && !isPlatform) {
+    if (['prepare_allocation', 'settle', 'close_non_cash'].includes(input.action) && !isPlatform) {
       return Response.json({ error: 'Settlement is restricted to the trusted platform service.' }, { status: 403 });
     }
     if (input.action === 'submit_evidence' && !(input.evidenceRefs?.length || input.note)) {
@@ -177,8 +186,8 @@ export async function POST(
       };
       if (input.action === 'team_approve') updates.teamApprovedByUserId = actor.uid;
       if (input.action === 'league_approve') updates.leagueApprovedByUserId = actor.uid;
-      if (input.action === 'open_funding') updates.termsLockedAt = FieldValue.serverTimestamp();
-      if (input.action === 'lock_funding') updates.fundingLockedAt = FieldValue.serverTimestamp();
+      if (['open_funding', 'activate_non_cash'].includes(input.action)) updates.termsLockedAt = FieldValue.serverTimestamp();
+      if (['lock_funding', 'commit_grant'].includes(input.action)) updates.fundingLockedAt = FieldValue.serverTimestamp();
       if (input.action === 'submit_evidence') {
         updates.evidenceRefs = input.evidenceRefs ?? [];
         updates.evidenceNote = input.note ?? '';

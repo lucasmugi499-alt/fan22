@@ -518,6 +518,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /recipientEligibility/{eligibilityId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /supportReservations/{reservationId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     match /leagueAdminApplications/{applicationId} {
       allow create: if signedIn() &&
         request.resource.data.userId == request.auth.uid &&
@@ -628,6 +638,16 @@ service cloud.firestore {
     match /pointsEvents/{eventId} {
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /leagueNoticeReads/{readId} {
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /athleteShareEvents/{eventId} {
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 

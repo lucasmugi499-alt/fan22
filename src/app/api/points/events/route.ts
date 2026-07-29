@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   cappedPointsAward,
+  kampalaPeriod,
   pointsIdempotencyKey,
 } from '@/lib/money';
 import type { PointsEvent } from '@/types/money';
@@ -101,12 +102,7 @@ export async function POST(request: Request) {
   );
   const eventId = Buffer.from(idempotencyKey).toString('base64url').slice(0, 120);
   const eventRef = adminDb.collection('pointsEvents').doc(eventId);
-  const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setUTCHours(0, 0, 0, 0);
-  const weekStart = new Date(now);
-  weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
-  weekStart.setUTCHours(0, 0, 0, 0);
+  const period = kampalaPeriod();
 
   try {
     const result = await adminDb.runTransaction(async (transaction) => {
@@ -116,7 +112,7 @@ export async function POST(request: Request) {
         adminDb.collection('pointsEvents')
           .where('userId', '==', input.userId)
           .where('status', '==', 'confirmed')
-          .where('createdAt', '>=', Timestamp.fromDate(weekStart)),
+            .where('createdAt', '>=', Timestamp.fromDate(period.weekStart)),
       );
       let dailyTotal = 0;
       let weeklyTotal = 0;
@@ -124,7 +120,7 @@ export async function POST(request: Request) {
         const data = snapshot.data();
         const createdAt = data.createdAt?.toDate?.() as Date | undefined;
         weeklyTotal += data.points ?? 0;
-        if (createdAt && createdAt >= dayStart) dailyTotal += data.points ?? 0;
+        if (createdAt && createdAt >= period.dayStart) dailyTotal += data.points ?? 0;
       }
       const points = cappedPointsAward(input.actionType, dailyTotal, weeklyTotal);
       transaction.create(eventRef, {
@@ -132,9 +128,28 @@ export async function POST(request: Request) {
         ...input,
         points,
         idempotencyKey,
-        status: points > 0 ? 'confirmed' : 'reversed',
+        status: points > 0 ? 'confirmed' : 'cap_rejected',
+        periodDate: period.dateKey,
+        periodWeek: period.weekKey,
         createdAt: FieldValue.serverTimestamp(),
       });
+      if (input.actionType === 'league_notice_read' && input.relatedEntityId) {
+        transaction.set(adminDb.collection('leagueNoticeReads').doc(`${input.relatedEntityId}_${input.userId}`), {
+          id: `${input.relatedEntityId}_${input.userId}`,
+          noticeId: input.relatedEntityId,
+          userId: input.userId,
+          readAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      if (input.actionType === 'athlete_card_shared' && input.relatedEntityId) {
+        transaction.set(adminDb.collection('athleteShareEvents').doc(`${input.relatedEntityId}_${input.userId}`), {
+          id: `${input.relatedEntityId}_${input.userId}`,
+          athleteId: input.relatedEntityId,
+          userId: input.userId,
+          issuedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      if (points > 0) transaction.update(adminDb.collection('users').doc(input.userId), { points: FieldValue.increment(points) });
       return { id: eventId, points, duplicate: false };
     });
     return Response.json({
@@ -143,7 +158,7 @@ export async function POST(request: Request) {
         ? 'Recognition was already recorded.'
         : result.points > 0
           ? `${result.points} participation points recorded.`
-          : 'The daily or weekly points cap has been reached.',
+          : 'The daily or weekly points cap has been reached; no points were added.',
     });
   } catch (error) {
     console.error('Points event failed', error);

@@ -71,6 +71,9 @@ Do not seed production with synthetic investor data.
 ## Payments
 
 Data mode and payment mode are separate. Firebase mode does not enable payments.
-`GOALPLACE_PAYMENTS_MODE=sandbox`, a provider identifier, and a server-only webhook secret
-are required before the sandbox payment endpoint responds. Real-money launch gates are in
+`GOALPLACE_PAYMENTS_MODE=sandbox`, an explicit provider identifier, and server-only secrets
+are required before the payment endpoint responds. `sandbox` is the only provider that may
+be enabled without an Airtel or MTN sandbox contract and credentials. Airtel/MTN adapter
+code performs provider-status confirmation before it reaches the shared settlement processor;
+it does not activate collection or payout by itself. Real-money launch gates are in
 `docs/MONEY_ENGINE.md`.

@@ -59,6 +59,8 @@ import type {
   PointsEvent,
   Refund,
   Settlement,
+  RecipientEligibility,
+  SupportReservation,
 } from '@/types/money';
 import { db, requireFirebaseClient } from './client';
 
@@ -103,6 +105,8 @@ export type FirestoreCollectionMap = {
   chargebacks: Chargeback;
   settlements: Settlement;
   complianceCases: ComplianceCase;
+  recipientEligibility: RecipientEligibility;
+  supportReservations: SupportReservation;
 };
 
 export type FirestoreCollectionName = keyof FirestoreCollectionMap;

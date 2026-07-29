@@ -1,7 +1,8 @@
 # GoalPlace256 Audit And Feature Completion
 
-Status: implementation complete and the local release gate has passed. Staging deployment
-and environment verification may proceed.
+Status: core product and internal money architecture complete. Real-money provider
+integration, recipient KYC, payouts, refunds, chargebacks, reconciliation, production-rules
+promotion, and legal approval remain blocked. Payments must remain sandbox-only.
 
 ## Scope
 
@@ -30,7 +31,9 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] One canonical investor dataset; obsolete generated mock collections removed
 - [x] No stored-value wallet or client-side financial writes
 - [x] Immutable double-entry contribution settlement journal
-- [x] Signed, timestamp-validated, idempotent PSP webhook boundary
+- [x] Signed, timestamp-validated, idempotent sandbox webhook boundary
+- [x] Provider-neutral sandbox/Airtel/MTN adapter contract with status-polled callback boundary
+- [x] Terminal payment state transitions, support reservations, recipient eligibility gate, and points projection
 - [x] Flat, capped, non-cash GoalPlace Points
 - [x] Non-cash/sponsor-funded challenge lifecycle and role separation
 - [x] Team and League approval workflow for verified support needs
@@ -119,6 +122,16 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Mobile QA record
 - [x] Result workflow and staging runbooks match implementation
 
+## Real-Money Blockers
+
+- [ ] Airtel Money sandbox credentials, callback contract, collection/disbursement tests, and reconciliation certification
+- [ ] MTN MoMo sandbox credentials, collection/disbursement tests, callback status-polling tests, and reconciliation certification
+- [ ] Staging payment egress IP provisioned and registered only after the provider adapter tests pass
+- [ ] Recipient KYC, guardian, and payout-destination operations
+- [ ] Payout, refund, chargeback, and daily reconciliation operations
+- [ ] Candidate Firestore rules reviewed and promoted to production through the explicit candidate command
+- [ ] Written legal, tax, PDPO, safeguarding, and PSP approvals
+
 ## Final Verification Gate
 
 - [x] Unit and integration tests pass
@@ -129,8 +142,8 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] No broken public routes, console errors, image failures, or horizontal overflow
 - [x] Authenticated role workflow QA passes
 - [x] Synthetic-data disclosure is present where required
-- [x] Final code review has no unresolved high-severity findings
-- [x] Only after all checks pass: commit, push, and deploy
+- [x] Current code review has no unresolved demo-environment high-severity findings
+- [ ] Only after the real-money blockers above are closed: enable provider collection or payout
 
 ## Dependency Advisory Note
 

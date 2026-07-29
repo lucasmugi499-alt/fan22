@@ -110,6 +110,130 @@ export function buildContributionSettlement({
   return { transaction, entries };
 }
 
+export function buildRecipientPayout({
+  transactionId,
+  allocationId,
+  amountMinor,
+  currency = 'UGX',
+  createdAt,
+}: {
+  transactionId: string;
+  allocationId: string;
+  amountMinor: number;
+  currency?: MoneyCurrency;
+  createdAt: string;
+}) {
+  return buildBalancedJournal({
+    transactionId,
+    type: 'recipient_payout',
+    relatedEntityId: allocationId,
+    currency,
+    createdAt,
+    entries: [
+      ['recipient_payable', 'debit', amountMinor],
+      ['payout_clearing', 'credit', amountMinor],
+    ],
+  });
+}
+
+export function buildRefundJournal({
+  transactionId,
+  contributionId,
+  supportAmountMinor,
+  platformFeeMinor,
+  currency = 'UGX',
+  createdAt,
+}: {
+  transactionId: string;
+  contributionId: string;
+  supportAmountMinor: number;
+  platformFeeMinor: number;
+  currency?: MoneyCurrency;
+  createdAt: string;
+}) {
+  const total = supportAmountMinor + platformFeeMinor;
+  return buildBalancedJournal({
+    transactionId,
+    type: 'refund',
+    relatedEntityId: contributionId,
+    currency,
+    createdAt,
+    entries: [
+      ['recipient_payable', 'debit', supportAmountMinor],
+      ['platform_fee_revenue', 'debit', platformFeeMinor],
+      ['refund_payable', 'credit', total],
+    ],
+  });
+}
+
+export function buildChargebackJournal({
+  transactionId,
+  contributionId,
+  amountMinor,
+  currency = 'UGX',
+  createdAt,
+}: {
+  transactionId: string;
+  contributionId: string;
+  amountMinor: number;
+  currency?: MoneyCurrency;
+  createdAt: string;
+}) {
+  return buildBalancedJournal({
+    transactionId,
+    type: 'chargeback',
+    relatedEntityId: contributionId,
+    currency,
+    createdAt,
+    entries: [
+      ['chargeback_reserve', 'debit', amountMinor],
+      ['psp_clearing', 'credit', amountMinor],
+    ],
+  });
+}
+
+function buildBalancedJournal({
+  transactionId,
+  type,
+  relatedEntityId,
+  currency,
+  createdAt,
+  entries,
+}: {
+  transactionId: string;
+  type: LedgerTransaction['type'];
+  relatedEntityId: string;
+  currency: MoneyCurrency;
+  createdAt: string;
+  entries: Array<[LedgerEntry['accountCode'], LedgerEntry['direction'], number]>;
+}) {
+  const mapped: LedgerEntry[] = entries.map(([accountCode, direction, amountMinor], index) => {
+    assertMoney(amountMinor);
+    return {
+      id: `${transactionId}:${index + 1}`,
+      transactionId,
+      accountCode,
+      direction,
+      amountMinor,
+      currency,
+      relatedEntityId,
+      createdAt,
+    };
+  });
+  assertBalancedEntries(mapped);
+  return {
+    transaction: {
+      id: transactionId,
+      type,
+      relatedEntityId,
+      currency,
+      idempotencyKey: `${type}:${relatedEntityId}`,
+      createdAt,
+    } satisfies LedgerTransaction,
+    entries: mapped,
+  };
+}
+
 export function assertBalancedEntries(entries: Pick<LedgerEntry, 'direction' | 'amountMinor' | 'currency'>[]) {
   const currencies = new Set(entries.map((entry) => entry.currency));
   if (currencies.size !== 1) throw new Error('A ledger transaction cannot mix currencies.');
@@ -146,6 +270,23 @@ export function cappedPointsAward(
     POINTS_DAILY_CAP - dailyTotal,
     POINTS_WEEKLY_CAP - weeklyTotal,
   ));
+}
+
+/** Uganda has no DST; accounting periods follow Africa/Kampala (UTC+03:00). */
+export function kampalaPeriod(date = new Date()) {
+  const shifted = new Date(date.getTime() + 3 * 60 * 60_000);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+  const weekday = shifted.getUTCDay() || 7;
+  const dayStart = new Date(Date.UTC(year, month, day, -3, 0, 0, 0));
+  const weekStart = new Date(Date.UTC(year, month, day - (weekday - 1), -3, 0, 0, 0));
+  const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const isoDate = new Date(Date.UTC(year, month, day));
+  isoDate.setUTCDate(isoDate.getUTCDate() + 4 - (isoDate.getUTCDay() || 7));
+  const isoYear = isoDate.getUTCFullYear();
+  const isoWeek = Math.ceil(((isoDate.getTime() - Date.UTC(isoYear, 0, 1)) / 86_400_000 + 1) / 7);
+  return { dayStart, weekStart, dateKey, weekKey: `${isoYear}-W${String(isoWeek).padStart(2, '0')}` };
 }
 
 export function requiresEnhancedReview(amountMinor: number) {

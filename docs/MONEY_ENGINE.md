@@ -1,6 +1,6 @@
 # GoalPlace256 Money, Support, Challenge, And Points Engine
 
-Status: pilot architecture implemented; real payments disabled.
+Status: pilot architecture and sandbox provider boundary implemented; real payments disabled.
 
 This document records the product boundary. It is not a Ugandan legal opinion.
 
@@ -30,8 +30,8 @@ opposing outcomes, fan prizes, or cash-funded one-match challenges.
 ```text
 Supporter chooses a support amount
 -> server creates an idempotent payment intent
--> licensed PSP collects payment
--> signed PSP webhook confirms settlement
+-> provider adapter requests sandbox collection
+-> provider callback is authenticated and status-confirmed
 -> immutable balanced ledger transaction is written
 -> recipient allocation is created
 -> payout remains pending until destination and KYC controls pass
@@ -79,18 +79,19 @@ athletes require guardian consent and a verified guardian or organization/vendor
 ## Challenge Lifecycle
 
 ```text
-draft
--> proposed
--> team_approved
--> league_approved
--> funding_open
--> funding_locked
--> in_progress
--> evidence_submitted
--> under_review
--> achieved / not_achieved / void
--> allocation_pending
--> settled
+Non-cash:
+
+```text
+proposed -> team approved -> approved -> active -> evidence -> review
+-> achieved / not achieved / void -> closed
+```
+
+Sponsor grant:
+
+```text
+proposed -> team approved -> approved -> grant committed -> active -> evidence -> outcome verified
+-> allocation approved -> paid
+```
 ```
 
 Pilot challenges use `non_cash` or `sponsor_grant`. Supporter-pooled conditional funding is
@@ -104,7 +105,8 @@ approve settlement.
 - One event per idempotency key
 - Daily cap: 100
 - Weekly cap: 350
-- Failed payments receive no points
+- Cap-rejected events are retained without changing the points balance
+- Points accounting periods follow `Africa/Kampala`
 - Match attendance requires a trusted attendance record
 - Comments require a verified constructive flag
 - Fraudulent events can be reversed
@@ -116,6 +118,7 @@ Real money remains disabled until all are complete:
 - Written Ugandan payment-flow opinion
 - Written gaming/challenge opinion
 - Licensed PSP contract and provider integration
+- Airtel/MTN sandbox credentials, collection/disbursement status polling, and callback verification
 - Signed webhook and reconciliation certification
 - KYC/AML responsibility matrix
 - Recipient and guardian verification

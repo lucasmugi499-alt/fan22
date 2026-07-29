@@ -55,6 +55,15 @@ export async function POST(
       if (!need.recipientUpdates?.some((update) => Boolean(update.evidenceUrl))) {
         throw new Error('The recipient must submit completion evidence first.');
       }
+      const allocations = await transaction.get(
+        adminDb.collection('allocations').where('supportNeedId', '==', supportNeedId),
+      );
+      const paidAmount = allocations.docs
+        .filter((allocation) => allocation.data().status === 'paid')
+        .reduce((sum, allocation) => sum + (allocation.data().amountMinor ?? 0), 0);
+      if (paidAmount < need.targetAmount) {
+        throw new Error('Completion requires a recorded recipient payout or approved vendor payment.');
+      }
 
       transaction.update(needRef, {
         status: 'completed',

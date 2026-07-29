@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { cappedPointsAward, pointsIdempotencyKey } from '@/lib/money';
+import { cappedPointsAward, kampalaPeriod, pointsIdempotencyKey } from '@/lib/money';
 import type { Match } from '@/types';
 
 export const runtime = 'nodejs';
@@ -50,12 +50,7 @@ export async function POST(
   const idempotencyKey = pointsIdempotencyKey(actor.uid, 'match_attended', matchId);
   const pointsEventId = Buffer.from(idempotencyKey).toString('base64url').slice(0, 120);
   const pointsRef = adminDb.collection('pointsEvents').doc(pointsEventId);
-  const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setUTCHours(0, 0, 0, 0);
-  const weekStart = new Date(now);
-  weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
-  weekStart.setUTCHours(0, 0, 0, 0);
+  const period = kampalaPeriod();
 
   const result = await adminDb.runTransaction(async (transaction) => {
     const existing = await transaction.get(attendanceRef);
@@ -64,7 +59,7 @@ export async function POST(
       adminDb.collection('pointsEvents')
         .where('userId', '==', actor.uid)
         .where('status', '==', 'confirmed')
-        .where('createdAt', '>=', Timestamp.fromDate(weekStart)),
+        .where('createdAt', '>=', Timestamp.fromDate(period.weekStart)),
     );
     let dailyTotal = 0;
     let weeklyTotal = 0;
@@ -72,7 +67,7 @@ export async function POST(
       const data = snapshot.data();
       const createdAt = data.createdAt?.toDate?.() as Date | undefined;
       weeklyTotal += data.points ?? 0;
-      if (createdAt && createdAt >= dayStart) dailyTotal += data.points ?? 0;
+      if (createdAt && createdAt >= period.dayStart) dailyTotal += data.points ?? 0;
     }
     const points = cappedPointsAward('match_attended', dailyTotal, weeklyTotal);
     transaction.create(attendanceRef, {
@@ -90,9 +85,12 @@ export async function POST(
       relatedEntityId: matchId,
       points,
       idempotencyKey,
-      status: points > 0 ? 'confirmed' : 'reversed',
+      status: points > 0 ? 'confirmed' : 'cap_rejected',
+      periodDate: period.dateKey,
+      periodWeek: period.weekKey,
       createdAt: FieldValue.serverTimestamp(),
     });
+    if (points > 0) transaction.update(adminDb.collection('users').doc(actor.uid), { points: FieldValue.increment(points) });
     return { duplicate: false, points };
   });
   return Response.json({

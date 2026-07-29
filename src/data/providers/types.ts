@@ -69,6 +69,8 @@ export type CreateContributionIntentInput = {
   supportNeedId?: string;
   supportAmountMinor: number;
   message?: string;
+  /** Collected only for a provider-owned mobile-money prompt; never stored in public data. */
+  customerPhone?: string;
   idempotencyKey: string;
 };
 

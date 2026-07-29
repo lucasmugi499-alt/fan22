@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { HandHeart, Coins } from '@phosphor-icons/react';
 import { Sheet } from '@/components/ui/Sheet';
@@ -35,6 +35,9 @@ export function SupportSheet({
   const [amount, setAmount] = useState<number>(PRESETS[1]);
   const [custom, setCustom] = useState<string>('');
   const [message, setMessage] = useState('');
+  const [phone, setPhone] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const checkoutSessionId = useRef<string | null>(null);
 
   const userId = currentUser?.uid ?? userProfile?.uid ?? userProfile?.id ?? 'guest';
   const chosen = custom !== '' ? Number(custom) : amount;
@@ -47,7 +50,11 @@ export function SupportSheet({
     ? 'Minimum support is UGX 1,000'
     : !paymentsAvailable
       ? 'Real payments are disabled until a licensed payment provider is configured'
-      : null;
+      : paymentsAvailable && !isDemoMode && !phone
+        ? 'Enter the mobile-money number that should receive the provider prompt'
+      : paymentsAvailable && !isDemoMode && phone && !/^256\d{9}$/.test(phone)
+        ? 'Use an Uganda number in 2567XXXXXXXX format'
+        : null;
 
   async function pledge() {
     if (disabledReason) return;
@@ -55,7 +62,9 @@ export function SupportSheet({
       toast.error('Sign in to support this athlete.');
       return;
     }
+    setSubmitting(true);
     try {
+      checkoutSessionId.current ??= crypto.randomUUID();
       await provider.createContributionIntent({
         supporterUserId: userId,
         purpose: need ? 'verified_support_need' : 'direct_athlete_support',
@@ -64,14 +73,18 @@ export function SupportSheet({
         supportNeedId: need?.id,
         supportAmountMinor: chosen,
         message: message.trim() || undefined,
-        idempotencyKey: `support:${userId}:${need?.id ?? athlete.id}:${Date.now()}`,
+        customerPhone: phone || undefined,
+        idempotencyKey: `support:${userId}:${need?.id ?? athlete.id}:${checkoutSessionId.current}`,
       });
       toast.success(isDemoMode
         ? `Synthetic support of UGX ${chosen.toLocaleString()} recorded. No money moved.`
         : 'Continue with the licensed payment provider.');
+      checkoutSessionId.current = null;
       onClose();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'This support pledge could not be recorded.');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -84,7 +97,7 @@ export function SupportSheet({
       footer={
         <div className="space-y-2">
           {disabledReason ? <p className="text-center text-xs text-[var(--state-pending)]">{disabledReason}</p> : null}
-          <Button block icon={HandHeart} onClick={pledge} disabled={Boolean(disabledReason)}>
+          <Button block icon={HandHeart} onClick={pledge} disabled={Boolean(disabledReason) || submitting}>
             Pledge UGX {Number.isFinite(chosen) ? chosen.toLocaleString() : 0}
           </Button>
         </div>
@@ -134,6 +147,21 @@ export function SupportSheet({
             className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand"
           />
         </div>
+
+        {!isDemoMode && paymentsAvailable ? (
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Mobile-money number</p>
+            <input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              placeholder="2567XXXXXXXX"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value.replace(/\s+/g, ''))}
+              className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm tabular-nums text-text-strong outline-none placeholder:text-subtle focus:border-brand"
+            />
+          </div>
+        ) : null}
 
         {/* Breakdown */}
         <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm">

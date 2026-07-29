@@ -7,8 +7,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
-import { challengeLabel } from '@/lib/status';
-import type { ChallengeAction } from '@/lib/challenge';
+import { challengeLifecycleLabel, type ChallengeAction } from '@/lib/challenge';
 import type { Challenge } from '@/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,7 +23,7 @@ const ACTIONS: Record<Scope, Partial<Record<Challenge['status'], ChallengeAction
   },
   league: {
     team_approved: ['league_approve'],
-    league_approved: ['open_funding'],
+    league_approved: ['activate_non_cash', 'commit_grant'],
     funding_open: ['lock_funding'],
     funding_locked: ['start_challenge'],
     evidence_submitted: ['begin_review'],
@@ -32,9 +31,9 @@ const ACTIONS: Record<Scope, Partial<Record<Challenge['status'], ChallengeAction
   },
   platform: {
     under_review: ['mark_achieved', 'mark_not_achieved', 'mark_void'],
-    achieved: ['prepare_allocation'],
-    not_achieved: ['prepare_allocation'],
-    void: ['prepare_allocation'],
+    achieved: ['prepare_allocation', 'close_non_cash'],
+    not_achieved: ['prepare_allocation', 'close_non_cash'],
+    void: ['prepare_allocation', 'close_non_cash'],
     allocation_pending: ['settle'],
   },
 };
@@ -43,6 +42,8 @@ const ACTION_LABEL: Record<ChallengeAction, string> = {
   team_approve: 'Approve feasibility',
   team_reject: 'Reject proposal',
   league_approve: 'Approve rules',
+  activate_non_cash: 'Activate challenge',
+  commit_grant: 'Commit grant',
   open_funding: 'Open pilot',
   lock_funding: 'Lock terms',
   start_challenge: 'Start challenge',
@@ -53,7 +54,15 @@ const ACTION_LABEL: Record<ChallengeAction, string> = {
   mark_void: 'Void challenge',
   prepare_allocation: 'Prepare settlement',
   settle: 'Settle record',
+  close_non_cash: 'Close challenge',
 };
+
+function actionsFor(scope: Scope, challenge: Challenge) {
+  const all = ACTIONS[scope][challenge.status] ?? [];
+  return all.filter((action) => challenge.fundingModel === 'non_cash'
+    ? !['commit_grant', 'prepare_allocation', 'settle', 'open_funding', 'lock_funding'].includes(action)
+    : !['activate_non_cash', 'close_non_cash', 'open_funding', 'lock_funding'].includes(action));
+}
 
 export function ChallengeWorkflow({
   scope,
@@ -85,7 +94,7 @@ export function ChallengeWorkflow({
     [athletes],
   );
   const queue = useMemo(() => challenges.filter((challenge) => {
-    if (!(ACTIONS[scope][challenge.status]?.length)) return false;
+    if (!actionsFor(scope, challenge).length) return false;
     if (scope === 'league') return challenge.leagueId === targetId;
     if (scope === 'team') return athleteById.get(challenge.athleteId)?.teamId === targetId;
     return true;
@@ -134,7 +143,7 @@ export function ChallengeWorkflow({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-text-strong">{challenge.description}</p>
               <p className="mt-1 text-xs text-muted">
-                {athlete?.name ?? 'Athlete'} · {challengeLabel(challenge.status)} · {challenge.fundingModel === 'sponsor_grant' ? 'Sponsor grant' : 'Non-cash'}
+                {athlete?.name ?? 'Athlete'} · {challengeLifecycleLabel(challenge.fundingModel, challenge.status)} · {challenge.fundingModel === 'sponsor_grant' ? 'Sponsor grant' : 'Non-cash'}
               </p>
             </div>
             <Button size="sm" variant="secondary" icon={Target} onClick={() => setActive(challenge)}>
@@ -155,10 +164,10 @@ export function ChallengeWorkflow({
           open
           onClose={() => setActive(null)}
           title={active.description}
-          description={`${challengeLabel(active.status)} · ${athleteById.get(active.athleteId)?.name ?? 'Athlete'}`}
+          description={`${challengeLifecycleLabel(active.fundingModel, active.status)} · ${athleteById.get(active.athleteId)?.name ?? 'Athlete'}`}
           footer={
             <div className="grid gap-2 sm:grid-cols-2">
-              {(ACTIONS[scope][active.status] ?? []).map((action) => (
+              {actionsFor(scope, active).map((action) => (
                 <Button
                   key={action}
                   block

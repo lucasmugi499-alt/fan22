@@ -28,6 +28,7 @@
     "clean:execute": "tsx scripts/clean-execute.ts",
     "deploy:staging": "firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",
     "deploy:staging:functions": "firebase deploy --project staging --config firebase.staging.json --only functions",
+    "deploy:prod:rules-candidate": "firebase deploy --project manifest-quasar-479416-s7 --config firebase.production-candidate.json --only firestore:fg256",
     "deploy:prod": "firebase deploy --project manifest-quasar-479416-s7 --only firestore:fg256,functions",
     "create:owner": "tsx scripts/create-owner.ts"
   },

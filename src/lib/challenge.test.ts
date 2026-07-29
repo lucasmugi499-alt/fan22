@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   challengeNextStatus,
+  challengeActionMatchesFundingModel,
+  challengeLifecycleLabel,
   challengeTermsAreLocked,
   roleCanTransitionChallenge,
 } from './challenge';
@@ -22,5 +24,12 @@ describe('challenge lifecycle', () => {
   it('locks terms once funding opens', () => {
     expect(challengeTermsAreLocked('league_approved')).toBe(false);
     expect(challengeTermsAreLocked('funding_open')).toBe(true);
+  });
+
+  it('splits non-cash milestones from grant settlement language', () => {
+    expect(challengeActionMatchesFundingModel('non_cash', 'activate_non_cash')).toBe(true);
+    expect(challengeActionMatchesFundingModel('non_cash', 'prepare_allocation')).toBe(false);
+    expect(challengeLifecycleLabel('non_cash', 'settled')).toBe('Closed');
+    expect(challengeLifecycleLabel('sponsor_grant', 'settled')).toBe('Paid');
   });
 });

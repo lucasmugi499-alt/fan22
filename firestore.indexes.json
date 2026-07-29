@@ -18,6 +18,14 @@
       ]
     },
     {
+      "collectionGroup": "supportReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "supportNeedId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "resultSubmissions",
       "queryScope": "COLLECTION",
       "fields": [

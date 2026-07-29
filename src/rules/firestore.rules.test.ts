@@ -1002,6 +1002,19 @@ describe('money and points trust boundary', () => {
         points: 999999,
         status: 'confirmed',
       }));
+      await assertFails(setDoc(doc(db, 'supportReservations/forged'), {
+        supportNeedId: 'need_001',
+        paymentIntentId: 'pi_001',
+        supporterUserId: OUTSIDER,
+        amountMinor: 10000,
+        status: 'active',
+      }));
+      await assertFails(setDoc(doc(db, 'recipientEligibility/forged'), {
+        recipientType: 'athlete',
+        recipientId: 'athlete_001',
+        status: 'eligible',
+        supportEnabled: true,
+      }));
     }
   });
 
