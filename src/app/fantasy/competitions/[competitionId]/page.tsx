@@ -7,6 +7,8 @@ export function generateStaticParams() {
   return fantasyCompetitions.map((competition) => ({ competitionId: competition.id }));
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({
   params,
 }: {

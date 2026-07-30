@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: 'Build a free fantasy squad and score only from verified GoalPlace256 match records.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function FantasyPage() {
   const catalogue = await getFantasyHubCatalogue();
   return <FantasyHub {...catalogue} />;

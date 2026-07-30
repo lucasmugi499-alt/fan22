@@ -9,6 +9,8 @@ export const metadata: Metadata = {
     'Follow verified grassroots leagues, fixtures, results, and rising athletes across Uganda on GoalPlace256.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Page() {
   const initialData = await getPublicLandingData();
   return (

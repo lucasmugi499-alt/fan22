@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { FantasyMiniLeagueDetailLoader } from '@/components/fantasy/FantasyMiniLeagueDetailLoader';
-import { fantasyMiniLeagues } from '@/data/fantasyDemo';
 import { getFantasyMiniLeague } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
   description: 'A free GoalPlace Fantasy mini-league table.',
 };
 
-export function generateStaticParams() {
-  return fantasyMiniLeagues.map((league) => ({ miniLeagueId: league.id }));
-}
+export const dynamic = 'force-dynamic';
 
 export default async function FantasyMiniLeaguePage({
   params,

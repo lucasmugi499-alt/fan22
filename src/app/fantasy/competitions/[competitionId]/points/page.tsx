@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { FantasyPoints } from '@/components/fantasy/FantasyExperience';
-import { fantasyCompetitions } from '@/data/fantasyDemo';
 import { getFantasyCompetitionBundle } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
   description: 'See provisional, official and corrected Fantasy Points with verified scoring explanations.',
 };
 
-export function generateStaticParams() {
-  return fantasyCompetitions.map((competition) => ({ competitionId: competition.id }));
-}
+export const dynamic = 'force-dynamic';
 
 export default async function FantasyPointsPage({
   params,

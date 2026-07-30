@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import { FantasySquadBuilder } from '@/components/fantasy/FantasySquadBuilder';
 import {
-  fantasyCompetitions,
-} from '@/data/fantasyDemo';
-import {
   getFantasyCompetitionBundle,
   getFantasyPlayerCards,
 } from '@/server/fantasy/catalogue';
@@ -13,9 +10,7 @@ export const metadata: Metadata = {
   description: 'Select a valid free fantasy squad before the trusted server deadline.',
 };
 
-export function generateStaticParams() {
-  return fantasyCompetitions.map((competition) => ({ competitionId: competition.id }));
-}
+export const dynamic = 'force-dynamic';
 
 export default async function FantasyTeamPage({
   params,

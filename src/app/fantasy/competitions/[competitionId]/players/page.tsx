@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { FantasyPlayersDirectory } from '@/components/fantasy/FantasyExperience';
-import { fantasyCompetitions } from '@/data/fantasyDemo';
 import {
   getFantasyCompetitionBundle,
   getFantasyPlayerCards,
@@ -12,9 +11,7 @@ export const metadata: Metadata = {
   description: 'Browse eligible athletes, verified recent form, availability and Fantasy Credit prices.',
 };
 
-export function generateStaticParams() {
-  return fantasyCompetitions.map((competition) => ({ competitionId: competition.id }));
-}
+export const dynamic = 'force-dynamic';
 
 export default async function FantasyPlayersPage({
   params,

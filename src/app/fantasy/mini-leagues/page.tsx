@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: 'Create or join a free private fantasy mini-league with no entry fee or cash pool.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function FantasyMiniLeaguesPage() {
   const [catalogue, competitions] = await Promise.all([
     getFantasyMiniLeagueCatalogue(),
