@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { assertSafeProductionEnvironment, type GoalPlaceEnvironment } from '../../src/lib/environment';
 
-type SwitchableEnvironment = 'demo' | 'beta' | 'production';
-type ActiveEnvironment = SwitchableEnvironment | 'maintenance';
+export type SwitchableEnvironment = 'demo' | 'beta' | 'production';
+export type ActiveEnvironment = SwitchableEnvironment | 'maintenance';
+export type EnvironmentAction = 'status' | 'activate' | 'maintenance' | 'rollback';
 
-type EnvironmentRegistry = {
+export type EnvironmentRegistry = {
   publicDomain: string;
   activationStateFile: string;
   environments: Record<SwitchableEnvironment, {
@@ -22,7 +24,7 @@ type EnvironmentRegistry = {
   }>;
 };
 
-type ActivationState = {
+export type ActivationState = {
   activeEnvironment: ActiveEnvironment;
   previousEnvironment: ActiveEnvironment | null;
   environmentVersion: string;
@@ -33,22 +35,40 @@ type ActivationState = {
   lastActivationReport: string | null;
 };
 
-const ROOT = process.cwd();
-const REGISTRY_FILE = path.join(ROOT, 'config/environments.json');
-const ACTIVE_FILE = path.join(ROOT, 'config/active-environment.json');
-const REPORT_DIR = path.join(ROOT, 'reports/environment');
+export type ActivationOptions = {
+  root?: string;
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
+};
+
+export type ActivationResult = {
+  state: ActivationState;
+  reportPath: string | null;
+  lines: string[];
+};
+
+const DEFAULT_ROOT = process.cwd();
+
+function paths(root: string) {
+  return {
+    registryFile: path.join(root, 'config/environments.json'),
+    activeFile: path.join(root, 'config/active-environment.json'),
+    reportDir: path.join(root, 'reports/environment'),
+  };
+}
 
 function readJson<T>(file: string): T {
   return JSON.parse(readFileSync(file, 'utf8')) as T;
 }
 
 function writeJson(file: string, value: unknown) {
+  mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function arg(name: string) {
+function arg(argv: string[], name: string) {
   const prefix = `--${name}=`;
-  const value = process.argv.find((item) => item.startsWith(prefix));
+  const value = argv.find((item) => item.startsWith(prefix));
   return value ? value.slice(prefix.length) : undefined;
 }
 
@@ -72,15 +92,15 @@ function expectSetting(values: Map<string, string>, name: string, expected: stri
   if (actual !== expected) problems.push(`${name} expected ${expected}, got ${actual ?? 'missing'}`);
 }
 
-function requireControlInputs(target: ActiveEnvironment) {
+function requireControlInputs(target: ActiveEnvironment, env: NodeJS.ProcessEnv) {
   const missing: string[] = [];
-  if (!process.env.GOALPLACE_ACTIVATION_IDENTITY) missing.push('GOALPLACE_ACTIVATION_IDENTITY');
-  if (process.env.GOALPLACE_BACKUP_CONFIRMED !== 'true') missing.push('GOALPLACE_BACKUP_CONFIRMED=true');
-  if (process.env.GOALPLACE_HEALTHCHECK_PASSED !== 'true') missing.push('GOALPLACE_HEALTHCHECK_PASSED=true');
-  if (process.env.GOALPLACE_CACHE_PURGED !== 'true') missing.push('GOALPLACE_CACHE_PURGED=true');
-  if (process.env.GOALPLACE_POST_SWITCH_SMOKE_PASSED !== 'true') missing.push('GOALPLACE_POST_SWITCH_SMOKE_PASSED=true');
+  if (!env.GOALPLACE_ACTIVATION_IDENTITY) missing.push('GOALPLACE_ACTIVATION_IDENTITY');
+  if (env.GOALPLACE_BACKUP_CONFIRMED !== 'true') missing.push('GOALPLACE_BACKUP_CONFIRMED=true');
+  if (env.GOALPLACE_HEALTHCHECK_PASSED !== 'true') missing.push('GOALPLACE_HEALTHCHECK_PASSED=true');
+  if (env.GOALPLACE_CACHE_PURGED !== 'true') missing.push('GOALPLACE_CACHE_PURGED=true');
+  if (env.GOALPLACE_POST_SWITCH_SMOKE_PASSED !== 'true') missing.push('GOALPLACE_POST_SWITCH_SMOKE_PASSED=true');
 
-  if (target === 'production' && process.env.GOALPLACE_PRODUCTION_CONFIRM !== 'ACTIVATE GOALPLACE256 PRODUCTION') {
+  if (target === 'production' && env.GOALPLACE_PRODUCTION_CONFIRM !== 'ACTIVATE GOALPLACE256 PRODUCTION') {
     missing.push('GOALPLACE_PRODUCTION_CONFIRM="ACTIVATE GOALPLACE256 PRODUCTION"');
   }
 
@@ -89,9 +109,15 @@ function requireControlInputs(target: ActiveEnvironment) {
   }
 }
 
-function validateTarget(registry: EnvironmentRegistry, target: SwitchableEnvironment) {
+function validateTarget(
+  root: string,
+  registry: EnvironmentRegistry,
+  target: SwitchableEnvironment,
+) {
   const config = registry.environments[target];
-  const appHostingFile = path.join(ROOT, config.appHostingConfig);
+  if (!config) throw new Error(`${target} environment is not registered.`);
+
+  const appHostingFile = path.join(root, config.appHostingConfig);
   if (!existsSync(appHostingFile)) throw new Error(`${config.appHostingConfig} is missing.`);
   if (target !== 'demo' && hasPlaceholders(appHostingFile)) {
     throw new Error(`${config.appHostingConfig} still contains REPLACE_WITH_* placeholders.`);
@@ -130,10 +156,6 @@ function validateTarget(registry: EnvironmentRegistry, target: SwitchableEnviron
     problems.push('production cannot activate with sandbox payments');
   }
 
-  if (problems.length) {
-    throw new Error(`${target} App Hosting config failed activation assertions:\n${problems.join('\n')}`);
-  }
-
   if (target === 'production') {
     assertSafeProductionEnvironment({
       NODE_ENV: 'production',
@@ -149,11 +171,15 @@ function validateTarget(registry: EnvironmentRegistry, target: SwitchableEnviron
       NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS: 'false',
     } as NodeJS.ProcessEnv);
   }
+
+  if (problems.length) {
+    throw new Error(`${target} App Hosting config failed activation assertions:\n${problems.join('\n')}`);
+  }
 }
 
-function reportId(target: ActiveEnvironment, action: string, now: string) {
+function reportId(target: ActiveEnvironment, action: string, now: string, env: NodeJS.ProcessEnv) {
   const digest = createHash('sha256')
-    .update(`${target}:${action}:${now}:${process.env.GOALPLACE_ACTIVATION_IDENTITY ?? 'unknown'}`)
+    .update(`${target}:${action}:${now}:${env.GOALPLACE_ACTIVATION_IDENTITY ?? 'unknown'}`)
     .digest('hex')
     .slice(0, 12);
   return `environment-${action}-${target}-${now.replace(/[:.]/g, '-')}-${digest}.json`;
@@ -165,9 +191,12 @@ function writeReport(input: {
   previous: ActiveEnvironment | null;
   next: ActivationState;
   registry: EnvironmentRegistry;
+  root: string;
+  env: NodeJS.ProcessEnv;
 }) {
-  mkdirSync(REPORT_DIR, { recursive: true });
-  const file = path.join(REPORT_DIR, reportId(input.target, input.action, input.next.updatedAt));
+  const reportDir = paths(input.root).reportDir;
+  mkdirSync(reportDir, { recursive: true });
+  const file = path.join(reportDir, reportId(input.target, input.action, input.next.updatedAt, input.env));
   writeJson(file, {
     action: input.action,
     target: input.target,
@@ -175,92 +204,136 @@ function writeReport(input: {
     publicDomain: input.registry.publicDomain,
     publicUrl: input.next.publicUrl,
     environmentVersion: input.next.environmentVersion,
-    deploymentIdentity: process.env.GOALPLACE_ACTIVATION_IDENTITY,
-    backupConfirmed: process.env.GOALPLACE_BACKUP_CONFIRMED === 'true',
-    healthcheckPassed: process.env.GOALPLACE_HEALTHCHECK_PASSED === 'true',
-    cachePurgeConfirmed: process.env.GOALPLACE_CACHE_PURGED === 'true',
-    postSwitchSmokePassed: process.env.GOALPLACE_POST_SWITCH_SMOKE_PASSED === 'true',
+    deploymentIdentity: input.env.GOALPLACE_ACTIVATION_IDENTITY,
+    backupConfirmed: input.env.GOALPLACE_BACKUP_CONFIRMED === 'true',
+    healthcheckPassed: input.env.GOALPLACE_HEALTHCHECK_PASSED === 'true',
+    cachePurgeConfirmed: input.env.GOALPLACE_CACHE_PURGED === 'true',
+    postSwitchSmokePassed: input.env.GOALPLACE_POST_SWITCH_SMOKE_PASSED === 'true',
     databaseMutation: 'none',
     createdAt: input.next.updatedAt,
   });
-  return path.relative(ROOT, file);
+  return path.relative(input.root, file);
 }
 
-function nextState(
-  state: ActivationState,
-  target: ActiveEnvironment,
-  action: string,
-  registry: EnvironmentRegistry,
-): ActivationState {
-  const now = new Date().toISOString();
-  const previous = state.activeEnvironment === target ? state.previousEnvironment : state.activeEnvironment;
+function nextState(input: {
+  state: ActivationState;
+  target: ActiveEnvironment;
+  action: string;
+  registry: EnvironmentRegistry;
+  root: string;
+  env: NodeJS.ProcessEnv;
+  now: Date;
+}): ActivationState {
+  const timestamp = input.now.toISOString();
+  const previous = input.state.activeEnvironment === input.target
+    ? input.state.previousEnvironment
+    : input.state.activeEnvironment;
   const provisional: ActivationState = {
-    activeEnvironment: target,
+    activeEnvironment: input.target,
     previousEnvironment: previous,
-    environmentVersion: `env-${target}-${now.replace(/[:.]/g, '-')}`,
-    publicUrl: process.env.GOALPLACE_PUBLIC_URL ?? `https://${registry.publicDomain}`,
-    maintenance: target === 'maintenance',
-    updatedAt: now,
-    updatedBy: process.env.GOALPLACE_ACTIVATION_IDENTITY ?? 'unknown',
+    environmentVersion: `env-${input.target}-${timestamp.replace(/[:.]/g, '-')}`,
+    publicUrl: input.env.GOALPLACE_PUBLIC_URL ?? `https://${input.registry.publicDomain}`,
+    maintenance: input.target === 'maintenance',
+    updatedAt: timestamp,
+    updatedBy: input.env.GOALPLACE_ACTIVATION_IDENTITY ?? 'unknown',
     lastActivationReport: null,
   };
   provisional.lastActivationReport = writeReport({
-    action,
-    target,
+    action: input.action,
+    target: input.target,
     previous,
     next: provisional,
-    registry,
+    registry: input.registry,
+    root: input.root,
+    env: input.env,
   });
   return provisional;
 }
 
-function activate(target: ActiveEnvironment, action = 'activate') {
-  const registry = readJson<EnvironmentRegistry>(REGISTRY_FILE);
-  const state = readJson<ActivationState>(ACTIVE_FILE);
+export function activateEnvironment(
+  target: ActiveEnvironment,
+  action = 'activate',
+  options: ActivationOptions = {},
+): ActivationResult {
+  const root = options.root ?? DEFAULT_ROOT;
+  const env = options.env ?? process.env;
+  const now = options.now ?? (() => new Date());
+  const { registryFile, activeFile } = paths(root);
+  const registry = readJson<EnvironmentRegistry>(registryFile);
+  const state = readJson<ActivationState>(activeFile);
 
-  if (target !== 'maintenance') validateTarget(registry, target);
-  requireControlInputs(target);
+  if (target !== 'maintenance') validateTarget(root, registry, target);
+  requireControlInputs(target, env);
 
-  const next = nextState(state, target, action, registry);
-  writeJson(ACTIVE_FILE, next);
-  console.log(`Active environment: ${next.activeEnvironment}`);
-  console.log(`Previous environment: ${next.previousEnvironment ?? 'none'}`);
-  console.log(`Environment version: ${next.environmentVersion}`);
-  console.log(`Audit report: ${next.lastActivationReport}`);
-  console.log('Database mutation: none');
+  const next = nextState({
+    state,
+    target,
+    action,
+    registry,
+    root,
+    env,
+    now: now(),
+  });
+  writeJson(activeFile, next);
+
+  return {
+    state: next,
+    reportPath: next.lastActivationReport,
+    lines: [
+      `Active environment: ${next.activeEnvironment}`,
+      `Previous environment: ${next.previousEnvironment ?? 'none'}`,
+      `Environment version: ${next.environmentVersion}`,
+      `Audit report: ${next.lastActivationReport}`,
+      'Database mutation: none',
+    ],
+  };
 }
 
-function status() {
-  const state = readJson<ActivationState>(ACTIVE_FILE);
-  console.log(`Active environment : ${state.activeEnvironment}`);
-  console.log(`Previous environment: ${state.previousEnvironment ?? 'none'}`);
-  console.log(`Environment version: ${state.environmentVersion}`);
-  console.log(`Public URL         : ${state.publicUrl}`);
-  console.log(`Maintenance        : ${state.maintenance ? 'yes' : 'no'}`);
-  console.log(`Updated at         : ${state.updatedAt}`);
-  console.log(`Updated by         : ${state.updatedBy}`);
-  console.log(`Last report        : ${state.lastActivationReport ?? 'none'}`);
+export function environmentStatus(options: ActivationOptions = {}): ActivationResult {
+  const root = options.root ?? DEFAULT_ROOT;
+  const state = readJson<ActivationState>(paths(root).activeFile);
+  return {
+    state,
+    reportPath: state.lastActivationReport,
+    lines: [
+      `Active environment : ${state.activeEnvironment}`,
+      `Previous environment: ${state.previousEnvironment ?? 'none'}`,
+      `Environment version: ${state.environmentVersion}`,
+      `Public URL         : ${state.publicUrl}`,
+      `Maintenance        : ${state.maintenance ? 'yes' : 'no'}`,
+      `Updated at         : ${state.updatedAt}`,
+      `Updated by         : ${state.updatedBy}`,
+      `Last report        : ${state.lastActivationReport ?? 'none'}`,
+    ],
+  };
 }
 
-function rollback() {
-  const state = readJson<ActivationState>(ACTIVE_FILE);
+export function rollbackEnvironment(options: ActivationOptions = {}) {
+  const root = options.root ?? DEFAULT_ROOT;
+  const state = readJson<ActivationState>(paths(root).activeFile);
   if (!state.previousEnvironment) throw new Error('Rollback refused. No previous environment is recorded.');
-  activate(state.previousEnvironment, 'rollback');
+  return activateEnvironment(state.previousEnvironment, 'rollback', options);
 }
 
-const action = arg('action') ?? process.argv[2] ?? 'status';
-const target = arg('environment') as GoalPlaceEnvironment | undefined;
+export function runActivationCli(argv = process.argv.slice(2), options: ActivationOptions = {}) {
+  const action = (arg(argv, 'action') ?? argv[0] ?? 'status') as EnvironmentAction;
+  const target = arg(argv, 'environment') as GoalPlaceEnvironment | undefined;
 
-try {
-  if (action === 'status') status();
-  else if (action === 'rollback') rollback();
-  else if (action === 'maintenance') activate('maintenance', 'maintenance');
-  else if (action === 'activate' && target && ['demo', 'beta', 'production'].includes(target)) {
-    activate(target as SwitchableEnvironment);
-  } else {
-    throw new Error('Usage: tsx scripts/environment/activate.ts --action=status|activate|maintenance|rollback --environment=demo|beta|production');
+  if (action === 'status') return environmentStatus(options);
+  if (action === 'rollback') return rollbackEnvironment(options);
+  if (action === 'maintenance') return activateEnvironment('maintenance', 'maintenance', options);
+  if (action === 'activate' && target && ['demo', 'beta', 'production'].includes(target)) {
+    return activateEnvironment(target as SwitchableEnvironment, 'activate', options);
   }
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
+  throw new Error('Usage: tsx scripts/environment/activate.ts --action=status|activate|maintenance|rollback --environment=demo|beta|production');
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  try {
+    const result = runActivationCli();
+    for (const line of result.lines) console.log(line);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  }
 }
