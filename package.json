@@ -12,6 +12,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "security:audit": "tsx scripts/release/advisory-gate.ts",
+    "deploy:ready": "npm run lint && npm test && npm run test:rules && npm run functions:typecheck && npm run functions:build && npm run demo:validate && npm run security:audit && npm run build",
+    "deploy:ready:production": "npm run deploy:ready && npm run prod:assert-clean",
     "seed:mock": "tsx --env-file=.env.local scripts/seed-mock-data.ts",
     "seed:firebase": "tsx scripts/seed-firestore.ts",
     "seed:emulator": "tsx scripts/seed-emulator.ts",
@@ -81,11 +84,16 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.12",
-    "firebase-tools": "^15.24.0",
+    "firebase-tools": "^15.25.0",
     "shadcn": "^4.15.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next": {
+      "sharp": "0.35.3"
+    }
   }
 }
