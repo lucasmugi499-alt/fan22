@@ -1,6 +1,7 @@
 'use client';
 
 import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
+import { AppCheck, getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 import { FirebaseStorage, getStorage } from 'firebase/storage';
@@ -31,6 +32,7 @@ let appInstance: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 let storageInstance: FirebaseStorage | null = null;
+let appCheckInstance: AppCheck | null = null;
 
 const dbId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID;
 
@@ -39,12 +41,25 @@ if (isFirebaseConfigured) {
   authInstance = getAuth(appInstance);
   dbInstance = dbId ? getFirestore(appInstance, dbId) : getFirestore(appInstance);
   storageInstance = getStorage(appInstance);
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY) {
+    appCheckInstance = initializeAppCheck(appInstance, {
+      provider: new ReCaptchaEnterpriseProvider(process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
 }
 
 export const firebaseApp = appInstance;
 export const auth = authInstance;
 export const db = dbInstance;
 export const storage = storageInstance;
+export const appCheck = appCheckInstance;
+
+export async function getPublicAppCheckToken() {
+  if (!appCheckInstance) return null;
+  const token = await getToken(appCheckInstance).catch(() => null);
+  return token?.token ?? null;
+}
 
 export function requireFirebaseClient() {
   if (!firebaseApp || !auth || !db || !storage) {

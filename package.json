@@ -52,6 +52,7 @@
     "clsx": "^2.1.1",
     "firebase": "^12.16.0",
     "firebase-admin": "^14.2.0",
+    "google-auth-library": "^10.9.1",
     "idb-keyval": "^6.3.0",
     "motion": "^12.40.0",
     "next": "^16.2.12",

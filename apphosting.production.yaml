@@ -24,6 +24,18 @@ env:
   - variable: GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "false"
     availability: [BUILD]
+  - variable: GOALPLACE_REQUIRE_APP_CHECK
+    value: "true"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_SCHEDULER_AUTH_MODE
+    value: oidc
+    availability: [RUNTIME]
+  - variable: GOALPLACE_SCHEDULER_AUDIENCE
+    value: REPLACE_WITH_PRODUCTION_SCHEDULER_AUDIENCE
+    availability: [RUNTIME]
+  - variable: GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS
+    value: REPLACE_WITH_PRODUCTION_SCHEDULER_SERVICE_ACCOUNT
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "false"
     availability: [BUILD]
@@ -50,6 +62,9 @@ env:
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: REPLACE_WITH_PRODUCTION_APP_ID
+    availability: [BUILD]
+  - variable: NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY
+    value: REPLACE_WITH_PRODUCTION_APP_CHECK_SITE_KEY
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
     value: fg256

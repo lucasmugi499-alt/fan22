@@ -24,6 +24,12 @@ env:
   - variable: GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
     availability: [BUILD]
+  - variable: GOALPLACE_REQUIRE_APP_CHECK
+    value: "false"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_SCHEDULER_AUTH_MODE
+    value: shared_secret
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
     availability: [BUILD]

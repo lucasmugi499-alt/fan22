@@ -2,8 +2,13 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { clientIpFrom, enforceRateLimit, parseJsonBody, verifyOptionalAppCheck } from '@/server/api/security';
 
 export const runtime = 'nodejs';
+
+function sha256(value: string) {
+  return createHash('sha256').update(value).digest('hex');
+}
 
 const schema = z.object({
   type: z.enum(['sponsor', 'league_pilot']),
@@ -16,38 +21,47 @@ const schema = z.object({
   scale: z.string().trim().min(1).max(80),
   interest: z.string().trim().min(10).max(800),
   preferredContact: z.string().trim().min(1).max(30),
+  website: z.string().max(0).optional(),
 });
 
 export async function POST(request: Request) {
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Complete every required field.' }, { status: 400 });
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const hour = new Date().toISOString().slice(0, 13);
-  const rateId = createHash('sha256').update(`${forwarded}:${hour}`).digest('hex');
-  const rateRef = adminDb.collection('publicInquiryRateLimits').doc(rateId);
+  const appCheck = await verifyOptionalAppCheck(request);
+  if ('response' in appCheck) return appCheck.response;
+
+  const parsed = await parseJsonBody(request, schema, { maxBytes: 8 * 1024 });
+  if ('response' in parsed) {
+    return Response.json({ error: 'Complete every required field.' }, { status: parsed.response.status });
+  }
+
+  const input = parsed.data;
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const normalizedPhone = input.phone.replace(/[^\d+]/g, '');
+  const clientIp = clientIpFrom(request);
+  const duplicateKey = `${input.type}:${normalizedEmail}:${normalizedPhone}:${input.organization.trim().toLowerCase()}`;
+  const limited = await enforceRateLimit({
+    bucket: 'public-inquiries',
+    identity: [clientIp, appCheck.appId, duplicateKey],
+    limit: 3,
+    windowSeconds: 60 * 60,
+  });
+  if (limited) return limited;
+
   const inquiryRef = adminDb.collection('publicInquiries').doc();
   try {
     await adminDb.runTransaction(async (transaction) => {
-      const rate = await transaction.get(rateRef);
-      const count = Number(rate.data()?.count ?? 0);
-      if (count >= 3) throw new Error('rate_limit');
-      transaction.set(rateRef, {
-        count: count + 1,
-        expiresAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
       transaction.create(inquiryRef, {
         id: inquiryRef.id,
-        ...parsed.data,
+        ...input,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         status: 'new',
         source: 'public_website',
+        appCheckAppId: appCheck.appId,
+        clientIpHash: clientIp === 'unknown' ? null : sha256(clientIp),
         createdAt: FieldValue.serverTimestamp(),
       });
     });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'rate_limit') {
-      return Response.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
-    }
+  } catch {
     return Response.json({ error: 'The request could not be saved.' }, { status: 500 });
   }
   return Response.json({ id: inquiryRef.id }, { status: 201 });

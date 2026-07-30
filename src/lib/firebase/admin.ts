@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getAppCheck } from 'firebase-admin/app-check';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
@@ -43,6 +44,7 @@ function createAdminApp() {
 
 export const adminApp = createAdminApp();
 export const adminAuth = getAuth(adminApp);
+export const adminAppCheck = getAppCheck(adminApp);
 const dbId =
   process.env.GOALPLACE_FIRESTORE_DATABASE_ID ||
   process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID;

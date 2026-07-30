@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { CheckCircle, PaperPlaneTilt } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/Button';
+import { getPublicAppCheckToken } from '@/lib/firebase/client';
 
 export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }) {
   const [submitting, setSubmitting] = useState(false);
@@ -14,9 +15,13 @@ export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }
     setSubmitting(true);
     setError('');
     const form = new FormData(event.currentTarget);
+    const appCheckToken = await getPublicAppCheckToken();
     const response = await fetch('/api/public-inquiries', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(appCheckToken ? { 'x-firebase-appcheck': appCheckToken } : {}),
+      },
       body: JSON.stringify({
         type,
         name: form.get('name'),
