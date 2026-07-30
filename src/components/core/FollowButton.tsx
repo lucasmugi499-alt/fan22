@@ -4,16 +4,12 @@ import { useState } from 'react';
 import { Check, Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
 import type { FollowTargetType } from '@/data/providers/types';
 import { useAuth } from '@/context/AuthProvider';
 import { useAuthGate } from '@/components/auth/AuthRequiredModal';
 import { cn } from '@/lib/utils';
-
-function profileField(targetType: FollowTargetType) {
-  if (targetType === 'athlete') return 'followedAthletes' as const;
-  if (targetType === 'team') return 'followedTeams' as const;
-  return 'followedLeagues' as const;
-}
+import { followProfileField, nextFollowIds } from './followState';
 
 export function FollowButton({
   targetType,
@@ -26,26 +22,28 @@ export function FollowButton({
   label?: string;
   className?: string;
 }) {
-  const { userProfile, updateLocalProfile } = useAuth();
+  const { userProfile, updateLocalProfile, isDemoMode } = useAuth();
   const { requireAuth } = useAuthGate();
-  const field = profileField(targetType);
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const field = followProfileField(targetType);
   const [optimisticFollowing, setOptimisticFollowing] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const following = optimisticFollowing ?? (userProfile?.[field]?.includes(targetId) ?? false);
 
   function toggle() {
     requireAuth(async () => {
-      if (!userProfile || saving) return;
+      if (saving) return;
+      if (!userProfile) {
+        toast.error(`Sign in to follow this ${targetType}.`);
+        return;
+      }
       const next = !following;
       setOptimisticFollowing(next);
       setSaving(true);
-      const current = new Set(userProfile[field] ?? []);
-      if (next) current.add(targetId);
-      else current.delete(targetId);
-      updateLocalProfile({ [field]: [...current] });
+      updateLocalProfile({ [field]: nextFollowIds(userProfile, field, targetId, next) });
 
       try {
-        const result = await dataProvider.toggleFollow(userProfile.id, targetType, targetId);
+        const result = await provider.toggleFollow(userProfile.id, targetType, targetId);
         setOptimisticFollowing(null);
         toast.success(result.message ?? (next ? 'Follow saved.' : 'Follow removed.'));
       } catch (cause) {
@@ -73,7 +71,7 @@ export function FollowButton({
       {following
         ? <Check className="h-4 w-4" weight="bold" />
         : <Plus className="h-4 w-4" weight="bold" />}
-      {following ? 'Following' : label ?? `Follow ${targetType}`}
+      {saving ? 'Saving...' : following ? 'Following' : label ?? `Follow ${targetType}`}
     </button>
   );
 }
