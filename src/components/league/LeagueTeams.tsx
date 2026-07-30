@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Buildings, Check, FileCsv, UserPlus } from '@phosphor-icons/react';
+import { Buildings, Check, FileCsv, Plus, UserPlus } from '@phosphor-icons/react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
@@ -38,11 +38,14 @@ export function LeagueTeams() {
   const { teams, matches, athletes, rosters, retry } = detail;
   const loading = catalog.loading || (Boolean(league) && detail.loading);
   const [tab, setTab] = useState<Tab>('Standings');
-  const [mode, setMode] = useState<'invite' | 'import' | null>(null);
+  const [mode, setMode] = useState<'team' | 'invite' | 'import' | null>(null);
   const [saving, setSaving] = useState(false);
   const [teamId, setTeamId] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteLink, setInviteLink] = useState('');
+  const [teamName, setTeamName] = useState('');
+  const [teamCity, setTeamCity] = useState('');
+  const [teamVenue, setTeamVenue] = useState('');
   const [importRows, setImportRows] = useState<Array<{ name: string; city?: string; venue?: string }>>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const submittedRosters = rosters.filter((roster) => roster.status === 'submitted');
@@ -79,6 +82,11 @@ export function LeagueTeams() {
   }, [league, lTeams, matches, seasons]);
   const activeSeason = league ? currentSeasonFor(seasons, league.id, league.currentSeasonId) : undefined;
 
+  function openOperation(nextMode: 'team' | 'invite' | 'import') {
+    setInviteLink('');
+    setMode(nextMode);
+  }
+
   async function saveOperation() {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
     if (!league || !actorUserId) {
@@ -86,8 +94,63 @@ export function LeagueTeams() {
       return;
     }
     setSaving(true);
+    let keepOpen = false;
     try {
-      if (mode === 'invite') {
+      if (mode === 'team') {
+        const normalizedName = teamName.trim();
+        if (normalizedName.length < 2) throw new Error('Enter the team name.');
+        if (lTeams.some((team) => team.name.trim().toLowerCase() === normalizedName.toLowerCase())) {
+          throw new Error('A team with this name already exists in the league.');
+        }
+        const now = new Date().toISOString();
+        const newTeamId = `${league.id}_${normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
+        await provider.createTeams([{
+          id: newTeamId,
+          name: normalizedName,
+          sport: league.sport,
+          leagueId: league.id,
+          city: teamCity.trim() || league.city,
+          location: teamVenue.trim() || `${normalizedName} home venue`,
+          country: 'Uganda',
+          description: `${normalizedName} competes in ${league.name}.`,
+          plan: 'free',
+          verified: false,
+          adminUserIds: [],
+          totalSupport: 0,
+          supportersCount: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          pointsFor: 0,
+          pointsAgainst: 0,
+          leaguePoints: 0,
+          verificationStatus: 'pending',
+          createdAt: now,
+        }]);
+        setTeamId(newTeamId);
+        if (inviteEmail.trim()) {
+          if (!inviteEmail.includes('@') || !activeSeason) throw new Error('A valid admin email and active season are required.');
+          const invitation = await provider.createTeamAdminInvitation({
+            id: `${newTeamId}_${inviteEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+            userId: '',
+            teamId: newTeamId,
+            leagueId: league.id,
+            seasonId: activeSeason.id,
+            role: 'team_admin',
+            status: 'invited',
+            invitedByUserId: actorUserId,
+            invitedEmail: inviteEmail.trim().toLowerCase(),
+            createdAt: now,
+          });
+          const link = invitation.actionUrl ? `${window.location.origin}${invitation.actionUrl}` : '';
+          setInviteLink(link);
+          keepOpen = Boolean(link);
+          if (link) await navigator.clipboard.writeText(link).catch(() => undefined);
+          toast.success(link ? 'Team created and invitation link copied.' : 'Team and invitation created.');
+        } else {
+          toast.success('Team created. You can invite its administrator when ready.');
+        }
+      } else if (mode === 'invite') {
         if (!teamId || !inviteEmail.includes('@') || !activeSeason) throw new Error('Choose a team, valid email, and active season.');
         const invitation = await provider.createTeamAdminInvitation({
           id: `${teamId}_${inviteEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
@@ -105,6 +168,7 @@ export function LeagueTeams() {
           ? `${window.location.origin}${invitation.actionUrl}`
           : '';
         setInviteLink(link);
+        keepOpen = Boolean(link);
         if (link) await navigator.clipboard.writeText(link).catch(() => undefined);
         toast.success(link ? 'Invitation link copied.' : 'Team Admin invitation created.');
       } else {
@@ -136,7 +200,7 @@ export function LeagueTeams() {
         await provider.createTeams(imported);
         toast.success(`${imported.length} teams imported.`);
       }
-      setMode(null);
+      if (!keepOpen) setMode(null);
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'This operation could not be completed.');
@@ -179,8 +243,8 @@ export function LeagueTeams() {
         <div className="flex items-center justify-between gap-2 px-[var(--gutter)] pb-3 md:px-0">
           <h1 className="text-xl font-semibold text-text-strong">Teams</h1>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" icon={FileCsv} onClick={() => setMode('import')}>Import</Button>
-            <Button size="sm" icon={UserPlus} onClick={() => setMode('invite')}>Invite</Button>
+            <Button size="sm" variant="secondary" icon={FileCsv} onClick={() => openOperation('import')}>Import</Button>
+            <Button size="sm" icon={Plus} onClick={() => openOperation('team')}>Add team</Button>
           </div>
         </div>
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
@@ -238,21 +302,36 @@ export function LeagueTeams() {
       <Sheet
         open={mode !== null}
         onClose={() => setMode(null)}
-        title={mode === 'invite' ? 'Invite Team Admin' : 'Import teams'}
-        description={mode === 'invite' ? 'Assignment is scoped to one team and season.' : 'CSV columns: name, city, venue'}
-        footer={<Button block icon={Check} onClick={saveOperation} disabled={saving || Boolean(importErrors.length)}>{saving ? 'Saving...' : mode === 'invite' ? 'Create invitation' : `Import ${importRows.length} teams`}</Button>}
+        title={mode === 'team' ? 'Add team and administrator' : mode === 'invite' ? 'Invite Team Admin' : 'Import teams'}
+        description={mode === 'team' ? 'Create the team now and optionally issue its first admin invitation.' : mode === 'invite' ? 'Assignment is scoped to one team and season.' : 'CSV columns: name, city, venue'}
+        footer={
+          <Button
+            block
+            icon={inviteLink ? Check : mode === 'team' ? Plus : mode === 'invite' ? UserPlus : Check}
+            onClick={inviteLink ? () => setMode(null) : saveOperation}
+            disabled={saving || Boolean(importErrors.length)}
+          >
+            {inviteLink ? 'Done' : saving ? 'Saving...' : mode === 'team' ? 'Create team' : mode === 'invite' ? 'Create invitation' : `Import ${importRows.length} teams`}
+          </Button>
+        }
       >
-        {mode === 'invite' ? (
+        {mode === 'team' ? (
+          <div className="space-y-4">
+            <label className="block text-xs font-semibold uppercase text-subtle">Team name<input className="field mt-2 normal-case" value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="Kampala City Stars" /></label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-semibold uppercase text-subtle">City or district<input className="field mt-2 normal-case" value={teamCity} onChange={(event) => setTeamCity(event.target.value)} placeholder={league?.city ?? 'Kampala'} /></label>
+              <label className="block text-xs font-semibold uppercase text-subtle">Home venue<input className="field mt-2 normal-case" value={teamVenue} onChange={(event) => setTeamVenue(event.target.value)} placeholder="Public venue" /></label>
+            </div>
+            <label className="block text-xs font-semibold uppercase text-subtle">First Team Admin email <span className="font-normal normal-case text-muted">(optional)</span><input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
+            <p className="text-xs leading-5 text-muted">The team begins unverified with no administrator. When an email is supplied, the recipient receives an expiring assignment link and creates or signs into their own fan account to accept it.</p>
+            {inviteLink ? <InvitationLink value={inviteLink} /> : null}
+          </div>
+        ) : mode === 'invite' ? (
           <div className="space-y-4">
             <label className="block text-xs font-semibold uppercase text-subtle">Team<select className="field mt-2 normal-case" value={teamId} onChange={(event) => setTeamId(event.target.value)}><option value="">Choose team</option>{lTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
             <label className="block text-xs font-semibold uppercase text-subtle">Admin email<input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
             <p className="text-xs text-muted">The recipient signs in with this email and accepts the assignment. A trusted server then issues the Team Admin claim.</p>
-            {inviteLink ? (
-              <label className="block text-xs font-semibold uppercase text-subtle">
-                Expiring invitation link
-                <input className="field mt-2 normal-case" readOnly value={inviteLink} onFocus={(event) => event.currentTarget.select()} />
-              </label>
-            ) : null}
+            {inviteLink ? <InvitationLink value={inviteLink} /> : null}
           </div>
         ) : (
           <div className="space-y-4">
@@ -268,5 +347,15 @@ export function LeagueTeams() {
         )}
       </Sheet>
     </div>
+  );
+}
+
+function InvitationLink({ value }: { value: string }) {
+  return (
+    <label className="block text-xs font-semibold uppercase text-subtle">
+      Expiring invitation link
+      <input className="field mt-2 normal-case" readOnly value={value} onFocus={(event) => event.currentTarget.select()} />
+      <span className="mt-2 block font-normal normal-case leading-5 text-muted">The link has been copied. It expires after seven days and only works for the invited email.</span>
+    </label>
   );
 }

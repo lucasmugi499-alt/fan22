@@ -108,6 +108,8 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
       await dataProvider.acceptTeamAdminInvitation(assignmentId, userId, token);
       setAccepted(true);
       toast.success('Team Admin invitation accepted.');
+      await currentUser?.getIdToken(true);
+      window.setTimeout(() => window.location.assign('/team-admin'), 600);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Could not accept this invitation.');
     }
@@ -134,7 +136,7 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
       <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted ? 'Invitation accepted' : 'Team Admin invitation'}</h1>
       <p className="mt-2 text-sm text-muted">
         {accepted
-          ? 'Your assignment and trusted Team Admin access are active. Reopen the app to enter the Team Console.'
+          ? 'Your assignment and trusted Team Admin access are active. Opening the Team Console now.'
           : `You have been invited to administer team ${assignment.teamId} for the ${assignment.seasonId} season.`}
       </p>
       {!accepted && authStatus === 'logged_in' ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}

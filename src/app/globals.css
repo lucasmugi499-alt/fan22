@@ -279,8 +279,12 @@
 
   .snap-row {
     display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 12px;
     overflow-x: auto;
+    overscroll-behavior-inline: contain;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;

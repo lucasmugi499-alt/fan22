@@ -103,25 +103,24 @@ export function FanOnboarding({
     updateLocalProfile(updates);
 
     try {
-      await provider.updateUserProfile(userProfile.id, {
-        city,
-        sportPreferences: sports,
-        onboardingCompletedAt: completedAt,
-      });
-      const differences = [
-        ['league', userProfile.followedLeagues, leagueIds],
-        ['team', userProfile.followedTeams, teamIds],
-        ['athlete', userProfile.followedAthletes, athleteIds],
-      ] as const;
-      const followActions = differences.flatMap(([targetType, previousIds, nextIds]) => [
-        ...nextIds
-          .filter((id) => !previousIds.includes(id))
-          .map((id) => provider.toggleFollow(userProfile.id, targetType, id)),
-        ...previousIds
-          .filter((id) => !nextIds.includes(id))
-          .map((id) => provider.toggleFollow(userProfile.id, targetType, id)),
-      ]);
-      await Promise.all(followActions);
+      await provider.updateUserProfile(userProfile.id, updates);
+      const recognitionActions = [
+        ...leagueIds
+          .filter((id) => !(userProfile.followedLeagues ?? []).includes(id))
+          .map((id) => provider.recordPointsAction({
+            userId: userProfile.id,
+            actionType: 'first_league_followed' as const,
+            relatedEntityId: id,
+          })),
+        ...teamIds
+          .filter((id) => !(userProfile.followedTeams ?? []).includes(id))
+          .map((id) => provider.recordPointsAction({
+            userId: userProfile.id,
+            actionType: 'team_followed' as const,
+            relatedEntityId: id,
+          })),
+      ];
+      await Promise.all(recognitionActions.map((action) => action.catch(() => undefined)));
       toast.success('Your sports home is ready.');
       onClose();
     } catch (cause) {

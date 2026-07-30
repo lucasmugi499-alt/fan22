@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +30,6 @@ export function Sheet({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-
   useEffect(() => {
     if (!open) return;
 
@@ -72,10 +72,10 @@ export function Sheet({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <button
         aria-label="Close"
         onClick={onClose}
@@ -84,12 +84,12 @@ export function Sheet({
       <div
         ref={panelRef}
         className={cn(
-          'relative flex max-h-[92dvh] w-full flex-col rounded-t-[var(--radius-2xl)] border border-border bg-surface-1 bezel-core shadow-e3 pb-safe',
+          'relative flex max-h-[calc(100dvh-12px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[var(--radius-2xl)] border border-border bg-surface-1 bezel-core shadow-e3 pb-safe',
           'motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-fluid)]',
           'sm:m-4 sm:max-w-md sm:rounded-[var(--radius-2xl)]'
         )}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border p-4">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-4">
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-semibold text-text-strong">{title}</h2>
             {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
@@ -105,8 +105,9 @@ export function Sheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
 
-        {footer ? <div className="border-t border-border p-4">{footer}</div> : null}
+        {footer ? <div className="shrink-0 border-t border-border p-4">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

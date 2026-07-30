@@ -165,6 +165,9 @@ export type EditableUserProfile = {
   city?: string;
   avatarUrl?: string;
   sportPreferences?: SportSlug[];
+  followedAthletes?: string[];
+  followedTeams?: string[];
+  followedLeagues?: string[];
   notificationPreferences?: NotificationPreferences;
   lowDataMode?: boolean;
   onboardingCompletedAt?: string;

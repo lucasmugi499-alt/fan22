@@ -157,6 +157,19 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
   }
 }
 
+export function getPostSignInRoute(role: AppRole | null, requestedPath?: string | null): string {
+  if (
+    requestedPath
+    && requestedPath.startsWith('/')
+    && !requestedPath.startsWith('//')
+    && !requestedPath.startsWith('/login')
+    && !requestedPath.startsWith('/register')
+  ) {
+    return requestedPath;
+  }
+  return getDefaultRouteForRole(role);
+}
+
 export const PUBLIC_ROUTES = [
   '/',
   '/how-it-works',

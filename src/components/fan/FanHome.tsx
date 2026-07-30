@@ -46,6 +46,10 @@ export function FanHome() {
   const followedLeagueIds = useMemo(() => userProfile?.followedLeagues ?? [], [userProfile?.followedLeagues]);
   const followedTeamIds = useMemo(() => userProfile?.followedTeams ?? [], [userProfile?.followedTeams]);
   const followedAthleteIds = useMemo(() => userProfile?.followedAthletes ?? [], [userProfile?.followedAthletes]);
+  const followedLeagues = useMemo(
+    () => followedLeagueIds.map((id) => leagues.find((league) => league.id === id)).filter((league) => league !== undefined),
+    [followedLeagueIds, leagues],
+  );
   const preferredMatch = useCallback((match: Match) =>
     (!followedLeagueIds.length && !followedTeamIds.length) ||
     followedLeagueIds.includes(match.leagueId) ||
@@ -127,6 +131,48 @@ export function FanHome() {
           Tune my home
         </Button>
       </div>
+
+      <section className="min-w-0 space-y-3" aria-labelledby="your-leagues-heading">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 id="your-leagues-heading" className="text-[15px] font-semibold text-text-strong">Your leagues</h2>
+            <p className="text-xs text-muted">Fixtures and official updates from the competitions you follow.</p>
+          </div>
+          <Button size="sm" variant="ghost" icon={SlidersHorizontal} onClick={() => setOnboardingOpen(true)}>
+            Edit
+          </Button>
+        </div>
+        {followedLeagues.length ? (
+          <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+            {followedLeagues.map((league) => (
+              <Link
+                key={league.id}
+                href={`/leagues/${league.id}`}
+                className="snap-item flex min-h-20 w-[260px] max-w-[80vw] items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface-1 p-3 bezel-core"
+              >
+                <Crest name={league.name} sport={String(league.sport)} size={42} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-text-strong">{league.name}</span>
+                  <span className="mt-1 block text-xs text-muted">{league.city} / {league.sport}</span>
+                </span>
+                <CaretRight className="ml-auto h-4 w-4 shrink-0 text-muted" />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOnboardingOpen(true)}
+            className="flex min-h-20 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border border-dashed border-border-strong bg-surface-1 px-4 text-left"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-text-strong">Choose your first league</span>
+              <span className="mt-1 block text-xs text-muted">Your home will use those follows immediately.</span>
+            </span>
+            <CaretRight className="h-5 w-5 shrink-0 text-brand" />
+          </button>
+        )}
+      </section>
 
       {/* Fixtures rail grouped by day */}
       <section className="space-y-3">

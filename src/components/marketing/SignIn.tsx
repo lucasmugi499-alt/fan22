@@ -1,21 +1,21 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, ArrowRight, Eye, EyeSlash, SignIn as SignInIcon } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
-import { getDefaultRouteForRole } from '@/lib/auth/permissions';
+import { getDefaultRouteForRole, getPostSignInRoute } from '@/lib/auth/permissions';
 import {
-  getUserProfile,
-  getUserRole,
   isAuthAvailable,
   login,
+  logout,
   registerAccount,
   requestPasswordReset,
 } from '@/lib/firebase/auth';
 import { MarketingShell } from '@/components/marketing/MarketingShell';
 import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Sheet';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
 
@@ -29,9 +29,15 @@ const ROLES: { role: AppRole; label: string; blurb: string; icon: IconComponent 
 
 type AccountMode = 'signin' | 'register' | 'reset';
 
-export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }) {
+export function SignIn({
+  initialMode = 'signin',
+  nextPath,
+}: {
+  initialMode?: AccountMode;
+  nextPath?: string;
+}) {
   const router = useRouter();
-  const { setDemoRole } = useAuth();
+  const { setDemoRole, authStatus, role } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -40,6 +46,17 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [awaitingAuthState, setAwaitingAuthState] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
+
+  useEffect(() => {
+    if (!awaitingAuthState || authStatus !== 'logged_in') return;
+    if (!role) return;
+    router.replace(getPostSignInRoute(role, nextPath));
+  }, [authStatus, awaitingAuthState, nextPath, role, router]);
+  const accountRoleError = awaitingAuthState && authStatus === 'logged_in' && !role
+    ? 'This account is signed in, but it does not have an app role yet.'
+    : null;
 
   function enterAs(role: AppRole) {
     setDemoRole(role);
@@ -69,20 +86,15 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
           return;
         }
         await registerAccount({ email: email.trim(), password, name: name.trim() });
+        await logout();
+        setMode('signin');
+        setPassword('');
         setSuccess('Account created. Check your inbox to verify your email, then sign in.');
         return;
       }
 
-      const credential = await login(email.trim(), password);
-      const profile = await getUserProfile(credential.user.uid);
-      const role = await getUserRole(credential.user, profile);
-
-      if (!role) {
-        setError('This account is signed in, but it does not have an app role yet.');
-        return;
-      }
-
-      router.push(getDefaultRouteForRole(role));
+      await login(email.trim(), password);
+      setAwaitingAuthState(true);
     } catch (cause) {
       const code = typeof cause === 'object' && cause && 'code' in cause ? String(cause.code) : '';
       if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
@@ -221,9 +233,9 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
               </div>
               {mode === 'register' ? <p className="text-xs text-muted">Use at least eight characters.</p> : null}
             </div> : null}
-            {error ? (
+            {error || accountRoleError ? (
               <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">
-                {error}
+                {error ?? accountRoleError}
               </p>
             ) : null}
             {success ? (
@@ -271,7 +283,94 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
             You can switch roles at any time from the Demo pill in the bottom corner.
           </p>
         ) : null}
+
+        <button
+          type="button"
+          onClick={() => setAccessOpen(true)}
+          className="mx-auto mt-5 flex min-h-11 items-center justify-center text-sm font-semibold text-brand hover:underline"
+        >
+          How accounts and invitations work
+        </button>
       </section>
+
+      <Sheet
+        open={accessOpen}
+        onClose={() => setAccessOpen(false)}
+        title="Choose the right access path"
+        description="Public roles are never selected during registration."
+      >
+        <div className="space-y-3">
+          <AccessPath
+            icon={Broadcast}
+            title="Fan account"
+            description="Create your own account, follow local sport, join fantasy, and support verified needs."
+            action="Create fan account"
+            onClick={() => {
+              setAccessOpen(false);
+              setMode('register');
+            }}
+          />
+          <AccessPath
+            icon={ShieldCheck}
+            title="League organizer"
+            description="Create a fan account first, then submit the league and your authority for Platform Admin review."
+            action="Apply to operate a league"
+            onClick={() => router.push('/apply/league-admin')}
+          />
+          <AccessPath
+            icon={Users}
+            title="Team administrator"
+            description="A League Admin adds the team and sends an expiring email invitation. Sign in through that link to accept."
+            action="I have an invitation"
+            onClick={() => {
+              setAccessOpen(false);
+              setMode('signin');
+            }}
+          />
+          <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4">
+            <div className="flex items-start gap-3">
+              <Gavel className="mt-0.5 h-5 w-5 shrink-0 text-brand-2" weight="duotone" />
+              <div>
+                <p className="text-sm font-semibold text-text-strong">Platform oversight</p>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  Platform Admins review league applications, issue trusted role access, and retain an audit trail of invitations and approvals.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Sheet>
     </MarketingShell>
+  );
+}
+
+function AccessPath({
+  icon: Icon,
+  title,
+  description,
+  action,
+  onClick,
+}: {
+  icon: IconComponent;
+  title: string;
+  description: string;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-border bg-surface-1 p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-md)] bg-brand-subtle text-brand">
+          <Icon className="h-5 w-5" weight="duotone" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-text-strong">{title}</p>
+          <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
+          <button type="button" onClick={onClick} className="mt-3 min-h-11 text-sm font-semibold text-brand hover:underline">
+            {action}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

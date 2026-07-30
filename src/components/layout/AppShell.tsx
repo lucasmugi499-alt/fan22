@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
 import { navForRole } from '@/lib/nav';
-import { PUBLIC_ROUTES } from '@/lib/auth/permissions';
+import { isPublicRoute } from '@/lib/auth/permissions';
 import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { DesktopRail } from './DesktopRail';
@@ -22,16 +22,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { role } = useAuth();
 
   const isMarketing =
-    PUBLIC_ROUTES.includes(pathname) ||
-    pathname === '/' ||
+    isPublicRoute(pathname) ||
     pathname.startsWith('/about') ||
     pathname.startsWith('/how-it-works') ||
     pathname.startsWith('/pilot') ||
     pathname.startsWith('/verification') ||
     pathname.startsWith('/sponsors') ||
     pathname.startsWith('/terms') ||
-    pathname.startsWith('/privacy') ||
-    pathname.startsWith('/login');
+    pathname.startsWith('/privacy');
 
   if (isMarketing) {
     return <div className="min-h-dvh">{children}</div>;

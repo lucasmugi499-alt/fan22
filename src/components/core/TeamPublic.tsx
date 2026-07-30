@@ -26,13 +26,32 @@ function ugx(n: number): string {
 }
 
 export function TeamPublic({ teamId }: { teamId: string }) {
-  const { teams, athletes, matches, leagues, seasons, feedPosts, supportNeeds, sponsors, loading } = useGoalPlaceData({
+  const profileData = useGoalPlaceData({
     collections: ['teams', 'athletes', 'matches', 'leagues', 'seasons', 'feedPosts', 'supportNeeds', 'sponsors'],
     scope: { teamId },
     recordLimit: 120,
   });
-  const team = useMemo(() => teams.find((t) => t.id === teamId), [teams, teamId]);
+  const {
+    teams: profileTeams,
+    athletes,
+    matches: profileMatches,
+    leagues,
+    seasons: profileSeasons,
+    feedPosts,
+    supportNeeds,
+    sponsors,
+  } = profileData;
+  const team = useMemo(() => profileTeams.find((t) => t.id === teamId), [profileTeams, teamId]);
   const league = useMemo(() => leagues.find((l) => l.id === team?.leagueId), [leagues, team]);
+  const leagueData = useGoalPlaceData({
+    collections: ['teams', 'matches', 'seasons'],
+    scope: { leagueId: league?.id ?? '__pending__' },
+    recordLimit: 250,
+  });
+  const teams = league?.id ? leagueData.teams : profileTeams;
+  const matches = league?.id ? leagueData.matches : profileMatches;
+  const seasons = league?.id ? leagueData.seasons : profileSeasons;
+  const loading = profileData.loading || (Boolean(league?.id) && leagueData.loading);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const roster = useMemo(() => athletes.filter((a) => a.teamId === teamId), [athletes, teamId]);
   const teamMatches = useMemo(() => matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId), [matches, teamId]);
@@ -60,7 +79,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   if (!team) return <EmptyState icon={Warning} title="Team not found" description="This team may have been removed, or the link is out of date." />;
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <IdentityHero
         gradient={clubColor(team.name).gradient}
         media={<Crest name={team.name} sport={String(team.sport)} size={72} className="!bg-white/15 !border-white/40 !text-white" />}
@@ -78,8 +97,8 @@ export function TeamPublic({ teamId }: { teamId: string }) {
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-5">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
           {nextMatch ? <NextMatchCard match={nextMatch} home={teamById.get(nextMatch.homeTeamId)} away={teamById.get(nextMatch.awayTeamId)} /> : null}
 
           {results.length ? (

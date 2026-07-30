@@ -15,6 +15,7 @@ import {
   canVerifyFinalResult,
   canVerifyMatch,
   getDefaultRouteForRole,
+  getPostSignInRoute,
   isLoggedIn,
 } from './permissions';
 
@@ -151,5 +152,19 @@ describe('getDefaultRouteForRole', () => {
 
   it('sends anonymous visitors to the landing page', () => {
     expect(getDefaultRouteForRole(null)).toBe('/');
+  });
+});
+
+describe('getPostSignInRoute', () => {
+  it('returns a safe invitation route after authentication', () => {
+    expect(getPostSignInRoute('fan', '/invitations/team/invite_1?token=abc')).toBe(
+      '/invitations/team/invite_1?token=abc',
+    );
+  });
+
+  it('uses the role home when no safe local path was requested', () => {
+    expect(getPostSignInRoute('fan', 'https://example.com')).toBe('/home');
+    expect(getPostSignInRoute('league_admin', '//example.com')).toBe('/league-admin');
+    expect(getPostSignInRoute('team_admin', '/login')).toBe('/team-admin');
   });
 });

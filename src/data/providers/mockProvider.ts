@@ -72,6 +72,7 @@ import {
 import type { Contribution, PaymentIntent, PointsEvent } from '@/types/money';
 import { challengeNextStatus } from '@/lib/challenge';
 import { normalizeChallengeStatus } from '@/lib/status';
+import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
@@ -576,8 +577,12 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async updateUserProfile(userId, data) {
     const user = users.find((item) => item.id === userId);
-    if (!user) throw new Error('User profile not found.');
-    Object.assign(user, data);
+    const demoProfile = Object.values(MOCK_PROFILES).find(
+      (profile) => profile.id === userId || profile.uid === userId,
+    );
+    if (!user && !demoProfile) throw new Error('User profile not found.');
+    if (user) Object.assign(user, data);
+    if (demoProfile) Object.assign(demoProfile, data);
     if (data.onboardingCompletedAt) {
       await mockProvider.recordPointsAction({
         userId,
