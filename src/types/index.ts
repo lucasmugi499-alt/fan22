@@ -971,16 +971,137 @@ export interface AdminAuditEvent {
   createdAt: string;
 }
 
+export type AccessRoleKey =
+  | "super_admin"
+  | "platform_admin"
+  | "platform_reviewer"
+  | "platform_support"
+  | "league_owner"
+  | "league_admin"
+  | "league_operator"
+  | "league_verifier"
+  | "team_owner"
+  | "team_admin"
+  | "roster_manager"
+  | "result_reporter"
+  | "content_manager"
+  | "athlete_self"
+  | "athlete_guardian";
+
+export type AccessScopeType = "platform" | "organization" | "league" | "team" | "athlete";
+
+export interface Invitation {
+  id: string;
+  type:
+    | "platform_admin"
+    | "league_owner"
+    | "league_admin"
+    | "team_owner"
+    | "team_admin"
+    | "athlete"
+    | "guardian";
+  invitedEmail?: string;
+  invitedPhone?: string;
+  roleKey: AccessRoleKey;
+  scopeType: AccessScopeType;
+  scopeId: string;
+  permissionBundleId?: string;
+  tokenHash?: string;
+  tokenVersion: number;
+  status:
+    | "draft"
+    | "queued"
+    | "sent"
+    | "delivered"
+    | "viewed"
+    | "accepted"
+    | "declined"
+    | "expired"
+    | "revoked"
+    | "superseded"
+    | "failed_delivery";
+  invitedByUserId: string;
+  applicationId?: string;
+  organizationId?: string;
+  leagueId?: string;
+  actionUrl?: string;
+  expiresAt: string;
+  viewedAt?: string;
+  acceptedAt?: string;
+  declinedAt?: string;
+  revokedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccessAssignmentRecord {
+  id: string;
+  userId: string;
+  roleKey: AccessRoleKey;
+  scopeType: AccessScopeType;
+  scopeId: string;
+  permissionBundleId: string;
+  status: "pending" | "active" | "suspended" | "expired" | "revoked";
+  grantedByUserId: string;
+  invitationId?: string;
+  applicationId?: string;
+  validFrom: string;
+  validUntil?: string;
+  suspendedAt?: string;
+  revokedAt?: string;
+  revocationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccessIndexRecord {
+  userId: string;
+  scopeType: AccessScopeType;
+  scopeId: string;
+  activeRoles: AccessRoleKey[];
+  capabilities: string[];
+  assignmentIds: string[];
+  accessVersion: number;
+  updatedAt: string;
+}
+
 export interface LeagueAdminApplication {
   id: string;
   userId: string;
+  applicantEmail?: string;
+  applicantPhone?: string;
   leagueName: string;
   sport: SportSlug;
+  country?: string;
+  region?: string;
   city: string;
+  estimatedTeams?: number;
+  estimatedAthletes?: number;
+  competitionFormat?: string;
+  currentOperations?: string;
   evidenceNote: string;
-  status: "pending" | "approved" | "rejected" | "needs_information";
+  status:
+    | "draft"
+    | "email_verification_pending"
+    | "pending"
+    | "submitted"
+    | "under_review"
+    | "needs_information"
+    | "resubmitted"
+    | "risk_review"
+    | "waitlisted"
+    | "approved"
+    | "rejected"
+    | "withdrawn"
+    | "expired"
+    | "converted_to_onboarding";
   leagueId?: string;
+  organizationId?: string;
+  invitationId?: string;
+  invitationActionUrl?: string;
+  riskFlags?: string[];
   reviewedByUserId?: string;
+  applicantMessage?: string;
   createdAt: string;
   updatedAt?: string;
 }

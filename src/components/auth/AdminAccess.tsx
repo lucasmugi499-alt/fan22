@@ -10,7 +10,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import type { SportSlug, TeamAssignment } from '@/types';
+import type { Invitation, SportSlug, TeamAssignment } from '@/types';
 
 export function LeagueAdminApplicationForm() {
   const { authStatus, currentUser, userProfile, isDemoMode } = useAuth();
@@ -30,6 +30,7 @@ export function LeagueAdminApplicationForm() {
     try {
       await provider.createLeagueAdminApplication({
         userId,
+        applicantEmail: currentUser?.email ?? userProfile?.email,
         leagueName: leagueName.trim(),
         sport,
         city: city.trim(),
@@ -153,6 +154,86 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
           : `You have been invited to administer team ${assignment.teamId} for the ${assignment.seasonId} season.`}
       </p>
       {!accepted && authStatus === 'logged_in' ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
+    </Card>
+  );
+}
+
+export function AccessInvitationAcceptance({ invitationId, token }: { invitationId: string; token: string }) {
+  const { authStatus, currentUser, userProfile, isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const [invitation, setInvitation] = useState<Invitation>();
+  const [loading, setLoading] = useState(true);
+  const [accepted, setAccepted] = useState(false);
+  const [loadedAt] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (authStatus !== 'logged_in') return;
+    let cancelled = false;
+    provider.getInvitationById(invitationId)
+      .then((item) => { if (!cancelled) setInvitation(item); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [authStatus, invitationId, provider]);
+
+  async function accept() {
+    const userId = currentUser?.uid ?? userProfile?.uid;
+    if (!userId) return;
+    try {
+      await provider.acceptInvitation(invitationId, userId, token);
+      setAccepted(true);
+      toast.success('Invitation accepted.');
+      await currentUser?.getIdToken(true);
+      window.setTimeout(() => {
+        if (invitation?.roleKey === 'league_owner' || invitation?.roleKey === 'league_admin') {
+          window.location.assign('/league-admin/onboarding');
+        } else if (invitation?.roleKey === 'team_owner' || invitation?.roleKey === 'team_admin') {
+          window.location.assign('/team-admin');
+        } else {
+          window.location.assign('/home');
+        }
+      }, 600);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not accept this invitation.');
+    }
+  }
+
+  if (!token) {
+    return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation link is incomplete, expired, or has been revoked.</p></Card>;
+  }
+  if (authStatus !== 'logged_in') {
+    const next = `/invitations/access/${encodeURIComponent(invitationId)}?token=${encodeURIComponent(token)}`;
+    return (
+      <Card className="mx-auto max-w-lg p-6 text-center">
+        <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
+        <h1 className="mt-3 text-xl font-semibold text-text-strong">GoalPlace256 invitation</h1>
+        <p className="mt-2 text-sm text-muted">Sign in with the invited email address to review and accept this assignment.</p>
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in to accept</Link>
+      </Card>
+    );
+  }
+  if (loading) return <Skeleton className="mx-auto h-64 max-w-lg rounded-[var(--radius-lg)]" />;
+  if (!invitation) {
+    return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation may have expired, been revoked, or belonged to another environment.</p></Card>;
+  }
+
+  const expired = Date.parse(invitation.expiresAt) <= loadedAt;
+  const canAccept = !accepted && invitation.status !== 'accepted' && !expired;
+
+  return (
+    <Card className="mx-auto max-w-lg p-6 text-center">
+      <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
+      <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted || invitation.status === 'accepted' ? 'Invitation accepted' : 'GoalPlace256 invitation'}</h1>
+      <p className="mt-2 text-sm text-muted">
+        {accepted || invitation.status === 'accepted'
+          ? 'Your scoped assignment is active. Opening your workspace now.'
+          : `You have been invited as ${invitation.roleKey.replace(/_/g, ' ')} for ${invitation.scopeType} ${invitation.scopeId}.`}
+      </p>
+      <dl className="mt-5 grid gap-2 rounded-[var(--radius-md)] bg-surface-2 p-4 text-left text-sm">
+        <div className="flex justify-between gap-3"><dt className="text-muted">Role</dt><dd className="font-semibold capitalize text-text-strong">{invitation.roleKey.replace(/_/g, ' ')}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-muted">Scope</dt><dd className="font-semibold text-text-strong">{invitation.scopeType}:{invitation.scopeId}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-muted">Status</dt><dd className="font-semibold capitalize text-text-strong">{expired ? 'expired' : invitation.status.replace(/_/g, ' ')}</dd></div>
+      </dl>
+      {canAccept ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
     </Card>
   );
 }

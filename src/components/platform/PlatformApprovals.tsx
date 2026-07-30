@@ -52,14 +52,19 @@ export function PlatformApprovals() {
     }
     setSaving(true);
     try {
-      await provider.reviewApproval({
+      const result = await provider.reviewApproval({
         targetCollection: active.targetCollection,
         targetId: active.id,
         actorUserId,
         decision,
         note: note.trim() || undefined,
       });
-      toast.success(decision === 'approved' ? `${active.title} approved.` : 'Decision recorded.');
+      if (result.actionUrl && typeof navigator !== 'undefined') {
+        await navigator.clipboard?.writeText(new URL(result.actionUrl, window.location.origin).toString()).catch(() => undefined);
+      }
+      toast.success(result.actionUrl
+        ? `${active.title} approved. Invitation link copied.`
+        : decision === 'approved' ? `${active.title} approved.` : 'Decision recorded.');
       setActive(null);
       setNote('');
       retry();

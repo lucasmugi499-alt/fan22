@@ -27,6 +27,8 @@ import type {
   SupportPledge,
   Team,
   TeamAssignment,
+  Invitation,
+  AccessAssignmentRecord,
   User,
   Verification,
   WalletTransaction,
@@ -82,6 +84,8 @@ export const investorDemoRuntime = {
   adminAuditEvents: [] as AdminAuditEvent[],
   athleteClaims: [] as AthleteClaim[],
   leagueAdminApplications: [] as LeagueAdminApplication[],
+  invitations: [] as Invitation[],
+  accessAssignments: [] as AccessAssignmentRecord[],
   supportNeeds: investorDemo.athletes.slice(0, 6).map((athlete, index): SupportNeed => ({
     id: `support_need_${index + 1}`,
     athleteId: athlete.id,

@@ -14,7 +14,7 @@ describe('mock provider league applications', () => {
       evidenceNote: 'Demo application for testing league creation.',
     });
 
-    await mockProvider.reviewApproval({
+    const approval = await mockProvider.reviewApproval({
       targetCollection: 'leagueAdminApplications',
       targetId: applicationId,
       actorUserId: 'mock_admin',
@@ -33,13 +33,20 @@ describe('mock provider league applications', () => {
       status: 'draft',
       verified: false,
     });
-    expect(league?.adminUserIds).toContain('mock_fan');
+    expect(league?.adminUserIds).not.toContain('mock_fan');
     expect(league?.adminUserIds).toContain(MOCK_PROFILES.league_admin.uid);
     expect(application).toMatchObject({
       status: 'approved',
       leagueId: `league_${applicationId}`,
+      invitationId: `invite_${applicationId}_league_owner`,
+      invitationActionUrl: `/invitations/access/invite_${applicationId}_league_owner?token=demo`,
       reviewedByUserId: 'mock_admin',
     });
+    expect(approval.actionUrl).toBe(`/invitations/access/invite_${applicationId}_league_owner?token=demo`);
+
+    await mockProvider.acceptInvitation(`invite_${applicationId}_league_owner`, 'mock_fan', 'demo');
+    const acceptedLeagues = await mockProvider.getLeagues();
+    expect(acceptedLeagues.find((item) => item.id === `league_${applicationId}`)?.adminUserIds).toContain('mock_fan');
   });
 
   it('keeps demo league setup records addressable by league scope', async () => {

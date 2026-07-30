@@ -44,6 +44,9 @@ import {
   SupportPledge,
   Team,
   TeamAssignment,
+  Invitation,
+  AccessAssignmentRecord,
+  AccessIndexRecord,
   User,
   UserProfile,
   Verification,
@@ -89,6 +92,9 @@ export type FirestoreCollectionMap = {
   adminLogs: AdminLog;
   adminAuditEvents: AdminAuditEvent;
   teamAssignments: TeamAssignment;
+  invitations: Invitation;
+  accessAssignments: AccessAssignmentRecord;
+  accessIndex: AccessIndexRecord;
   rosters: Roster;
   standings: StoredStanding;
   sponsorReports: SponsorReport;

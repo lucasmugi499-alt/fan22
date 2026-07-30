@@ -173,6 +173,25 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    match /invitations/{invitationId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() &&
+          resource.data.invitedEmail is string &&
+          request.auth.token.email is string &&
+          resource.data.invitedEmail == request.auth.token.email);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /accessAssignments/{assignmentId} {
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /accessIndex/{indexId} {
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
     match /sponsors/{sponsorId} {
       allow read: if true;
       allow create: if signedIn();

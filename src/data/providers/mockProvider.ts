@@ -53,7 +53,9 @@ import {
 import { investorDemoRuntime } from '../investorDemo';
 import {
   AdminAuditEvent,
+  AccessAssignmentRecord,
   Challenge,
+  Invitation,
   League,
   LeagueAdminApplication,
   Match,
@@ -87,6 +89,8 @@ const storedSeasonsKey = 'goalplace256.demo.seasons';
 const storedTeamsKey = 'goalplace256.demo.teams';
 const storedMatchesKey = 'goalplace256.demo.matches';
 const storedTeamAssignmentsKey = 'goalplace256.demo.teamAssignments';
+const storedInvitationsKey = 'goalplace256.demo.invitations';
+const storedAccessAssignmentsKey = 'goalplace256.demo.accessAssignments';
 const selectedLeagueKey = 'goalplace256:assignment:league';
 const resultSubmissions = new Map<string, ResultSubmission>(
   seededResultSubmissions.map((submission) => [submission.id, submission]),
@@ -187,6 +191,20 @@ function persistDemoTeamAssignment(assignment: TeamAssignment) {
   writeStoredItems(storedTeamAssignmentsKey, stored);
 }
 
+function persistDemoInvitation(invitation: Invitation) {
+  replaceById(investorDemoRuntime.invitations, invitation);
+  const stored = readStoredItems<Invitation>(storedInvitationsKey);
+  replaceById(stored, invitation);
+  writeStoredItems(storedInvitationsKey, stored);
+}
+
+function persistDemoAccessAssignment(assignment: AccessAssignmentRecord) {
+  replaceById(investorDemoRuntime.accessAssignments, assignment);
+  const stored = readStoredItems<AccessAssignmentRecord>(storedAccessAssignmentsKey);
+  replaceById(stored, assignment);
+  writeStoredItems(storedAccessAssignmentsKey, stored);
+}
+
 function demoLeagueIdForApplication(applicationId: string) {
   return `league_${applicationId}`;
 }
@@ -203,7 +221,6 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
     plan: 'free',
     verified: false,
     adminUserIds: [
-      application.userId,
       MOCK_PROFILES.league_admin.uid,
       MOCK_PROFILES.platform_admin.uid,
       MOCK_PROFILES.super_admin.uid,
@@ -223,6 +240,30 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
       allowsPerformancePledges: false,
     },
     createdAt: new Date().toISOString(),
+  };
+}
+
+function invitationFromApplication(application: LeagueAdminApplication): Invitation {
+  const invitationId = `invite_${application.id}_league_owner`;
+  return {
+    id: invitationId,
+    type: 'league_owner',
+    invitedEmail: application.applicantEmail ?? `${application.userId}@demo.goalplace256.test`,
+    roleKey: 'league_owner',
+    scopeType: 'league',
+    scopeId: demoLeagueIdForApplication(application.id),
+    permissionBundleId: 'league_owner',
+    tokenHash: 'demo',
+    tokenVersion: 1,
+    status: 'sent',
+    invitedByUserId: MOCK_PROFILES.platform_admin.uid,
+    applicationId: application.id,
+    organizationId: `org_${application.id}`,
+    leagueId: demoLeagueIdForApplication(application.id),
+    actionUrl: `/invitations/access/${invitationId}?token=demo`,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -358,6 +399,10 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getTeamAssignments() {
     return mergedById(teamAssignments, readStoredItems<TeamAssignment>(storedTeamAssignmentsKey));
+  },
+  async getInvitationById(idValue) {
+    return investorDemoRuntime.invitations.find((item) => item.id === idValue)
+      ?? readStoredItems<Invitation>(storedInvitationsKey).find((item) => item.id === idValue);
   },
   async getTeamAssignmentById(idValue) {
     return readStoredItems<TeamAssignment>(storedTeamAssignmentsKey).find((assignment) => assignment.id === idValue)
@@ -943,6 +988,53 @@ export const mockProvider: GoalPlaceDataProvider = {
     });
     return result(assignmentId, 'Team Admin invitation accepted.');
   },
+  async acceptInvitation(invitationId, userId, token) {
+    if (!token) throw new Error('A complete invitation link is required.');
+    const invitation = investorDemoRuntime.invitations.find((item) => item.id === invitationId)
+      ?? readStoredItems<Invitation>(storedInvitationsKey).find((item) => item.id === invitationId);
+    if (!invitation) throw new Error('Invitation not found.');
+    if (invitation.status === 'accepted') return result(invitationId, 'Invitation already accepted.');
+    if (!['sent', 'delivered', 'viewed', 'queued'].includes(invitation.status)) {
+      throw new Error('Invitation is no longer active.');
+    }
+    invitation.status = 'accepted';
+    invitation.acceptedAt = new Date().toISOString();
+    invitation.updatedAt = new Date().toISOString();
+    persistDemoInvitation(invitation);
+
+    const assignment: AccessAssignmentRecord = {
+      id: `assignment_${invitation.id}`,
+      userId,
+      roleKey: invitation.roleKey,
+      scopeType: invitation.scopeType,
+      scopeId: invitation.scopeId,
+      permissionBundleId: invitation.permissionBundleId ?? 'league_owner',
+      status: 'active',
+      grantedByUserId: invitation.invitedByUserId,
+      invitationId: invitation.id,
+      applicationId: invitation.applicationId,
+      validFrom: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    persistDemoAccessAssignment(assignment);
+
+    if (invitation.scopeType === 'league') {
+      const league = leagues.find((item) => item.id === invitation.scopeId)
+        ?? readStoredItems<League>(storedLeaguesKey).find((item) => item.id === invitation.scopeId);
+      if (league && !league.adminUserIds.includes(userId)) {
+        league.adminUserIds.push(userId);
+        persistDemoLeague(league);
+      }
+    }
+    audit({
+      actorUserId: userId,
+      action: 'accepted',
+      targetCollection: 'invitations',
+      targetId: invitationId,
+    });
+    return result(invitationId, 'League Owner invitation accepted.');
+  },
   async revokeTeamAssignment(assignmentId, actorUserId, note) {
     const assignment = teamAssignments.find((item) => item.id === assignmentId)
       ?? readStoredItems<TeamAssignment>(storedTeamAssignmentsKey).find((item) => item.id === assignmentId);
@@ -1070,8 +1162,13 @@ export const mockProvider: GoalPlaceDataProvider = {
       application.updatedAt = new Date().toISOString();
       if (input.decision === 'approved') {
         const league = draftLeagueFromApplication(application);
+        const invitation = invitationFromApplication(application);
         application.leagueId = league.id;
+        application.organizationId = invitation.organizationId;
+        application.invitationId = invitation.id;
+        application.invitationActionUrl = invitation.actionUrl;
         persistDemoLeague(league);
+        persistDemoInvitation(invitation);
       }
       persistDemoApplication(application);
     }
@@ -1082,12 +1179,21 @@ export const mockProvider: GoalPlaceDataProvider = {
       targetId: input.targetId,
       note: input.note,
     });
-    return result(
-      input.targetId,
-      input.targetCollection === 'leagueAdminApplications' && input.decision === 'approved'
-        ? 'Demo league created.'
-        : 'Approval decision recorded.',
-    );
+    const application = input.targetCollection === 'leagueAdminApplications'
+      ? investorDemoRuntime.leagueAdminApplications.find((item) => item.id === input.targetId)
+        ?? readStoredItems<LeagueAdminApplication>(storedApplicationsKey).find((item) => item.id === input.targetId)
+      : undefined;
+    return {
+      ...result(
+        input.targetId,
+        input.targetCollection === 'leagueAdminApplications' && input.decision === 'approved'
+          ? 'Demo league created and League Owner invitation queued.'
+          : 'Approval decision recorded.',
+      ),
+      actionUrl: input.targetCollection === 'leagueAdminApplications' && input.decision === 'approved'
+        ? application?.invitationActionUrl
+        : undefined,
+    };
   },
   async resolveReport(input) {
     const report = reports.find((item) => item.id === input.reportId);

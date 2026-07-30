@@ -222,6 +222,7 @@ export function isMarketingRoute(pathname: string): boolean {
   return (
     PUBLIC_ROUTES.includes(pathname)
     || pathname.startsWith('/invitations/team/')
+    || pathname.startsWith('/invitations/access/')
   );
 }
 

@@ -62,6 +62,7 @@ import {
   SupportNeed,
   Team,
   TeamAssignment,
+  Invitation,
   Verification,
 } from '@/types';
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
@@ -144,7 +145,8 @@ async function requestTrustedFinalization(matchId: string) {
 
 async function requestTrustedAccess(
   body: { action: 'accept_team_invitation'; assignmentId: string; token: string } |
-    { action: 'approve_league_admin'; applicationId: string },
+    { action: 'approve_league_admin'; applicationId: string } |
+    { action: 'accept_invitation'; invitationId: string; token: string },
 ) {
   const { auth } = requireFirebaseClient();
   const currentUser = auth.currentUser;
@@ -160,6 +162,7 @@ async function requestTrustedAccess(
   const payload = await response.json().catch(() => ({})) as { error?: string };
   if (!response.ok) throw new Error(payload.error ?? 'GoalPlace256 could not update access.');
   await currentUser.getIdToken(true);
+  return payload;
 }
 
 function buildStandings(leagueId: string, teams: Team[], matches: Match[]) {
@@ -372,6 +375,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return isFirebaseConfigured
       ? readCollection<TeamAssignment>('teamAssignments')
       : mockProvider.getTeamAssignments();
+  },
+  async getInvitationById(id) {
+    return isFirebaseConfigured
+      ? readDoc<Invitation>('invitations', id)
+      : mockProvider.getInvitationById(id);
   },
   async getTeamAssignmentById(id) {
     return isFirebaseConfigured
@@ -855,6 +863,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     await requestTrustedAccess({ action: 'accept_team_invitation', assignmentId, token });
     return writeResult(assignmentId, 'Team Admin invitation accepted.');
   },
+  async acceptInvitation(invitationId, userId, token) {
+    requireActor(userId);
+    await requestTrustedAccess({ action: 'accept_invitation', invitationId, token });
+    return writeResult(invitationId, 'Invitation accepted.');
+  },
   async revokeTeamAssignment(assignmentId, actorUserId, note) {
     requireActor(actorUserId);
     await requestTrustedAdminAction({
@@ -993,11 +1006,18 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       input.targetCollection === 'leagueAdminApplications' &&
       input.decision === 'approved'
     ) {
-      await requestTrustedAccess({
+      const payload = await requestTrustedAccess({
         action: 'approve_league_admin',
         applicationId: input.targetId,
-      });
-      return writeResult(input.targetId, 'League Admin access granted.');
+      }) as {
+        actionUrl?: string;
+        invitationId?: string;
+      };
+      return {
+        ...(await writeResult(input.targetId, 'League Owner invitation created.')),
+        actionUrl: payload.actionUrl,
+        id: payload.invitationId ?? input.targetId,
+      };
     }
     await requestTrustedAdminAction({ action: 'review_approval', ...input });
     return writeResult(input.targetId, 'Approval decision recorded.');

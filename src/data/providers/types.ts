@@ -28,6 +28,7 @@ import {
   SupportNeed,
   Team,
   TeamAssignment,
+  Invitation,
   User,
   Verification,
 } from '@/types';
@@ -235,6 +236,7 @@ export interface GoalPlaceDataProvider {
   getReports(): Promise<Report[]>;
   getVerifications(): Promise<Verification[]>;
   getTeamAssignments(): Promise<TeamAssignment[]>;
+  getInvitationById(id: string): Promise<Invitation | undefined>;
   getTeamAssignmentById(id: string): Promise<TeamAssignment | undefined>;
   getRosters(options?: DataQueryOptions): Promise<Roster[]>;
   getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
@@ -292,6 +294,7 @@ export interface GoalPlaceDataProvider {
   createFixtures(fixtures: Match[]): Promise<DataWriteResult>;
   createTeamAdminInvitation(data: TeamAssignment): Promise<DataWriteResult>;
   acceptTeamAdminInvitation(assignmentId: string, userId: string, token: string): Promise<DataWriteResult>;
+  acceptInvitation(invitationId: string, userId: string, token: string): Promise<DataWriteResult>;
   revokeTeamAssignment(assignmentId: string, actorUserId: string, note?: string): Promise<DataWriteResult>;
   markNotificationRead(notificationId: string, read?: boolean): Promise<DataWriteResult>;
   markAllNotificationsRead(userId: string): Promise<DataWriteResult>;
