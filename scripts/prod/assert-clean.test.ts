@@ -32,6 +32,8 @@ const baseValues = {
   NEXT_PUBLIC_FIREBASE_DATABASE_ID: 'fg256',
   GOALPLACE_ADMIN_PROJECT_ID: 'goalplace256-prod',
   GOALPLACE_FIRESTORE_DATABASE_ID: 'fg256',
+  GOALPLACE_APP_BASE_URL: 'https://goalplace256.com',
+  GOALPLACE_EMAIL_FROM: 'GoalPlace256 <team@goalplace256.com>',
 };
 
 function appHostingYaml(values: Record<string, string>) {
@@ -42,6 +44,9 @@ function appHostingYaml(values: Record<string, string>) {
       `    value: ${JSON.stringify(value)}`,
       '    availability: [BUILD, RUNTIME]',
     ]),
+    '  - variable: RESEND_API_KEY',
+    '    secret: resendApiKey',
+    '    availability: [RUNTIME]',
   ].join('\n');
 }
 
@@ -152,5 +157,17 @@ describe('production clean-start assertion', () => {
         directOriginPolicy: 'gateway-or-staff-preview',
       },
     }))).toThrow(/data origin must be production/);
+  });
+
+  it('rejects production email without a configured sender', () => {
+    expect(() => assertCleanProductionConfiguration(fixture({
+      values: { GOALPLACE_EMAIL_FROM: '' },
+    }))).toThrow(/production email sender/);
+  });
+
+  it('rejects a plaintext Resend key in production App Hosting config', () => {
+    expect(() => assertCleanProductionConfiguration(fixture({
+      values: { RESEND_API_KEY: 're_plaintext_key' },
+    }))).toThrow(/Secret Manager/);
   });
 });

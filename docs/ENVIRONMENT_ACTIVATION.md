@@ -38,6 +38,10 @@ Beta is the invite-only testing environment. It must use a separate Firebase pro
 
 Production starts clean. It must not include demo users, synthetic records, investor tools, mock fallback, sandbox callbacks, or real payments before the separate money launch gate.
 
+Every active environment that sends operational email must configure `GOALPLACE_APP_BASE_URL`,
+`GOALPLACE_EMAIL_FROM`, and an App Hosting Secret Manager reference named `resendApiKey`.
+Activation rejects plaintext `RESEND_API_KEY` values in App Hosting config.
+
 Each app exposes:
 
 - `environment`
@@ -151,7 +155,7 @@ Run this before production deployment:
 npm run prod:assert-clean
 ```
 
-The guard rejects unsafe production configuration, including demo login, seeding, investor tools, mock mode, synthetic data mode, sandbox payments, demo/beta callback URLs, and forbidden production App Hosting values.
+The guard rejects unsafe production configuration, including demo login, seeding, investor tools, mock mode, synthetic data mode, sandbox payments, demo/beta callback URLs, missing email sender/base URL configuration, plaintext Resend keys, and forbidden production App Hosting values.
 
 Production activation will also refuse to run until the production project placeholders are replaced.
 

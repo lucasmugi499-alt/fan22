@@ -88,6 +88,8 @@ Before production activation:
   emulator.
 - Confirm the clean production Firebase project, Storage bucket, Auth config, App Check key,
   scheduler OIDC audience, and scheduler service account.
+- Create the App Hosting Secret Manager secret `resendApiKey` and configure
+  `GOALPLACE_APP_BASE_URL` plus a verified `GOALPLACE_EMAIL_FROM` sender.
 - Run `npm run deploy:ready:production`.
 - Run the environment activation workflow with the production confirmation phrase.
 

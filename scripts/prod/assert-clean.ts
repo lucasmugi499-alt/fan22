@@ -21,12 +21,15 @@ type EnvironmentRegistry = {
 
 function appHostingValues(text: string) {
   const values = new Map<string, string>();
+  const secrets = new Map<string, string>();
   const blocks = text.matchAll(/-\s+variable:\s+([A-Z0-9_]+)([\s\S]*?)(?=\n\s*-\s+variable:|\n\S|$)/g);
   for (const block of blocks) {
     const value = block[2].match(/\n\s+value:\s+"?([^"\n]+)"?/);
+    const secret = block[2].match(/\n\s+secret:\s+"?([^"\n]+)"?/);
     if (value) values.set(block[1], value[1]);
+    if (secret) secrets.set(block[1], secret[1]);
   }
-  return values;
+  return { values, secrets };
 }
 
 function expectValue(values: Map<string, string>, name: string, expected: string, problems: string[]) {
@@ -36,6 +39,23 @@ function expectValue(values: Map<string, string>, name: string, expected: string
 
 function assertNoPlaceholder(value: string | undefined, label: string, problems: string[]) {
   if (!value || value.startsWith('REPLACE_WITH_')) problems.push(`${label} is not configured`);
+}
+
+function assertSecretReference(
+  values: Map<string, string>,
+  secrets: Map<string, string>,
+  variable: string,
+  expectedSecret: string,
+  problems: string[],
+) {
+  if (values.has(variable)) {
+    problems.push(`${variable} must use a Secret Manager reference, not a plaintext value`);
+    return;
+  }
+  const actual = secrets.get(variable);
+  if (actual !== expectedSecret) {
+    problems.push(`${variable} expected secret ${expectedSecret}, got ${actual ?? 'missing'}`);
+  }
 }
 
 function readActiveEnvironment(root: string) {
@@ -90,7 +110,7 @@ export function assertCleanProductionConfiguration(root = ROOT) {
     throw new Error('Production App Hosting config still contains REPLACE_WITH_* placeholders.');
   }
 
-  const values = appHostingValues(productionConfig);
+  const { values, secrets } = appHostingValues(productionConfig);
   expectValue(values, 'GOALPLACE_ENVIRONMENT', 'production', problems);
   expectValue(values, 'NEXT_PUBLIC_GOALPLACE_ENVIRONMENT', 'production', problems);
   expectValue(values, 'GOALPLACE_DATA_ORIGIN', 'production', problems);
@@ -103,6 +123,9 @@ export function assertCleanProductionConfiguration(root = ROOT) {
   expectValue(values, 'NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS', 'false', problems);
   expectValue(values, 'GOALPLACE_REQUIRE_APP_CHECK', 'true', problems);
   expectValue(values, 'GOALPLACE_SCHEDULER_AUTH_MODE', 'oidc', problems);
+  assertNoPlaceholder(values.get('GOALPLACE_APP_BASE_URL'), 'production public application URL', problems);
+  assertNoPlaceholder(values.get('GOALPLACE_EMAIL_FROM'), 'production email sender', problems);
+  assertSecretReference(values, secrets, 'RESEND_API_KEY', 'resendApiKey', problems);
 
   const environmentVersion = values.get('NEXT_PUBLIC_GOALPLACE_ENVIRONMENT_VERSION');
   if (!environmentVersion || environmentVersion === 'env-production-unset') {

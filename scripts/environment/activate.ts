@@ -79,17 +79,34 @@ function hasPlaceholders(file: string) {
 function appHostingValues(file: string) {
   const text = readFileSync(file, 'utf8');
   const values = new Map<string, string>();
+  const secrets = new Map<string, string>();
   const blocks = text.matchAll(/-\s+variable:\s+([A-Z0-9_]+)([\s\S]*?)(?=\n\s*-\s+variable:|\n\S|$)/g);
   for (const block of blocks) {
     const value = block[2].match(/\n\s+value:\s+"?([^"\n]+)"?/);
+    const secret = block[2].match(/\n\s+secret:\s+"?([^"\n]+)"?/);
     if (value) values.set(block[1], value[1]);
+    if (secret) secrets.set(block[1], secret[1]);
   }
-  return values;
+  return { values, secrets };
 }
 
 function expectSetting(values: Map<string, string>, name: string, expected: string, problems: string[]) {
   const actual = values.get(name);
   if (actual !== expected) problems.push(`${name} expected ${expected}, got ${actual ?? 'missing'}`);
+}
+
+function expectRequiredSetting(values: Map<string, string>, name: string, problems: string[]) {
+  const actual = values.get(name);
+  if (!actual || actual.startsWith('REPLACE_WITH_')) problems.push(`${name} is not configured`);
+}
+
+function expectSecret(secrets: Map<string, string>, values: Map<string, string>, name: string, expectedSecret: string, problems: string[]) {
+  if (values.has(name)) {
+    problems.push(`${name} must use a Secret Manager reference, not a plaintext value`);
+    return;
+  }
+  const actual = secrets.get(name);
+  if (actual !== expectedSecret) problems.push(`${name} expected secret ${expectedSecret}, got ${actual ?? 'missing'}`);
 }
 
 function requireControlInputs(target: ActiveEnvironment, env: NodeJS.ProcessEnv) {
@@ -126,7 +143,7 @@ function validateTarget(
     throw new Error(`${target} Firebase project is not configured.`);
   }
 
-  const values = appHostingValues(appHostingFile);
+  const { values, secrets } = appHostingValues(appHostingFile);
   const problems: string[] = [];
   expectSetting(values, 'GOALPLACE_ENVIRONMENT', target, problems);
   expectSetting(values, 'NEXT_PUBLIC_GOALPLACE_ENVIRONMENT', target, problems);
@@ -134,6 +151,9 @@ function validateTarget(
   expectSetting(values, 'NEXT_PUBLIC_FIREBASE_PROJECT_ID', config.firebaseProjectId, problems);
   expectSetting(values, 'GOALPLACE_ADMIN_PROJECT_ID', config.firebaseProjectId, problems);
   expectSetting(values, 'GOALPLACE_ALLOW_REAL_PAYMENTS', 'false', problems);
+  expectRequiredSetting(values, 'GOALPLACE_APP_BASE_URL', problems);
+  expectRequiredSetting(values, 'GOALPLACE_EMAIL_FROM', problems);
+  expectSecret(secrets, values, 'RESEND_API_KEY', 'resendApiKey', problems);
 
   if (config.requiresDemoLogin) {
     expectSetting(values, 'NEXT_PUBLIC_ENABLE_DEMO_LOGIN', 'true', problems);

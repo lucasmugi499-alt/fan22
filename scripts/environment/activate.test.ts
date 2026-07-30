@@ -28,6 +28,9 @@ function yaml(values: Record<string, string>) {
       `    value: ${JSON.stringify(value)}`,
       '    availability: [BUILD, RUNTIME]',
     ]),
+    '  - variable: RESEND_API_KEY',
+    '    secret: resendApiKey',
+    '    availability: [RUNTIME]',
   ].join('\n');
 }
 
@@ -49,6 +52,8 @@ function envValues(environment: 'demo' | 'beta' | 'production', overrides: Recor
     GOALPLACE_ADMIN_PROJECT_ID: projectId,
     NEXT_PUBLIC_FIREBASE_DATABASE_ID: 'fg256',
     GOALPLACE_FIRESTORE_DATABASE_ID: 'fg256',
+    GOALPLACE_APP_BASE_URL: `https://${demo ? 'demo' : environment}.goalplace256.com`,
+    GOALPLACE_EMAIL_FROM: 'GoalPlace256 <team@goalplace256.com>',
     ...(environment === 'beta' ? { GOALPLACE_PAYMENTS_MODE: 'sandbox' } : {}),
     ...overrides,
   };
@@ -193,6 +198,30 @@ describe('environment activation command', () => {
       }),
       env: controls,
     })).toThrow(/REPLACE_WITH/);
+  });
+
+  it('refuses activation when transactional email is not backed by a Secret Manager key', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.demo.yaml'), `${yaml(envValues('demo', {
+      RESEND_API_KEY: 're_plaintext_key',
+    }))}\n`);
+
+    expect(() => activateEnvironment('demo', 'activate', {
+      root,
+      env: controls,
+    })).toThrow(/Secret Manager/);
+  });
+
+  it('refuses activation when email sender settings are missing', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.demo.yaml'), `${yaml(envValues('demo', {
+      GOALPLACE_EMAIL_FROM: '',
+    }))}\n`);
+
+    expect(() => activateEnvironment('demo', 'activate', {
+      root,
+      env: controls,
+    })).toThrow(/GOALPLACE_EMAIL_FROM/);
   });
 
   it('requires the exact production confirmation phrase', () => {
