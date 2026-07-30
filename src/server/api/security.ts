@@ -39,10 +39,10 @@ export async function requireAuthenticatedUser(request: Request) {
   return { actor } as const;
 }
 
-export function requireRole(actor: AuthenticatedActor, roles: string[]) {
+export function requireRole(actor: AuthenticatedActor, roles: string[], message = 'You do not have permission to perform this action.') {
   return roles.includes(String(actor.role))
     ? null
-    : jsonError('You do not have permission to perform this action.', 403);
+    : jsonError(message, 403);
 }
 
 export async function parseJsonBody<T extends z.ZodTypeAny>(

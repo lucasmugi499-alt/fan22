@@ -1,26 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { z } from 'zod';
+import { adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 
 export const runtime = 'nodejs';
-
-type Actor = Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
-
-async function actorFor(request: Request) {
-  const token = bearerToken(request);
-  if (!token) return null;
-  return adminAuth.verifyIdToken(token).catch(() => null);
-}
-
-function hasRole(actor: Actor, roles: string[]) {
-  return roles.includes(String(actor.role));
-}
 
 function audit(
   actorUserId: string,
@@ -39,29 +24,54 @@ function audit(
   };
 }
 
+function hasRole(actor: AuthenticatedActor, roles: string[]) {
+  return roles.includes(String(actor.role));
+}
+
 function publicBaseUrl(request: Request) {
   return process.env.GOALPLACE_APP_BASE_URL
     ?? process.env.NEXT_PUBLIC_APP_URL
     ?? new URL(request.url).origin;
 }
 
+const adminActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('create_team_invitation'),
+    teamId: z.string().trim().min(1).max(160),
+    leagueId: z.string().trim().min(1).max(160),
+    seasonId: z.string().trim().min(1).max(160),
+    invitedEmail: z.string().trim().email().max(200).transform((value) => value.toLowerCase()),
+  }),
+  z.object({
+    action: z.literal('review_approval'),
+    targetCollection: z.enum(['athletes', 'leagues', 'leagueAdminApplications']),
+    targetId: z.string().trim().min(1).max(160),
+    decision: z.enum(['approved', 'rejected', 'requested_information']),
+    note: z.string().trim().max(1200).optional().default(''),
+  }),
+  z.object({
+    action: z.literal('resolve_report'),
+    reportId: z.string().trim().min(1).max(160),
+    decision: z.enum(['resolved', 'dismissed']),
+    note: z.string().trim().max(1200).optional().default(''),
+  }),
+]);
+
 export async function POST(request: Request) {
-  const actor = await actorFor(request);
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+
+  const parsed = await parseJsonBody(request, adminActionSchema, { maxBytes: 8 * 1024 });
+  if ('response' in parsed) return parsed.response;
+
+  const actor = auth.actor;
+  const body = parsed.data;
 
   try {
     if (body.action === 'create_team_invitation') {
-      if (!hasRole(actor, ['league_admin', 'platform_admin', 'super_admin'])) {
-        return Response.json({ error: 'League Admin access required.' }, { status: 403 });
-      }
-      const teamId = String(body.teamId ?? '');
-      const leagueId = String(body.leagueId ?? '');
-      const seasonId = String(body.seasonId ?? '');
-      const invitedEmail = String(body.invitedEmail ?? '').trim().toLowerCase();
-      if (!teamId || !leagueId || !seasonId || !invitedEmail.includes('@')) {
-        return Response.json({ error: 'Team, league, season and email are required.' }, { status: 400 });
-      }
+      const forbidden = requireRole(actor, ['league_admin', 'platform_admin', 'super_admin'], 'League Admin access required.');
+      if (forbidden) return forbidden;
+      const { teamId, leagueId, seasonId, invitedEmail } = body;
       const league = await adminDb.collection('leagues').doc(leagueId).get();
       const leagueData = league.data();
       if (
@@ -152,18 +162,9 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'review_approval') {
-      if (!hasRole(actor, ['platform_admin', 'super_admin'])) {
-        return Response.json({ error: 'Platform Admin access required.' }, { status: 403 });
-      }
-      const targetCollection = String(body.targetCollection ?? '');
-      const targetId = String(body.targetId ?? '');
-      const decision = String(body.decision ?? '');
-      const note = typeof body.note === 'string' ? body.note.trim() : '';
-      if (!['athletes', 'leagues', 'leagueAdminApplications'].includes(targetCollection)
-        || !['approved', 'rejected', 'requested_information'].includes(decision)
-        || !targetId) {
-        return Response.json({ error: 'Invalid approval decision.' }, { status: 400 });
-      }
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { targetCollection, targetId, decision, note } = body;
       if (targetCollection === 'leagueAdminApplications' && decision === 'approved') {
         return Response.json({ error: 'League Admin approval uses the access workflow.' }, { status: 409 });
       }
@@ -192,15 +193,9 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'resolve_report') {
-      if (!hasRole(actor, ['platform_admin', 'super_admin'])) {
-        return Response.json({ error: 'Platform Admin access required.' }, { status: 403 });
-      }
-      const reportId = String(body.reportId ?? '');
-      const decision = String(body.decision ?? '');
-      const note = typeof body.note === 'string' ? body.note.trim() : '';
-      if (!reportId || !['resolved', 'dismissed'].includes(decision)) {
-        return Response.json({ error: 'Invalid trust decision.' }, { status: 400 });
-      }
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { reportId, decision, note } = body;
       const reportRef = adminDb.collection('reports').doc(reportId);
       await adminDb.runTransaction(async (transaction) => {
         const report = await transaction.get(reportRef);
