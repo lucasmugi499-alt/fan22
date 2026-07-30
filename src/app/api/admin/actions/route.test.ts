@@ -53,7 +53,7 @@ describe('trusted admin actions route hardening', () => {
       teamId: 'team_1',
       leagueId: 'league_1',
       seasonId: 'season_1',
-      invitedEmail: `${'a'.repeat(9 * 1024)}@example.com`,
+      invitedEmail: `${'a'.repeat(65 * 1024)}@example.com`,
     })));
 
     expect(response.status).toBe(413);

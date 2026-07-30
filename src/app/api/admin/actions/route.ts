@@ -60,6 +60,33 @@ const adminActionSchema = z.discriminatedUnion('action', [
     invitedEmail: z.string().trim().email().max(200).transform((value) => value.toLowerCase()),
   }),
   z.object({
+    action: z.literal('create_teams'),
+    teams: z.array(z.object({
+      id: z.string().trim().min(1).max(160),
+      name: z.string().trim().min(2).max(120),
+      sport: z.union([z.enum(['football', 'basketball', 'rugby']), z.enum(['Football', 'Basketball', 'Rugby'])]),
+      leagueId: z.string().trim().min(1).max(160),
+      city: z.string().trim().min(2).max(100),
+      location: z.string().trim().max(160).optional(),
+      country: z.literal('Uganda'),
+      description: z.string().trim().max(1000),
+      plan: z.enum(['free', 'pro']),
+      verified: z.boolean(),
+      adminUserIds: z.array(z.string()).default([]),
+      totalSupport: z.number().nonnegative(),
+      supportersCount: z.number().nonnegative(),
+      wins: z.number().nonnegative(),
+      draws: z.number().nonnegative().optional(),
+      losses: z.number().nonnegative(),
+      pointsFor: z.number().nonnegative(),
+      pointsAgainst: z.number().nonnegative(),
+      leaguePoints: z.number().nonnegative(),
+      verificationStatus: z.enum(['pending', 'verified', 'rejected', 'disputed']).optional(),
+      teamAdminEmail: z.string().trim().email().optional(),
+      createdAt: z.string().optional(),
+    })).min(1).max(40),
+  }),
+  z.object({
     action: z.literal('update_league_profile'),
     leagueId: z.string().trim().min(1).max(160),
     name: z.string().trim().min(3).max(120).optional(),
@@ -93,7 +120,7 @@ export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
 
-  const parsed = await parseJsonBody(request, adminActionSchema, { maxBytes: 8 * 1024 });
+  const parsed = await parseJsonBody(request, adminActionSchema, { maxBytes: 64 * 1024 });
   if ('response' in parsed) return parsed.response;
 
   const actor = auth.actor;
@@ -296,6 +323,52 @@ export async function POST(request: Request) {
         emailMessageId: email.id,
         emailError: email.error,
       });
+    }
+
+    if (body.action === 'create_teams') {
+      const forbidden = requireRole(actor, ['league_admin', 'platform_admin', 'super_admin'], 'League Admin access required.');
+      if (forbidden) return forbidden;
+      const leagueIds = [...new Set(body.teams.map((team) => team.leagueId))];
+      const leagueSnapshots = await Promise.all(leagueIds.map((leagueId) => adminDb.collection('leagues').doc(leagueId).get()));
+      const leagueById = new Map(leagueSnapshots.map((snapshot) => [snapshot.id, snapshot]));
+      for (const leagueId of leagueIds) {
+        const league = leagueById.get(leagueId);
+        if (!league?.exists) return Response.json({ error: `League ${leagueId} not found.` }, { status: 404 });
+        if (
+          !hasRole(actor, ['platform_admin', 'super_admin'])
+          && !league.data()?.adminUserIds?.includes(actor.uid)
+        ) {
+          return Response.json({ error: `You do not manage league ${leagueId}.` }, { status: 403 });
+        }
+      }
+      await adminDb.runTransaction(async (transaction) => {
+        const teamRefs = body.teams.map((team) => adminDb.collection('teams').doc(team.id));
+        const existingTeams = await Promise.all(teamRefs.map((teamRef) => transaction.get(teamRef)));
+        existingTeams.forEach((existing, index) => {
+          if (existing.exists) throw new Error(`Team ${body.teams[index].name} already exists.`);
+        });
+        for (const [index, team] of body.teams.entries()) {
+          const teamRef = teamRefs[index];
+          transaction.set(teamRef, {
+            ...team,
+            adminUserIds: [],
+            createdAt: team.createdAt ?? FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          transaction.update(adminDb.collection('leagues').doc(team.leagueId), {
+            teamsCount: FieldValue.increment(1),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          'created',
+          'teams',
+          body.teams[0].id,
+          `Created ${body.teams.length} team(s) by trusted League Admin workflow.`,
+        ));
+      });
+      return Response.json({ ok: true, id: body.teams[0].id, count: body.teams.length });
     }
 
     if (body.action === 'review_approval') {

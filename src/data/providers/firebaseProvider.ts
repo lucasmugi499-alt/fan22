@@ -824,10 +824,10 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async createTeams(teams) {
     requireActor();
     if (!teams.length) throw new Error('Add at least one team.');
-    const { db } = requireFirebaseClient();
-    const batch = writeBatch(db);
-    for (const team of teams) batch.set(doc(db, 'teams', team.id), team);
-    await batch.commit();
+    await requestTrustedAdminAction({
+      action: 'create_teams',
+      teams,
+    });
     return writeResult(teams[0].id, `${teams.length} teams imported.`);
   },
   async createFixtures(fixtures) {
