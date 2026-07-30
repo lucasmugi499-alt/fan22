@@ -1,21 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  authenticateDemoAccount,
-  DEMO_ACCOUNT_PASSWORD,
   DEMO_LOGIN_ACCOUNTS,
+  findDemoAccount,
   featuredDemoAccounts,
 } from './demoAccounts';
 
 describe('demo account authentication', () => {
-  it('accepts every seeded account with the shared staging password', () => {
+  it('recognizes every seeded demo account email without owning the password', () => {
     for (const account of DEMO_LOGIN_ACCOUNTS) {
-      expect(authenticateDemoAccount(account.email, DEMO_ACCOUNT_PASSWORD)).toEqual(account);
+      expect(findDemoAccount(account.email)).toEqual(account);
     }
   });
 
-  it('rejects an unknown account or incorrect password', () => {
-    expect(authenticateDemoAccount('unknown@example.com', DEMO_ACCOUNT_PASSWORD)).toBeNull();
-    expect(authenticateDemoAccount(DEMO_LOGIN_ACCOUNTS[0].email, 'wrong password')).toBeNull();
+  it('rejects an unknown account before Firebase Auth is called', () => {
+    expect(findDemoAccount('unknown@example.com')).toBeNull();
   });
 
   it('provides one quick account for every seeded demo role', () => {

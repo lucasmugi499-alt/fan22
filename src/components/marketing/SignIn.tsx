@@ -19,8 +19,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
 import {
-  authenticateDemoAccount,
-  DEMO_ACCOUNT_PASSWORD,
+  findDemoAccount,
   featuredDemoAccounts,
 } from '@/lib/auth/demoAccounts';
 
@@ -38,7 +37,6 @@ export function SignIn({
 }) {
   const router = useRouter();
   const {
-    setDemoRole,
     authStatus,
     role,
     currentUser,
@@ -79,13 +77,13 @@ export function SignIn({
 
     try {
       if (demoAccessActive) {
-        const account = authenticateDemoAccount(email, password);
+        const account = findDemoAccount(email);
         if (!account) {
-          setError(`Choose a listed demo account and use the shared password ${DEMO_ACCOUNT_PASSWORD}.`);
+          setError('Choose one of the seeded demo accounts.');
           return;
         }
-        setDemoRole(account.role);
-        router.replace(getPostSignInRoute(account.role, nextPath ?? account.workspace));
+        await login(email.trim(), password);
+        setAwaitingAuthState(true);
         return;
       }
 
@@ -256,13 +254,13 @@ export function SignIn({
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 pr-12 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
-                  placeholder={DEMO_ACCOUNT_PASSWORD}
+                  placeholder="Account password"
                 />
                 <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-muted hover:text-text-strong">
                   {showPassword ? <EyeSlash className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              <p className="text-xs text-muted">Shared staging password: <code className="text-text-strong">{DEMO_ACCOUNT_PASSWORD}</code></p>
+              <p className="text-xs text-muted">Uses the password already seeded in Firebase Auth for this account.</p>
             </div>
             {error ? (
               <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">

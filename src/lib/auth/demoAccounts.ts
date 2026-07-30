@@ -1,8 +1,6 @@
 import accounts from '../../../data/investor-demo/demo-accounts.json';
 import type { AppRole } from '@/types';
 
-export const DEMO_ACCOUNT_PASSWORD = 'GoalPlace256!Demo';
-
 export type DemoLoginAccount = {
   uid: string;
   email: string;
@@ -22,8 +20,7 @@ export const DEMO_LOGIN_ACCOUNTS = accounts.filter(
   (account): account is DemoLoginAccount => allowedRoles.has(account.role as AppRole),
 );
 
-export function authenticateDemoAccount(email: string, password: string): DemoLoginAccount | null {
-  if (password !== DEMO_ACCOUNT_PASSWORD) return null;
+export function findDemoAccount(email: string): DemoLoginAccount | null {
   const normalizedEmail = email.trim().toLowerCase();
   return DEMO_LOGIN_ACCOUNTS.find((account) => account.email.toLowerCase() === normalizedEmail) ?? null;
 }

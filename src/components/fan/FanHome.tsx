@@ -19,6 +19,7 @@ import { ErrorState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FanOnboarding } from '@/components/fan/FanOnboarding';
+import { FAN_HOME_RECORD_LIMIT } from '@/components/fan/fanHomeData';
 import type { Match } from '@/types';
 
 function dayLabel(iso: string): string {
@@ -40,6 +41,7 @@ export function FanHome() {
     athleteRanking: 'support',
     athleteLimit: 8,
     feedLimit: 12,
+    recordLimit: FAN_HOME_RECORD_LIMIT,
   });
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
