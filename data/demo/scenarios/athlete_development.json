@@ -1,0 +1,6 @@
+{
+  "scenarioId": "athlete_development",
+  "description": "A verified athlete support need is near target with payout and Career Passport context.",
+  "expectedRoleActions": ["fan_support_need", "athlete_add_update", "league_admin_review_completion"],
+  "validationAssertions": ["verified_support_need_exists", "support_total_below_target", "athlete_profile_linked"]
+}

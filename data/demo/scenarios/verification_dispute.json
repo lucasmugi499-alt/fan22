@@ -1,0 +1,6 @@
+{
+  "scenarioId": "verification_dispute",
+  "description": "A team-submitted result is disputed, evidence is attached and the owning League Admin has a review action.",
+  "expectedRoleActions": ["team_admin_dispute_result", "league_admin_resolve_dispute", "platform_admin_view_audit"],
+  "validationAssertions": ["disputed_submission_exists", "submission_events_exist", "match_not_directly_client_official"]
+}

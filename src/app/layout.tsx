@@ -7,6 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/context/AuthProvider';
 import { AuthModalProvider } from '@/components/auth/AuthRequiredModal';
 import { DemoRoleSwitcher } from '@/components/auth/DemoRoleSwitcher';
+import { EnvironmentBoundary } from '@/components/layout/EnvironmentBoundary';
+import { EnvironmentBanner } from '@/components/layout/EnvironmentBanner';
 
 const displayFont = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -28,6 +30,7 @@ const monoFont = Space_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://goalplace256.com'),
   title: {
     default: 'GoalPlace256 | Verified grassroots sport',
     template: '%s | GoalPlace256',
@@ -43,12 +46,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body
         className={`min-h-full ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}
       >
-        <AuthProvider>
-          <AuthModalProvider>
-            <AppShell>{children}</AppShell>
-            <DemoRoleSwitcher />
-          </AuthModalProvider>
-        </AuthProvider>
+        <EnvironmentBoundary>
+          <EnvironmentBanner />
+          <AuthProvider>
+            <AuthModalProvider>
+              <AppShell>{children}</AppShell>
+              <DemoRoleSwitcher />
+            </AuthModalProvider>
+          </AuthProvider>
+        </EnvironmentBoundary>
         <Toaster
           theme="dark"
           position="top-center"

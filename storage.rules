@@ -20,6 +20,10 @@ service firebase.storage {
         request.resource.contentType.matches('image/.*|video/.*');
     }
 
+    function validPublicOwner(ownerType) {
+      return ownerType in ['athletes', 'teams', 'leagues', 'feed'];
+    }
+
     match /users/{userId}/{allPaths=**} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create, update: if signedIn() && request.auth.uid == userId && validMedia();
@@ -52,7 +56,13 @@ service firebase.storage {
 
     match /publishedMedia/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
-      allow create: if signedIn() && request.auth.uid == userId && validEvidence();
+      allow create: if signedIn() &&
+        ownerType in ['user', 'athlete', 'team', 'league'] &&
+        request.auth.uid == userId &&
+        validEvidence() &&
+        request.resource.metadata.ownerType == ownerType &&
+        request.resource.metadata.ownerId == ownerId &&
+        request.resource.metadata.uploadedBy == userId;
       allow update: if false;
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
     }
@@ -63,9 +73,22 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    match /public/{ownerType}/{ownerId}/{userId}/{fileName} {
+      allow read: if true;
+      allow create: if signedIn() &&
+        validPublicOwner(ownerType) &&
+        request.auth.uid == userId &&
+        validMedia() &&
+        request.resource.metadata.ownerType == ownerType &&
+        request.resource.metadata.ownerId == ownerId &&
+        request.resource.metadata.uploadedBy == userId;
+      allow update: if false;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
+    }
+
     match /public/{allPaths=**} {
       allow read: if true;
-      allow create, update: if signedIn() && validMedia();
+      allow create, update: if false;
       allow delete: if isAdmin();
     }
 

@@ -1,0 +1,6 @@
+{
+  "scenarioId": "sponsor_reporting",
+  "description": "A sponsor campaign has restricted proof records, official match impact and downloadable reporting material.",
+  "expectedRoleActions": ["platform_admin_view_report", "league_admin_view_campaign", "fan_view_public_sponsor_story"],
+  "validationAssertions": ["sponsor_campaign_exists", "sponsor_report_exists", "public_pages_exclude_restricted_report_data"]
+}

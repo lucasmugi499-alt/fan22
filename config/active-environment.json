@@ -1,0 +1,10 @@
+{
+  "activeEnvironment": "demo",
+  "previousEnvironment": null,
+  "environmentVersion": "env-2026-07-30T00-00-00Z",
+  "publicUrl": "GOALPLACE_PUBLIC_URL or goalplace256.com",
+  "maintenance": false,
+  "updatedAt": "2026-07-30T00:00:00.000Z",
+  "updatedBy": "initial-release-gate-1",
+  "lastActivationReport": null
+}

@@ -1,0 +1,15 @@
+{
+  "seedVersion": "2026.08.0",
+  "sourcePath": "data/investor-demo/demo-accounts.json",
+  "sourceSha256": "ea6bbf954e582407b41884912c2a3af19e8c099cc60092248688972898ff4c3a",
+  "passwordPolicy": "Passwords are never stored in this manifest; seed commands require FIREBASE_DEMO_PASSWORD.",
+  "allowedEmailDomain": "demo.goalplace256.test",
+  "forbiddenInProduction": true,
+  "roles": [
+    "fan",
+    "athlete",
+    "team_admin",
+    "league_admin",
+    "platform_admin"
+  ]
+}

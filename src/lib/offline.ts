@@ -8,6 +8,7 @@ const RESULT_PREFIX = 'goalplace256:result-draft:';
 export const PRIVATE_CACHE_QUERY_VERSION = 'v2';
 
 export type PrivateCacheScope = {
+  environment?: string;
   projectId: string;
   databaseId: string;
   dataMode: string;
@@ -20,6 +21,7 @@ export type PrivateCacheScope = {
 
 export function privateCacheNamespace(scope: PrivateCacheScope) {
   const values = [
+    scope.environment || 'local',
     scope.projectId || 'unconfigured',
     scope.databaseId || '(default)',
     scope.dataMode,

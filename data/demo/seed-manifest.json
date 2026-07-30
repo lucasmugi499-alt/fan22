@@ -1,0 +1,53 @@
+{
+  "seedVersion": "2026.08.0",
+  "environment": "investor-demo",
+  "dataOrigin": "synthetic_demo",
+  "createdAt": "2026-07-30T00:00:00.000Z",
+  "sourceEnvironment": "data/investor-demo",
+  "requiredRulesFile": "firestore.rules.next",
+  "requiredIndexesFile": "firestore.indexes.json",
+  "mediaVersion": "2026.08.0",
+  "deterministicIds": true,
+  "promotable": false,
+  "content": {
+    "databasePath": "data/investor-demo/database.json",
+    "databaseSha256": "92956e8b3de5cc2fa743354b159446235a82395511c2988bb97dde88f48f94f6",
+    "authManifestPath": "data/demo/auth-manifest.json",
+    "mediaManifestPath": "data/demo/media-manifest.json"
+  },
+  "counts": {
+    "sports": 3,
+    "users": 1308,
+    "leagues": 6,
+    "seasons": 6,
+    "teams": 60,
+    "teamAssignments": 60,
+    "rosters": 60,
+    "athletes": 1000,
+    "matches": 540,
+    "resultSubmissions": 264,
+    "resultSubmissionEvents": 756,
+    "standings": 60,
+    "challenges": 120,
+    "supportPledges": 1020,
+    "walletTransactions": 1020,
+    "feedPosts": 204,
+    "comments": 354,
+    "notifications": 264,
+    "sponsors": 12,
+    "sponsorReports": 6,
+    "leagueNotices": 48,
+    "verifications": 186,
+    "reports": 12,
+    "awards": 9,
+    "finalizations": 240
+  },
+  "scenarioPacks": [
+    "normal_matchweek",
+    "verification_dispute",
+    "athlete_development",
+    "fantasy_round",
+    "sponsor_reporting",
+    "platform_trust_case"
+  ]
+}

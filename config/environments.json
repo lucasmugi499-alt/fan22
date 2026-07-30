@@ -1,0 +1,40 @@
+{
+  "publicDomain": "goalplace256.com",
+  "temporaryPublicUrlEnv": "GOALPLACE_PUBLIC_URL",
+  "activationStateFile": "config/active-environment.json",
+  "environments": {
+    "demo": {
+      "label": "Investor Demo",
+      "firebaseProjectId": "studio-534174814-9df36",
+      "firestoreDatabaseId": "fg256",
+      "appHostingConfig": "apphosting.demo.yaml",
+      "expectedDataOrigin": "synthetic_demo",
+      "requiresDemoLogin": true,
+      "requiresInvestorTools": true,
+      "paymentsMode": "disabled",
+      "directOriginPolicy": "gateway-or-staff-preview"
+    },
+    "beta": {
+      "label": "Beta",
+      "firebaseProjectId": "REPLACE_WITH_BETA_PROJECT",
+      "firestoreDatabaseId": "fg256",
+      "appHostingConfig": "apphosting.beta.yaml",
+      "expectedDataOrigin": "beta_test",
+      "requiresDemoLogin": false,
+      "requiresInvestorTools": false,
+      "paymentsMode": "sandbox",
+      "directOriginPolicy": "gateway-or-staff-preview"
+    },
+    "production": {
+      "label": "Production",
+      "firebaseProjectId": "REPLACE_WITH_CLEAN_PRODUCTION_PROJECT",
+      "firestoreDatabaseId": "fg256",
+      "appHostingConfig": "apphosting.production.yaml",
+      "expectedDataOrigin": "production",
+      "requiresDemoLogin": false,
+      "requiresInvestorTools": false,
+      "paymentsMode": "disabled",
+      "directOriginPolicy": "gateway-only"
+    }
+  }
+}

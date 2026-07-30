@@ -79,6 +79,7 @@ export function ResultSubmissionSheet({
   });
   const actorUserId = currentUser?.uid ?? userProfile?.uid;
   const draftNamespace = useMemo(() => privateCacheNamespace({
+    environment: process.env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT ?? process.env.NODE_ENV ?? 'local',
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
     databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
     dataMode: isDemoMode ? 'mock' : 'firebase',

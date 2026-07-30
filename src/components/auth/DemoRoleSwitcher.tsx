@@ -5,6 +5,7 @@ import { UserSwitch } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { isPublicRoute } from '@/lib/auth/permissions';
+import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
 
 /**
  * Dev/demo-only role switcher. Gated behind `isDemoModeEnabled` exactly like the auth
@@ -15,7 +16,8 @@ export function DemoRoleSwitcher() {
   const pathname = usePathname();
   const { role, setDemoRole } = useAuth();
 
-  if (!isDemoModeEnabled || !role || isPublicRoute(pathname)) return null;
+  const investorToolsEnabled = goalPlaceEnvironment() === 'demo' && environmentFlags().enableInvestorTools;
+  if (!isDemoModeEnabled || !investorToolsEnabled || !role || isPublicRoute(pathname)) return null;
 
   function switchAccount() {
     setDemoRole(null);

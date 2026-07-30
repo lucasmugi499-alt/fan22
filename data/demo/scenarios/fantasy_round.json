@@ -1,0 +1,6 @@
+{
+  "scenarioId": "fantasy_round",
+  "description": "Lineups are near lock, official match results drive fantasy scoring and one correction can change the leaderboard.",
+  "expectedRoleActions": ["fan_submit_lineup", "fan_make_transfer", "platform_admin_activate_competition"],
+  "validationAssertions": ["active_fantasy_competition_exists", "open_or_recent_round_exists", "leaderboard_entries_exist"]
+}

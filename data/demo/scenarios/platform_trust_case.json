@@ -1,0 +1,6 @@
+{
+  "scenarioId": "platform_trust_case",
+  "description": "A report or compliance case requires Platform Admin review while public surfaces stay redacted.",
+  "expectedRoleActions": ["fan_report_content", "platform_admin_resolve_report", "platform_admin_view_audit"],
+  "validationAssertions": ["open_report_exists", "admin_audit_event_exists", "private_records_not_public"]
+}

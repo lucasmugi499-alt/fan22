@@ -1,0 +1,6 @@
+{
+  "scenarioId": "normal_matchweek",
+  "description": "Recently official results, upcoming fixtures, league table movement, athlete stories, support needs and a fantasy deadline.",
+  "expectedRoleActions": ["fan_follow_league", "team_admin_submit_result", "league_admin_publish_notice"],
+  "validationAssertions": ["recent_official_results_exist", "upcoming_fixtures_exist", "fantasy_open_round_exists"]
+}

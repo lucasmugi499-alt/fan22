@@ -2,7 +2,7 @@
   "firestore": [
     {
       "database": "fg256",
-      "rules": "firestore.rules",
+      "rules": "firestore.rules.next",
       "indexes": "firestore.indexes.json"
     }
   ],

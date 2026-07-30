@@ -1,0 +1,12 @@
+{
+  "seedVersion": "2026.08.0",
+  "assetRoot": "public/demo/assets",
+  "allowedTypes": [
+    "image/svg+xml"
+  ],
+  "storageMigrationPolicy": "Demo media must never be referenced by production records. Pilot media migration requires consent, ownership review and a migration manifest.",
+  "forbiddenProductionUrlFragments": [
+    "/demo/assets/",
+    "demo.goalplace256.test"
+  ]
+}

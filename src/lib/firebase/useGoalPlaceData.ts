@@ -335,6 +335,7 @@ export function useGoalPlaceData({
   const scopeKey = `${scope?.leagueId ?? ''}:${scope?.teamId ?? ''}:${scope?.athleteId ?? ''}:${scope?.matchId ?? ''}:${recordLimit ?? ''}`;
   const uid = currentUser?.uid ?? userProfile?.uid ?? 'public';
   const cacheNamespace = privateCacheNamespace({
+    environment: process.env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT ?? process.env.NODE_ENV ?? 'local',
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
     databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
     dataMode,
@@ -498,6 +499,7 @@ export function useUserNotifications(userId?: string | null) {
       }
     });
     const cacheKey = `${privateCacheNamespace({
+      environment: process.env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT ?? process.env.NODE_ENV ?? 'local',
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
       databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)',
       dataMode: isDemoMode ? 'mock' : 'firebase',

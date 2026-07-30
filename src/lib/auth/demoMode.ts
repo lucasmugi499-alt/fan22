@@ -1,3 +1,5 @@
+import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
+
 /**
  * Demo mode lets anyone assume a role client-side without authenticating. Firestore rules
  * key off real custom claims, so no data is exposed — but every internal surface renders as
@@ -7,4 +9,5 @@
  * NEXT_PUBLIC_ENABLE_DEMO_LOGIN=true (used for pilot/demo deployments).
  */
 export const isDemoModeEnabled =
-  process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === 'true';
+  goalPlaceEnvironment() !== 'production' &&
+  (process.env.NODE_ENV === 'development' || environmentFlags().allowDemoLogin);

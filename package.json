@@ -31,7 +31,19 @@
     "deploy:staging:functions": "firebase deploy --project staging --config firebase.staging.json --only functions",
     "deploy:prod:candidate-after-approval": "firebase deploy --project manifest-quasar-479416-s7 --config firebase.production-candidate.json --only firestore:fg256",
     "deploy:prod:legacy-blocked": "node -e \"throw new Error('Legacy production deploy is blocked. Use the reviewed candidate path after explicit approval.')\"",
-    "create:owner": "tsx scripts/create-owner.ts"
+    "create:owner": "tsx scripts/create-owner.ts",
+    "environment:status": "tsx scripts/environment/activate.ts --action=status",
+    "environment:activate:demo": "tsx scripts/environment/activate.ts --action=activate --environment=demo",
+    "environment:activate:beta": "tsx scripts/environment/activate.ts --action=activate --environment=beta",
+    "environment:activate:production": "tsx scripts/environment/activate.ts --action=activate --environment=production",
+    "environment:maintenance": "tsx scripts/environment/activate.ts --action=maintenance",
+    "environment:rollback": "tsx scripts/environment/activate.ts --action=rollback",
+    "prod:assert-clean": "tsx scripts/prod/assert-clean.ts",
+    "demo:export": "tsx scripts/demo/data-lifecycle.ts --action=export",
+    "demo:validate": "tsx scripts/demo/data-lifecycle.ts --action=validate",
+    "demo:reset": "tsx scripts/demo/data-lifecycle.ts --action=demo-reset",
+    "beta:seed": "tsx scripts/demo/data-lifecycle.ts --action=beta-seed",
+    "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
