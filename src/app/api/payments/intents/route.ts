@@ -1,10 +1,11 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { contributionQuote, requiresEnhancedReview } from '@/lib/money';
 import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderConfigurationError } from '@/server/payments/providers';
 import { recordProviderAttempt } from '@/server/payments/providerAttempts';
 import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -22,11 +23,6 @@ const intentSchema = z.object({
   idempotencyKey: z.string().min(12).max(160),
 });
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
-
 function recipientCollection(type: 'athlete' | 'team' | 'league' | 'programme') {
   return { athlete: 'athletes', team: 'teams', league: 'leagues', programme: 'programmes' }[type];
 }
@@ -41,12 +37,12 @@ export async function POST(request: Request) {
   if (process.env.GOALPLACE_PAYMENTS_MODE !== 'sandbox') {
     return Response.json({ error: 'Payments remain sandbox-only until legal and PSP launch gates are complete.' }, { status: 503 });
   }
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const actor = auth.actor;
   if (actor.email_verified !== true) return Response.json({ error: 'Verify your email address before supporting a recipient.' }, { status: 403 });
-  const parsed = intentSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid contribution request.' }, { status: 400 });
+  const parsed = await parseJsonBody(request, intentSchema, { maxBytes: 12 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid contribution request.' }, { status: parsed.response.status });
   const input = parsed.data;
   if (input.supporterUserId !== actor.uid) return Response.json({ error: 'The supporter must be the signed-in account.' }, { status: 403 });
 
