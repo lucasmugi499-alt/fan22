@@ -25,7 +25,7 @@
     "sync:staging-fantasy": "tsx scripts/seed-investor-demo.ts --project studio-534174814-9df36 --database fg256 --merge-fantasy",
     "set-admin-claims": "node --experimental-strip-types scripts/set-admin-claims.ts",
     "reset:demo": "node --experimental-strip-types scripts/reset-demo-data.ts",
-    "test:rules": "firebase emulators:exec --only firestore --project goalplace256-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project goalplace256-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "functions:build": "npm --prefix functions run build",
     "functions:typecheck": "npm --prefix functions run typecheck",
     "clean:preview": "tsx scripts/clean-preview.ts",

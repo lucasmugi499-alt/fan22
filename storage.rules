@@ -7,7 +7,7 @@ service firebase.storage {
     }
 
     function role() {
-      return signedIn() ? request.auth.token.role : null;
+      return signedIn() && request.auth.token.keys().hasAny(['role']) ? request.auth.token.role : null;
     }
 
     function isAdmin() {
@@ -28,6 +28,9 @@ service firebase.storage {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create, update: if signedIn() && request.auth.uid == userId && validMedia();
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow write: if resource != null &&
+        request.resource == null &&
+        (isAdmin() || (signedIn() && request.auth.uid == userId));
     }
 
     // Match evidence backing a result submission.
@@ -49,14 +52,16 @@ service firebase.storage {
 
     match /matchEvidence/{matchId}/{teamId}/{userId}/{fileName} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.auth.uid == userId && validEvidence();
+      allow create: if resource == null && signedIn() && request.auth.uid == userId && validEvidence();
       allow update: if false;
       allow delete: if isAdmin();
+      allow write: if resource != null && request.resource == null && isAdmin();
     }
 
     match /publishedMedia/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
-      allow create: if signedIn() &&
+      allow create: if resource == null &&
+        signedIn() &&
         ownerType in ['user', 'athlete', 'team', 'league'] &&
         request.auth.uid == userId &&
         validEvidence() &&
@@ -65,17 +70,22 @@ service firebase.storage {
         request.resource.metadata.uploadedBy == userId;
       allow update: if false;
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow write: if resource != null &&
+        request.resource == null &&
+        (isAdmin() || (signedIn() && request.auth.uid == userId));
     }
 
     match /approvedMedia/{allPaths=**} {
       allow read: if true;
       allow create, update: if isAdmin() && validMedia();
       allow delete: if isAdmin();
+      allow write: if isAdmin() && (request.resource == null || validMedia());
     }
 
     match /public/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
-      allow create: if signedIn() &&
+      allow create: if resource == null &&
+        signedIn() &&
         validPublicOwner(ownerType) &&
         request.auth.uid == userId &&
         validMedia() &&
@@ -84,6 +94,9 @@ service firebase.storage {
         request.resource.metadata.uploadedBy == userId;
       allow update: if false;
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow write: if resource != null &&
+        request.resource == null &&
+        (isAdmin() || (signedIn() && request.auth.uid == userId));
     }
 
     match /public/{allPaths=**} {

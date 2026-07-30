@@ -16,13 +16,13 @@ This performs:
 
 - ESLint
 - Vitest
-- Firestore rules tests through the Firebase emulator
+- Firestore and Storage rules tests through the Firebase emulators
 - Firebase Functions typecheck and build
 - demo seed validation
 - dependency advisory gate
 - Next production build
 
-The Firestore emulator requires a local Java runtime on `PATH`. If Java is missing,
+The Firebase rules emulators require a local Java runtime on `PATH`. If Java is missing,
 `npm run test:rules` fails before executing rule assertions.
 
 For production, run:
@@ -65,6 +65,8 @@ Implemented:
 
 - `firebase-tools` lockfile updated from `15.24.0` to `15.25.0`
 - vulnerable transitive `sharp` under Next overridden to `0.35.3`
+- Storage rules are now covered by emulator tests for scoped public media, private user
+  media, approved media, match evidence immutability, content type, and size limits.
 
 Still registered:
 
