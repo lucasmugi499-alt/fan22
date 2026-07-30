@@ -56,8 +56,12 @@ import {
   Challenge,
   League,
   LeagueAdminApplication,
+  Match,
   ResultSubmission,
+  Season,
   SupportNeed,
+  Team,
+  TeamAssignment,
 } from '@/types';
 import {
   canAcceptNewSubmission,
@@ -79,6 +83,11 @@ const followed = new Set<string>();
 const saved = new Set<string>();
 const storedApplicationsKey = 'goalplace256.demo.leagueAdminApplications';
 const storedLeaguesKey = 'goalplace256.demo.leagues';
+const storedSeasonsKey = 'goalplace256.demo.seasons';
+const storedTeamsKey = 'goalplace256.demo.teams';
+const storedMatchesKey = 'goalplace256.demo.matches';
+const storedTeamAssignmentsKey = 'goalplace256.demo.teamAssignments';
+const selectedLeagueKey = 'goalplace256:assignment:league';
 const resultSubmissions = new Map<string, ResultSubmission>(
   seededResultSubmissions.map((submission) => [submission.id, submission]),
 );
@@ -145,6 +154,37 @@ function persistDemoLeague(league: League) {
   const stored = readStoredItems<League>(storedLeaguesKey);
   replaceById(stored, league);
   writeStoredItems(storedLeaguesKey, stored);
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(selectedLeagueKey, league.id);
+  }
+}
+
+function persistDemoSeason(season: Season) {
+  replaceById(seasons, season);
+  const stored = readStoredItems<Season>(storedSeasonsKey);
+  replaceById(stored, season);
+  writeStoredItems(storedSeasonsKey, stored);
+}
+
+function persistDemoTeam(team: Team) {
+  replaceById(teams, team);
+  const stored = readStoredItems<Team>(storedTeamsKey);
+  replaceById(stored, team);
+  writeStoredItems(storedTeamsKey, stored);
+}
+
+function persistDemoMatch(match: Match) {
+  replaceById(matches, match);
+  const stored = readStoredItems<Match>(storedMatchesKey);
+  replaceById(stored, match);
+  writeStoredItems(storedMatchesKey, stored);
+}
+
+function persistDemoTeamAssignment(assignment: TeamAssignment) {
+  replaceById(teamAssignments, assignment);
+  const stored = readStoredItems<TeamAssignment>(storedTeamAssignmentsKey);
+  replaceById(stored, assignment);
+  writeStoredItems(storedTeamAssignmentsKey, stored);
 }
 
 function demoLeagueIdForApplication(applicationId: string) {
@@ -162,7 +202,12 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
     status: 'draft',
     plan: 'free',
     verified: false,
-    adminUserIds: [application.userId],
+    adminUserIds: [
+      application.userId,
+      MOCK_PROFILES.league_admin.uid,
+      MOCK_PROFILES.platform_admin.uid,
+      MOCK_PROFILES.super_admin.uid,
+    ],
     season: 'Not launched',
     teamsCount: 0,
     athletesCount: 0,
@@ -217,15 +262,16 @@ export const mockProvider: GoalPlaceDataProvider = {
     return mergedById(leagues, readStoredItems<League>(storedLeaguesKey));
   },
   async getSeasons() {
-    return seasons;
+    return mergedById(seasons, readStoredItems<Season>(storedSeasonsKey));
   },
   async getLeagueById(idValue) {
     return readStoredItems<League>(storedLeaguesKey).find((league) => league.id === idValue)
       ?? getLeagueById(idValue);
   },
   async getTeams(options) {
+    const allTeams = mergedById(teams, readStoredItems<Team>(storedTeamsKey));
     return take(
-      teams.filter((team) =>
+      allTeams.filter((team) =>
         (!options?.teamId || team.id === options.teamId) &&
         (!options?.leagueId || team.leagueId === options.leagueId)
       ),
@@ -233,7 +279,8 @@ export const mockProvider: GoalPlaceDataProvider = {
     );
   },
   async getTeamById(idValue) {
-    return getTeamById(idValue);
+    return readStoredItems<Team>(storedTeamsKey).find((team) => team.id === idValue)
+      ?? getTeamById(idValue);
   },
   async getAthletes(options) {
     return take(athletes
@@ -254,7 +301,8 @@ export const mockProvider: GoalPlaceDataProvider = {
     );
   },
   async getMatches(options) {
-    return take(matches
+    const allMatches = mergedById(matches, readStoredItems<Match>(storedMatchesKey));
+    return take(allMatches
       .filter((match) =>
         (!options?.matchId || match.id === options.matchId) &&
         (!options?.leagueId || match.leagueId === options.leagueId) &&
@@ -264,7 +312,8 @@ export const mockProvider: GoalPlaceDataProvider = {
       ), options?.limit, options?.afterId);
   },
   async getMatchById(idValue) {
-    return getMatchById(idValue);
+    return readStoredItems<Match>(storedMatchesKey).find((match) => match.id === idValue)
+      ?? getMatchById(idValue);
   },
   async getChallenges(options) {
     return take(challenges
@@ -308,10 +357,11 @@ export const mockProvider: GoalPlaceDataProvider = {
     return verifications;
   },
   async getTeamAssignments() {
-    return teamAssignments;
+    return mergedById(teamAssignments, readStoredItems<TeamAssignment>(storedTeamAssignmentsKey));
   },
   async getTeamAssignmentById(idValue) {
-    return teamAssignments.find((assignment) => assignment.id === idValue);
+    return readStoredItems<TeamAssignment>(storedTeamAssignmentsKey).find((assignment) => assignment.id === idValue)
+      ?? teamAssignments.find((assignment) => assignment.id === idValue);
   },
   async getRosters(options) {
     return take(rosters
@@ -785,25 +835,27 @@ export const mockProvider: GoalPlaceDataProvider = {
       id: data.id ?? id('season'),
       createdAt: new Date().toISOString(),
     };
-    seasons.unshift(season);
+    persistDemoSeason(season);
     return result(season.id, 'Season created.');
   },
   async transitionSeason(seasonId, status) {
-    const season = seasons.find((item) => item.id === seasonId);
+    const season = readStoredItems<Season>(storedSeasonsKey).find((item) => item.id === seasonId)
+      ?? seasons.find((item) => item.id === seasonId);
     if (!season) throw new Error('Season not found.');
     season.status = status;
+    persistDemoSeason(season);
     return result(seasonId, `Season moved to ${status}.`);
   },
   async createTeams(nextTeams) {
-    for (const team of nextTeams) replaceById(teams, team);
+    for (const team of nextTeams) persistDemoTeam(team);
     return result(nextTeams[0]?.id ?? id('team_batch'), `${nextTeams.length} teams imported.`);
   },
   async createFixtures(fixtures) {
-    for (const fixture of fixtures) replaceById(matches, fixture);
+    for (const fixture of fixtures) persistDemoMatch(fixture);
     return result(fixtures[0]?.id ?? id('fixture_batch'), `${fixtures.length} fixtures created.`);
   },
   async createTeamAdminInvitation(data) {
-    replaceById(teamAssignments, data);
+    persistDemoTeamAssignment(data);
     audit({
       actorUserId: data.invitedByUserId ?? data.userId,
       action: 'invited',
