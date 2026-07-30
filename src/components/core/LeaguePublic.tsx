@@ -19,6 +19,7 @@ import { MatchCard } from '@/components/core/MatchCard';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { getSportTheme } from '@/lib/sportThemes';
 import { LeagueNoticeList } from '@/components/core/LeagueNoticeList';
+import type { Athlete, FeedPost, League, LeagueNotice, Match, Season, Team } from '@/types';
 
 const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
   football: 'pitch',
@@ -26,14 +27,30 @@ const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
   rugby: 'broadcast',
 };
 
-export function LeaguePublic({ leagueId }: { leagueId: string }) {
+type InitialLeaguePublicData = {
+  league?: League;
+  teams?: Team[];
+  matches?: Match[];
+  seasons?: Season[];
+  athletes?: Athlete[];
+  feedPosts?: FeedPost[];
+  leagueNotices?: LeagueNotice[];
+};
+
+export function LeaguePublic({
+  leagueId,
+  initialData,
+}: {
+  leagueId: string;
+  initialData?: InitialLeaguePublicData;
+}) {
   const exact = useGoalPlaceData({
     collections: ['leagues'],
     scope: { leagueId },
   });
   const league = useMemo(
-    () => exact.leagues.find((item) => item.id === leagueId),
-    [exact.leagues, leagueId],
+    () => exact.leagues.find((item) => item.id === leagueId) ?? initialData?.league,
+    [exact.leagues, initialData?.league, leagueId],
   );
   const related = useGoalPlaceData({
     collections: ['teams', 'matches', 'seasons', 'athletes', 'leagueNotices'],
@@ -45,9 +62,13 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
     scope: { leagueId, audience: 'public' },
     recordLimit: 12,
   });
-  const { teams, matches, seasons, athletes, leagueNotices } = related;
-  const feedPosts = newsData.feedPosts;
-  const loading = exact.loading || (Boolean(league) && related.loading);
+  const teams = useMemo(() => related.teams.length ? related.teams : initialData?.teams ?? [], [initialData?.teams, related.teams]);
+  const matches = useMemo(() => related.matches.length ? related.matches : initialData?.matches ?? [], [initialData?.matches, related.matches]);
+  const seasons = useMemo(() => related.seasons.length ? related.seasons : initialData?.seasons ?? [], [initialData?.seasons, related.seasons]);
+  const athletes = useMemo(() => related.athletes.length ? related.athletes : initialData?.athletes ?? [], [initialData?.athletes, related.athletes]);
+  const leagueNotices = useMemo(() => related.leagueNotices.length ? related.leagueNotices : initialData?.leagueNotices ?? [], [initialData?.leagueNotices, related.leagueNotices]);
+  const feedPosts = useMemo(() => newsData.feedPosts.length ? newsData.feedPosts : initialData?.feedPosts ?? [], [initialData?.feedPosts, newsData.feedPosts]);
+  const loading = !initialData?.league && (exact.loading || (Boolean(league) && related.loading));
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const lTeams = useMemo(() => teamsInLeague(leagueId, teams), [teams, leagueId]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedLeagueId === leagueId), [feedPosts, leagueId]);
@@ -95,17 +116,16 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
         </p>
       </Card>
 
-      {upcoming.length ? (
-        <section className="space-y-2.5">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><CalendarBlank className="h-4 w-4 text-brand" /> Upcoming fixtures</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {upcoming.map((match) => <MatchCard key={match.id} match={match} home={teamById.get(match.homeTeamId)} away={teamById.get(match.awayTeamId)} href={`/matches/${match.id}`} />)}
-          </div>
-        </section>
-      ) : null}
-
       <section className="space-y-2.5">
-        <h2 className="text-[15px] font-semibold text-text-strong">Table</h2>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">Official results only</p>
+            <h2 className="font-display text-2xl font-semibold text-text-strong">League table</h2>
+          </div>
+          <span className="rounded-[var(--radius-pill)] border border-border bg-surface-2 px-3 py-1 text-xs font-semibold text-muted">
+            {official.length} official matches
+          </span>
+        </div>
         <DemoDataNote />
         {standings.length ? (
           <RichStandings
@@ -119,6 +139,15 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
           <Card className="p-4 text-sm text-muted">Standings appear as official results are recorded.</Card>
         )}
       </section>
+
+      {upcoming.length ? (
+        <section className="space-y-2.5">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><CalendarBlank className="h-4 w-4 text-brand" /> Upcoming fixtures</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {upcoming.map((match) => <MatchCard key={match.id} match={match} home={teamById.get(match.homeTeamId)} away={teamById.get(match.awayTeamId)} href={`/matches/${match.id}`} />)}
+          </div>
+        </section>
+      ) : null}
 
       <NewsRow title="League news" posts={news} />
       {newsData.error ? (

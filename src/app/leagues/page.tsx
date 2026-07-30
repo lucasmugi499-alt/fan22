@@ -1,6 +1,7 @@
 import { LeaguesDiscover } from "@/components/discover/LeaguesDiscover";
-import { getPublicLeagues } from "@/server/publicCatalogue";
+import { getPublicLeagueDiscoveryData } from "@/server/publicCatalogue";
 
 export default async function Page() {
-  return <LeaguesDiscover initialLeagues={await getPublicLeagues()} />;
+  const data = await getPublicLeagueDiscoveryData();
+  return <LeaguesDiscover {...data} />;
 }

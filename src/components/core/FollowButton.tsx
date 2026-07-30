@@ -45,8 +45,9 @@ export function FollowButton({
       updateLocalProfile({ [field]: [...current] });
 
       try {
-        await dataProvider.toggleFollow(userProfile.id, targetType, targetId);
+        const result = await dataProvider.toggleFollow(userProfile.id, targetType, targetId);
         setOptimisticFollowing(null);
+        toast.success(result.message ?? (next ? 'Follow saved.' : 'Follow removed.'));
       } catch (cause) {
         setOptimisticFollowing(null);
         updateLocalProfile({ [field]: userProfile[field] });
@@ -64,7 +65,7 @@ export function FollowButton({
       disabled={saving}
       className={cn(
         'inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] px-4 text-sm font-semibold backdrop-blur-sm transition-colors disabled:opacity-60',
-        following ? 'bg-white text-black' : 'bg-black/30 text-white hover:bg-black/45',
+        following ? 'bg-brand text-on-brand shadow-[var(--glow-brand)]' : 'bg-black/30 text-white hover:bg-black/45',
         className,
       )}
       aria-pressed={following}

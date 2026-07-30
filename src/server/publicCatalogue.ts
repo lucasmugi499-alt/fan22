@@ -2,7 +2,7 @@ import 'server-only';
 
 import { investorDemo } from '@/data/investorDemo';
 import { adminDb } from '@/lib/firebase/admin';
-import type { Athlete, Challenge, League, Match, Team } from '@/types';
+import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
 
 function usesFirebaseData() {
   return (
@@ -56,6 +56,64 @@ export async function getPublicTeams() {
   return withSyntheticDemoFallback(
     () => recentCollection<Team>('teams', 80),
     () => investorDemo.teams,
+  );
+}
+
+export async function getPublicLeagueDiscoveryData() {
+  const fallback = () => ({
+    leagues: investorDemo.leagues,
+    teams: investorDemo.teams,
+    matches: investorDemo.matches,
+    seasons: investorDemo.seasons,
+  });
+  if (!usesFirebaseData()) return fallback();
+  return withSyntheticDemoFallback(
+    async () => {
+      const [leagues, teams, matches, seasons] = await Promise.all([
+        recentCollection<League>('leagues', 48),
+        recentCollection<Team>('teams', 240),
+        adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(700).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+        recentCollection<Season>('seasons', 80),
+      ]);
+      return { leagues, teams, matches, seasons };
+    },
+    fallback,
+  );
+}
+
+export async function getPublicLeagueProfileData(leagueId: string) {
+  const fallback = () => ({
+    league: investorDemo.leagues.find((league) => league.id === leagueId),
+    teams: investorDemo.teams.filter((team) => team.leagueId === leagueId),
+    matches: investorDemo.matches.filter((match) => match.leagueId === leagueId),
+    seasons: investorDemo.seasons.filter((season) => season.leagueId === leagueId),
+    athletes: investorDemo.athletes.filter((athlete) => athlete.leagueId === leagueId).slice(0, 48),
+    feedPosts: investorDemo.feedPosts.filter((post) => post.relatedLeagueId === leagueId).slice(0, 12),
+    leagueNotices: investorDemo.leagueNotices.filter((notice) => notice.leagueId === leagueId).slice(0, 12),
+  });
+  if (!usesFirebaseData()) return fallback();
+  return withSyntheticDemoFallback(
+    async () => {
+      const [league, teams, matches, seasons, athletes, feedPosts, leagueNotices] = await Promise.all([
+        adminDb.collection('leagues').doc(leagueId).get()
+          .then((snapshot) => snapshot.exists ? record<League>(snapshot.id, snapshot.data()!) : undefined),
+        adminDb.collection('teams').where('leagueId', '==', leagueId).limit(80).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Team>(item.id, item.data()))),
+        adminDb.collection('matches').where('leagueId', '==', leagueId).limit(240).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+        adminDb.collection('seasons').where('leagueId', '==', leagueId).limit(20).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Season>(item.id, item.data()))),
+        adminDb.collection('athletes').where('leagueId', '==', leagueId).limit(48).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Athlete>(item.id, item.data()))),
+        adminDb.collection('feedPosts').where('relatedLeagueId', '==', leagueId).limit(12).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<typeof investorDemo.feedPosts[number]>(item.id, item.data()))),
+        adminDb.collection('leagueNotices').where('leagueId', '==', leagueId).limit(12).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<typeof investorDemo.leagueNotices[number]>(item.id, item.data()))),
+      ]);
+      return { league, teams, matches, seasons, athletes, feedPosts, leagueNotices };
+    },
+    fallback,
   );
 }
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { athletePhoto } from '@/lib/media';
-import { SealCheck, Users, TrendUp } from '@phosphor-icons/react/dist/ssr';
+import { SealCheck, Users, TrendUp, MapPin, Trophy } from '@phosphor-icons/react/dist/ssr';
 import type { Athlete, League, Team } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -60,18 +60,31 @@ export function AthleteCard({ athlete, className }: { athlete: Athlete; classNam
 }
 
 /** Compact team row/card. */
-export function TeamCard({ team, className }: { team: Team; className?: string }) {
+export function TeamCard({
+  team,
+  className,
+  computedPoints,
+  rank,
+  leagueName,
+}: {
+  team: Team;
+  className?: string;
+  computedPoints?: number;
+  rank?: number;
+  leagueName?: string;
+}) {
   const accent = sportColor(String(team.sport));
+  const points = computedPoints ?? team.leaguePoints;
   return (
     <Link
       href={`/teams/${team.id}`}
       className={cn(
-        'flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-3 transition-colors duration-[var(--dur-micro)] hover:border-border-strong',
+        'group flex w-full min-w-0 max-w-full items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-3 transition-[border-color,transform] duration-[var(--dur-micro)] hover:-translate-y-0.5 hover:border-border-strong',
         className
       )}
     >
       <span
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-md)] border text-xs font-bold text-text-strong"
+        className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-md)] border text-xs font-bold text-text-strong"
         style={{ borderColor: accent, background: 'var(--surface-3)' }}
       >
         {team.name.slice(0, 2).toUpperCase()}
@@ -81,12 +94,17 @@ export function TeamCard({ team, className }: { team: Team; className?: string }
           <span className="truncate text-sm font-semibold text-text-strong">{team.name}</span>
           {team.verified ? <SealCheck className="h-4 w-4 shrink-0 text-[var(--state-verified)]" weight="fill" /> : null}
         </div>
-        <span className="truncate text-xs text-muted">
-          {team.city} · <span className="tabular tabular-nums">{team.record ?? `${team.wins}-${team.draws ?? 0}-${team.losses}`}</span>
+        <span className="block truncate text-xs text-muted">
+          {leagueName ? `${leagueName} · ` : ''}{team.city} · <span className="tabular tabular-nums">{team.record ?? `${team.wins}-${team.draws ?? 0}-${team.losses}`}</span>
         </span>
+        {rank ? (
+          <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-brand">
+            <Trophy className="h-3.5 w-3.5" weight="bold" /> #{rank} table position
+          </span>
+        ) : null}
       </div>
       <span data-numeric className="shrink-0 text-right text-sm font-bold tabular-nums text-brand">
-        {team.leaguePoints}
+        {points}
         <span className="ml-1 text-[10px] font-medium uppercase text-subtle">pts</span>
       </span>
     </Link>
@@ -94,13 +112,23 @@ export function TeamCard({ team, className }: { team: Team; className?: string }
 }
 
 /** League discovery card with its GoalPlace Index. */
-export function LeagueCard({ league, className }: { league: League; className?: string }) {
+export function LeagueCard({
+  league,
+  className,
+  leaderName,
+  officialMatches,
+}: {
+  league: League;
+  className?: string;
+  leaderName?: string;
+  officialMatches?: number;
+}) {
   const accent = sportColor(String(league.sport));
   return (
     <Link
       href={`/leagues/${league.id}`}
       className={cn(
-        'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-4 transition-colors duration-[var(--dur-micro)] hover:border-border-strong',
+        'group flex min-h-40 w-full min-w-0 max-w-full flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-4 transition-[border-color,transform] duration-[var(--dur-micro)] hover:-translate-y-0.5 hover:border-border-strong',
         className
       )}
     >
@@ -110,7 +138,7 @@ export function LeagueCard({ league, className }: { league: League; className?: 
             <span className="truncate text-sm font-semibold text-text-strong">{league.name}</span>
             {league.verified ? <SealCheck className="h-4 w-4 shrink-0 text-[var(--state-verified)]" weight="fill" /> : null}
           </div>
-          <span className="text-xs text-muted">{league.city} · {String(league.sport)}</span>
+          <span className="flex min-w-0 items-center gap-1 text-xs text-muted"><MapPin className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{league.city} · {String(league.sport)}</span></span>
         </div>
         <span className="shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-[10px] font-bold uppercase" style={{ background: 'var(--surface-3)', color: accent }}>
           {league.status}
@@ -120,6 +148,16 @@ export function LeagueCard({ league, className }: { league: League; className?: 
         <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> <span className="tabular tabular-nums">{league.teamsCount}</span> teams</span>
         <span className="inline-flex items-center gap-1">
           <span className="tabular tabular-nums font-semibold text-text-strong">{league.goalPlaceIndex}</span> index
+        </span>
+      </div>
+      <div className="mt-auto grid grid-cols-2 gap-2 border-t border-border pt-3 text-xs">
+        <span>
+          <span className="block text-[10px] uppercase text-subtle">Leader</span>
+          <span className="block truncate font-semibold text-text-strong">{leaderName ?? 'Table forming'}</span>
+        </span>
+        <span className="text-right">
+          <span className="block text-[10px] uppercase text-subtle">Official</span>
+          <span data-numeric className="font-semibold tabular-nums text-text-strong">{officialMatches ?? 0} matches</span>
         </span>
       </div>
     </Link>
