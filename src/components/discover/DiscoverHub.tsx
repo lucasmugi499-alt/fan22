@@ -13,15 +13,20 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
-import type { Athlete, Challenge, League, Match, Team } from '@/types';
+import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
+import {
+  buildLeagueTableSnapshot,
+  standingForTeam,
+  type LeagueTableSnapshot,
+} from './discoveryUtils';
 
 const TABS = ['For You', 'Athletes', 'Teams', 'Leagues', 'Matches', 'Challenges'] as const;
 type Tab = (typeof TABS)[number];
 
 export function DiscoverHub() {
   const { userProfile } = useAuth();
-  const { athletes, teams, leagues, matches, challenges, loading } = useGoalPlaceData({
-    collections: ['athletes', 'teams', 'leagues', 'matches', 'challenges'],
+  const { athletes, teams, leagues, matches, seasons, challenges, loading } = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons', 'challenges'],
     recordLimit: 1_200,
   });
   const [tab, setTab] = useState<Tab>('For You');
@@ -31,6 +36,12 @@ export function DiscoverHub() {
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
   const leagueById = useMemo(() => new Map(leagues.map((item) => [item.id, item])), [leagues]);
+  const leagueSnapshots = useLeagueSnapshots(leagues, teams, matches, seasons);
+
+  const pointsForTeam = useCallback(
+    (team: Team) => standingForTeam(team.id, leagueSnapshots)?.row.points ?? team.leaguePoints,
+    [leagueSnapshots],
+  );
 
   const matchesFilters = useCallback((item: { sport: unknown; city: string; name?: string }) =>
     (sport === 'all' || String(item.sport).toLowerCase() === sport) &&
@@ -49,7 +60,7 @@ export function DiscoverHub() {
     .sort((a, b) => b.goalPlacePoints - a.goalPlacePoints), [athletes, leagueById, matchesFilters, query, teamById, verifiedOnly]);
   const filteredTeams = useMemo(() => teams
     .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
-    .sort((a, b) => b.leaguePoints - a.leaguePoints), [teams, matchesFilters, verifiedOnly]);
+    .sort((a, b) => pointsForTeam(b) - pointsForTeam(a)), [teams, matchesFilters, pointsForTeam, verifiedOnly]);
   const filteredLeagues = useMemo(() => leagues
     .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
     .sort((a, b) => b.goalPlaceIndex - a.goalPlaceIndex), [leagues, matchesFilters, verifiedOnly]);
@@ -76,7 +87,7 @@ export function DiscoverHub() {
 
   const forYou = {
     athletes: followedOrTop(athletes, userProfile?.followedAthletes, (item) => item.goalPlacePoints),
-    teams: followedOrTop(teams, userProfile?.followedTeams, (item) => item.leaguePoints),
+    teams: followedOrTop(teams, userProfile?.followedTeams, pointsForTeam),
     leagues: followedOrTop(leagues, userProfile?.followedLeagues, (item) => item.goalPlaceIndex),
   };
   const cities = [...new Set(leagues.map((item) => item.city))].sort();
@@ -124,16 +135,27 @@ export function DiscoverHub() {
         </div>
 
         {tab === 'For You' ? (
-          <ForYou athletes={forYou.athletes} teams={forYou.teams} leagues={forYou.leagues} />
+          <ForYou athletes={forYou.athletes} teams={forYou.teams} leagues={forYou.leagues} leagueById={leagueById} leagueSnapshots={leagueSnapshots} />
         ) : null}
         {tab === 'Athletes' ? <AthleteGrid items={filteredAthletes} /> : null}
-        {tab === 'Teams' ? <TeamGrid items={filteredTeams} /> : null}
-        {tab === 'Leagues' ? <LeagueGrid items={filteredLeagues} /> : null}
+        {tab === 'Teams' ? <TeamGrid items={filteredTeams} leagueById={leagueById} leagueSnapshots={leagueSnapshots} /> : null}
+        {tab === 'Leagues' ? <LeagueGrid items={filteredLeagues} leagueSnapshots={leagueSnapshots} /> : null}
         {tab === 'Matches' ? <MatchGrid items={filteredMatches} teamById={teamById} /> : null}
         {tab === 'Challenges' ? <ChallengeGrid items={filteredChallenges} athletes={athletes} leagueById={leagueById} /> : null}
       </div>
     </div>
   );
+}
+
+function useLeagueSnapshots(
+  leagues: League[],
+  teams: Team[],
+  matches: Match[],
+  seasons: Season[],
+) {
+  return useMemo(() => new Map(
+    leagues.map((league) => [league.id, buildLeagueTableSnapshot(league, teams, matches, seasons)]),
+  ), [leagues, matches, seasons, teams]);
 }
 
 function followedOrTop<T extends { id: string }>(
@@ -145,17 +167,29 @@ function followedOrTop<T extends { id: string }>(
   return (preferred.length ? preferred : [...items].sort((a, b) => score(b) - score(a))).slice(0, 6);
 }
 
-function ForYou({ athletes, teams, leagues }: { athletes: Athlete[]; teams: Team[]; leagues: League[] }) {
+function ForYou({
+  athletes,
+  teams,
+  leagues,
+  leagueById,
+  leagueSnapshots,
+}: {
+  athletes: Athlete[];
+  teams: Team[];
+  leagues: League[];
+  leagueById: Map<string, League>;
+  leagueSnapshots: Map<string, LeagueTableSnapshot>;
+}) {
   return (
     <div className="space-y-7">
       <Section title="Rising this week" copy="Ranked by verified GoalPlace activity, never by support spend.">
         <AthleteGrid items={athletes} />
       </Section>
       <Section title="Your community teams" copy="Follow teams to move them into your personal home.">
-        <TeamGrid items={teams} />
+        <TeamGrid items={teams} leagueById={leagueById} leagueSnapshots={leagueSnapshots} />
       </Section>
       <Section title="Competition hubs" copy="Official tables, fixtures, stories, and notices.">
-        <LeagueGrid items={leagues} />
+        <LeagueGrid items={leagues} leagueSnapshots={leagueSnapshots} />
       </Section>
     </div>
   );
@@ -174,14 +208,57 @@ function AthleteGrid({ items }: { items: Athlete[] }) {
       </div>
     : <EmptyState icon={MagnifyingGlass} title="No athletes found" description="Try widening the filters." />;
 }
-function TeamGrid({ items }: { items: Team[] }) {
+function TeamGrid({
+  items,
+  leagueById,
+  leagueSnapshots,
+}: {
+  items: Team[];
+  leagueById: Map<string, League>;
+  leagueSnapshots: Map<string, LeagueTableSnapshot>;
+}) {
   return items.length
-    ? <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">{items.map((item) => <TeamCard key={item.id} team={item} />)}</div>
+    ? (
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+        {items.map((item) => {
+          const standing = standingForTeam(item.id, leagueSnapshots);
+          return (
+            <TeamCard
+              key={item.id}
+              team={item}
+              computedPoints={standing?.row.points}
+              rank={standing?.rank}
+              leagueName={leagueById.get(item.leagueId)?.name}
+            />
+          );
+        })}
+      </div>
+    )
     : <EmptyState icon={MagnifyingGlass} title="No teams found" description="Try widening the filters." />;
 }
-function LeagueGrid({ items }: { items: League[] }) {
+function LeagueGrid({
+  items,
+  leagueSnapshots,
+}: {
+  items: League[];
+  leagueSnapshots: Map<string, LeagueTableSnapshot>;
+}) {
   return items.length
-    ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{items.map((item) => <LeagueCard key={item.id} league={item} />)}</div>
+    ? (
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {items.map((item) => {
+          const snapshot = leagueSnapshots.get(item.id);
+          return (
+            <LeagueCard
+              key={item.id}
+              league={item}
+              leaderName={snapshot?.rows[0]?.teamName}
+              officialMatches={snapshot?.officialMatches}
+            />
+          );
+        })}
+      </div>
+    )
     : <EmptyState icon={MagnifyingGlass} title="No leagues found" description="Try widening the filters." />;
 }
 function MatchGrid({ items, teamById }: { items: Match[]; teamById: Map<string, Team> }) {

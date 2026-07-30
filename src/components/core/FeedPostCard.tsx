@@ -1,10 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Heart, ChatCircle, ShareFat, SealCheck, WarningCircle, PaperPlaneTilt } from '@phosphor-icons/react';
+import { Heart, ChatCircle, ShareFat, SealCheck, WarningCircle, PaperPlaneTilt, Trophy, Users } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { athletePhoto } from '@/lib/media';
-import type { FeedPost } from '@/types';
+import type { FeedPost, League, Team } from '@/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
 import { useAuthGate } from '@/components/auth/AuthRequiredModal';
@@ -13,6 +14,7 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import type { Comment } from '@/types';
+import type { LeagueStanding } from '@/lib/leagueModel';
 
 function timeAgo(iso?: string): string {
   if (!iso) return '';
@@ -38,11 +40,18 @@ const ROLE_LABEL: Record<string, string> = {
   sponsor: 'Sponsor',
 };
 
+type FeedPostContext = {
+  team?: Team;
+  league?: League;
+  teamStanding?: { row: LeagueStanding; rank: number } | null;
+  officialMatches?: number;
+};
+
 /**
  * Feed engagement is optimistic, but every visible count is reconciled through the
  * provider. Failed actions roll back rather than leaving a local-only promise.
  */
-export function FeedPostCard({ post }: { post: FeedPost }) {
+export function FeedPostCard({ post, context }: { post: FeedPost; context?: FeedPostContext }) {
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const { requireAuth } = useAuthGate();
   const provider = isDemoMode ? mockProvider : dataProvider;
@@ -186,6 +195,8 @@ export function FeedPostCard({ post }: { post: FeedPost }) {
             </div>
           ) : null}
 
+          <FeedContextStrip context={context} />
+
           {media && !userProfile?.lowDataMode ? (
             <div className="mt-3 overflow-hidden rounded-[var(--radius-md)] border border-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -253,5 +264,41 @@ export function FeedPostCard({ post }: { post: FeedPost }) {
       </div>
     </Sheet>
     </>
+  );
+}
+
+function FeedContextStrip({ context }: { context?: FeedPostContext }) {
+  const team = context?.team;
+  const league = context?.league;
+  if (!team && !league) return null;
+
+  const primaryHref = team ? `/teams/${team.id}` : `/leagues/${league?.id}`;
+  const primaryName = team?.name ?? league?.name ?? 'Competition';
+  const leagueName = league?.name ?? 'League';
+
+  return (
+    <Link
+      href={primaryHref}
+      className="mt-3 flex min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-xs transition-colors hover:border-border-strong"
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-surface-3 text-brand">
+        {team ? <Trophy className="h-4 w-4" weight="bold" /> : <Users className="h-4 w-4" weight="bold" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-semibold text-text-strong">{primaryName}</span>
+        <span className="block truncate text-subtle">{team ? leagueName : 'Official league context'}</span>
+      </span>
+      {context?.teamStanding ? (
+        <span className="shrink-0 text-right tabular-nums">
+          <span className="block font-bold text-brand">#{context.teamStanding.rank}</span>
+          <span className="text-[10px] uppercase text-subtle">{context.teamStanding.row.points} pts</span>
+        </span>
+      ) : (
+        <span className="shrink-0 text-right tabular-nums">
+          <span className="block font-bold text-text-strong">{context?.officialMatches ?? 0}</span>
+          <span className="text-[10px] uppercase text-subtle">official</span>
+        </span>
+      )}
+    </Link>
   );
 }

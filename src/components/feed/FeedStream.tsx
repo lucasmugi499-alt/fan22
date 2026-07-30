@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { adaptFeedPost } from '@/lib/firebase/useGoalPlaceData';
+import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useAuth } from '@/context/AuthProvider';
 import { useAuthGate } from '@/components/auth/AuthRequiredModal';
 import { FeedPostCard } from '@/components/core/FeedPostCard';
@@ -14,6 +15,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import type { FeedPost } from '@/types';
+import {
+  buildLeagueTableSnapshot,
+  standingForTeam,
+} from '@/components/discover/discoveryUtils';
 
 const PAGE_SIZE = 24;
 
@@ -21,6 +26,10 @@ export function FeedStream() {
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const { requireAuth } = useAuthGate();
   const provider = isDemoMode ? mockProvider : dataProvider;
+  const { teams, leagues, matches, seasons } = useGoalPlaceData({
+    collections: ['teams', 'leagues', 'matches', 'seasons'],
+    recordLimit: 1_200,
+  });
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -60,6 +69,21 @@ export function FeedStream() {
         .sort((a, b) => +new Date(b.createdAt || b.timestamp || 0) - +new Date(a.createdAt || a.timestamp || 0)),
     [feedPosts],
   );
+  const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
+  const leagueById = useMemo(() => new Map(leagues.map((item) => [item.id, item])), [leagues]);
+  const leagueSnapshots = useMemo(() => new Map(
+    leagues.map((league) => [league.id, buildLeagueTableSnapshot(league, teams, matches, seasons)]),
+  ), [leagues, matches, seasons, teams]);
+
+  const contextForPost = useCallback((post: FeedPost) => {
+    const team = post.relatedTeamId ? teamById.get(post.relatedTeamId) : undefined;
+    const league = post.relatedLeagueId
+      ? leagueById.get(post.relatedLeagueId)
+      : team?.leagueId ? leagueById.get(team.leagueId) : undefined;
+    const teamStanding = team ? standingForTeam(team.id, leagueSnapshots) : null;
+    const officialMatches = league ? leagueSnapshots.get(league.id)?.officialMatches : undefined;
+    return { team, league, teamStanding, officialMatches };
+  }, [leagueById, leagueSnapshots, teamById]);
 
   function openComposer() {
     requireAuth(() => setComposing(true), 'Sign in to publish to the community feed.');
@@ -108,7 +132,7 @@ export function FeedStream() {
       {posts.length ? (
         <>
           <div className="md:space-y-3">
-            {posts.map((post) => <FeedPostCard key={post.id} post={post} />)}
+            {posts.map((post) => <FeedPostCard key={post.id} post={post} context={contextForPost(post)} />)}
           </div>
           {hasMore ? (
             <div className="flex justify-center px-[var(--gutter)] py-5 md:px-0">
