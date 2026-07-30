@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeProductionEnvironment, goalPlaceEnvironment } from './environment';
+import { assertSafeProductionEnvironment, goalPlaceEnvironment, publicEnvironment } from './environment';
 
 const safeProduction = {
   NODE_ENV: 'production',
@@ -26,6 +26,17 @@ describe('environment guard', () => {
 
   it('allows a clean production configuration', () => {
     expect(() => assertSafeProductionEnvironment(safeProduction)).not.toThrow();
+  });
+
+  it('reports App Hosting runtime Firebase values when public build vars are unavailable', () => {
+    expect(publicEnvironment({
+      GOALPLACE_ENVIRONMENT: 'demo',
+      GOALPLACE_ADMIN_PROJECT_ID: 'studio-534174814-9df36',
+    } as NodeJS.ProcessEnv)).toMatchObject({
+      environment: 'demo',
+      firebaseProjectId: 'studio-534174814-9df36',
+      dataMode: 'firebase',
+    });
   });
 
   it.each([

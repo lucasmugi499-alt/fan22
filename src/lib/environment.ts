@@ -46,14 +46,18 @@ export function environmentFlags(env: NodeJS.ProcessEnv = process.env): Environm
 }
 
 export function publicEnvironment(env: NodeJS.ProcessEnv = process.env): PublicEnvironment {
+  const runtimeFirebaseProjectId = env.GOALPLACE_ADMIN_PROJECT_ID ?? env.GCLOUD_PROJECT;
+  const dataMode = env.NEXT_PUBLIC_DATA_MODE ?? (runtimeFirebaseProjectId ? 'firebase' : 'mock');
+
   return {
     environment: goalPlaceEnvironment(env),
     environmentVersion:
       env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT_VERSION ??
       env.GOALPLACE_ENVIRONMENT_VERSION ??
+      env.K_REVISION ??
       'local-dev',
-    firebaseProjectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured',
-    dataMode: env.NEXT_PUBLIC_DATA_MODE ?? 'mock',
+    firebaseProjectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? runtimeFirebaseProjectId ?? 'unconfigured',
+    dataMode,
   };
 }
 
