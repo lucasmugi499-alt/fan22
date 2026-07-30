@@ -186,6 +186,11 @@ export type EditableTeamProfile = Pick<
   'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail'
 >;
 
+export type EditableLeagueProfile = Pick<
+  League,
+  'name' | 'city' | 'description' | 'status' | 'plan' | 'verified'
+>;
+
 export type CreateLeagueNoticeInput = Omit<LeagueNotice, 'id' | 'createdAt'> & {
   id?: string;
 };
@@ -279,12 +284,15 @@ export interface GoalPlaceDataProvider {
   createChallenge(data: Omit<Challenge, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
   transitionChallenge(data: TransitionChallengeInput): Promise<DataWriteResult>;
   createLeagueNotice(data: CreateLeagueNoticeInput): Promise<DataWriteResult>;
+  createLeague(data: Omit<League, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
+  updateLeagueProfile(leagueId: string, data: Partial<EditableLeagueProfile>): Promise<DataWriteResult>;
   createSeason(data: Omit<Season, 'id' | 'createdAt'> & { id?: string }): Promise<DataWriteResult>;
   transitionSeason(seasonId: string, status: Season['status']): Promise<DataWriteResult>;
   createTeams(teams: Team[]): Promise<DataWriteResult>;
   createFixtures(fixtures: Match[]): Promise<DataWriteResult>;
   createTeamAdminInvitation(data: TeamAssignment): Promise<DataWriteResult>;
   acceptTeamAdminInvitation(assignmentId: string, userId: string, token: string): Promise<DataWriteResult>;
+  revokeTeamAssignment(assignmentId: string, actorUserId: string, note?: string): Promise<DataWriteResult>;
   markNotificationRead(notificationId: string, read?: boolean): Promise<DataWriteResult>;
   markAllNotificationsRead(userId: string): Promise<DataWriteResult>;
   subscribeToNotifications(

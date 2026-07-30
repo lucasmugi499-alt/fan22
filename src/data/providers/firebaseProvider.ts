@@ -774,6 +774,28 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     });
     return writeResult(ref.id, 'League notice published.');
   },
+  async createLeague(data) {
+    requireActor();
+    const response = await requestTrustedAdminAction({
+      action: 'create_league',
+      name: data.name,
+      sport: data.sport,
+      city: data.city,
+      description: data.description,
+      status: data.status,
+      plan: data.plan,
+    });
+    return writeResult(response.id ?? data.id ?? data.name, 'League created.');
+  },
+  async updateLeagueProfile(leagueId, data) {
+    requireActor();
+    await requestTrustedAdminAction({
+      action: 'update_league_profile',
+      leagueId,
+      ...data,
+    });
+    return writeResult(leagueId, 'League profile updated.');
+  },
   async createSeason(data) {
     requireActor();
     const { db } = requireFirebaseClient();
@@ -832,6 +854,15 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     requireActor(userId);
     await requestTrustedAccess({ action: 'accept_team_invitation', assignmentId, token });
     return writeResult(assignmentId, 'Team Admin invitation accepted.');
+  },
+  async revokeTeamAssignment(assignmentId, actorUserId, note) {
+    requireActor(actorUserId);
+    await requestTrustedAdminAction({
+      action: 'revoke_team_assignment',
+      assignmentId,
+      note,
+    });
+    return writeResult(assignmentId, 'Team assignment revoked.');
   },
   async markNotificationRead(notificationId, read = true) {
     requireActor();

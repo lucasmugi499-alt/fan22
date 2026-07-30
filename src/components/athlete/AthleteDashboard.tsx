@@ -31,6 +31,7 @@ export function AthleteDashboard() {
   const { userProfile, isDemoMode } = useAuth();
   const { athletes, teams, challenges, matches, supportNeeds, loading, retry } = useGoalPlaceData({
     collections: ['athletes', 'teams', 'challenges', 'matches', 'supportNeeds'],
+    recordLimit: 1200,
   });
   const [manageMode, setManageMode] = useState<AthleteManageMode | null>(null);
   const [activeNeed, setActiveNeed] = useState<SupportNeed | null>(null);

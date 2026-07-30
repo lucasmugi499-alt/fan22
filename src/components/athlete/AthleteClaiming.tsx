@@ -65,10 +65,12 @@ export function AthleteClaiming({
         setQuery(invited.name);
       });
     }
-  }, [athletes, scope]);
+    if (!athleteId && userProfile?.name && !query) {
+      queueMicrotask(() => setQuery(userProfile.name));
+    }
+  }, [athletes, query, scope, userProfile?.name]);
 
   const candidates = useMemo(() => athletes
-    .filter((athlete) => !athlete.userId)
     .filter((athlete) => !query.trim() || `${athlete.name} ${athlete.position} ${athlete.city}`.toLowerCase().includes(query.toLowerCase()))
     .sort((left, right) => Number(right.id === invitedAthleteId) - Number(left.id === invitedAthleteId))
     .slice(0, 12), [athletes, invitedAthleteId, query]);
@@ -165,9 +167,11 @@ export function AthleteClaiming({
           <Card key={athlete.id} className="flex items-center justify-between gap-3 p-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-text-strong">{athlete.name}</p>
-              <p className="truncate text-xs text-muted">{athlete.position} / {athlete.city}</p>
+              <p className="truncate text-xs text-muted">{athlete.position} / {athlete.city}{athlete.userId ? ' / linked profile' : ''}</p>
             </div>
-            <Button size="sm" variant="secondary" disabled={saving === athlete.id} onClick={() => void requestClaim(athlete.id)}>Claim</Button>
+            <Button size="sm" variant="secondary" disabled={saving === athlete.id || Boolean(athlete.userId)} onClick={() => void requestClaim(athlete.id)}>
+              {athlete.userId ? 'Linked' : 'Claim'}
+            </Button>
           </Card>
         ))}
       </div>

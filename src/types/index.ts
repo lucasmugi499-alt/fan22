@@ -902,7 +902,9 @@ export interface AdminAuditEvent {
     | "dismissed"
     | "invited"
     | "accepted"
-    | "created";
+    | "created"
+    | "updated"
+    | "revoked";
   targetCollection: string;
   targetId: string;
   note?: string;

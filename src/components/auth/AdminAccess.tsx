@@ -51,7 +51,7 @@ export function LeagueAdminApplicationForm() {
       <Card className="mx-auto max-w-lg p-6 text-center">
         <ShieldCheck className="mx-auto h-8 w-8 text-brand" weight="duotone" />
         <h1 className="mt-3 text-xl font-semibold text-text-strong">Operate a league on GoalPlace256</h1>
-        <p className="mt-2 text-sm text-muted">Sign in with a fan account first. League Admin access is granted only after platform review.</p>
+        <p className="mt-2 text-sm text-muted">Sign in to submit a league application. Platform review creates the league and assigns administrator access.</p>
         <Link href="/login" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
       </Card>
     );
@@ -80,7 +80,7 @@ export function LeagueAdminApplicationForm() {
     <form onSubmit={submit} className="mx-auto max-w-lg space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-text-strong">League Admin application</h1>
-        <p className="text-sm text-muted">Tell us about the competition you are authorized to operate.</p>
+        <p className="text-sm text-muted">Create a league request with real operating details. Platform Admin can approve it into a connected league record.</p>
       </div>
       <Field label="League name"><input required value={leagueName} onChange={(event) => setLeagueName(event.target.value)} className="field" /></Field>
       <div className="grid gap-3 sm:grid-cols-2">

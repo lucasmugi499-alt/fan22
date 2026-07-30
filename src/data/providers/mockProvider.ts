@@ -829,6 +829,58 @@ export const mockProvider: GoalPlaceDataProvider = {
     leagueNotices.unshift(notice);
     return result(notice.id, 'League notice published.');
   },
+  async createLeague(data) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const leagueId = data.id ?? id('league');
+    const seasonId = data.currentSeasonId ?? `season_${leagueId}_${year}`;
+    const league: League = {
+      ...data,
+      id: leagueId,
+      currentSeasonId: seasonId,
+      season: data.season || `${year} Season`,
+      country: 'Uganda',
+      createdAt: now.toISOString(),
+    };
+    const season: Season = {
+      id: seasonId,
+      leagueId,
+      name: league.season,
+      sport: league.sport === 'Basketball' ? 'basketball' : league.sport === 'Rugby' ? 'rugby' : 'football',
+      status: 'registration',
+      startDate: now.toISOString().slice(0, 10),
+      competitionFormat: 'league',
+      scoring: league.sport === 'basketball' || league.sport === 'Basketball'
+        ? { win: 2, draw: null, loss: 0 }
+        : league.sport === 'rugby' || league.sport === 'Rugby'
+          ? { win: 4, draw: 2, loss: 0 }
+          : { win: 3, draw: 1, loss: 0 },
+      createdAt: now.toISOString(),
+    };
+    persistDemoLeague(league);
+    persistDemoSeason(season);
+    audit({
+      actorUserId: data.adminUserIds[0] ?? 'platform_demo',
+      action: 'created',
+      targetCollection: 'leagues',
+      targetId: league.id,
+    });
+    return result(league.id, 'League created.');
+  },
+  async updateLeagueProfile(leagueId, data) {
+    const league = readStoredItems<League>(storedLeaguesKey).find((item) => item.id === leagueId)
+      ?? leagues.find((item) => item.id === leagueId);
+    if (!league) throw new Error('League not found.');
+    Object.assign(league, data);
+    persistDemoLeague(league);
+    audit({
+      actorUserId: league.adminUserIds[0] ?? 'platform_demo',
+      action: 'updated',
+      targetCollection: 'leagues',
+      targetId: leagueId,
+    });
+    return result(leagueId, 'League profile updated.');
+  },
   async createSeason(data) {
     const season = {
       ...data,
@@ -890,6 +942,23 @@ export const mockProvider: GoalPlaceDataProvider = {
       targetId: assignmentId,
     });
     return result(assignmentId, 'Team Admin invitation accepted.');
+  },
+  async revokeTeamAssignment(assignmentId, actorUserId, note) {
+    const assignment = teamAssignments.find((item) => item.id === assignmentId)
+      ?? readStoredItems<TeamAssignment>(storedTeamAssignmentsKey).find((item) => item.id === assignmentId);
+    if (!assignment) throw new Error('Team assignment not found.');
+    assignment.status = 'revoked';
+    assignment.revokedAt = new Date().toISOString();
+    assignment.updatedAt = new Date().toISOString();
+    persistDemoTeamAssignment(assignment);
+    audit({
+      actorUserId,
+      action: 'revoked',
+      targetCollection: 'teamAssignments',
+      targetId: assignmentId,
+      note,
+    });
+    return result(assignmentId, 'Team assignment revoked.');
   },
   async markNotificationRead(notificationId, read = true) {
     const notification = notifications.find((item) => item.id === notificationId);

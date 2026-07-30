@@ -16,6 +16,11 @@ export function resolveMyAthlete(
   if (profile) {
     const mine = athletes.find((a) => a.userId === profile.uid || a.userId === profile.id);
     if (mine) return mine;
+    const profileName = (profile.displayName ?? profile.name ?? '').trim().toLowerCase();
+    if (profileName) {
+      const byName = athletes.find((a) => a.name.trim().toLowerCase() === profileName);
+      if (byName) return byName;
+    }
   }
   if (!isDemoMode) return null;
   return [...athletes].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0))[0];

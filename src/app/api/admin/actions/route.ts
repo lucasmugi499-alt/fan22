@@ -34,7 +34,24 @@ function publicBaseUrl(request: Request) {
     ?? new URL(request.url).origin;
 }
 
+function slugPart(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48) || 'league';
+}
+
 const adminActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('create_league'),
+    name: z.string().trim().min(3).max(120),
+    sport: z.enum(['football', 'basketball', 'rugby']),
+    city: z.string().trim().min(2).max(100),
+    description: z.string().trim().max(1000).optional().default(''),
+    status: z.enum(['draft', 'community', 'verified', 'partner', 'suspended']).optional().default('community'),
+    plan: z.enum(['free', 'pro', 'partner']).optional().default('free'),
+  }),
   z.object({
     action: z.literal('create_team_invitation'),
     teamId: z.string().trim().min(1).max(160),
@@ -43,10 +60,25 @@ const adminActionSchema = z.discriminatedUnion('action', [
     invitedEmail: z.string().trim().email().max(200).transform((value) => value.toLowerCase()),
   }),
   z.object({
+    action: z.literal('update_league_profile'),
+    leagueId: z.string().trim().min(1).max(160),
+    name: z.string().trim().min(3).max(120).optional(),
+    city: z.string().trim().min(2).max(100).optional(),
+    description: z.string().trim().max(1000).optional(),
+    status: z.enum(['draft', 'community', 'verified', 'partner', 'suspended']).optional(),
+    plan: z.enum(['free', 'pro', 'partner']).optional(),
+    verified: z.boolean().optional(),
+  }),
+  z.object({
     action: z.literal('review_approval'),
     targetCollection: z.enum(['athletes', 'leagues', 'leagueAdminApplications']),
     targetId: z.string().trim().min(1).max(160),
     decision: z.enum(['approved', 'rejected', 'requested_information']),
+    note: z.string().trim().max(1200).optional().default(''),
+  }),
+  z.object({
+    action: z.literal('revoke_team_assignment'),
+    assignmentId: z.string().trim().min(1).max(160),
     note: z.string().trim().max(1200).optional().default(''),
   }),
   z.object({
@@ -68,6 +100,111 @@ export async function POST(request: Request) {
   const body = parsed.data;
 
   try {
+    if (body.action === 'create_league') {
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const unique = createHash('sha256')
+        .update(`${body.name}:${body.city}:${body.sport}:${actor.uid}:${now.toISOString()}`)
+        .digest('hex')
+        .slice(0, 8);
+      const leagueId = `league_${slugPart(body.name)}_${unique}`;
+      const seasonId = `season_${leagueId}_${year}`;
+      await adminDb.runTransaction(async (transaction) => {
+        transaction.set(adminDb.collection('leagues').doc(leagueId), {
+          id: leagueId,
+          name: body.name,
+          sport: body.sport,
+          city: body.city,
+          country: 'Uganda',
+          description: body.description,
+          status: body.status,
+          plan: body.plan,
+          verified: body.status === 'verified' || body.status === 'partner',
+          adminUserIds: [],
+          season: `${year} Season`,
+          currentSeasonId: seasonId,
+          teamsCount: 0,
+          athletesCount: 0,
+          matchesCount: 0,
+          matchCompletionRate: 0,
+          verifiedResultsRate: 0,
+          goalPlaceIndex: 45,
+          ranking: 1,
+          totalSupport: 0,
+          supportersCount: 0,
+          verificationRules: {
+            requiresLeagueAdminApproval: true,
+            requiresRefereeConfirmation: false,
+            allowsPerformancePledges: true,
+          },
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('seasons').doc(seasonId), {
+          id: seasonId,
+          leagueId,
+          name: `${year} Season`,
+          sport: body.sport,
+          status: 'registration',
+          startDate: now.toISOString().slice(0, 10),
+          competitionFormat: 'league',
+          scoring: body.sport === 'basketball'
+            ? { win: 2, draw: null, loss: 0 }
+            : body.sport === 'rugby'
+              ? { win: 4, draw: 2, loss: 0 }
+              : { win: 3, draw: 1, loss: 0 },
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          'created',
+          'leagues',
+          leagueId,
+          `Created ${body.name} from Platform Admin console.`,
+        ));
+      });
+      return Response.json({ ok: true, id: leagueId, seasonId });
+    }
+
+    if (body.action === 'update_league_profile') {
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { leagueId } = body;
+      const updates = {
+        name: body.name,
+        city: body.city,
+        description: body.description,
+        status: body.status,
+        plan: body.plan,
+        verified: body.verified,
+      };
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([, value]) => value !== undefined),
+      );
+      if (!Object.keys(cleanUpdates).length) {
+        return Response.json({ error: 'Provide at least one league field to update.' }, { status: 400 });
+      }
+      const leagueRef = adminDb.collection('leagues').doc(leagueId);
+      await adminDb.runTransaction(async (transaction) => {
+        const league = await transaction.get(leagueRef);
+        if (!league.exists) throw new Error('League not found.');
+        transaction.update(leagueRef, {
+          ...cleanUpdates,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          'updated',
+          'leagues',
+          leagueId,
+          'Updated league profile from Platform Admin console.',
+        ));
+      });
+      return Response.json({ ok: true, id: leagueId });
+    }
+
     if (body.action === 'create_team_invitation') {
       const forbidden = requireRole(actor, ['league_admin', 'platform_admin', 'super_admin'], 'League Admin access required.');
       if (forbidden) return forbidden;
@@ -190,6 +327,31 @@ export async function POST(request: Request) {
         ));
       });
       return Response.json({ ok: true, id: targetId });
+    }
+
+    if (body.action === 'revoke_team_assignment') {
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { assignmentId, note } = body;
+      const assignmentRef = adminDb.collection('teamAssignments').doc(assignmentId);
+      await adminDb.runTransaction(async (transaction) => {
+        const assignment = await transaction.get(assignmentRef);
+        if (!assignment.exists) throw new Error('Team assignment not found.');
+        if (assignment.data()?.status === 'revoked') throw new Error('Team assignment is already revoked.');
+        transaction.update(assignmentRef, {
+          status: 'revoked',
+          revokedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          'revoked',
+          'teamAssignments',
+          assignmentId,
+          note,
+        ));
+      });
+      return Response.json({ ok: true, id: assignmentId });
     }
 
     if (body.action === 'resolve_report') {
