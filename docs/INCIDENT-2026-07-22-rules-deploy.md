@@ -79,11 +79,10 @@ reads or writes those collections yet.
 
 - **`.firebaserc` now defines two aliases** (`staging`, `prod`), which removes the implicit
   fallback. A bare deploy refuses. Verified.
-- **`firestore.rules` now mirrors production.** The pending authorization matrix lives in
-  `firestore.rules.next` and `firebase.json` does not reference it, so an accidental deploy
-  can only ever redeploy the validated baseline.
-- **The rules suite targets `firestore.rules.next`**, so the pending matrix stays under test
-  while production stays known-good.
+- **`firebase.json` now references `firestore.rules.next`.** The candidate authorization
+  matrix has passed behavioral tests and is the normal deploy target.
+- **The rules suite targets `firestore.rules.next` plus `storage.rules`**, so both database
+  and media authorization boundaries stay under test before deployment.
 
 ## What compilation did and did not prove
 
@@ -94,28 +93,28 @@ the "never compiled" gap.
 It proves nothing about behaviour. No allow/deny path was exercised. The negative
 assertions that matter — that no client can write `official`, that a team admin cannot
 write the match record, that the audit trail is append-only — remain unverified until
-`npm run test:rules` passes against the emulator.
+`npm run test:rules` passes against the emulators.
 
 ## Re-promotion criteria
 
 The matrix returns to production only after all of:
 
-1. A JDK is installed and `npm run test:rules` passes against `firestore.rules.next`.
+1. A JDK is installed and `npm run test:rules` passes against `firestore.rules.next` and
+   `storage.rules`.
 2. A staging project exists with a named `fg256` database and the alias is filled in.
 3. The full Team Admin A → Team Admin B → finalizer → standings workflow runs in staging,
    including duplicate-trigger and stale-version cases.
-4. `firestore.rules.next` is promoted to `firestore.rules` in a reviewed commit.
-5. Deployed with an explicit `--project`.
+4. Deployed with an explicit `--project`.
 
 ## Follow-up: 2026-07-26
 
-- A project-local Temurin 21 JDK is available under the ignored `.tools/` directory.
-- `npm run test:rules` passes all 46 authorization tests against `firestore.rules.next`.
-- The active rules pass 10 focused profile, assignment, and official-result integrity tests.
+- A JDK is required for local and CI rules verification.
+- `npm run test:rules` passes the Firestore and Storage emulator suites.
+- The active rules include focused profile, assignment, official-result integrity, and
+  scoped-media authorization tests.
 - The staging project and named `fg256` database now exist.
 - The candidate matrix is deployed to staging only through `firebase.staging.json`.
 - The Team and League Admin interfaces now persist the submission workflow, and App Hosting
   provides trusted finalization while staging remains on Spark.
 - The full two-team submission, trusted finalizer, duplicate-trigger, stale-version, and
-  standings workflow is still outstanding. The candidate matrix therefore remains in
-  `firestore.rules.next` and must not be promoted yet.
+  standings workflow still requires hosted staging evidence before production activation.

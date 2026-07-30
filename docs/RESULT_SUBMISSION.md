@@ -101,7 +101,7 @@ forgery, attendance forgery, and feed-counter tampering.
 
 ## Evidence storage
 
-`storage.rules`, path `matchEvidence/{matchId}/{teamId}/{fileName}`.
+`storage.rules`, path `matchEvidence/{matchId}/{teamId}/{userId}/{fileName}`.
 
 Previously evidence had nowhere safe to go: the only writable paths were `/public`
 (world-readable *and* writable by any signed-in user — an opposing team could read or
@@ -223,8 +223,8 @@ Done:
   thin wrappers over `planFinalization()`. Compiles and the entrypoint loads.
 - Idempotency ledger at `finalizations/{finalizationKey}`, written inside the same
   transaction that applies the result.
-- Security rules suite (`npm run test:rules`) covering the create/answer/adjudicate matrix
-  and the trust boundary.
+- Security rules suite (`npm run test:rules`) covering the create/answer/adjudicate matrix,
+  scoped Storage media, and the trust boundary.
 - Team Admin submit, confirm and dispute UI backed by provider transactions and live
   submission listeners.
 - League Admin uphold, correct and reject UI backed by the same workflow.
@@ -265,5 +265,5 @@ this project. It would deploy cleanly, report healthy, and never fire.
 ```bash
 npm run functions:build      # compile, including the shared pure logic
 npm run test:rules           # needs a JDK
-npm run deploy:staging       # candidate rules only, explicit staging config
+npm run deploy:staging:candidate  # candidate rules only, explicit staging config
 ```

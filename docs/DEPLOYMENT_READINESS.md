@@ -1,8 +1,8 @@
 # GoalPlace256 Deployment Readiness
 
 Status: demo deployment candidate can be checked from the repository with one command.
-Production deployment remains blocked until the clean production Firebase/App Hosting
-placeholders are replaced and `prod:assert-clean` passes.
+Production deployment remains blocked until the clean production environment registry and
+Firebase/App Hosting placeholders are replaced and `prod:assert-clean` passes.
 
 ## Primary Gate
 
@@ -37,8 +37,8 @@ That includes the same checks and then runs:
 npm run prod:assert-clean
 ```
 
-The production guard intentionally fails while `apphosting.production.yaml` still contains
-`REPLACE_WITH_*` placeholders.
+The production guard intentionally fails while `config/environments.json` or
+`apphosting.production.yaml` still contain unconfigured production values.
 
 ## Dependency Advisory Policy
 
@@ -80,7 +80,10 @@ Still registered:
 
 Before production activation:
 
-- Replace all `REPLACE_WITH_*` values in `apphosting.production.yaml`.
+- Replace all production `REPLACE_WITH_*` values in `config/environments.json` and
+  `apphosting.production.yaml`.
+- Set a real production `NEXT_PUBLIC_GOALPLACE_ENVIRONMENT_VERSION` for the activation,
+  not `env-production-unset`.
 - Install Java in CI/operator machines so `npm run test:rules` can start the Firestore
   emulator.
 - Confirm the clean production Firebase project, Storage bucket, Auth config, App Check key,
