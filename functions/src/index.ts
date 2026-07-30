@@ -1,4 +1,4 @@
-import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
@@ -43,6 +43,7 @@ const paymentCallbackBaseUrl = defineString('GOALPLACE_PAYMENT_CALLBACK_BASE_URL
   description: 'Registered App Hosting HTTPS origin used by the sandbox reconciliation job.',
 });
 const paymentReconciliationSecret = defineSecret('GOALPLACE_RECONCILIATION_SECRET');
+const fantasyScoringSecret = defineSecret('GOALPLACE_FANTASY_SCORING_SECRET');
 
 /**
  * Fires whenever a submission changes. Finalization runs only when the document is in a
@@ -67,6 +68,48 @@ export const onResultSubmissionWritten = onDocumentWritten(
       logger.debug('No finalization required', { matchId, reason: result.reason });
     }
   }
+);
+
+/**
+ * A finalization document is immutable and version-specific, making it the durable handoff
+ * to Fantasy. If the App Hosting call fails, this trigger retries the same event and the
+ * scoring service's idempotency keys make repeated delivery safe.
+ */
+export const onOfficialResultFinalized = onDocumentCreated(
+  {
+    document: 'finalizations/{finalizationId}',
+    database: DATABASE_ID,
+    region: REGION,
+    secrets: [fantasyScoringSecret],
+  },
+  async (event) => {
+    const finalization = event.data?.data();
+    const matchId = finalization?.matchId as string | undefined;
+    if (!matchId) {
+      logger.error('Fantasy scoring skipped: finalization has no matchId.', {
+        finalizationId: event.params.finalizationId,
+      });
+      return;
+    }
+    const baseUrl = paymentCallbackBaseUrl.value();
+    if (!baseUrl.startsWith('https://')) {
+      throw new Error('Fantasy scoring App Hosting base URL is not configured.');
+    }
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/fantasy/score-finalized`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goalplace-fantasy-secret': fantasyScoringSecret.value(),
+      },
+      body: JSON.stringify({ matchId }),
+    });
+    if (!response.ok) throw new Error(`Fantasy scoring endpoint returned ${response.status}.`);
+    logger.info('Official Fantasy Points generated', {
+      matchId,
+      finalizationId: event.params.finalizationId,
+      result: await response.json(),
+    });
+  },
 );
 
 /**
@@ -95,6 +138,29 @@ export const reconcileResultSubmissions = onSchedule(
       retried: retried.length,
     });
   }
+);
+
+export const lockFantasyLineups = onSchedule(
+  {
+    schedule: 'every 5 minutes',
+    region: REGION,
+    timeoutSeconds: 120,
+    secrets: [fantasyScoringSecret],
+  },
+  async () => {
+    const baseUrl = paymentCallbackBaseUrl.value();
+    if (!baseUrl.startsWith('https://')) {
+      throw new Error('Fantasy lineup locking App Hosting base URL is not configured.');
+    }
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/fantasy/lock-lineups`, {
+      method: 'POST',
+      headers: {
+        'x-goalplace-fantasy-secret': fantasyScoringSecret.value(),
+      },
+    });
+    if (!response.ok) throw new Error(`Fantasy lineup lock endpoint returned ${response.status}.`);
+    logger.info('Fantasy lineup deadline sweep complete', await response.json());
+  },
 );
 
 /**

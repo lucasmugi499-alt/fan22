@@ -1172,3 +1172,130 @@ describe('notice and sponsor-report visibility', () => {
     ));
   });
 });
+
+describe('GoalPlace Fantasy trust boundary', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'fantasyCompetitions/fantasy_rugby'), {
+        name: 'Rugby Fantasy Pilot',
+        sport: 'rugby',
+        status: 'active',
+        isFreeToPlay: true,
+      });
+      await setDoc(doc(db, 'fantasyLeaderboards/fantasy_rugby_team_1'), {
+        competitionId: 'fantasy_rugby',
+        fantasyTeamId: 'fantasy_rugby_team_1',
+        rank: 1,
+        totalPoints: 120,
+      });
+      await setDoc(doc(db, `fantasyTeams/fantasy_rugby_${OUTSIDER}`), {
+        competitionId: 'fantasy_rugby',
+        userId: OUTSIDER,
+        name: 'Fan XV',
+      });
+      await setDoc(doc(db, 'fantasyMiniLeagues/private_league'), {
+        competitionId: 'fantasy_rugby',
+        ownerUserId: TEAM_A_ADMIN,
+        name: 'Private table',
+        visibility: 'private',
+        status: 'active',
+      });
+      await setDoc(doc(db, `fantasyMiniLeagueMembers/private_league_${OUTSIDER}`), {
+        miniLeagueId: 'private_league',
+        competitionId: 'fantasy_rugby',
+        userId: OUTSIDER,
+        fantasyTeamId: `fantasy_rugby_${OUTSIDER}`,
+        status: 'active',
+      });
+      await setDoc(doc(db, `fantasyMiniLeagueMembers/private_league_${TEAM_B_ADMIN}`), {
+        miniLeagueId: 'private_league',
+        competitionId: 'fantasy_rugby',
+        userId: TEAM_B_ADMIN,
+        fantasyTeamId: `fantasy_rugby_${TEAM_B_ADMIN}`,
+        status: 'pending',
+      });
+    });
+  });
+
+  it('allows public competition and leaderboard reads', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(publicDb, 'fantasyCompetitions/fantasy_rugby')));
+    await assertSucceeds(getDoc(doc(publicDb, 'fantasyLeaderboards/fantasy_rugby_team_1')));
+  });
+
+  it('lets a manager read only their own private team', async () => {
+    await assertSucceeds(getDoc(doc(
+      asUser(OUTSIDER),
+      `fantasyTeams/fantasy_rugby_${OUTSIDER}`,
+    )));
+    await assertFails(getDoc(doc(
+      asUser(TEAM_B_ADMIN),
+      `fantasyTeams/fantasy_rugby_${OUTSIDER}`,
+    )));
+  });
+
+  it('allows a member to read their private mini-league', async () => {
+    await assertSucceeds(getDoc(doc(
+      asUser(OUTSIDER),
+      'fantasyMiniLeagues/private_league',
+    )));
+    await assertFails(getDoc(doc(
+      asUser(TEAM_B_ADMIN),
+      'fantasyMiniLeagues/private_league',
+    )));
+  });
+
+  it('refuses every client write to official fantasy outputs', async () => {
+    for (const db of [
+      asUser(OUTSIDER),
+      asUser(LEAGUE_ADMIN),
+      asUserWithClaims('platform', { role: 'platform_admin' }),
+    ]) {
+      await assertFails(setDoc(doc(db, 'fantasyPointEvents/forged'), {
+        competitionId: 'fantasy_rugby',
+        athleteId: 'athlete_001',
+        basePoints: 999,
+        status: 'official',
+      }));
+      await assertFails(setDoc(doc(db, 'fantasyRoundScores/forged'), {
+        competitionId: 'fantasy_rugby',
+        fantasyTeamId: `fantasy_rugby_${OUTSIDER}`,
+        totalPoints: 999,
+      }));
+      await assertFails(setDoc(doc(db, 'fantasyLeaderboards/forged'), {
+        competitionId: 'fantasy_rugby',
+        rank: 1,
+        totalPoints: 999,
+      }));
+      await assertFails(setDoc(doc(db, 'fantasyPlayerPrices/forged'), {
+        competitionId: 'fantasy_rugby',
+        athleteId: 'athlete_001',
+        credits: 1,
+      }));
+      await assertFails(setDoc(doc(db, 'fantasyCorrections/forged'), {
+        competitionId: 'fantasy_rugby',
+        oldTotals: {},
+        newTotals: { forged: 999 },
+      }));
+    }
+  });
+
+  it('requires validated server APIs for teams and mini-league membership', async () => {
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'fantasyTeams/second_entry'), {
+      competitionId: 'fantasy_rugby',
+      userId: OUTSIDER,
+      name: 'Second illegal entry',
+    }));
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'fantasyLineupVersions/late_lineup'), {
+      fantasyTeamId: `fantasy_rugby_${OUTSIDER}`,
+      competitionId: 'fantasy_rugby',
+      status: 'locked',
+    }));
+    await assertFails(setDoc(doc(asUser(OUTSIDER), 'fantasyMiniLeagueMembers/forged'), {
+      miniLeagueId: 'private_league',
+      userId: OUTSIDER,
+      status: 'active',
+    }));
+  });
+});

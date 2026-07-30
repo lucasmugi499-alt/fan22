@@ -756,6 +756,131 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // GoalPlace Fantasy is free to play and consumes official sport records. Every
+    // competitive output is server-owned so a client cannot manufacture points, prices,
+    // corrections, or rank. Authenticated actions pass through validation APIs.
+    match /fantasyCompetitions/{competitionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyScoringProfiles/{profileId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasySquadRules/{rulesId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyRounds/{roundId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyPlayers/{playerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyPlayerPrices/{priceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyTeams/{teamId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /fantasyLineupVersions/{lineupId} {
+      allow read: if isPlatformAdmin() ||
+        (
+          signedIn() &&
+          get(/databases/$(database)/documents/fantasyTeams/$(resource.data.fantasyTeamId)).data.userId == request.auth.uid
+        );
+      allow write: if false;
+    }
+
+    match /fantasyTransfers/{transferId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /fantasyPointEvents/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyRoundScores/{scoreId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyLeaderboards/{entryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyMiniLeagues/{leagueId} {
+      allow read: if resource.data.visibility == 'public' ||
+        isPlatformAdmin() ||
+        (
+          signedIn() &&
+          (
+            resource.data.ownerUserId == request.auth.uid ||
+            (
+              exists(/databases/$(database)/documents/fantasyMiniLeagueMembers/$(leagueId + '_' + request.auth.uid)) &&
+              get(/databases/$(database)/documents/fantasyMiniLeagueMembers/$(leagueId + '_' + request.auth.uid)).data.status == 'active'
+            )
+          )
+        );
+      allow write: if false;
+    }
+
+    match /fantasyMiniLeagueMembers/{memberId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid) ||
+        (
+          signedIn() &&
+          get(/databases/$(database)/documents/fantasyMiniLeagues/$(resource.data.miniLeagueId)).data.ownerUserId == request.auth.uid
+        );
+      allow write: if false;
+    }
+
+    match /fantasyAchievements/{achievementId} {
+      allow read: if isPlatformAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /fantasyCorrections/{correctionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fantasyAuditEvents/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /officialAthleteMatchStats/{statId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /publicInquiries/{inquiryId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /publicInquiryRateLimits/{limitId} {
+      allow read, write: if false;
+    }
+
     match /ledgerAccounts/{accountId} {
       allow read: if isPlatformAdmin();
       allow write: if false;

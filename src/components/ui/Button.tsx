@@ -28,7 +28,7 @@ const button = cva(
         danger: 'bg-[var(--state-error)] text-white shadow-e1 hover:opacity-90',
       },
       size: {
-        sm: 'h-9 px-4 text-sm',
+        sm: 'min-h-11 px-4 text-sm md:min-h-9',
         md: 'h-11 px-5 text-[15px]',
         lg: 'h-12 px-6 text-base',
         icon: 'h-11 w-11 tap px-0',

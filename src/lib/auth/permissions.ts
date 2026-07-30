@@ -165,6 +165,8 @@ export const PUBLIC_ROUTES = [
   '/pilot',
   '/login',
   '/register',
+  '/terms',
+  '/privacy',
   '/apply/league-admin',
 ];
 
@@ -179,8 +181,16 @@ export const PUBLIC_DISCOVERY_ROUTES = [
 ];
 
 export function isPublicRoute(pathname: string): boolean {
+  const publicFantasyRoute =
+    pathname === '/fantasy'
+    || pathname === '/fantasy/how-it-works'
+    || (
+      pathname.startsWith('/fantasy/competitions/')
+      && !pathname.endsWith('/team')
+    );
   return (
     PUBLIC_ROUTES.includes(pathname) ||
+    publicFantasyRoute ||
     pathname.startsWith('/invitations/team/') ||
     PUBLIC_DISCOVERY_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),

@@ -12,7 +12,7 @@ Payments remain sandbox-only.
 
 This ledger combines the build 27 audit with the requested product feature roadmap. The
 "What I would not add yet" list is intentionally excluded: scouting tools, AI rankings,
-cryptocurrency, fantasy sport, open direct messaging, betting-style predictions, large 3D
+cryptocurrency, open direct messaging, betting-style predictions, large 3D
 scenes, and spend-based fan leaderboards are not part of this completion pass.
 
 Synthetic data must always remain visibly labelled as demonstration data.
@@ -132,6 +132,29 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Reduced-motion-safe premium interactions
 - [x] Mobile and desktop accessibility QA
 
+## Free-To-Play Fantasy Foundation
+
+- [x] Football, basketball, Rugby 15s, and Rugby 7s configuration
+- [x] Versioned sport-specific scoring profiles and squad rules
+- [x] Public competition, player, points, leaderboard, and how-it-works routes
+- [x] Mobile squad builder with server deadlines, immutable lineup versions, and offline draft
+- [x] Trusted scoring from verified official result versions only
+- [x] Captain and vice-captain scoring, correction audit, and leaderboard recalculation
+- [x] One fantasy team per account and competition
+- [x] Free public/private mini-leagues with approval and moderation boundaries
+- [x] Server-controlled transfers with round allowances
+- [x] Candidate Firestore rules block all client-authored official Fantasy Points
+- [x] Demo competitions for football, basketball, and rugby
+- [ ] Complete match-squad and athlete-event capture for non-scoring appearances
+- [ ] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
+- [ ] League and Platform Admin activation workflow browser QA
+- [ ] Candidate fantasy rules and indexes promoted only after staging validation
+
+Fantasy is free to play. Fantasy Credits have no cash value and cannot be purchased,
+transferred, withdrawn, or converted to GoalPlace Points. Contributions and financial
+activity never influence Fantasy Points or ranking. Production fantasy activation remains
+blocked until the unchecked staging gates above are complete.
+
 ## Documentation Cleanup
 
 - [x] One navigation source of truth
@@ -162,6 +185,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] No broken public routes, console errors, image failures, or horizontal overflow
 - [x] Demo-role workflow QA passes
 - [ ] Firebase-authenticated role workflow QA passes in staging
+- [ ] Firebase-authenticated fantasy workflow QA passes in staging
 - [x] Synthetic-data disclosure is present where required
 - [x] Current code review has no unresolved demo-environment high-severity findings
 - [ ] Only after the real-money blockers above are closed: enable provider collection or payout

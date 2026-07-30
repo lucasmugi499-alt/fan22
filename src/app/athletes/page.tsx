@@ -1,5 +1,6 @@
 import { AthletesDiscover } from "@/components/discover/AthletesDiscover";
+import { getPublicAthletes } from "@/server/publicCatalogue";
 
-export default function Page() {
-  return <AthletesDiscover />;
+export default async function Page() {
+  return <AthletesDiscover initialAthletes={await getPublicAthletes()} />;
 }

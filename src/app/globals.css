@@ -330,7 +330,7 @@
   to { opacity: 1; transform: none; }
 }
 .page-enter {
-  animation: pageIn 280ms var(--ease-out) both;
+  animation: pageIn 280ms var(--ease-out);
 }
 @keyframes sheetUp {
   from { transform: translateY(100%); }
@@ -365,7 +365,9 @@
 .landing-ticker-track {
   animation: landingTicker 24s linear infinite;
 }
-.landing-ticker:hover .landing-ticker-track {
+.landing-ticker:hover .landing-ticker-track,
+.landing-ticker:focus-within .landing-ticker-track,
+.landing-ticker:focus .landing-ticker-track {
   animation-play-state: paused;
 }
 

@@ -29,6 +29,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/pilot') ||
     pathname.startsWith('/verification') ||
     pathname.startsWith('/sponsors') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/privacy') ||
     pathname.startsWith('/login');
 
   if (isMarketing) {

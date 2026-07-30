@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { ShieldCheck, ChartLineUp, SealCheck } from '@phosphor-icons/react/dist/ssr';
 import { MarketingShell, MarketingHero } from '@/components/marketing/MarketingShell';
+import { PublicInquiryForm } from '@/components/marketing/PublicInquiryForm';
 
 export function Sponsors() {
   return (
@@ -24,17 +24,10 @@ export function Sponsors() {
         ))}
       </section>
 
-      <section className="pb-20">
-        <div className="rounded-[var(--radius-xl)] border border-border bg-surface-1 bezel-core p-6">
-          <h2 className="font-display text-xl font-semibold text-text-strong">Sponsor a verified league</h2>
-          <p className="mt-1 max-w-lg text-sm text-muted">
-            During the pilot, sponsor reporting runs as a platform-managed impact view. Talk to us
-            about featuring verified athletes and leagues.
-          </p>
-          <Link href="/login" className="mt-4 inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-border-strong bg-surface-2 px-6 text-sm font-medium text-text-strong hover:bg-surface-3">
-            Request the deck
-          </Link>
-        </div>
+      <section className="pb-20 pt-8">
+        <h2 className="font-display text-3xl font-semibold text-text-strong">Request the sponsor proof deck</h2>
+        <p className="mb-6 mt-2 max-w-2xl text-muted">Tell us what impact you want to create. We will share the reporting model, example campaign story, and pilot package options.</p>
+        <PublicInquiryForm type="sponsor" />
       </section>
     </MarketingShell>
   );

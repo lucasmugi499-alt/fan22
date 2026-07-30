@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { MapPin, ShieldCheck, Users } from '@phosphor-icons/react/dist/ssr';
 import { MarketingShell, MarketingHero } from '@/components/marketing/MarketingShell';
+import { PublicInquiryForm } from '@/components/marketing/PublicInquiryForm';
 
 export function Pilot() {
   return (
@@ -24,17 +24,10 @@ export function Pilot() {
         ))}
       </section>
 
-      <section className="pb-20">
-        <div className="rounded-[var(--radius-xl)] border border-[color:var(--border-glow)] bg-brand-subtle p-6 shadow-[var(--glow-brand)]">
-          <h2 className="font-display text-xl font-semibold text-text-strong">Bring your league on</h2>
-          <p className="mt-1 max-w-lg text-sm text-muted">
-            Leagues in the pilot get verified standings, an exception-based verification desk, and
-            sponsor-ready impact reports.
-          </p>
-          <Link href="/login" className="mt-4 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-6 text-sm font-semibold text-on-brand">
-            Get started
-          </Link>
-        </div>
+      <section className="pb-20 pt-8">
+        <h2 className="font-display text-3xl font-semibold text-text-strong">Bring your league into the pilot</h2>
+        <p className="mb-6 mt-2 max-w-2xl text-muted">Share the league structure and the operational problem you most need solved. This request does not create an administrator account.</p>
+        <PublicInquiryForm type="league_pilot" />
       </section>
     </MarketingShell>
   );

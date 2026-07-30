@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, ArrowRight, SignIn as SignInIcon } from '@phosphor-icons/react';
+import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, ArrowRight, Eye, EyeSlash, SignIn as SignInIcon } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { getDefaultRouteForRole } from '@/lib/auth/permissions';
@@ -39,6 +39,7 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   function enterAs(role: AppRole) {
     setDemoRole(role);
@@ -68,8 +69,7 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
           return;
         }
         await registerAccount({ email: email.trim(), password, name: name.trim() });
-        setSuccess('Account created. Check your inbox to verify your email.');
-        router.push('/home');
+        setSuccess('Account created. Check your inbox to verify your email, then sign in.');
         return;
       }
 
@@ -104,11 +104,25 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-lg)] bg-brand text-on-brand shadow-[var(--glow-brand)]">
             <SealCheck className="h-6 w-6" weight="fill" />
           </span>
-          <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight text-text-strong">Enter GoalPlace256</h1>
+          <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight text-text-strong">
+            {isDemoModeEnabled
+              ? 'Enter GoalPlace256'
+              : mode === 'register'
+                ? 'Create your fan account'
+                : mode === 'reset'
+                  ? 'Reset your password'
+                  : 'Welcome back'}
+          </h1>
           {isDemoModeEnabled ? (
             <p className="mt-1 text-sm text-muted">This is a demonstration build. Choose a role to explore the platform.</p>
           ) : (
-            <p className="mt-1 text-sm text-muted">Sign in to your account to continue.</p>
+            <p className="mt-1 text-sm text-muted">
+              {mode === 'register'
+                ? 'Start following local leagues, teams, athletes, and fantasy competitions.'
+                : mode === 'reset'
+                  ? 'Enter your email and we will send a secure reset link.'
+                  : 'Sign in to continue to your sports home.'}
+            </p>
           )}
         </div>
 
@@ -170,7 +184,7 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
                 />
               </div>
             ) : null}
-            {mode !== 'reset' ? <div className="space-y-1.5">
+            <div className="space-y-1.5">
               <label htmlFor="email" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
                 Email
               </label>
@@ -179,28 +193,34 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
                 type="email"
                 autoComplete="email"
                 required
-                minLength={mode === 'register' ? 8 : undefined}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
                 placeholder="you@example.com"
               />
-            </div> : null}
-            <div className="space-y-1.5">
+            </div>
+            {mode !== 'reset' ? <div className="space-y-1.5">
               <label htmlFor="password" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
-                placeholder="Your password"
-              />
-            </div>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                  required
+                  minLength={mode === 'register' ? 8 : undefined}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 pr-12 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
+                  placeholder="Your password"
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-muted hover:text-text-strong">
+                  {showPassword ? <EyeSlash className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              {mode === 'register' ? <p className="text-xs text-muted">Use at least eight characters.</p> : null}
+            </div> : null}
             {error ? (
               <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">
                 {error}
@@ -234,9 +254,14 @@ export function SignIn({ initialMode = 'signin' }: { initialMode?: AccountMode }
                 Back to sign in
               </button>
             ) : (
-              <p className="text-center text-xs leading-5 text-muted">
-                Fan accounts are self-service. Athlete, Team Admin, and League Admin access is granted through verification or invitation.
-              </p>
+              <>
+                <p className="text-center text-xs leading-5 text-muted">
+                  By creating an account, you agree to the <a href="/terms" className="text-brand hover:underline">Terms</a> and <a href="/privacy" className="text-brand hover:underline">Privacy notice</a>. Athlete and administrator access requires verification or invitation.
+                </p>
+                <button type="button" onClick={() => setMode('signin')} className="min-h-11 w-full text-sm font-medium text-muted hover:text-brand">
+                  Already have an account? Sign in
+                </button>
+              </>
             )}
           </form>
         )}

@@ -16,10 +16,16 @@ import type { Match, Team } from '@/types';
 const TABS = ['Live', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
-export function MatchesBrowser() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+export function MatchesBrowser({
+  initialMatches = [],
+  initialTeams = [],
+}: {
+  initialMatches?: Match[];
+  initialTeams?: Team[];
+}) {
+  const [matches, setMatches] = useState<Match[]>(initialMatches);
+  const [teams, setTeams] = useState<Team[]>(initialTeams);
+  const [loading, setLoading] = useState(!initialMatches.length);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<Error>();

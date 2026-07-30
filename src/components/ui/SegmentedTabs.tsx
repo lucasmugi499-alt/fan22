@@ -20,7 +20,7 @@ export function SegmentedTabs<T extends string>({
 }) {
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label="Workspace sections"
       className={cn(
         'flex gap-1 overflow-x-auto border-b border-border px-[var(--gutter)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
@@ -32,8 +32,7 @@ export function SegmentedTabs<T extends string>({
         return (
           <button
             key={tab}
-            role="tab"
-            aria-selected={isActive}
+            aria-pressed={isActive}
             onClick={() => onChange(tab)}
             className={cn(
               'relative shrink-0 whitespace-nowrap px-3 py-3 text-sm font-medium transition-colors duration-[var(--dur-micro)]',

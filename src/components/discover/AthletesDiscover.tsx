@@ -16,9 +16,9 @@ import type { Athlete } from '@/types';
 const SPORTS = ['All', 'Football', 'Basketball', 'Rugby'] as const;
 type SportFilter = (typeof SPORTS)[number];
 
-export function AthletesDiscover() {
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [loading, setLoading] = useState(true);
+export function AthletesDiscover({ initialAthletes = [] }: { initialAthletes?: Athlete[] }) {
+  const [athletes, setAthletes] = useState<Athlete[]>(initialAthletes);
+  const [loading, setLoading] = useState(!initialAthletes.length);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<Error>();

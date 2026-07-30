@@ -606,6 +606,8 @@ export interface MatchEvent {
   description: string;
 }
 
+export * from './fantasy';
+
 export interface Challenge {
   id: string;
   athleteId: string;
@@ -855,16 +857,27 @@ export interface Notification {
     | "support_received"
     | "pledge_created"
     | "challenge_verified"
-      | "match_result_verified"
-      | "fixture_reminder"
-      | "venue_changed"
-      | "result_confirmation_required"
-      | "result_disputed"
-      | "league_notice"
-      | "support_need_funded"
-      | "athlete_followed"
+    | "match_result_verified"
+    | "fixture_reminder"
+    | "venue_changed"
+    | "result_confirmation_required"
+    | "result_disputed"
+    | "league_notice"
+    | "support_need_funded"
+    | "athlete_followed"
     | "sponsor_campaign_update"
-    | "awards_ranking_update";
+    | "awards_ranking_update"
+    | "fantasy_lineup_deadline"
+    | "fantasy_athlete_unavailable"
+    | "fantasy_fixture_postponed"
+    | "fantasy_player_active"
+    | "fantasy_provisional_score"
+    | "fantasy_match_pending_verification"
+    | "fantasy_points_official"
+    | "fantasy_score_corrected"
+    | "fantasy_round_recap"
+    | "fantasy_mini_league_invitation"
+    | "fantasy_mini_league_rank_change";
   title: string;
   body: string;
   read: boolean;

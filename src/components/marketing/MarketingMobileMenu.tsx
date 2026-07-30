@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -11,6 +11,7 @@ import {
   List,
   SignIn,
   SoccerBall,
+  Trophy,
   Users,
   X,
 } from '@phosphor-icons/react';
@@ -20,6 +21,7 @@ const LINKS = [
   { label: 'Leagues', href: '/leagues', icon: SoccerBall },
   { label: 'Matches', href: '/matches', icon: CalendarBlank },
   { label: 'Athletes', href: '/athletes', icon: Users },
+  { label: 'Fantasy', href: '/fantasy', icon: Trophy },
   { label: 'How it works', href: '/how-it-works', icon: Info },
   { label: 'Sponsors', href: '/sponsors', icon: Basketball },
 ] as const;
@@ -27,13 +29,33 @@ const LINKS = [
 export function MarketingMobileMenu() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
 
     const previousOverflow = document.body.style.overflow;
+    const panel = panelRef.current;
+    const trigger = triggerRef.current;
+    panel?.querySelector<HTMLElement>('a[href],button:not([disabled])')?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !panel) return;
+      const items = Array.from(panel.querySelectorAll<HTMLElement>('a[href],button:not([disabled])'));
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     document.body.style.overflow = 'hidden';
@@ -42,12 +64,14 @@ export function MarketingMobileMenu() {
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
+      trigger?.focus();
     };
   }, [open]);
 
   return (
     <div className="lg:hidden">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={open ? 'Close navigation' : 'Open navigation'}
         aria-expanded={open}
@@ -61,6 +85,7 @@ export function MarketingMobileMenu() {
       {open ? (
         <div className="fixed inset-x-0 bottom-0 top-[4.25rem] z-40 h-[calc(100dvh-4.25rem)] bg-surface-0/95 backdrop-blur-xl">
           <nav
+            ref={panelRef}
             id="marketing-mobile-navigation"
             aria-label="Mobile navigation"
             className="mx-auto flex h-full max-w-7xl flex-col px-[var(--gutter)] py-5"

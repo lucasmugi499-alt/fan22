@@ -6,12 +6,14 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { TeamCard } from '@/components/core/EntityCards';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import type { Team } from '@/types';
 
-export function TeamsDiscover() {
+export function TeamsDiscover({ initialTeams = [] }: { initialTeams?: Team[] }) {
   const { teams, loading } = useGoalPlaceData({ collections: ['teams'] });
-  const list = useMemo(() => [...teams].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0)), [teams]);
+  const records = teams.length ? teams : initialTeams;
+  const list = useMemo(() => [...records].sort((a, b) => (b.totalSupport ?? 0) - (a.totalSupport ?? 0)), [records]);
 
-  if (loading) {
+  if (loading && !initialTeams.length) {
     return <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-[var(--radius-lg)]" />)}</div>;
   }
 

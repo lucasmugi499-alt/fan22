@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
+import { fantasyDemo } from '../src/data/fantasyDemo';
 
 type JsonScalar = string | number | boolean | null;
 type JsonValue = JsonScalar | JsonValue[] | { [key: string]: JsonValue };
@@ -59,6 +60,22 @@ const EXPECTED_COUNTS: Record<string, number> = {
   reports: 12,
   awards: 9,
   finalizations: 240,
+  fantasyCompetitions: fantasyDemo.competitions.length,
+  fantasyScoringProfiles: fantasyDemo.scoringProfiles.length,
+  fantasySquadRules: fantasyDemo.squadRules.length,
+  fantasyRounds: fantasyDemo.rounds.length,
+  fantasyPlayers: fantasyDemo.players.length,
+  fantasyPlayerPrices: fantasyDemo.playerPrices.length,
+  fantasyTeams: fantasyDemo.teams.length,
+  fantasyLineupVersions: fantasyDemo.lineupVersions.length,
+  fantasyTransfers: fantasyDemo.transfers.length,
+  fantasyPointEvents: fantasyDemo.pointEvents.length,
+  fantasyRoundScores: fantasyDemo.roundScores.length,
+  fantasyLeaderboards: fantasyDemo.leaderboards.length,
+  fantasyMiniLeagues: fantasyDemo.miniLeagues.length,
+  fantasyMiniLeagueMembers: fantasyDemo.miniLeagueMembers.length,
+  fantasyAchievements: fantasyDemo.achievements.length,
+  fantasyCorrections: fantasyDemo.corrections.length,
 };
 
 const REQUIRED_CONFIRMATION = 'SEED-GOALPLACE-STAGING';
@@ -594,7 +611,25 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   requireSafeTarget(args);
   const source = path.resolve(args.source ?? DEFAULT_SOURCE);
-  const database = readJson<DatabaseExport>(path.join(source, 'database.json'));
+  const database = {
+    ...readJson<DatabaseExport>(path.join(source, 'database.json')),
+    fantasyCompetitions: fantasyDemo.competitions,
+    fantasyScoringProfiles: fantasyDemo.scoringProfiles,
+    fantasySquadRules: fantasyDemo.squadRules,
+    fantasyRounds: fantasyDemo.rounds,
+    fantasyPlayers: fantasyDemo.players,
+    fantasyPlayerPrices: fantasyDemo.playerPrices,
+    fantasyTeams: fantasyDemo.teams,
+    fantasyLineupVersions: fantasyDemo.lineupVersions,
+    fantasyTransfers: fantasyDemo.transfers,
+    fantasyPointEvents: fantasyDemo.pointEvents,
+    fantasyRoundScores: fantasyDemo.roundScores,
+    fantasyLeaderboards: fantasyDemo.leaderboards,
+    fantasyMiniLeagues: fantasyDemo.miniLeagues,
+    fantasyMiniLeagueMembers: fantasyDemo.miniLeagueMembers,
+    fantasyAchievements: fantasyDemo.achievements,
+    fantasyCorrections: fantasyDemo.corrections,
+  } as unknown as DatabaseExport;
   const accounts = readJson<DemoAccount[]>(path.join(source, 'demo-accounts.json'));
   const counts = validatePackage(database, accounts);
 

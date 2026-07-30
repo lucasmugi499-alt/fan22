@@ -30,7 +30,15 @@ import {
 import { MarketingShell } from '@/components/marketing/MarketingShell';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { isActiveChallenge, isOfficialMatch } from '@/lib/status';
-import type { League, Match, Team } from '@/types';
+import type { Athlete, Challenge, League, Match, Team } from '@/types';
+
+export interface LandingInitialData {
+  leagues: League[];
+  teams: Team[];
+  athletes: Athlete[];
+  matches: Match[];
+  challenges: Challenge[];
+}
 
 const DISCOVERY_FEATURES = [
   {
@@ -178,13 +186,18 @@ function matchLabel(match: Match, home?: Team, away?: Team) {
   return `${home?.name ?? 'Home'} vs ${away?.name ?? 'Away'} at ${match.venue}`;
 }
 
-export function Landing() {
-  const { leagues, teams, athletes, matches, challenges } = useGoalPlaceData({
+export function Landing({ initialData }: { initialData: LandingInitialData }) {
+  const liveData = useGoalPlaceData({
     collections: ['leagues', 'teams', 'athletes', 'matches', 'challenges'],
     athleteRanking: 'points',
     athleteLimit: 12,
     recordLimit: 60,
   });
+  const leagues = liveData.leagues.length ? liveData.leagues : initialData.leagues;
+  const teams = liveData.teams.length ? liveData.teams : initialData.teams;
+  const athletes = liveData.athletes.length ? liveData.athletes : initialData.athletes;
+  const matches = liveData.matches.length ? liveData.matches : initialData.matches;
+  const challenges = liveData.challenges.length ? liveData.challenges : initialData.challenges;
   const teamById = new Map(teams.map((team) => [team.id, team]));
   const leagueById = new Map(leagues.map((league) => [league.id, league]));
   const featuredLeagues = leagues.slice(0, 6);
@@ -211,8 +224,10 @@ export function Landing() {
   const tickerItems = [
     ...recentOfficial.slice(0, 2).map((match) =>
       matchLabel(match, teamById.get(match.homeTeamId), teamById.get(match.awayTeamId))),
-    `${leagues.length} active leagues across Uganda`,
-    `${leagues.reduce((total, league) => total + league.athletesCount, 0).toLocaleString()} athlete profiles in this demonstration`,
+    ...(leagues.length ? [`${leagues.length} active leagues across Uganda`] : []),
+    ...(leagues.length
+      ? [`${leagues.reduce((total, league) => total + league.athletesCount, 0).toLocaleString()} athlete profiles`]
+      : []),
   ];
 
   return (
@@ -277,7 +292,7 @@ export function Landing() {
             </div>
           </div>
 
-          <div className="landing-rise landing-delay-4 hidden lg:block">
+          {spotlightMatch ? <div className="landing-rise landing-delay-4 hidden lg:block">
             <div className="landing-score-card overflow-hidden rounded-lg border border-white/15 bg-black/55 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs">
                 <span className="flex items-center gap-2 font-semibold text-white">
@@ -322,14 +337,14 @@ export function Landing() {
                 </span>
               </div>
             </div>
-          </div>
+          </div> : null}
         </div>
       </section>
 
-      <div className="landing-ticker -mx-[var(--gutter)] overflow-hidden border-b border-border bg-brand text-on-brand">
+      {tickerItems.length ? <div className="landing-ticker -mx-[var(--gutter)] overflow-hidden border-b border-border bg-brand text-on-brand" tabIndex={0} aria-label="Latest official sports activity">
         <div className="landing-ticker-track flex w-max items-center py-3 text-xs font-bold">
           {[0, 1].map((copy) => (
-            <div key={copy} className="flex items-center">
+            <div key={copy} className="flex items-center" aria-hidden={copy === 1 ? true : undefined}>
               {tickerItems.map((item) => (
                 <span key={`${copy}-${item}`} className="flex items-center whitespace-nowrap px-6">
                   <Lightning className="mr-2 h-4 w-4" weight="fill" />
@@ -339,7 +354,7 @@ export function Landing() {
             </div>
           ))}
         </div>
-      </div>
+      </div> : null}
 
       <section className="mx-auto max-w-7xl py-24 sm:py-28">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">

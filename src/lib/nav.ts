@@ -11,7 +11,6 @@ import {
   Gear,
   Megaphone,
   Users,
-  Bell,
   SoccerBall,
   Trophy,
   Coins,
@@ -51,9 +50,7 @@ export interface RoleNav {
 }
 
 const COMMON_MORE: NavDestination[] = [
-  { name: 'Notifications', href: '/notifications', icon: Bell },
-  { name: 'Profile', href: '/profile', icon: User },
-  { name: 'Settings', href: '/settings', icon: Gear },
+  { name: 'Account settings', href: '/settings', icon: Gear },
 ];
 
 export const ROLE_NAV: Record<string, RoleNav> = {
@@ -71,6 +68,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       { name: 'Sponsors', href: '/sponsors', icon: Coins },
       { name: 'Local map', href: '/map', icon: MapPin },
       { name: 'Support', href: '/support', icon: HandHeart },
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
       { name: 'Sign in', href: '/login', icon: SignIn },
     ],
   },
@@ -80,15 +78,16 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       { name: 'Home', href: '/home', icon: House },
       { name: 'Matches', href: '/matches', icon: Calendar },
       { name: 'Discover', href: '/discover', icon: Users },
-      { name: 'Feed', href: '/feed', icon: ListBullets },
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
     ],
     more: [
       { name: 'Leagues', href: '/leagues', icon: Buildings },
       { name: 'Teams', href: '/teams', icon: SoccerBall },
       { name: 'Awards', href: '/awards', icon: Trophy },
-      { name: 'Support activity', href: '/contributions', icon: Wallet },
+      { name: 'My support', href: '/contributions', icon: Wallet },
       { name: 'Local map', href: '/map', icon: MapPin },
-      { name: 'Support', href: '/support', icon: HandHeart },
+      { name: 'Support athletes', href: '/support', icon: HandHeart },
+      { name: 'Feed', href: '/feed', icon: ListBullets },
       ...COMMON_MORE,
     ],
   },
@@ -97,20 +96,21 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     primary: [
       { name: 'Dashboard', href: '/athlete-dashboard', icon: SquaresFour },
       { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'Support activity', href: '/contributions', icon: Wallet },
-      { name: 'Profile', href: '/profile', icon: User },
+      { name: 'My support', href: '/contributions', icon: Wallet },
+      { name: 'Account', href: '/profile', icon: User },
     ],
     more: [
       { name: 'Feed', href: '/feed', icon: ListBullets },
       { name: 'Leagues', href: '/leagues', icon: Buildings },
       { name: 'Awards', href: '/awards', icon: Trophy },
-      ...COMMON_MORE.filter((d) => d.name !== 'Profile'),
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
+      ...COMMON_MORE,
     ],
   },
   team_admin: {
     workspace: 'Team Console',
     primary: [
-      { name: 'Team', href: '/team-admin', icon: SquaresFour },
+      { name: 'Overview', href: '/team-admin', icon: SquaresFour },
       { name: 'Roster', href: '/team-admin/roster', icon: Users },
       { name: 'Fixtures', href: '/team-admin/fixtures', icon: Calendar },
       { name: 'Updates', href: '/team-admin/updates', icon: Megaphone },
@@ -119,6 +119,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       { name: 'Field mode', href: '/team-admin/field-mode', icon: DeviceMobile },
       { name: 'Team profile', href: '/team-admin/profile', icon: Buildings },
       { name: 'Matches', href: '/matches', icon: Calendar },
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
       ...COMMON_MORE,
     ],
   },
@@ -133,6 +134,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     more: [
       { name: 'Reports', href: '/league-admin/reports', icon: ChartLine },
       { name: 'Matches', href: '/matches', icon: Calendar },
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
       ...COMMON_MORE,
     ],
   },
@@ -147,6 +149,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     more: [
       { name: 'Sponsors', href: '/admin/sponsors', icon: Coins },
       { name: 'Financial operations', href: '/admin/finance', icon: Wallet },
+      { name: 'Fantasy', href: '/fantasy', icon: Trophy },
       ...COMMON_MORE,
     ],
   },

@@ -61,7 +61,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
               Home
             </Link>
             <Link
-              href="/leagues"
+              href="/login"
               className="hidden rounded-sm px-3 py-2 text-muted transition hover:bg-white/5 hover:text-text-strong lg:block"
             >
               Leagues
@@ -97,10 +97,10 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
               Sign in
             </Link>
             <Link
-              href="/login"
+              href="/leagues"
               className="group ml-1 hidden h-10 items-center gap-2 rounded-sm bg-brand px-4 font-bold text-on-brand transition hover:bg-brand-hover active:translate-y-px lg:inline-flex"
             >
-              Explore GoalPlace256
+              Explore leagues
               <ArrowRight
                 className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
                 weight="bold"
