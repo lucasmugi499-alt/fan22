@@ -1,21 +1,24 @@
 import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
+import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
-
-async function actorFor(request: Request) {
-  const token = bearerToken(request);
-  if (!token) return null;
-  return adminAuth.verifyIdToken(token).catch(() => null);
-}
-
 const PRIVILEGED_ROLES = ['league_admin', 'platform_admin', 'super_admin'];
+
+const accessActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('accept_team_invitation'),
+    assignmentId: z.string().trim().min(1).max(180),
+    token: z.string().trim().min(20).max(512),
+  }),
+  z.object({
+    action: z.literal('approve_league_admin'),
+    applicationId: z.string().trim().min(1).max(180),
+  }),
+]);
 
 async function synchronizeRoleClaim(uid: string, role: 'team_admin' | 'league_admin') {
   const account = await adminAuth.getUser(uid);
@@ -29,21 +32,20 @@ async function synchronizeRoleClaim(uid: string, role: 'team_admin' | 'league_ad
 }
 
 export async function POST(request: Request) {
-  const actor = await actorFor(request);
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const body = await request.json().catch(() => ({})) as {
-    action?: 'accept_team_invitation' | 'approve_league_admin';
-    assignmentId?: string;
-    applicationId?: string;
-    token?: string;
-  };
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+
+  const parsed = await parseJsonBody(request, accessActionSchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return parsed.response;
+
+  const actor = auth.actor;
+  const body = parsed.data;
 
   try {
     if (body.action === 'accept_team_invitation') {
       if (actor.email_verified !== true) {
         return Response.json({ error: 'Verify your email address before accepting an invitation.' }, { status: 403 });
       }
-      if (!body.assignmentId || !body.token) return Response.json({ error: 'A complete invitation link is required.' }, { status: 400 });
       const assignmentRef = adminDb.collection('teamAssignments').doc(body.assignmentId);
       const assignment = await assignmentRef.get();
       if (!assignment.exists) return Response.json({ error: 'Invitation not found.' }, { status: 404 });
@@ -98,10 +100,8 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'approve_league_admin') {
-      if (!['platform_admin', 'super_admin'].includes(String(actor.role))) {
-        return Response.json({ error: 'Platform Admin access required.' }, { status: 403 });
-      }
-      if (!body.applicationId) return Response.json({ error: 'Application is required.' }, { status: 400 });
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
       const applicationRef = adminDb.collection('leagueAdminApplications').doc(body.applicationId);
       const application = await applicationRef.get();
       if (!application.exists) return Response.json({ error: 'Application not found.' }, { status: 404 });
