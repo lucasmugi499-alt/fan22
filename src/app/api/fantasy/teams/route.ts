@@ -9,6 +9,7 @@ import type {
   FantasyRound,
   FantasySquadRules,
 } from '@/types/fantasy';
+import { isFantasyFanRole } from '@/lib/fantasy/access';
 
 export const runtime = 'nodejs';
 
@@ -32,6 +33,11 @@ export async function POST(request: Request) {
   const token = tokenFrom(request);
   const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
   if (!actor) return Response.json({ error: 'Sign in to submit a fantasy squad.' }, { status: 401 });
+  const profile = await adminDb.collection('users').doc(actor.uid).get();
+  const profileRole = profile.data()?.role;
+  if (!isFantasyFanRole(actor.role, profileRole)) {
+    return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
+  }
   const parsed = lineupSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success || fantasyRecordHasFinancialFields(parsed.data)) {
     return Response.json({ error: 'Invalid fantasy squad.' }, { status: 400 });
@@ -108,10 +114,8 @@ export async function POST(request: Request) {
   if (!validation.valid) {
     return Response.json({ error: 'Squad validation failed.', errors: validation.errors }, { status: 409 });
   }
-  const profile = await adminDb.collection('users').doc(actor.uid).get();
-  const role = typeof profile.data()?.role === 'string' ? profile.data()!.role : 'fan';
-  const conflictRoles = ['team_admin', 'league_admin', 'platform_admin', 'super_admin']
-    .filter((candidate) => candidate === role);
+  const role = 'fan';
+  const conflictRoles: string[] = [];
   const batch = adminDb.batch();
   if (existingTeam.exists && existingTeam.data()?.userId !== actor.uid) {
     return Response.json({ error: 'Fantasy team ownership conflict.' }, { status: 403 });

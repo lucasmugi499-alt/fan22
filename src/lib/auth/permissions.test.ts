@@ -110,7 +110,7 @@ describe('canAccessRoute', () => {
   });
 
   it('denies every protected route to logged-out visitors', () => {
-    for (const route of ['/home', '/feed', '/wallet', '/admin', '/league-admin', '/team-admin']) {
+    for (const route of ['/home', '/feed', '/wallet', '/fantasy', '/admin', '/league-admin', '/team-admin']) {
       expect(canAccessRoute(LOGGED_OUT, route)).toBe(false);
     }
   });
@@ -121,6 +121,7 @@ describe('canAccessRoute', () => {
     ['/team-admin', ['team_admin', 'league_admin', 'platform_admin', 'super_admin']],
     ['/athlete-dashboard', ['athlete', 'platform_admin', 'super_admin']],
     ['/wallet', ['fan', 'athlete', 'platform_admin', 'super_admin']],
+    ['/fantasy', ['fan']],
   ];
 
   for (const [route, allowed] of WORKSPACE_ACCESS) {

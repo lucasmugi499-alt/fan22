@@ -194,16 +194,8 @@ export const PUBLIC_DISCOVERY_ROUTES = [
 ];
 
 export function isPublicRoute(pathname: string): boolean {
-  const publicFantasyRoute =
-    pathname === '/fantasy'
-    || pathname === '/fantasy/how-it-works'
-    || (
-      pathname.startsWith('/fantasy/competitions/')
-      && !pathname.endsWith('/team')
-    );
   return (
     PUBLIC_ROUTES.includes(pathname) ||
-    publicFantasyRoute ||
     pathname.startsWith('/invitations/team/') ||
     PUBLIC_DISCOVERY_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -218,6 +210,9 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
 
   if (!isLoggedIn(auth) || !auth.role) return false;
 
+  if (pathname.startsWith('/fantasy')) {
+    return hasRole(auth, 'fan');
+  }
   if (pathname.startsWith('/athlete-dashboard')) {
     return hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
   }

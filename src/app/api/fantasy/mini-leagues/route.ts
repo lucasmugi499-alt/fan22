@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { isFantasyFanRole } from '@/lib/fantasy/access';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +90,10 @@ export async function POST(request: Request) {
   const token = tokenFrom(request);
   const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
   if (!actor) return Response.json({ error: 'Sign in to manage mini-leagues.' }, { status: 401 });
+  const profile = await adminDb.collection('users').doc(actor.uid).get();
+  if (!isFantasyFanRole(actor.role, profile.data()?.role)) {
+    return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
+  }
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'Invalid mini-league request.' }, { status: 400 });
 

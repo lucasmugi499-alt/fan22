@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, ArrowRight, Eye, EyeSlash, SignIn as SignInIcon } from '@phosphor-icons/react';
+import { Broadcast, SealCheck, Users, ShieldCheck, Gavel, Eye, EyeSlash, SignIn as SignInIcon } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { getDefaultRouteForRole, getPostSignInRoute } from '@/lib/auth/permissions';
@@ -18,14 +18,14 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
+import {
+  authenticateDemoAccount,
+  DEMO_ACCOUNT_PASSWORD,
+  featuredDemoAccounts,
+} from '@/lib/auth/demoAccounts';
 
-const ROLES: { role: AppRole; label: string; blurb: string; icon: IconComponent }[] = [
-  { role: 'fan', label: 'Fan', blurb: 'Follow matches and back athletes.', icon: Broadcast },
-  { role: 'athlete', label: 'Athlete', blurb: 'Your verified career portfolio.', icon: SealCheck },
-  { role: 'team_admin', label: 'Team Admin', blurb: 'Run the roster and submit results.', icon: Users },
-  { role: 'league_admin', label: 'League Admin', blurb: 'Operate the league and resolve exceptions.', icon: ShieldCheck },
-  { role: 'platform_admin', label: 'Platform Admin', blurb: 'Govern trust across the platform.', icon: Gavel },
-];
+const FEATURED_DEMO_ACCOUNTS = featuredDemoAccounts();
+const DEFAULT_DEMO_EMAIL = FEATURED_DEMO_ACCOUNTS.find((account) => account.role === 'fan')?.email ?? '';
 
 type AccountMode = 'signin' | 'register' | 'reset';
 
@@ -38,7 +38,7 @@ export function SignIn({
 }) {
   const router = useRouter();
   const { setDemoRole, authStatus, role } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(isDemoModeEnabled ? DEFAULT_DEMO_EMAIL : '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mode, setMode] = useState<AccountMode>(initialMode);
@@ -58,11 +58,6 @@ export function SignIn({
     ? 'This account is signed in, but it does not have an app role yet.'
     : null;
 
-  function enterAs(role: AppRole) {
-    setDemoRole(role);
-    router.push(getDefaultRouteForRole(role));
-  }
-
   async function submitAccountSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -70,6 +65,17 @@ export function SignIn({
     setSubmitting(true);
 
     try {
+      if (isDemoModeEnabled) {
+        const account = authenticateDemoAccount(email, password);
+        if (!account) {
+          setError(`Choose a listed demo account and use the shared password ${DEMO_ACCOUNT_PASSWORD}.`);
+          return;
+        }
+        setDemoRole(account.role);
+        router.replace(getPostSignInRoute(account.role, nextPath ?? account.workspace));
+        return;
+      }
+
       if (mode === 'reset') {
         await requestPasswordReset(email.trim());
         setSuccess('Password reset email sent. Check your inbox.');
@@ -126,7 +132,7 @@ export function SignIn({
                   : 'Welcome back'}
           </h1>
           {isDemoModeEnabled ? (
-            <p className="mt-1 text-sm text-muted">This is a demonstration build. Choose a role to explore the platform.</p>
+            <p className="mt-1 text-sm text-muted">Sign in with one of the seeded staging demo accounts.</p>
           ) : (
             <p className="mt-1 text-sm text-muted">
               {mode === 'register'
@@ -139,26 +145,54 @@ export function SignIn({
         </div>
 
         {isDemoModeEnabled ? (
-          <div className="mt-8 space-y-2.5">
-            {ROLES.map(({ role, label, blurb, icon: Icon }) => (
-              <button
-                key={role}
-                onClick={() => enterAs(role)}
-                className="group flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-4 text-left transition-[border-color,transform] duration-[var(--dur-micro)] ease-[var(--ease-fluid)] hover:-translate-y-0.5 hover:border-[color:var(--border-glow)]"
+          <form onSubmit={submitAccountSignIn} className="mx-auto mt-8 max-w-sm space-y-4 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-5">
+            <label className="block text-xs font-medium uppercase tracking-[0.08em] text-subtle">
+              Demo account
+              <select
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError(null);
+                }}
+                className="field mt-2 normal-case"
               >
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-md)] bg-surface-3 text-brand">
-                  <Icon className="h-5 w-5" weight="bold" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-text-strong">Continue as {label}</p>
-                  <p className="truncate text-xs text-muted">{blurb}</p>
-                </div>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-3 text-muted transition-transform duration-[var(--dur-micro)] ease-[var(--ease-fluid)] group-hover:translate-x-0.5 group-hover:text-brand">
-                  <ArrowRight className="h-4 w-4" weight="bold" />
-                </span>
-              </button>
-            ))}
-          </div>
+                {FEATURED_DEMO_ACCOUNTS.map((account) => (
+                  <option key={account.uid} value={account.email}>
+                    {demoRoleLabel(account.role)} · {account.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="space-y-1.5">
+              <label htmlFor="demo-password" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="demo-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 pr-12 text-sm text-text-strong outline-none transition-colors placeholder:text-subtle focus:border-brand"
+                  placeholder={DEMO_ACCOUNT_PASSWORD}
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-muted hover:text-text-strong">
+                  {showPassword ? <EyeSlash className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted">Shared staging password: <code className="text-text-strong">{DEMO_ACCOUNT_PASSWORD}</code></p>
+            </div>
+            {error ? (
+              <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">
+                {error}
+              </p>
+            ) : null}
+            <Button type="submit" block icon={SignInIcon} disabled={submitting}>
+              {submitting ? 'Signing in...' : 'Sign in to demo'}
+            </Button>
+          </form>
         ) : (
           <form onSubmit={submitAccountSignIn} className="mx-auto mt-8 max-w-sm space-y-4 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-5">
             <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-surface-2 p-1">
@@ -278,19 +312,15 @@ export function SignIn({
           </form>
         )}
 
-        {isDemoModeEnabled ? (
-          <p className="mt-6 text-center text-xs text-subtle">
-            You can switch roles at any time from the Demo pill in the bottom corner.
-          </p>
+        {!isDemoModeEnabled ? (
+          <button
+            type="button"
+            onClick={() => setAccessOpen(true)}
+            className="mx-auto mt-5 flex min-h-11 items-center justify-center text-sm font-semibold text-brand hover:underline"
+          >
+            How accounts and invitations work
+          </button>
         ) : null}
-
-        <button
-          type="button"
-          onClick={() => setAccessOpen(true)}
-          className="mx-auto mt-5 flex min-h-11 items-center justify-center text-sm font-semibold text-brand hover:underline"
-        >
-          How accounts and invitations work
-        </button>
       </section>
 
       <Sheet
@@ -342,6 +372,10 @@ export function SignIn({
       </Sheet>
     </MarketingShell>
   );
+}
+
+function demoRoleLabel(role: AppRole) {
+  return role.split('_').map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(' ');
 }
 
 function AccessPath({

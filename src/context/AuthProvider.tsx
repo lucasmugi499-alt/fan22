@@ -11,6 +11,7 @@ import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { clearPrivateCaches } from '@/lib/offline';
 
 const demoRoleStorageKey = 'goalplace256.demoRole';
+const demoProfileStoragePrefix = 'goalplace256.demoProfile.';
 
 type AuthContextValue = {
   authStatus: AuthStatus;
@@ -59,6 +60,30 @@ function clearStoredDemoRole() {
   document.cookie = `${demoRoleStorageKey}=; path=/; Max-Age=0; SameSite=Lax`;
 }
 
+function getStoredDemoProfile(role: AppRole): UserProfile {
+  const base = MOCK_PROFILES[role];
+  if (typeof window === 'undefined') return { ...base };
+  try {
+    const value = window.localStorage.getItem(`${demoProfileStoragePrefix}${role}`);
+    const saved = value ? JSON.parse(value) as Partial<UserProfile> : {};
+    return {
+      ...base,
+      ...saved,
+      id: base.id,
+      uid: base.uid,
+      email: base.email,
+      role: base.role,
+      status: base.status,
+    };
+  } catch {
+    return { ...base };
+  }
+}
+
+function storeDemoProfile(role: AppRole, profile: UserProfile) {
+  window.localStorage.setItem(`${demoProfileStoragePrefix}${role}`, JSON.stringify(profile));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -72,13 +97,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setDemoRole = useCallback((newRole: AppRole | null) => {
     if (newRole && isDemoModeEnabled) {
+      const profile = getStoredDemoProfile(newRole);
       storeDemoRole(newRole);
       setIsDemoMode(true);
       setDemoRoleState(newRole);
-      setUserProfile(MOCK_PROFILES[newRole]);
+      setUserProfile(profile);
       setRole(newRole);
       setAuthStatus('logged_in');
-      setCurrentUser({ uid: MOCK_PROFILES[newRole].uid, email: MOCK_PROFILES[newRole].email } as User);
+      setCurrentUser({ uid: profile.uid, email: profile.email } as User);
     } else {
       setIsDemoMode(false);
       setDemoRoleState(null);
@@ -88,13 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthStatus('logged_out');
       setCurrentUser(null);
       
-      // Exiting demo mode needs a full page load so Firebase auth state is re-checked.
-      // Land on the public site rather than reloading in place: reloading the current
-      // (now unauthorised) workspace left users staring at a logged-out app page, which
-      // read as "sign out did nothing".
       if (isFirebaseConfigured) {
         setAuthStatus('loading');
-        window.location.assign('/');
       }
     }
   }, []);
@@ -103,14 +124,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearPrivateCaches().catch(() => undefined);
     if (isDemoMode) {
       setDemoRole(null);
+      window.location.assign('/');
       return;
     }
     await firebaseLogout();
   }, [isDemoMode, setDemoRole]);
 
   const updateLocalProfile = useCallback((updates: Partial<UserProfile>) => {
-    setUserProfile((profile) => (profile ? { ...profile, ...updates } : profile));
-  }, []);
+    setUserProfile((profile) => {
+      if (!profile) return profile;
+      const nextProfile = { ...profile, ...updates };
+      if (isDemoMode && role) storeDemoProfile(role, nextProfile);
+      return nextProfile;
+    });
+  }, [isDemoMode, role]);
 
   useEffect(() => {
     const restoreDemoRole = window.setTimeout(() => {
