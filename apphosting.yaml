@@ -91,3 +91,19 @@ env:
     value: fg256
     availability:
       - RUNTIME
+  - variable: GOALPLACE_APP_BASE_URL
+    value: https://s7.us-east4.hosted.app
+    availability:
+      - RUNTIME
+  - variable: GOALPLACE_EMAIL_FROM
+    value: "GoalPlace256 <onboarding@resend.dev>"
+    availability:
+      - RUNTIME
+  - variable: GOALPLACE_EMAIL_REPLY_TO
+    value: support@goalplace256.com
+    availability:
+      - RUNTIME
+  - variable: RESEND_API_KEY
+    secret: resendApiKey
+    availability:
+      - RUNTIME

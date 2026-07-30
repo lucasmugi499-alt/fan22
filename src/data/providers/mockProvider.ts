@@ -855,7 +855,14 @@ export const mockProvider: GoalPlaceDataProvider = {
     return result(fixtures[0]?.id ?? id('fixture_batch'), `${fixtures.length} fixtures created.`);
   },
   async createTeamAdminInvitation(data) {
-    persistDemoTeamAssignment(data);
+    persistDemoTeamAssignment({
+      ...data,
+      emailProvider: 'demo',
+      emailDelivery: 'sent',
+      emailMessageId: `demo_${data.id}`,
+      emailSentAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     audit({
       actorUserId: data.invitedByUserId ?? data.userId,
       action: 'invited',
@@ -863,8 +870,10 @@ export const mockProvider: GoalPlaceDataProvider = {
       targetId: data.id,
     });
     return {
-      ...result(data.id, 'Team Admin invitation created.'),
+      ...result(data.id, 'Demo Team Admin invitation sent.'),
       actionUrl: `/invitations/team/${data.id}?token=demo`,
+      emailDelivery: 'sent',
+      emailMessageId: `demo_${data.id}`,
     };
   },
   async acceptTeamAdminInvitation(assignmentId, userId, token) {

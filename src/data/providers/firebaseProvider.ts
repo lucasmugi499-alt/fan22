@@ -112,6 +112,9 @@ async function requestTrustedAdminAction(payload: Record<string, unknown>) {
     error?: string;
     id?: string;
     actionUrl?: string;
+    emailDelivery?: DataWriteResult['emailDelivery'];
+    emailMessageId?: string;
+    emailError?: string;
   };
   if (!response.ok) throw new Error(body.error ?? 'GoalPlace256 could not complete this action.');
   return body;
@@ -820,6 +823,9 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return {
       ...(await writeResult(result.id ?? data.id, 'Team Admin invitation created.')),
       actionUrl: result.actionUrl,
+      emailDelivery: result.emailDelivery,
+      emailMessageId: result.emailMessageId,
+      emailError: result.emailError,
     };
   },
   async acceptTeamAdminInvitation(assignmentId, userId, token) {

@@ -75,3 +75,15 @@ env:
   - variable: GOALPLACE_FIRESTORE_DATABASE_ID
     value: fg256
     availability: [RUNTIME]
+  - variable: GOALPLACE_APP_BASE_URL
+    value: https://goalplace256.com
+    availability: [RUNTIME]
+  - variable: GOALPLACE_EMAIL_FROM
+    value: "GoalPlace256 <team@goalplace256.com>"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_EMAIL_REPLY_TO
+    value: support@goalplace256.com
+    availability: [RUNTIME]
+  - variable: RESEND_API_KEY
+    secret: resendApiKey
+    availability: [RUNTIME]

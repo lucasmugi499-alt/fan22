@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 
 export const runtime = 'nodejs';
 
@@ -38,6 +39,12 @@ function audit(
   };
 }
 
+function publicBaseUrl(request: Request) {
+  return process.env.GOALPLACE_APP_BASE_URL
+    ?? process.env.NEXT_PUBLIC_APP_URL
+    ?? new URL(request.url).origin;
+}
+
 export async function POST(request: Request) {
   const actor = await actorFor(request);
   if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
@@ -56,16 +63,20 @@ export async function POST(request: Request) {
         return Response.json({ error: 'Team, league, season and email are required.' }, { status: 400 });
       }
       const league = await adminDb.collection('leagues').doc(leagueId).get();
+      const leagueData = league.data();
       if (
         !hasRole(actor, ['platform_admin', 'super_admin'])
-        && !league.data()?.adminUserIds?.includes(actor.uid)
+        && !leagueData?.adminUserIds?.includes(actor.uid)
       ) {
         return Response.json({ error: 'You do not manage this league.' }, { status: 403 });
       }
       const team = await adminDb.collection('teams').doc(teamId).get();
-      if (!team.exists || team.data()?.leagueId !== leagueId) {
+      const teamData = team.data();
+      if (!team.exists || teamData?.leagueId !== leagueId) {
         return Response.json({ error: 'The selected team does not belong to this league.' }, { status: 409 });
       }
+      const season = await adminDb.collection('seasons').doc(seasonId).get();
+      const seasonData = season.data();
 
       const invitationKey = createHash('sha256')
         .update(`${leagueId}:${seasonId}:${teamId}:${invitedEmail}`)
@@ -75,6 +86,7 @@ export async function POST(request: Request) {
       const token = randomBytes(32).toString('base64url');
       const tokenHash = createHash('sha256').update(token).digest('hex');
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const actionUrl = `/invitations/team/${invitationRef.id}?token=${encodeURIComponent(token)}`;
       await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(invitationRef);
         if (
@@ -97,6 +109,7 @@ export async function POST(request: Request) {
           tokenHash,
           expiresAt,
           createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
         transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
           actor.uid,
@@ -106,12 +119,35 @@ export async function POST(request: Request) {
           `Invitation expires ${expiresAt}.`,
         ));
       });
+      const email = await sendTeamInvitationEmail({
+        to: invitedEmail,
+        inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
+        assignmentId: invitationRef.id,
+        teamName: String(teamData?.name ?? teamId),
+        leagueName: String(leagueData?.name ?? leagueId),
+        seasonName: String(seasonData?.name ?? seasonId),
+        inviterName: String(actor.name ?? actor.email ?? 'your League Admin'),
+        expiresAt,
+      });
+      await invitationRef.set({
+        emailProvider: 'resend',
+        emailDelivery: email.status,
+        ...(email.id ? {
+          emailMessageId: email.id,
+          emailSentAt: FieldValue.serverTimestamp(),
+        } : {}),
+        ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       return Response.json({
         ok: true,
         id: invitationRef.id,
         token,
         expiresAt,
-        actionUrl: `/invitations/team/${invitationRef.id}?token=${encodeURIComponent(token)}`,
+        actionUrl,
+        emailDelivery: email.status,
+        emailMessageId: email.id,
+        emailError: email.error,
       });
     }
 

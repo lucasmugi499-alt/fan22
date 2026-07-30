@@ -50,6 +50,9 @@ export type DataWriteResult = {
   mode: DataProviderMode;
   message?: string;
   actionUrl?: string;
+  emailDelivery?: 'sent' | 'not_configured' | 'failed';
+  emailMessageId?: string;
+  emailError?: string;
 };
 
 export type FollowTargetType = 'athlete' | 'team' | 'league';

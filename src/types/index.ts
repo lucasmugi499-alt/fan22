@@ -453,9 +453,15 @@ export interface TeamAssignment {
   invitedEmail?: string;
   tokenHash?: string;
   expiresAt?: string;
+  emailProvider?: "resend" | "demo";
+  emailDelivery?: "sent" | "not_configured" | "failed";
+  emailMessageId?: string;
+  emailSentAt?: string;
+  emailError?: string;
   revokedAt?: string;
   acceptedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Roster {
