@@ -1,43 +1,39 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { checkCorrectionRequest } from '@/lib/resultSubmission';
 import { finalizeSubmission } from '@/server/resultFinalizer';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 import type { AppRole, ResultSubmission } from '@/types';
 
 export const runtime = 'nodejs';
 
 const requestSchema = z.object({
   action: z.literal('request'),
-  matchId: z.string().min(1),
-  actorUserId: z.string().min(1),
+  matchId: z.string().trim().min(1).max(180),
+  actorUserId: z.string().trim().min(1).max(180),
   reason: z.string().trim().min(10).max(1500),
 });
 
 const approvalSchema = z.object({
   action: z.literal('approve').optional(),
-  matchId: z.string().min(1),
-  actorUserId: z.string().min(1),
+  matchId: z.string().trim().min(1).max(180),
+  actorUserId: z.string().trim().min(1).max(180),
   homeScore: z.number().int().min(0).max(999),
   awayScore: z.number().int().min(0).max(999),
   reason: z.string().trim().min(10).max(1500),
 });
 const bodySchema = z.union([requestSchema, approvalSchema]);
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'A corrected score and reason are required.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'A corrected score and reason are required.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const input = parsed.data;
   const { matchId } = await params;
   if (input.matchId !== matchId || input.actorUserId !== actor.uid) {

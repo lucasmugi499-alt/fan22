@@ -1,19 +1,20 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import {
   challengeNextStatus,
   challengeActionMatchesFundingModel,
   roleCanTransitionChallenge,
   type ChallengeAction,
 } from '@/lib/challenge';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 import type { AppRole, Challenge } from '@/types';
 
 export const runtime = 'nodejs';
 
 const bodySchema = z.object({
-  challengeId: z.string().min(1),
-  actorUserId: z.string().min(1),
+  challengeId: z.string().trim().min(1).max(180),
+  actorUserId: z.string().trim().min(1).max(180),
   action: z.enum([
     'team_approve',
     'team_reject',
@@ -33,13 +34,8 @@ const bodySchema = z.object({
     'close_non_cash',
   ]),
   note: z.string().trim().max(1000).optional(),
-  evidenceRefs: z.array(z.string().min(1).max(500)).max(12).optional(),
+  evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(12).optional(),
 });
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
 
 function approvalDetails(action: ChallengeAction) {
   if (action === 'team_approve' || action === 'team_reject') {
@@ -68,12 +64,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ challengeId: string }> },
 ) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid challenge action.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid challenge action.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const input = parsed.data;
   const { challengeId } = await params;
   if (challengeId !== input.challengeId || actor.uid !== input.actorUserId) {

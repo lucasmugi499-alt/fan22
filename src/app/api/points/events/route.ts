@@ -1,6 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 import {
   cappedPointsAward,
   kampalaPeriod,
@@ -11,7 +12,7 @@ import type { PointsEvent } from '@/types/money';
 export const runtime = 'nodejs';
 
 const bodySchema = z.object({
-  userId: z.string().min(1),
+  userId: z.string().trim().min(1).max(180),
   actionType: z.enum([
     'profile_completed',
     'first_league_followed',
@@ -22,13 +23,8 @@ const bodySchema = z.object({
     'athlete_card_shared',
     'fan_onboarding_completed',
   ]),
-  relatedEntityId: z.string().min(1).max(160).optional(),
+  relatedEntityId: z.string().trim().min(1).max(160).optional(),
 });
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
 
 async function eligible(
   userId: string,
@@ -82,11 +78,11 @@ async function eligible(
 }
 
 export async function POST(request: Request) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid points event.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid points event.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const input = parsed.data;
   if (input.userId !== actor.uid) {
     return Response.json({ error: 'Points can only be recorded for the signed-in account.' }, { status: 403 });

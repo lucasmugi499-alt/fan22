@@ -1,15 +1,16 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { z } from 'zod';
+import { adminDb } from '@/lib/firebase/admin';
 import { cappedPointsAward, kampalaPeriod, pointsIdempotencyKey } from '@/lib/money';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 import type { Match } from '@/types';
 
 export const runtime = 'nodejs';
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
+const bodySchema = z.object({
+  attendanceToken: z.string().trim().min(1).max(512),
+});
 
 function validSignature(value: string, expected: string) {
   const left = Buffer.from(value);
@@ -21,14 +22,15 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Sign in before checking in.' }, { status: 401 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return Response.json({ error: 'Sign in before checking in.' }, { status: auth.response?.status ?? 401 });
+  const actor = auth.actor;
   const secret = process.env.GOALPLACE_ATTENDANCE_SECRET;
   if (!secret) return Response.json({ error: 'Venue check-in is not configured.' }, { status: 503 });
-  const body = await request.json().catch(() => null) as { attendanceToken?: string } | null;
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 1024 });
+  if ('response' in parsed) return Response.json({ error: 'This venue code is invalid.' }, { status: parsed.response.status });
   const { matchId } = await params;
-  const parts = body?.attendanceToken?.split('.') ?? [];
+  const parts = parsed.data.attendanceToken.split('.');
   if (parts.length !== 3 || parts[0] !== matchId) {
     return Response.json({ error: 'This venue code is invalid.' }, { status: 400 });
   }
