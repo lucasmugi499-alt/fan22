@@ -1,20 +1,16 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
 const schema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('request'), athleteId: z.string().min(1) }),
-  z.object({ action: z.literal('team_confirm'), claimId: z.string().min(1) }),
-  z.object({ action: z.literal('league_verify'), claimId: z.string().min(1) }),
-  z.object({ action: z.literal('reject'), claimId: z.string().min(1), reason: z.string().trim().min(4).max(300) }),
+  z.object({ action: z.literal('request'), athleteId: z.string().trim().min(1).max(180) }),
+  z.object({ action: z.literal('team_confirm'), claimId: z.string().trim().min(1).max(180) }),
+  z.object({ action: z.literal('league_verify'), claimId: z.string().trim().min(1).max(180) }),
+  z.object({ action: z.literal('reject'), claimId: z.string().trim().min(1).max(180), reason: z.string().trim().min(4).max(300) }),
 ]);
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
 
 function manages(data: FirebaseFirestore.DocumentData | undefined, uid: string) {
   return Array.isArray(data?.adminUserIds) && data.adminUserIds.includes(uid);
@@ -38,11 +34,11 @@ async function synchronizeAthleteRole(uid: string) {
 }
 
 export async function POST(request: Request) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid athlete claim action.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, schema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid athlete claim action.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const input = parsed.data;
 
   try {
