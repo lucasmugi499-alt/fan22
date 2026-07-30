@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { CheckCircle, EnvelopeSimple, ShieldCheck } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
 import { useAuth } from '@/context/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -12,7 +13,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import type { SportSlug, TeamAssignment } from '@/types';
 
 export function LeagueAdminApplicationForm() {
-  const { authStatus, currentUser, userProfile } = useAuth();
+  const { authStatus, currentUser, userProfile, isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
   const [leagueName, setLeagueName] = useState('');
   const [sport, setSport] = useState<SportSlug>('football');
   const [city, setCity] = useState('Kampala');
@@ -26,7 +28,7 @@ export function LeagueAdminApplicationForm() {
     if (!userId) return;
     setSaving(true);
     try {
-      await dataProvider.createLeagueAdminApplication({
+      await provider.createLeagueAdminApplication({
         userId,
         leagueName: leagueName.trim(),
         sport,
@@ -34,7 +36,9 @@ export function LeagueAdminApplicationForm() {
         evidenceNote: evidenceNote.trim(),
       });
       setSubmitted(true);
-      toast.success('Application sent for platform review.');
+      toast.success(isDemoMode
+        ? 'Demo league application created. Approve it from Platform Admin approvals.'
+        : 'Application sent for platform review.');
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Could not submit the application.');
     } finally {
@@ -58,7 +62,16 @@ export function LeagueAdminApplicationForm() {
       <Card className="mx-auto max-w-lg p-6 text-center">
         <CheckCircle className="mx-auto h-10 w-10 text-verified" weight="fill" />
         <h1 className="mt-3 text-xl font-semibold text-text-strong">Application received</h1>
-        <p className="mt-2 text-sm text-muted">A Platform Admin will review the league identity, competition structure, and administrator assignment. Your current role does not change until approval.</p>
+        <p className="mt-2 text-sm text-muted">
+          {isDemoMode
+            ? 'Switch to the Platform Admin demo account and approve this application to create the draft dummy league.'
+            : 'A Platform Admin will review the league identity, competition structure, and administrator assignment. Your current role does not change until approval.'}
+        </p>
+        {isDemoMode ? (
+          <Link href="/admin/approvals" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">
+            Open approvals
+          </Link>
+        ) : null}
       </Card>
     );
   }

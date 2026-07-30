@@ -1,4 +1,5 @@
-import { MapPin, ShieldCheck, Users } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
+import { ArrowRight, MapPin, ShieldCheck, Users } from '@phosphor-icons/react/dist/ssr';
 import { MarketingShell, MarketingHero } from '@/components/marketing/MarketingShell';
 import { PublicInquiryForm } from '@/components/marketing/PublicInquiryForm';
 
@@ -28,6 +29,16 @@ export function Pilot() {
         <h2 className="font-display text-3xl font-semibold text-text-strong">Bring your league into the pilot</h2>
         <p className="mb-6 mt-2 max-w-2xl text-muted">Share the league structure and the operational problem you most need solved. This request does not create an administrator account.</p>
         <PublicInquiryForm type="league_pilot" />
+        <div className="mt-5 border border-border bg-surface-1 p-5">
+          <h3 className="text-base font-semibold text-text-strong">Want to create a dummy league inside the app?</h3>
+          <p className="mt-1 text-sm leading-6 text-muted">
+            Sign in, submit a League Admin application, then approve it from the Platform Admin demo account. Approval creates a draft league you can use for test teams and fixtures.
+          </p>
+          <Link href="/apply/league-admin" className="mt-4 inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand transition hover:bg-brand-hover">
+            Start league application
+            <ArrowRight className="h-4 w-4" weight="bold" />
+          </Link>
+        </div>
       </section>
     </MarketingShell>
   );

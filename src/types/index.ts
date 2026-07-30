@@ -911,6 +911,7 @@ export interface LeagueAdminApplication {
   city: string;
   evidenceNote: string;
   status: "pending" | "approved" | "rejected" | "needs_information";
+  leagueId?: string;
   reviewedByUserId?: string;
   createdAt: string;
   updatedAt?: string;

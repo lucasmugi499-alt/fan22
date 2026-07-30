@@ -54,6 +54,7 @@ import { investorDemoRuntime } from '../investorDemo';
 import {
   AdminAuditEvent,
   Challenge,
+  League,
   LeagueAdminApplication,
   ResultSubmission,
   SupportNeed,
@@ -76,6 +77,8 @@ import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
+const storedApplicationsKey = 'goalplace256.demo.leagueAdminApplications';
+const storedLeaguesKey = 'goalplace256.demo.leagues';
 const resultSubmissions = new Map<string, ResultSubmission>(
   seededResultSubmissions.map((submission) => [submission.id, submission]),
 );
@@ -111,6 +114,73 @@ function replaceById<T extends { id: string }>(items: T[], value: T) {
   else items.unshift(value);
 }
 
+function readStoredItems<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) as T[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredItems<T>(key: string, items: T[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(key, JSON.stringify(items));
+}
+
+function mergedById<T extends { id: string }>(base: T[], extra: T[]) {
+  return [...new Map([...base, ...extra].map((item) => [item.id, item])).values()];
+}
+
+function persistDemoApplication(application: LeagueAdminApplication) {
+  replaceById(investorDemoRuntime.leagueAdminApplications, application);
+  const stored = readStoredItems<LeagueAdminApplication>(storedApplicationsKey);
+  replaceById(stored, application);
+  writeStoredItems(storedApplicationsKey, stored);
+}
+
+function persistDemoLeague(league: League) {
+  replaceById(leagues, league);
+  const stored = readStoredItems<League>(storedLeaguesKey);
+  replaceById(stored, league);
+  writeStoredItems(storedLeaguesKey, stored);
+}
+
+function demoLeagueIdForApplication(applicationId: string) {
+  return `league_${applicationId}`;
+}
+
+function draftLeagueFromApplication(application: LeagueAdminApplication): League {
+  return {
+    id: demoLeagueIdForApplication(application.id),
+    name: application.leagueName,
+    sport: application.sport,
+    city: application.city,
+    country: 'Uganda',
+    description: `${application.leagueName} is preparing its first GoalPlace256 season.`,
+    status: 'draft',
+    plan: 'free',
+    verified: false,
+    adminUserIds: [application.userId],
+    season: 'Not launched',
+    teamsCount: 0,
+    athletesCount: 0,
+    matchesCount: 0,
+    matchCompletionRate: 0,
+    verifiedResultsRate: 0,
+    goalPlaceIndex: 0,
+    totalSupport: 0,
+    supportersCount: 0,
+    verificationRules: {
+      requiresLeagueAdminApproval: true,
+      requiresRefereeConfirmation: false,
+      allowsPerformancePledges: false,
+    },
+    createdAt: new Date().toISOString(),
+  };
+}
+
 function take<T extends { id?: string }>(items: T[], limit?: number, afterId?: string) {
   const start = afterId ? Math.max(0, items.findIndex((item) => item.id === afterId) + 1) : 0;
   return limit ? items.slice(start, start + limit) : items.slice(start);
@@ -144,13 +214,14 @@ export const mockProvider: GoalPlaceDataProvider = {
     return awards;
   },
   async getLeagues() {
-    return leagues;
+    return mergedById(leagues, readStoredItems<League>(storedLeaguesKey));
   },
   async getSeasons() {
     return seasons;
   },
   async getLeagueById(idValue) {
-    return getLeagueById(idValue);
+    return readStoredItems<League>(storedLeaguesKey).find((league) => league.id === idValue)
+      ?? getLeagueById(idValue);
   },
   async getTeams(options) {
     return take(
@@ -282,7 +353,10 @@ export const mockProvider: GoalPlaceDataProvider = {
       ), options?.limit);
   },
   async getLeagueAdminApplications() {
-    return investorDemoRuntime.leagueAdminApplications;
+    return mergedById(
+      investorDemoRuntime.leagueAdminApplications,
+      readStoredItems<LeagueAdminApplication>(storedApplicationsKey),
+    );
   },
   async getAdminAuditEvents() {
     return investorDemoRuntime.adminAuditEvents;
@@ -841,7 +915,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-    investorDemoRuntime.leagueAdminApplications.unshift(application);
+    persistDemoApplication(application);
     return result(application.id, 'League Admin application submitted.');
   },
   async reviewApproval(input) {
@@ -856,15 +930,20 @@ export const mockProvider: GoalPlaceDataProvider = {
       league.status = input.decision === 'approved' ? 'verified' : 'draft';
       league.verified = input.decision === 'approved';
     } else {
-      const application = investorDemoRuntime.leagueAdminApplications.find(
-        (item) => item.id === input.targetId,
-      );
+      const application = investorDemoRuntime.leagueAdminApplications.find((item) => item.id === input.targetId)
+        ?? readStoredItems<LeagueAdminApplication>(storedApplicationsKey).find((item) => item.id === input.targetId);
       if (!application) throw new Error('Application not found.');
       application.status = input.decision === 'requested_information'
         ? 'needs_information'
         : input.decision;
       application.reviewedByUserId = input.actorUserId;
       application.updatedAt = new Date().toISOString();
+      if (input.decision === 'approved') {
+        const league = draftLeagueFromApplication(application);
+        application.leagueId = league.id;
+        persistDemoLeague(league);
+      }
+      persistDemoApplication(application);
     }
     audit({
       actorUserId: input.actorUserId,
@@ -873,7 +952,12 @@ export const mockProvider: GoalPlaceDataProvider = {
       targetId: input.targetId,
       note: input.note,
     });
-    return result(input.targetId, 'Approval decision recorded.');
+    return result(
+      input.targetId,
+      input.targetCollection === 'leagueAdminApplications' && input.decision === 'approved'
+        ? 'Demo league created.'
+        : 'Approval decision recorded.',
+    );
   },
   async resolveReport(input) {
     const report = reports.find((item) => item.id === input.reportId);

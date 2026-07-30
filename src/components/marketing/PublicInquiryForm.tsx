@@ -15,6 +15,26 @@ export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }
     setSubmitting(true);
     setError('');
     const form = new FormData(event.currentTarget);
+    const required = ['name', 'organization', 'email', 'phone', 'sport', 'region', 'scale', 'preferredContact'];
+    if (required.some((name) => !String(form.get(name) ?? '').trim())) {
+      setSubmitting(false);
+      setError('Complete every required field.');
+      return;
+    }
+    const email = String(form.get('email') ?? '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setSubmitting(false);
+      setError('Enter a valid email address.');
+      return;
+    }
+    const interest = String(form.get('interest') ?? '').trim();
+    if (interest.length < 10) {
+      setSubmitting(false);
+      setError(type === 'sponsor'
+        ? 'Add at least 10 characters about the sponsor area of interest.'
+        : 'Add at least 10 characters about the league challenge.');
+      return;
+    }
     const appCheckToken = await getPublicAppCheckToken();
     const response = await fetch('/api/public-inquiries', {
       method: 'POST',
@@ -26,12 +46,12 @@ export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }
         type,
         name: form.get('name'),
         organization: form.get('organization'),
-        email: form.get('email'),
+        email,
         phone: form.get('phone'),
         sport: form.get('sport'),
         region: form.get('region'),
         scale: form.get('scale'),
-        interest: form.get('interest'),
+        interest,
         preferredContact: form.get('preferredContact'),
       }),
     });
@@ -58,7 +78,7 @@ export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }
   }
 
   return (
-    <form onSubmit={submit} className="border border-border bg-surface-1 p-5 sm:p-7">
+    <form onSubmit={submit} noValidate className="border border-border bg-surface-1 p-5 sm:p-7">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field name="name" label="Your name" required />
         <Field name="organization" label={type === 'sponsor' ? 'Organization' : 'League name'} required />
@@ -78,7 +98,7 @@ export function PublicInquiryForm({ type }: { type: 'sponsor' | 'league_pilot' }
       <label className="mt-4 block text-sm font-medium text-text-strong" htmlFor={`${type}-interest`}>
         {type === 'sponsor' ? 'Area of interest' : 'Biggest operational challenge'}
       </label>
-      <textarea id={`${type}-interest`} name="interest" required maxLength={800} rows={4} className="mt-2 w-full border border-border bg-surface-2 p-3 text-sm text-text-strong outline-none focus:border-brand" />
+      <textarea id={`${type}-interest`} name="interest" required minLength={10} maxLength={800} rows={4} className="mt-2 w-full border border-border bg-surface-2 p-3 text-sm text-text-strong outline-none focus:border-brand" />
       {error ? <p className="mt-4 text-sm text-[var(--state-error)]">{error}</p> : null}
       <Button type="submit" icon={PaperPlaneTilt} disabled={submitting} className="mt-5">
         {submitting ? 'Sending…' : type === 'sponsor' ? 'Request sponsor deck' : 'Request pilot conversation'}
