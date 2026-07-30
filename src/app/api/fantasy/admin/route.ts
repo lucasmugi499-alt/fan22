@@ -1,8 +1,9 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { positionGroupFor } from '@/lib/fantasy/profiles';
 import type { FantasySquadRules } from '@/types/fantasy';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -12,24 +13,19 @@ const requestSchema = z.discriminatedUnion('action', [
     name: z.string().trim().min(5).max(80),
     shortName: z.string().trim().min(3).max(30),
     sport: z.enum(['football', 'basketball', 'rugby']),
-    variant: z.string().min(1),
-    leagueId: z.string().min(1),
-    seasonId: z.string().min(1),
-    scoringProfileId: z.string().min(1),
-    squadRulesId: z.string().min(1),
+    variant: z.string().trim().min(1).max(80),
+    leagueId: z.string().trim().min(1).max(180),
+    seasonId: z.string().trim().min(1).max(180),
+    scoringProfileId: z.string().trim().min(1).max(180),
+    squadRulesId: z.string().trim().min(1).max(180),
     dataLevel: z.enum(['basic', 'standard', 'advanced']),
-    recordedStatKeys: z.array(z.string().min(1)).min(1),
+    recordedStatKeys: z.array(z.string().trim().min(1).max(80)).min(1).max(80),
   }),
   z.object({
     action: z.literal('activate'),
-    competitionId: z.string().min(1),
+    competitionId: z.string().trim().min(1).max(180),
   }),
 ]);
-
-function tokenFrom(request: Request) {
-  const header = request.headers.get('authorization');
-  return header?.startsWith('Bearer ') ? header.slice(7) : null;
-}
 
 function asIso(value: unknown) {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
@@ -39,11 +35,11 @@ function asIso(value: unknown) {
 }
 
 export async function POST(request: Request) {
-  const token = tokenFrom(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid fantasy administration request.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, requestSchema, { maxBytes: 8 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid fantasy administration request.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const profile = await adminDb.collection('users').doc(actor.uid).get();
   const role = (actor.role ?? profile.data()?.role) as string | undefined;
 

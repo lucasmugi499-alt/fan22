@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { validateFantasySquad } from '@/lib/fantasy/squad';
 import type {
   FantasyLineupVersion,
@@ -10,32 +10,31 @@ import type {
   FantasySquadRules,
 } from '@/types/fantasy';
 import { isFantasyFanRole } from '@/lib/fantasy/access';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
 const schema = z.object({
-  competitionId: z.string().min(1),
-  roundId: z.string().min(1),
-  athleteOutId: z.string().min(1),
-  athleteInId: z.string().min(1),
+  competitionId: z.string().trim().min(1).max(180),
+  roundId: z.string().trim().min(1).max(180),
+  athleteOutId: z.string().trim().min(1).max(180),
+  athleteInId: z.string().trim().min(1).max(180),
 });
 
-function tokenFrom(request: Request) {
-  const header = request.headers.get('authorization');
-  return header?.startsWith('Bearer ') ? header.slice(7) : null;
-}
-
 export async function POST(request: Request) {
-  const token = tokenFrom(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Sign in to make a fantasy transfer.' }, { status: 401 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return Response.json({ error: 'Sign in to make a fantasy transfer.' }, { status: auth.response?.status ?? 401 });
+  const actor = auth.actor;
+  const parsed = await parseJsonBody(request, schema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) {
+    return Response.json({ error: 'Choose two different eligible athletes.' }, { status: parsed.response.status });
+  }
+  if (parsed.data.athleteInId === parsed.data.athleteOutId) {
+    return Response.json({ error: 'Choose two different eligible athletes.' }, { status: 400 });
+  }
   const profile = await adminDb.collection('users').doc(actor.uid).get();
   if (!isFantasyFanRole(actor.role, profile.data()?.role)) {
     return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
-  }
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success || parsed.data.athleteInId === parsed.data.athleteOutId) {
-    return Response.json({ error: 'Choose two different eligible athletes.' }, { status: 400 });
   }
   const input = parsed.data;
   const teamRef = adminDb.collection('fantasyTeams').doc(`${input.competitionId}_${actor.uid}`);

@@ -3,13 +3,14 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { isFantasyFanRole } from '@/lib/fantasy/access';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
 const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('create'),
-    competitionId: z.string().min(1),
+    competitionId: z.string().trim().min(1).max(180),
     name: z.string().trim().min(3).max(50),
     description: z.string().trim().max(180).default(''),
     visibility: z.enum(['public', 'private']),
@@ -22,8 +23,8 @@ const requestSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('moderate'),
-    miniLeagueId: z.string().min(1),
-    memberUserId: z.string().min(1),
+    miniLeagueId: z.string().trim().min(1).max(180),
+    memberUserId: z.string().trim().min(1).max(180),
     status: z.enum(['active', 'removed']),
   }),
 ]);
@@ -87,15 +88,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const token = tokenFrom(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Sign in to manage mini-leagues.' }, { status: 401 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return Response.json({ error: 'Sign in to manage mini-leagues.' }, { status: auth.response?.status ?? 401 });
+  const actor = auth.actor;
+  const parsed = await parseJsonBody(request, requestSchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid mini-league request.' }, { status: parsed.response.status });
   const profile = await adminDb.collection('users').doc(actor.uid).get();
   if (!isFantasyFanRole(actor.role, profile.data()?.role)) {
     return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
   }
-  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid mini-league request.' }, { status: 400 });
 
   if (parsed.data.action === 'create') {
     const competition = await adminDb.collection('fantasyCompetitions')
