@@ -1,31 +1,27 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 import type { AppRole, SupportNeed } from '@/types';
 
 export const runtime = 'nodejs';
 
 const bodySchema = z.object({
-  supportNeedId: z.string().min(1),
-  actorUserId: z.string().min(1),
+  supportNeedId: z.string().trim().min(1).max(180),
+  actorUserId: z.string().trim().min(1).max(180),
   action: z.enum(['team_verify', 'team_reject', 'league_approve', 'league_reject']),
   note: z.string().trim().max(1000).optional(),
 });
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ supportNeedId: string }> },
 ) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: 'Invalid support need review.' }, { status: 400 });
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid support need review.' }, { status: parsed.response.status });
+  const actor = auth.actor;
   const input = parsed.data;
   const { supportNeedId } = await params;
   if (supportNeedId !== input.supportNeedId || actor.uid !== input.actorUserId) {
