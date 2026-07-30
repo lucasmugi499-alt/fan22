@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/official-event.schema.json",
+  "title": "OfficialSportEvent",
+  "type": "object",
+  "required": ["id", "eventType", "eventSchemaVersion", "sportDefinitionVersion", "sportId", "competitionId", "seasonId", "matchId", "sequence", "payload", "sourceClaimId", "submittedByUserId", "officialResultVersion", "officialEventVersion", "verificationStatus", "idempotencyKey", "createdAt", "finalizedAt"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "eventType": { "type": "string" },
+    "eventSchemaVersion": { "type": "string" },
+    "sportDefinitionVersion": { "type": "string" },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "competitionId": { "type": "string" },
+    "seasonId": { "type": "string" },
+    "matchId": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "payload": true,
+    "sourceClaimId": { "type": "string" },
+    "submittedByUserId": { "type": "string" },
+    "officialResultVersion": { "type": "integer", "minimum": 1 },
+    "officialEventVersion": { "type": "integer", "minimum": 1 },
+    "verificationStatus": { "const": "official" },
+    "idempotencyKey": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "finalizedAt": { "type": "string" }
+  }
+}

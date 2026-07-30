@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/fantasy-scoring-profile.schema.json",
+  "title": "FantasyScoringProfile",
+  "type": "object",
+  "required": ["id", "version", "status", "sportId", "name", "minimumDataCollectionLevel", "rules", "captainMultiplier", "viceCaptainFallback", "roundingMode"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "status": { "enum": ["draft", "validated", "reviewed", "approved", "scheduled", "active", "retired"] },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "name": { "type": "string" },
+    "minimumDataCollectionLevel": { "enum": ["basic", "standard", "advanced"] },
+    "captainMultiplier": { "type": "number", "minimum": 1 },
+    "viceCaptainFallback": { "type": "boolean" },
+    "roundingMode": { "enum": ["none", "floor", "round", "ceil"] },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statisticCode", "operator", "points"],
+        "properties": {
+          "id": { "type": "string" },
+          "statisticCode": { "type": "string" },
+          "operator": { "enum": ["per_unit", "equals", "gte", "lte", "between", "first_occurrence", "threshold_band"] },
+          "points": { "type": "number" }
+        }
+      }
+    }
+  }
+}

@@ -303,10 +303,21 @@ export interface UserProfile {
   email: string;
   name: string;
   displayName?: string;
+  /**
+   * Legacy coarse persona used for current route selection and demo accounts.
+   * Authorization for scoped operations should use access assignments.
+   */
   role: AppRole;
+  primaryPersona?: AppRole;
+  accountStatus?: "invited" | "active" | "suspended" | "disabled" | "deletion_pending";
+  personId?: string;
+  accessVersion?: number;
+  onboardingStatus?: "not_started" | "in_progress" | "completed";
   status: ProfileStatus;
   avatarUrl?: string;
+  /** Legacy Community Points balance projection. Prefer `engagementPointsBalance`. */
   points: number;
+  engagementPointsBalance?: number;
   walletBalance: number;
   followedAthletes: string[];
   followedTeams: string[];
@@ -355,12 +366,19 @@ export interface User {
   email: string;
   displayName: string;
   name?: string;
+  /** Legacy primary persona. Scoped access lives in `accessAssignments`. */
   role: UserRole;
+  primaryPersona?: AppRole;
+  accountStatus?: "invited" | "active" | "suspended" | "disabled" | "deletion_pending";
+  personId?: string;
+  accessVersion?: number;
   photoURL?: string;
   avatarUrl?: string;
   city: string;
   country: "Uganda";
+  /** Legacy Community Points balance projection. Prefer `engagementPointsBalance`. */
   points: number;
+  engagementPointsBalance?: number;
   walletBalance: number;
   followedAthletes?: string[];
   followedTeams?: string[];
@@ -518,9 +536,51 @@ export interface Athlete {
   totalEarnings?: number;
   supportersCount: number;
   goalPlacePoints: number;
+  /** Legacy read projection. Official stats live in typed kernel statistic projections. */
   stats: Record<string, number>;
   impactNeeds: string[];
   createdAt: string;
+}
+
+export interface Person {
+  id: string;
+  legalName?: string;
+  preferredName?: string;
+  email?: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  country: "Uganda";
+  status: "draft" | "onboarding" | "active" | "paused" | "suspended" | "archived";
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface RosterMembership {
+  id: string;
+  athleteId: string;
+  teamId: string;
+  leagueId: string;
+  competitionId: string;
+  seasonId: string;
+  positionCode: string;
+  shirtNumber?: string;
+  registrationStatus:
+    | "proposed"
+    | "team_confirmed"
+    | "league_verified"
+    | "suspended"
+    | "released";
+  effectiveFrom: string;
+  effectiveTo?: string;
+  eligibilityRulePackVersion: string;
+  verifiedByUserId?: string;
+  verifiedAt?: string;
 }
 
 export interface AthleteClaim {

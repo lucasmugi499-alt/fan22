@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/statistic-definition.schema.json",
+  "title": "StatisticDefinition",
+  "type": "object",
+  "required": ["id", "version", "status", "sportId", "code", "entityType", "valueType", "sourceEventTypes", "aggregation", "minimumCollectionLevel"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "status": { "enum": ["draft", "validated", "reviewed", "approved", "scheduled", "active", "retired"] },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "code": { "type": "string" },
+    "entityType": { "enum": ["athlete", "team"] },
+    "valueType": { "enum": ["integer", "decimal", "duration", "percentage"] },
+    "sourceEventTypes": { "type": "array", "items": { "type": "string" } },
+    "aggregation": { "enum": ["count", "sum_payload", "sum_qualifier", "derived_ratio", "conditional_count"] },
+    "minimumCollectionLevel": { "enum": ["result", "basic", "standard", "advanced"] }
+  }
+}

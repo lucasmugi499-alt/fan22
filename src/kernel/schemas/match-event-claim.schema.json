@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/match-event-claim.schema.json",
+  "title": "MatchEventClaim",
+  "type": "object",
+  "required": ["id", "eventType", "sportId", "competitionId", "seasonId", "matchId", "sequence", "payload", "submittedByUserId", "status", "createdAt"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "eventType": { "type": "string" },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "competitionId": { "type": "string" },
+    "seasonId": { "type": "string" },
+    "matchId": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "payload": true,
+    "submittedByUserId": { "type": "string" },
+    "status": { "enum": ["submitted", "accepted", "rejected", "corrected", "superseded", "held_for_review"] },
+    "createdAt": { "type": "string" }
+  }
+}

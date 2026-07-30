@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/engagement-point-profile.schema.json",
+  "title": "EngagementPointProfile",
+  "type": "object",
+  "required": ["id", "version", "status", "dailyCap", "weeklyCap", "actions"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "status": { "enum": ["draft", "validated", "reviewed", "approved", "scheduled", "active", "retired"] },
+    "dailyCap": { "type": "number", "minimum": 0 },
+    "weeklyCap": { "type": "number", "minimum": 0 },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["actionCode", "award", "eligibilityPolicy", "repeatPolicy"],
+        "properties": {
+          "actionCode": { "type": "string" },
+          "award": { "type": "number" },
+          "eligibilityPolicy": { "type": "string" },
+          "repeatPolicy": { "type": "string" }
+        }
+      }
+    }
+  }
+}

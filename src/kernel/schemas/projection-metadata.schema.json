@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/projection-metadata.schema.json",
+  "title": "ProjectionMetadata",
+  "type": "object",
+  "required": ["projectionVersion", "rulePackVersion", "sourceVersionHash", "rebuiltAt"],
+  "additionalProperties": true,
+  "properties": {
+    "projectionVersion": { "type": "string" },
+    "rulePackVersion": { "type": "string" },
+    "sourceVersionHash": { "type": "string" },
+    "rebuiltAt": { "type": "string" }
+  }
+}

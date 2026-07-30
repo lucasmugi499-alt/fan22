@@ -1,4 +1,13 @@
 import { AppRole, UserProfile } from '@/types';
+import type { AccessContext } from './access';
+import {
+  canInviteTeamAdminInScope,
+  canCreateAthleteInScope,
+  canManageAthleteInScope,
+  canManageLeagueInScope,
+  canManageTeamInScope,
+  canSubmitResultInScope,
+} from './access';
 
 export type AuthStatus = 'loading' | 'logged_out' | 'logged_in';
 
@@ -6,6 +15,7 @@ export interface AuthState {
   authStatus: AuthStatus;
   userProfile: UserProfile | null;
   role: AppRole | null;
+  accessContext?: AccessContext;
 }
 
 export function isLoggedIn(auth: AuthState): boolean {
@@ -53,8 +63,8 @@ export function canCreateFanPost(auth: AuthState): boolean {
 }
 
 // Admin / Management
-export function canManageTeam(auth: AuthState, _teamId?: string): boolean {
-  void _teamId;
+export function canManageTeam(auth: AuthState, teamId?: string): boolean {
+  if (teamId) return canManageTeamInScope(auth.accessContext, teamId);
   return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
@@ -62,13 +72,13 @@ export function canAccessTeamAdminDashboard(auth: AuthState): boolean {
   return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canSubmitResult(auth: AuthState, _teamId?: string): boolean {
-  void _teamId;
+export function canSubmitResult(auth: AuthState, teamId?: string, matchId = 'unknown_match'): boolean {
+  if (teamId) return canSubmitResultInScope(auth.accessContext, matchId, teamId);
   return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canRequestAthleteVerification(auth: AuthState, _athleteId?: string): boolean {
-  void _athleteId;
+export function canRequestAthleteVerification(auth: AuthState, athleteId?: string): boolean {
+  if (athleteId) return canManageAthleteInScope(auth.accessContext, athleteId);
   return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
@@ -80,9 +90,17 @@ export function canApproveTeamSubmission(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canManageLeague(auth: AuthState, _leagueId?: string): boolean {
-  void _leagueId;
+export function canManageLeague(auth: AuthState, leagueId?: string): boolean {
+  if (leagueId) return canManageLeagueInScope(auth.accessContext, leagueId);
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+}
+
+export function canInviteTeamAdmin(auth: AuthState, teamId: string): boolean {
+  return canInviteTeamAdminInScope(auth.accessContext, teamId);
+}
+
+export function canCreateAthlete(auth: AuthState, teamId: string): boolean {
+  return canCreateAthleteInScope(auth.accessContext, teamId);
 }
 
 export function canViewLeagueAdminDashboard(auth: AuthState): boolean {

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/collection-profile.schema.json",
+  "title": "DataCollectionProfile",
+  "type": "object",
+  "required": ["id", "version", "status", "sportId", "level", "requiredEventTypes", "optionalEventTypes", "unsupportedEventTypes", "minimumCoverage", "fantasyEligibleStatisticCodes"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "status": { "enum": ["draft", "validated", "reviewed", "approved", "scheduled", "active", "retired"] },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "level": { "enum": ["result", "basic", "standard", "advanced"] },
+    "requiredEventTypes": { "type": "array", "items": { "type": "string" } },
+    "optionalEventTypes": { "type": "array", "items": { "type": "string" } },
+    "unsupportedEventTypes": { "type": "array", "items": { "type": "string" } },
+    "minimumCoverage": {
+      "type": "object",
+      "required": ["rosterCoveragePercent", "eventCoveragePercent", "reportingCompliancePercent"]
+    },
+    "fantasyEligibleStatisticCodes": { "type": "array", "items": { "type": "string" } }
+  }
+}
