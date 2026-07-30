@@ -16,6 +16,9 @@ import {
   canVerifyMatch,
   getDefaultRouteForRole,
   getPostSignInRoute,
+  getRoutePresentation,
+  isMarketingRoute,
+  isPublicDiscoveryRoute,
   isLoggedIn,
 } from './permissions';
 
@@ -142,6 +145,30 @@ describe('canAccessRoute', () => {
       expect(canAccessRoute(authAs(role), '/feed')).toBe(true);
       expect(canAccessRoute(authAs(role), '/matches')).toBe(true);
     }
+  });
+});
+
+describe('route presentation', () => {
+  it('keeps true marketing pages in the marketing shell', () => {
+    expect(isMarketingRoute('/')).toBe(true);
+    expect(isMarketingRoute('/how-it-works')).toBe(true);
+    expect(getRoutePresentation('/', 'logged_out')).toBe('marketing');
+  });
+
+  it('recognises public discovery roots and detail pages separately', () => {
+    expect(isPublicDiscoveryRoute('/matches')).toBe(true);
+    expect(isPublicDiscoveryRoute('/matches/match_1')).toBe(true);
+    expect(isMarketingRoute('/matches')).toBe(false);
+  });
+
+  it('gives logged-out discovery visitors public navigation', () => {
+    expect(getRoutePresentation('/matches', 'logged_out')).toBe('public_discovery');
+    expect(getRoutePresentation('/athletes/athlete_1', 'loading')).toBe('public_discovery');
+  });
+
+  it('keeps authenticated discovery pages inside the app navigation', () => {
+    expect(getRoutePresentation('/matches', 'logged_in')).toBe('app');
+    expect(getRoutePresentation('/teams/team_1', 'logged_in')).toBe('app');
   });
 });
 

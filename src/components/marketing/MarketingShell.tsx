@@ -61,7 +61,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
               Home
             </Link>
             <Link
-              href="/login"
+              href="/leagues"
               className="hidden rounded-sm px-3 py-2 text-muted transition hover:bg-white/5 hover:text-text-strong lg:block"
             >
               Leagues

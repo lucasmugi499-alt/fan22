@@ -172,6 +172,7 @@ export function getPostSignInRoute(role: AppRole | null, requestedPath?: string 
 
 export const PUBLIC_ROUTES = [
   '/',
+  '/about',
   '/how-it-works',
   '/verification',
   '/sponsors',
@@ -193,14 +194,34 @@ export const PUBLIC_DISCOVERY_ROUTES = [
   '/support',
 ];
 
-export function isPublicRoute(pathname: string): boolean {
-  return (
-    PUBLIC_ROUTES.includes(pathname) ||
-    pathname.startsWith('/invitations/team/') ||
-    PUBLIC_DISCOVERY_ROUTES.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`),
-    )
+export function isPublicDiscoveryRoute(pathname: string): boolean {
+  return PUBLIC_DISCOVERY_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
+}
+
+export function isMarketingRoute(pathname: string): boolean {
+  return (
+    PUBLIC_ROUTES.includes(pathname)
+    || pathname.startsWith('/invitations/team/')
+  );
+}
+
+export type RoutePresentation = 'marketing' | 'public_discovery' | 'app';
+
+export function getRoutePresentation(
+  pathname: string,
+  authStatus: AuthStatus,
+): RoutePresentation {
+  if (isMarketingRoute(pathname)) return 'marketing';
+  if (isPublicDiscoveryRoute(pathname) && authStatus !== 'logged_in') {
+    return 'public_discovery';
+  }
+  return 'app';
+}
+
+export function isPublicRoute(pathname: string): boolean {
+  return isMarketingRoute(pathname) || isPublicDiscoveryRoute(pathname);
 }
 
 export function canAccessRoute(auth: AuthState, pathname: string): boolean {

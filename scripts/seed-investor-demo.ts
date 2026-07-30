@@ -32,6 +32,7 @@ type Args = {
   execute: boolean;
   reset: boolean;
   createAuth: boolean;
+  mergeFantasy: boolean;
 };
 
 const EXPECTED_COUNTS: Record<string, number> = {
@@ -79,6 +80,7 @@ const EXPECTED_COUNTS: Record<string, number> = {
 };
 
 const REQUIRED_CONFIRMATION = 'SEED-GOALPLACE-STAGING';
+const FANTASY_CONFIRMATION = 'SYNC-GOALPLACE-FANTASY-STAGING';
 const DEFAULT_SOURCE = path.join(process.cwd(), 'data', 'investor-demo');
 const FIREBASE_CONFIG = path.join(
   process.env.HOME ?? '',
@@ -101,6 +103,7 @@ function parseArgs(argv: string[]): Args {
     execute: argv.includes('--execute'),
     reset: argv.includes('--reset'),
     createAuth: argv.includes('--create-auth'),
+    mergeFantasy: argv.includes('--merge-fantasy'),
   };
 }
 
@@ -192,9 +195,18 @@ function requireSafeTarget(args: Args) {
     );
   }
   if (args.execute) {
-    if (!args.reset) throw new Error('Execute requires --reset so package counts remain exact.');
-    if (args.confirm !== REQUIRED_CONFIRMATION) {
-      throw new Error(`Execute requires --confirm ${REQUIRED_CONFIRMATION}.`);
+    if (args.mergeFantasy) {
+      if (args.reset || args.createAuth) {
+        throw new Error('Fantasy merge cannot reset data or modify Authentication users.');
+      }
+      if (args.confirm !== FANTASY_CONFIRMATION) {
+        throw new Error(`Fantasy merge requires --confirm ${FANTASY_CONFIRMATION}.`);
+      }
+    } else {
+      if (!args.reset) throw new Error('Execute requires --reset so package counts remain exact.');
+      if (args.confirm !== REQUIRED_CONFIRMATION) {
+        throw new Error(`Execute requires --confirm ${REQUIRED_CONFIRMATION}.`);
+      }
     }
   }
 }
@@ -637,6 +649,7 @@ async function main() {
     JSON.stringify(
       {
         mode: args.execute ? 'EXECUTE' : 'DRY RUN',
+        operation: args.mergeFantasy ? 'merge-fantasy' : 'full-seed',
         project: args.project,
         database: args.database,
         synthetic: database.metadata.synthetic,
@@ -663,6 +676,42 @@ async function main() {
   const token = firebaseAccessToken();
   const backupDir = await takeBackup(token, projectId, databaseId);
   console.log(`Backup written to ${backupDir}`);
+
+  if (args.mergeFantasy) {
+    const fantasyCollections = Object.fromEntries(
+      collectionEntries(database).filter(([collection]) => collection.startsWith('fantasy')),
+    );
+    const fantasyDatabase = {
+      metadata: database.metadata,
+      ...fantasyCollections,
+    } as DatabaseExport;
+    await writeDatabase(token, projectId, databaseId, fantasyDatabase);
+    const fantasyCounts = Object.fromEntries(
+      Object.entries(counts).filter(([collection]) => collection.startsWith('fantasy')),
+    );
+    const verified = await verifyCounts(
+      token,
+      projectId,
+      databaseId,
+      fantasyCounts,
+      (await listAuthUsers(token, projectId)).length,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          status: 'success',
+          operation: 'merge-fantasy',
+          projectId,
+          databaseId,
+          collections: verified.collections,
+          authUsers: verified.authUsers,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
 
   deleteSeedCollections(projectId, databaseId);
   await writeDatabase(token, projectId, databaseId, database);

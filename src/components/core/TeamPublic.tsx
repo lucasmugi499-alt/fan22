@@ -16,7 +16,7 @@ import { Crest } from '@/components/premium/Crest';
 import { MatchCard } from '@/components/core/MatchCard';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { FollowButton } from '@/components/core/FollowButton';
 
 function ugx(n: number): string {
@@ -26,32 +26,42 @@ function ugx(n: number): string {
 }
 
 export function TeamPublic({ teamId }: { teamId: string }) {
+  const exact = useGoalPlaceData({
+    collections: ['teams'],
+    scope: { teamId },
+  });
+  const team = exact.teams.find((item) => item.id === teamId);
   const profileData = useGoalPlaceData({
-    collections: ['teams', 'athletes', 'matches', 'leagues', 'seasons', 'feedPosts', 'supportNeeds', 'sponsors'],
+    collections: ['athletes', 'matches', 'leagues', 'seasons', 'supportNeeds', 'sponsors'],
     scope: { teamId },
     recordLimit: 120,
   });
+  const newsData = useGoalPlaceData({
+    collections: ['feedPosts'],
+    scope: { teamId },
+    recordLimit: 12,
+  });
   const {
-    teams: profileTeams,
     athletes,
     matches: profileMatches,
     leagues,
     seasons: profileSeasons,
-    feedPosts,
     supportNeeds,
     sponsors,
   } = profileData;
-  const team = useMemo(() => profileTeams.find((t) => t.id === teamId), [profileTeams, teamId]);
+  const feedPosts = newsData.feedPosts;
   const league = useMemo(() => leagues.find((l) => l.id === team?.leagueId), [leagues, team]);
   const leagueData = useGoalPlaceData({
     collections: ['teams', 'matches', 'seasons'],
-    scope: { leagueId: league?.id ?? '__pending__' },
+    scope: { leagueId: league?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
-  const teams = league?.id ? leagueData.teams : profileTeams;
+  const teams = league?.id ? leagueData.teams : exact.teams;
   const matches = league?.id ? leagueData.matches : profileMatches;
   const seasons = league?.id ? leagueData.seasons : profileSeasons;
-  const loading = profileData.loading || (Boolean(league?.id) && leagueData.loading);
+  const loading = exact.loading
+    || (Boolean(team) && profileData.loading)
+    || (Boolean(league?.id) && leagueData.loading);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const roster = useMemo(() => athletes.filter((a) => a.teamId === teamId), [athletes, teamId]);
   const teamMatches = useMemo(() => matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId), [matches, teamId]);
@@ -76,6 +86,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const officialRecord = standings.find((row) => row.teamId === teamId);
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-36 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-40 w-full rounded-[var(--radius-lg)]" /></div>;
+  if (exact.error) return <ErrorState description="This team could not be loaded. Check your connection and try again." onRetry={exact.retry} />;
   if (!team) return <EmptyState icon={Warning} title="Team not found" description="This team may have been removed, or the link is out of date." />;
 
   return (
@@ -123,6 +134,11 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <PeopleCarousel title="Squad" athletes={roster} />
 
           <NewsRow title="From the club" posts={news} badge={<Crest name={team.name} sport={String(team.sport)} size={22} />} />
+          {newsData.error ? (
+            <Card className="p-4 text-sm text-muted">
+              Team updates are temporarily unavailable. The verified team record is still shown.
+            </Card>
+          ) : null}
 
           <Card className="p-4 md:p-5">
             <h2 className="text-[15px] font-semibold text-text-strong">Our story</h2>

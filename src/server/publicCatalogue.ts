@@ -11,6 +11,18 @@ function usesFirebaseData() {
   );
 }
 
+async function withSyntheticDemoFallback<T>(
+  load: () => Promise<T>,
+  fallback: () => T,
+): Promise<T> {
+  try {
+    return await load();
+  } catch (cause) {
+    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
+    return fallback();
+  }
+}
+
 function normalize(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   if ('toDate' in value && typeof value.toDate === 'function') {
@@ -33,49 +45,67 @@ async function recentCollection<T>(name: string, limit: number) {
 
 export async function getPublicLeagues() {
   if (!usesFirebaseData()) return investorDemo.leagues;
-  return recentCollection<League>('leagues', 24);
+  return withSyntheticDemoFallback(
+    () => recentCollection<League>('leagues', 24),
+    () => investorDemo.leagues,
+  );
 }
 
 export async function getPublicTeams() {
   if (!usesFirebaseData()) return investorDemo.teams;
-  return recentCollection<Team>('teams', 80);
+  return withSyntheticDemoFallback(
+    () => recentCollection<Team>('teams', 80),
+    () => investorDemo.teams,
+  );
 }
 
 export async function getPublicAthletes() {
   if (!usesFirebaseData()) return investorDemo.athletes.slice(0, 48);
-  return recentCollection<Athlete>('athletes', 48);
+  return withSyntheticDemoFallback(
+    () => recentCollection<Athlete>('athletes', 48),
+    () => investorDemo.athletes.slice(0, 48),
+  );
 }
 
 export async function getPublicMatches() {
   if (!usesFirebaseData()) return investorDemo.matches.slice(0, 60);
-  const snapshot = await adminDb.collection('matches')
-    .orderBy('scheduledAt', 'desc')
-    .limit(60)
-    .get();
-  return snapshot.docs.map((item) => record<Match>(item.id, item.data()));
+  return withSyntheticDemoFallback(
+    async () => {
+      const snapshot = await adminDb.collection('matches')
+        .orderBy('scheduledAt', 'desc')
+        .limit(60)
+        .get();
+      return snapshot.docs.map((item) => record<Match>(item.id, item.data()));
+    },
+    () => investorDemo.matches.slice(0, 60),
+  );
 }
 
 export async function getPublicLandingData() {
-  if (!usesFirebaseData()) {
-    return {
-      leagues: investorDemo.leagues,
-      teams: investorDemo.teams,
-      athletes: investorDemo.athletes.slice(0, 24),
-      matches: [
-        ...investorDemo.matches.filter((match) => match.status === 'live').slice(0, 2),
-        ...investorDemo.matches.filter((match) => match.status === 'scheduled').slice(0, 18),
-        ...investorDemo.matches.filter((match) => match.verificationStatus === 'verified').slice(-20),
-      ],
-      challenges: investorDemo.challenges.slice(0, 12),
-    };
-  }
-  const [leagues, teams, athletes, matches, challenges] = await Promise.all([
-    recentCollection<League>('leagues', 12),
-    recentCollection<Team>('teams', 80),
-    recentCollection<Athlete>('athletes', 24),
-    adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(40).get()
-      .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
-    recentCollection<Challenge>('challenges', 12),
-  ]);
-  return { leagues, teams, athletes, matches, challenges };
+  const fallback = () => ({
+    leagues: investorDemo.leagues,
+    teams: investorDemo.teams,
+    athletes: investorDemo.athletes.slice(0, 24),
+    matches: [
+      ...investorDemo.matches.filter((match) => match.status === 'live').slice(0, 2),
+      ...investorDemo.matches.filter((match) => match.status === 'scheduled').slice(0, 18),
+      ...investorDemo.matches.filter((match) => match.verificationStatus === 'verified').slice(-20),
+    ],
+    challenges: investorDemo.challenges.slice(0, 12),
+  });
+  if (!usesFirebaseData()) return fallback();
+  return withSyntheticDemoFallback(
+    async () => {
+      const [leagues, teams, athletes, matches, challenges] = await Promise.all([
+        recentCollection<League>('leagues', 12),
+        recentCollection<Team>('teams', 80),
+        recentCollection<Athlete>('athletes', 24),
+        adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(40).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+        recentCollection<Challenge>('challenges', 12),
+      ]);
+      return { leagues, teams, athletes, matches, challenges };
+    },
+    fallback,
+  );
 }

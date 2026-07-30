@@ -33,7 +33,7 @@ export function TeamProfile() {
   const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
   const detail = useGoalPlaceData({
     collections: ['athletes'],
-    scope: { teamId: team?.id ?? '__pending__' },
+    scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   const { athletes, retry } = detail;

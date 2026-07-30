@@ -67,7 +67,7 @@ export function TeamConsoleHome() {
   const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
   const detail = useGoalPlaceData({
     collections: ['matches', 'athletes'],
-    scope: { teamId: team?.id ?? '__pending__' },
+    scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   const { matches, athletes, error, retry } = detail;

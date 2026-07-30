@@ -3,7 +3,8 @@
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthProvider';
 import { navForRole } from '@/lib/nav';
-import { isPublicRoute } from '@/lib/auth/permissions';
+import { getRoutePresentation } from '@/lib/auth/permissions';
+import { MarketingShell } from '@/components/marketing/MarketingShell';
 import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { DesktopRail } from './DesktopRail';
@@ -19,20 +20,22 @@ import { DemoDataNote } from '@/components/ui/DemoDataNote';
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role } = useAuth();
+  const { authStatus, role } = useAuth();
+  const presentation = getRoutePresentation(pathname, authStatus);
 
-  const isMarketing =
-    isPublicRoute(pathname) ||
-    pathname.startsWith('/about') ||
-    pathname.startsWith('/how-it-works') ||
-    pathname.startsWith('/pilot') ||
-    pathname.startsWith('/verification') ||
-    pathname.startsWith('/sponsors') ||
-    pathname.startsWith('/terms') ||
-    pathname.startsWith('/privacy');
-
-  if (isMarketing) {
+  if (presentation === 'marketing') {
     return <div className="min-h-dvh">{children}</div>;
+  }
+
+  if (presentation === 'public_discovery') {
+    return (
+      <MarketingShell>
+        <div className="mx-auto min-h-[70dvh] max-w-[var(--page-max)] pb-12 pt-24">
+          <DemoDataNote className="mb-4" />
+          {children}
+        </div>
+      </MarketingShell>
+    );
   }
 
   const nav = navForRole(role);

@@ -9,7 +9,7 @@ import { getDefaultRouteForRole, getPostSignInRoute } from '@/lib/auth/permissio
 import {
   isAuthAvailable,
   login,
-  logout,
+  logout as firebaseLogout,
   registerAccount,
   requestPasswordReset,
 } from '@/lib/firebase/auth';
@@ -37,8 +37,21 @@ export function SignIn({
   nextPath?: string;
 }) {
   const router = useRouter();
-  const { setDemoRole, authStatus, role } = useAuth();
-  const [email, setEmail] = useState(isDemoModeEnabled ? DEFAULT_DEMO_EMAIL : '');
+  const {
+    setDemoRole,
+    authStatus,
+    role,
+    currentUser,
+    userProfile,
+    isDemoMode,
+    logout: signOutSession,
+  } = useAuth();
+  const [demoAccessActive, setDemoAccessActive] = useState(
+    isDemoModeEnabled && initialMode === 'signin',
+  );
+  const [email, setEmail] = useState(
+    isDemoModeEnabled && initialMode === 'signin' ? DEFAULT_DEMO_EMAIL : '',
+  );
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mode, setMode] = useState<AccountMode>(initialMode);
@@ -65,7 +78,7 @@ export function SignIn({
     setSubmitting(true);
 
     try {
-      if (isDemoModeEnabled) {
+      if (demoAccessActive) {
         const account = authenticateDemoAccount(email, password);
         if (!account) {
           setError(`Choose a listed demo account and use the shared password ${DEMO_ACCOUNT_PASSWORD}.`);
@@ -92,7 +105,7 @@ export function SignIn({
           return;
         }
         await registerAccount({ email: email.trim(), password, name: name.trim() });
-        await logout();
+        await firebaseLogout();
         setMode('signin');
         setPassword('');
         setSuccess('Account created. Check your inbox to verify your email, then sign in.');
@@ -115,6 +128,41 @@ export function SignIn({
     }
   }
 
+  if (authStatus === 'logged_in' && !awaitingAuthState) {
+    const destination = getDefaultRouteForRole(role);
+    const identity = userProfile?.displayName || currentUser?.email || 'your account';
+    return (
+      <MarketingShell>
+        <section className="mx-auto max-w-lg py-24 md:py-32">
+          <div className="rounded-[var(--radius-lg)] border border-border bg-surface-1 p-6 text-center shadow-e2">
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-lg)] bg-brand-subtle text-brand">
+              <SealCheck className="h-6 w-6" weight="fill" />
+            </span>
+            <h1 className="mt-4 font-display text-2xl font-semibold text-text-strong">
+              You are already signed in
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              This browser has an active {isDemoMode ? 'demo ' : ''}session for <strong className="text-text-strong">{identity}</strong>.
+              Password fields are not checked again until you sign out.
+            </p>
+            <div className="mt-6 grid gap-3">
+              <Button block onClick={() => router.replace(destination)}>
+                Continue to GoalPlace
+              </Button>
+              <Button
+                block
+                variant="secondary"
+                onClick={() => void signOutSession()}
+              >
+                Sign out and use another account
+              </Button>
+            </div>
+          </div>
+        </section>
+      </MarketingShell>
+    );
+  }
+
   return (
     <MarketingShell>
       <section className="mx-auto max-w-lg py-12 md:py-16">
@@ -123,7 +171,7 @@ export function SignIn({
             <SealCheck className="h-6 w-6" weight="fill" />
           </span>
           <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight text-text-strong">
-            {isDemoModeEnabled
+            {demoAccessActive
               ? 'Enter GoalPlace256'
               : mode === 'register'
                 ? 'Create your fan account'
@@ -131,7 +179,7 @@ export function SignIn({
                   ? 'Reset your password'
                   : 'Welcome back'}
           </h1>
-          {isDemoModeEnabled ? (
+          {demoAccessActive ? (
             <p className="mt-1 text-sm text-muted">Sign in with one of the seeded staging demo accounts.</p>
           ) : (
             <p className="mt-1 text-sm text-muted">
@@ -145,6 +193,38 @@ export function SignIn({
         </div>
 
         {isDemoModeEnabled ? (
+          <div className="mx-auto mt-7 grid max-w-sm grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-surface-2 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setDemoAccessActive(true);
+                setMode('signin');
+                setEmail(DEFAULT_DEMO_EMAIL);
+                setPassword('');
+                setError(null);
+                setSuccess(null);
+              }}
+              className={`min-h-11 rounded-[var(--radius-sm)] text-sm font-semibold ${demoAccessActive ? 'bg-surface-3 text-text-strong' : 'text-muted'}`}
+            >
+              Demo accounts
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDemoAccessActive(false);
+                setEmail('');
+                setPassword('');
+                setError(null);
+                setSuccess(null);
+              }}
+              className={`min-h-11 rounded-[var(--radius-sm)] text-sm font-semibold ${!demoAccessActive ? 'bg-surface-3 text-text-strong' : 'text-muted'}`}
+            >
+              Personal account
+            </button>
+          </div>
+        ) : null}
+
+        {demoAccessActive ? (
           <form onSubmit={submitAccountSignIn} className="mx-auto mt-8 max-w-sm space-y-4 rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core p-5">
             <label className="block text-xs font-medium uppercase tracking-[0.08em] text-subtle">
               Demo account
@@ -312,7 +392,7 @@ export function SignIn({
           </form>
         )}
 
-        {!isDemoModeEnabled ? (
+        {!demoAccessActive ? (
           <button
             type="button"
             onClick={() => setAccessOpen(true)}

@@ -19,6 +19,7 @@ import type {
   FantasyRound,
 } from '@/types/fantasy';
 import type { Athlete, League, Team } from '@/types';
+import { resolveFantasyCompetitions } from '@/lib/fantasy/catalogue';
 
 function usesFirebaseFantasy() {
   return (
@@ -53,12 +54,17 @@ async function collection<T>(
 
 export async function getFantasyCompetitions() {
   if (!usesFirebaseFantasy()) return fantasyCompetitions;
-  const snapshot = await adminDb.collection('fantasyCompetitions')
-    .where('status', '==', 'active')
-    .get();
-  return snapshot.docs.map((item) =>
-    record<FantasyCompetition>(item.id, item.data()),
-  );
+  try {
+    const snapshot = await adminDb.collection('fantasyCompetitions')
+      .where('status', '==', 'active')
+      .get();
+    return resolveFantasyCompetitions(snapshot.docs.map((item) =>
+      record<FantasyCompetition>(item.id, item.data()),
+    ));
+  } catch (cause) {
+    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
+    return fantasyCompetitions;
+  }
 }
 
 export async function getFantasyHubCatalogue() {
@@ -74,77 +80,99 @@ export async function getFantasyHubCatalogue() {
       ),
     };
   }
+  const fallbackNames = Object.fromEntries(
+    competitions.map((competition) => [
+      competition.leagueId,
+      fantasyCompetitionBundle(competition.id)?.league?.name ?? 'GoalPlace256 league',
+    ]),
+  );
   const leagueSnapshots = await Promise.all(
     [...new Set(competitions.map((competition) => competition.leagueId))]
       .map((leagueId) => adminDb.collection('leagues').doc(leagueId).get()),
-  );
+  ).catch((cause) => {
+    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
+    return [];
+  });
   return {
     competitions,
-    leagueNames: Object.fromEntries(
-      leagueSnapshots
+    leagueNames: {
+      ...fallbackNames,
+      ...Object.fromEntries(
+        leagueSnapshots
         .filter((league) => league.exists)
         .map((league) => [league.id, String(league.data()?.name ?? 'GoalPlace256 league')]),
-    ),
+      ),
+    },
   };
 }
 
 export async function getFantasyCompetitionBundle(competitionId: string) {
   if (!usesFirebaseFantasy()) return fantasyCompetitionBundle(competitionId);
-  const competitionSnapshot = await adminDb.collection('fantasyCompetitions')
-    .doc(competitionId)
-    .get();
-  if (!competitionSnapshot.exists) return null;
-  const competition = record<FantasyCompetition>(
-    competitionSnapshot.id,
-    competitionSnapshot.data()!,
-  );
-  const [leagueSnapshot, rounds, players, prices, leaderboard, pointEvents] = await Promise.all([
-    adminDb.collection('leagues').doc(competition.leagueId).get(),
-    collection<FantasyRound>('fantasyRounds', 'competitionId', competitionId),
-    collection<FantasyPlayer>('fantasyPlayers', 'competitionId', competitionId),
-    collection<FantasyPlayerPrice>('fantasyPlayerPrices', 'competitionId', competitionId),
-    collection<FantasyLeaderboardEntry>('fantasyLeaderboards', 'competitionId', competitionId),
-    collection<FantasyPointEvent>('fantasyPointEvents', 'competitionId', competitionId),
-  ]);
-  return {
-    competition,
-    league: leagueSnapshot.exists
-      ? record<League>(leagueSnapshot.id, leagueSnapshot.data()!)
-      : undefined,
-    rounds: rounds.sort((left, right) => left.number - right.number),
-    players,
-    prices,
-    leaderboard: leaderboard.sort((left, right) => left.rank - right.rank),
-    pointEvents,
-  };
+  try {
+    const competitionSnapshot = await adminDb.collection('fantasyCompetitions')
+      .doc(competitionId)
+      .get();
+    if (!competitionSnapshot.exists) return fantasyCompetitionBundle(competitionId);
+    const competition = record<FantasyCompetition>(
+      competitionSnapshot.id,
+      competitionSnapshot.data()!,
+    );
+    const [leagueSnapshot, rounds, players, prices, leaderboard, pointEvents] = await Promise.all([
+      adminDb.collection('leagues').doc(competition.leagueId).get(),
+      collection<FantasyRound>('fantasyRounds', 'competitionId', competitionId),
+      collection<FantasyPlayer>('fantasyPlayers', 'competitionId', competitionId),
+      collection<FantasyPlayerPrice>('fantasyPlayerPrices', 'competitionId', competitionId),
+      collection<FantasyLeaderboardEntry>('fantasyLeaderboards', 'competitionId', competitionId),
+      collection<FantasyPointEvent>('fantasyPointEvents', 'competitionId', competitionId),
+    ]);
+    return {
+      competition,
+      league: leagueSnapshot.exists
+        ? record<League>(leagueSnapshot.id, leagueSnapshot.data()!)
+        : undefined,
+      rounds: rounds.sort((left, right) => left.number - right.number),
+      players,
+      prices,
+      leaderboard: leaderboard.sort((left, right) => left.rank - right.rank),
+      pointEvents,
+    };
+  } catch (cause) {
+    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
+    return fantasyCompetitionBundle(competitionId);
+  }
 }
 
 export async function getFantasyPlayerCards(competitionId: string) {
   if (!usesFirebaseFantasy()) return fantasyPlayerCards(competitionId);
-  const bundle = await getFantasyCompetitionBundle(competitionId);
-  if (!bundle) return [];
-  const [athletes, teams] = await Promise.all([
-    collection<Athlete>('athletes', 'leagueId', bundle.competition.leagueId),
-    collection<Team>('teams', 'leagueId', bundle.competition.leagueId),
-  ]);
-  const athleteById = new Map(athletes.map((athlete) => [athlete.id, athlete]));
-  const teamById = new Map(teams.map((team) => [team.id, team]));
-  const priceByAthlete = new Map(
-    bundle.prices
-      .filter((price) => price.status === 'published')
-      .map((price) => [price.athleteId, price.credits]),
-  );
-  return bundle.players.flatMap((player) => {
-    const athlete = athleteById.get(player.athleteId);
-    if (!athlete) return [];
-    return [{
-      ...player,
-      name: athlete.name,
-      avatarUrl: athlete.avatarUrl ?? '/demo/assets/avatars/avatar_01.svg',
-      teamName: teamById.get(player.realTeamId)?.name ?? 'Independent',
-      credits: priceByAthlete.get(player.athleteId) ?? 0,
-    }];
-  });
+  try {
+    const bundle = await getFantasyCompetitionBundle(competitionId);
+    if (!bundle) return [];
+    const [athletes, teams] = await Promise.all([
+      collection<Athlete>('athletes', 'leagueId', bundle.competition.leagueId),
+      collection<Team>('teams', 'leagueId', bundle.competition.leagueId),
+    ]);
+    const athleteById = new Map(athletes.map((athlete) => [athlete.id, athlete]));
+    const teamById = new Map(teams.map((team) => [team.id, team]));
+    const priceByAthlete = new Map(
+      bundle.prices
+        .filter((price) => price.status === 'published')
+        .map((price) => [price.athleteId, price.credits]),
+    );
+    return bundle.players.flatMap((player) => {
+      const athlete = athleteById.get(player.athleteId);
+      if (!athlete) return [];
+      return [{
+        ...player,
+        name: athlete.name,
+        avatarUrl: athlete.avatarUrl ?? '/demo/assets/avatars/avatar_01.svg',
+        teamName: teamById.get(player.realTeamId)?.name ?? 'Independent',
+        credits: priceByAthlete.get(player.athleteId) ?? 0,
+      }];
+    });
+  } catch (cause) {
+    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
+    return fantasyPlayerCards(competitionId);
+  }
 }
 
 export async function getFantasyMiniLeagueCatalogue() {

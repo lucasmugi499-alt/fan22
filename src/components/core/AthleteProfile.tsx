@@ -37,7 +37,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
   const athlete = exact.athletes[0];
   const related = useGoalPlaceData({
     collections: ['athletes', 'teams', 'matches', 'feedPosts', 'leagues', 'seasons', 'supportNeeds'],
-    scope: { teamId: athlete?.teamId ?? '__pending__' },
+    scope: { teamId: athlete?.teamId ?? 'goalplace-pending' },
     recordLimit: 200,
   });
   const challengeData = useGoalPlaceData({

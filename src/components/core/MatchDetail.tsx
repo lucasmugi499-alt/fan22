@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   PaperPlaneTilt,
@@ -50,7 +51,9 @@ const EVENT_META: Record<string, { icon: IconComponent; label: string; scoring?:
   turnover: { icon: ArrowsClockwise, label: 'Turnover' },
 };
 
-export function MatchDetail({ matchId, attendanceToken }: { matchId: string; attendanceToken?: string }) {
+export function MatchDetail({ matchId }: { matchId: string }) {
+  const searchParams = useSearchParams();
+  const attendanceToken = searchParams.get('attendance') ?? undefined;
   const { currentUser, userProfile, role, isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const exact = useGoalPlaceData({
@@ -60,7 +63,7 @@ export function MatchDetail({ matchId, attendanceToken }: { matchId: string; att
   const match = exact.matches[0];
   const related = useGoalPlaceData({
     collections: ['leagues', 'teams', 'athletes', 'rosters', 'challenges'],
-    scope: { leagueId: match?.leagueId ?? '__pending__' },
+    scope: { leagueId: match?.leagueId ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   const { leagues, teams, athletes, rosters, challenges } = related;

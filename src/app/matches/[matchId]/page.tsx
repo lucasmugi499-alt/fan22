@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import { MatchDetail } from '@/components/core/MatchDetail';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { matches } from '@/data/mockDatabase';
 
 export function generateStaticParams() {
@@ -8,12 +10,22 @@ export function generateStaticParams() {
 
 export default async function MatchDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ matchId: string }>;
-  searchParams: Promise<{ attendance?: string }>;
 }) {
   const { matchId } = await params;
-  const { attendance } = await searchParams;
-  return <MatchDetail matchId={matchId} attendanceToken={attendance} />;
+  return (
+    <Suspense fallback={<MatchDetailFallback />}>
+      <MatchDetail matchId={matchId} />
+    </Suspense>
+  );
+}
+
+function MatchDetailFallback() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-52 w-full rounded-[var(--radius-xl)]" />
+      <Skeleton className="h-64 w-full rounded-[var(--radius-lg)]" />
+    </div>
+  );
 }

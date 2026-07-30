@@ -28,7 +28,7 @@ export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
   const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
   const detail = useGoalPlaceData({
     collections: ['matches'],
-    scope: { teamId: team?.id ?? '__pending__' },
+    scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   const teams = catalog.teams;

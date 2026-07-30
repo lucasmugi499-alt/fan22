@@ -22,7 +22,7 @@ export function TeamUpdates() {
   const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
   const detail = useGoalPlaceData({
     collections: ['feedPosts'],
-    scope: { teamId: team?.id ?? '__pending__' },
+    scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 50,
   });
   const { feedPosts, retry } = detail;

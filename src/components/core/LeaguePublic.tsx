@@ -12,7 +12,7 @@ import { NewsRow } from '@/components/premium/NewsRow';
 import { AthleteCard, TeamCard } from '@/components/core/EntityCards';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { DemoDataNote } from '@/components/ui/DemoDataNote';
 import { FollowButton } from '@/components/core/FollowButton';
 import { MatchCard } from '@/components/core/MatchCard';
@@ -27,12 +27,27 @@ const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
 };
 
 export function LeaguePublic({ leagueId }: { leagueId: string }) {
-  const { leagues, teams, matches, seasons, feedPosts, athletes, leagueNotices, loading } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'matches', 'seasons', 'feedPosts', 'athletes', 'leagueNotices'],
+  const exact = useGoalPlaceData({
+    collections: ['leagues'],
+    scope: { leagueId },
+  });
+  const league = useMemo(
+    () => exact.leagues.find((item) => item.id === leagueId),
+    [exact.leagues, leagueId],
+  );
+  const related = useGoalPlaceData({
+    collections: ['teams', 'matches', 'seasons', 'athletes', 'leagueNotices'],
     scope: { leagueId, audience: 'public' },
     recordLimit: 120,
   });
-  const league = useMemo(() => leagues.find((l) => l.id === leagueId), [leagues, leagueId]);
+  const newsData = useGoalPlaceData({
+    collections: ['feedPosts'],
+    scope: { leagueId, audience: 'public' },
+    recordLimit: 12,
+  });
+  const { teams, matches, seasons, athletes, leagueNotices } = related;
+  const feedPosts = newsData.feedPosts;
+  const loading = exact.loading || (Boolean(league) && related.loading);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const lTeams = useMemo(() => teamsInLeague(leagueId, teams), [teams, leagueId]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedLeagueId === leagueId), [feedPosts, leagueId]);
@@ -52,6 +67,7 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
   }, [league, lTeams, matches, seasons, leagueId]);
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-32 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-64 w-full rounded-[var(--radius-lg)]" /></div>;
+  if (exact.error) return <ErrorState description="This league could not be loaded. Check your connection and try again." onRetry={exact.retry} />;
   if (!league) return <EmptyState icon={Warning} title="League not found" description="This league may have been removed, or the link is out of date." />;
 
   return (
@@ -105,6 +121,11 @@ export function LeaguePublic({ leagueId }: { leagueId: string }) {
       </section>
 
       <NewsRow title="League news" posts={news} />
+      {newsData.error ? (
+        <Card className="p-4 text-sm text-muted">
+          League updates are temporarily unavailable. Fixtures and official records are still shown.
+        </Card>
+      ) : null}
 
       {leaders.length ? (
         <section className="space-y-2.5">

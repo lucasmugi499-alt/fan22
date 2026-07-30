@@ -4,7 +4,7 @@ env:
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_ENABLE_DEMO_LOGIN
-    value: "false"
+    value: "true"
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY

@@ -23,7 +23,7 @@ export function LeagueOverview() {
   const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
   const detail = useGoalPlaceData({
     collections: ['teams', 'matches'],
-    scope: { leagueId: league?.id ?? '__pending__' },
+    scope: { leagueId: league?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   const seasons = catalog.seasons;
