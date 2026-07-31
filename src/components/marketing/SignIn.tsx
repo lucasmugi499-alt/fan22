@@ -22,6 +22,7 @@ import {
   findDemoAccount,
   featuredDemoAccounts,
 } from '@/lib/auth/demoAccounts';
+import { dataMode } from '@/data/dataProvider';
 
 const FEATURED_DEMO_ACCOUNTS = featuredDemoAccounts();
 const DEFAULT_DEMO_EMAIL = FEATURED_DEMO_ACCOUNTS.find((account) => account.role === 'fan')?.email ?? '';
@@ -42,6 +43,7 @@ export function SignIn({
     currentUser,
     userProfile,
     isDemoMode,
+    setDemoRole,
     logout: signOutSession,
   } = useAuth();
   const [demoAccessActive, setDemoAccessActive] = useState(
@@ -59,6 +61,7 @@ export function SignIn({
   const [showPassword, setShowPassword] = useState(false);
   const [awaitingAuthState, setAwaitingAuthState] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const localDemoLogin = demoAccessActive && dataMode === 'mock';
 
   useEffect(() => {
     if (!awaitingAuthState || authStatus !== 'logged_in') return;
@@ -80,6 +83,11 @@ export function SignIn({
         const account = findDemoAccount(email);
         if (!account) {
           setError('Choose one of the seeded demo accounts.');
+          return;
+        }
+        if (dataMode === 'mock') {
+          setDemoRole(account.role);
+          router.replace(getPostSignInRoute(account.role, nextPath));
           return;
         }
         await login(email.trim(), password);
@@ -241,7 +249,7 @@ export function SignIn({
                 ))}
               </select>
             </label>
-            <div className="space-y-1.5">
+            {!localDemoLogin ? <div className="space-y-1.5">
               <label htmlFor="demo-password" className="text-xs font-medium uppercase tracking-[0.08em] text-subtle">
                 Password
               </label>
@@ -261,7 +269,11 @@ export function SignIn({
                 </button>
               </div>
               <p className="text-xs text-muted">Uses the password already seeded in Firebase Auth for this account.</p>
-            </div>
+            </div> : (
+              <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-xs leading-5 text-muted">
+                Local demo mode opens the selected seeded workspace without a password. Firebase staging still requires the seeded demo password.
+              </p>
+            )}
             {error ? (
               <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">
                 {error}

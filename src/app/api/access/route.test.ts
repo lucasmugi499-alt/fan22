@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { POST } from './route';
@@ -10,6 +11,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+    runTransaction: vi.fn(),
   },
 }));
 
@@ -67,5 +69,90 @@ describe('trusted access route hardening', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
     expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it('prevents fan accounts from accepting scoped operator invitations', async () => {
+    const token = 'operator_invitation_token';
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'fan_1',
+      role: 'fan',
+      email: 'fan@example.com',
+      email_verified: true,
+    });
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: vi.fn((id: string) => ({
+        id,
+        get: vi.fn().mockResolvedValue({
+          exists: collectionName === 'invitations',
+          data: () => ({
+            id,
+            roleKey: 'league_owner',
+            scopeType: 'league',
+            scopeId: 'league_1',
+            permissionBundleId: 'league_owner',
+            invitedByUserId: 'platform_admin_1',
+            invitedEmail: 'fan@example.com',
+            tokenHash,
+            status: 'sent',
+            expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          }),
+        }),
+      })),
+    }) as never);
+
+    const response = await POST(request(JSON.stringify({
+      action: 'accept_invitation',
+      invitationId: 'invite_league_owner_1',
+      token,
+    })));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.',
+    });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
+  });
+
+  it('prevents fan accounts from accepting legacy Team Admin invitations', async () => {
+    const token = 'team_admin_invitation_token';
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'fan_1',
+      role: 'fan',
+      email: 'fan@example.com',
+      email_verified: true,
+    });
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: vi.fn((id: string) => ({
+        id,
+        get: vi.fn().mockResolvedValue({
+          exists: collectionName === 'teamAssignments',
+          data: () => ({
+            id,
+            teamId: 'team_1',
+            seasonId: 'season_1',
+            invitedEmail: 'fan@example.com',
+            tokenHash,
+            status: 'invited',
+            expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          }),
+        }),
+      })),
+    }) as never);
+
+    const response = await POST(request(JSON.stringify({
+      action: 'accept_team_invitation',
+      assignmentId: 'team_assignment_1',
+      token,
+    })));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.',
+    });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 });

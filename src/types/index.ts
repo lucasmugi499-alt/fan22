@@ -395,6 +395,17 @@ export interface League {
   country: "Uganda";
   description: string;
   status: LeagueStatus;
+  lifecycleStatus?:
+    | "application_approved"
+    | "draft"
+    | "onboarding"
+    | "configuration_review"
+    | "ready_to_launch"
+    | "active"
+    | "paused"
+    | "suspended"
+    | "completed"
+    | "archived";
   plan: PlanType;
   verified: boolean;
   adminUserIds: string[];

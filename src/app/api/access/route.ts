@@ -8,6 +8,18 @@ import { PERMISSION_BUNDLES, accessIndexId, capabilitiesForAssignment } from '@/
 export const runtime = 'nodejs';
 
 const PRIVILEGED_ROLES = ['league_admin', 'platform_admin', 'super_admin'];
+const FAN_ACCOUNT_OPERATOR_INVITATION_ERROR = 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.';
+const OPERATOR_INVITATION_ROLES = new Set([
+  'league_owner',
+  'league_admin',
+  'team_owner',
+  'team_admin',
+  'roster_manager',
+  'result_reporter',
+  'content_manager',
+  'platform_admin',
+  'super_admin',
+]);
 
 const accessActionSchema = z.discriminatedUnion('action', [
   z.object({
@@ -93,6 +105,10 @@ function primaryPersonaForRole(roleKey: string) {
   return 'fan';
 }
 
+function blocksFanOperatorInvitation(actorRole: unknown, roleKey: string) {
+  return String(actorRole ?? 'fan') === 'fan' && OPERATOR_INVITATION_ROLES.has(roleKey);
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -122,6 +138,9 @@ export async function POST(request: Request) {
       if (data.userId && data.userId !== actor.uid) return Response.json({ error: 'This invitation belongs to another account.' }, { status: 403 });
       if (data.invitedEmail && data.invitedEmail.toLowerCase() !== actor.email?.toLowerCase()) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
+      }
+      if (blocksFanOperatorInvitation(actor.role, 'team_admin')) {
+        return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
       }
       if (data.status === 'active' && data.userId === actor.uid) {
         const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
@@ -317,6 +336,9 @@ export async function POST(request: Request) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
       const persona = primaryPersonaForRole(String(data.roleKey));
+      if (blocksFanOperatorInvitation(actor.role, String(data.roleKey))) {
+        return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
+      }
       if (data.status === 'accepted') {
         if (data.roleKey === 'league_owner' || data.roleKey === 'league_admin') {
           const role = await synchronizeRoleClaim(actor.uid, 'league_admin');

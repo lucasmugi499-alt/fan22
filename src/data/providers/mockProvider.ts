@@ -242,6 +242,7 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
     country: 'Uganda',
     description: `${application.leagueName} is preparing its first GoalPlace256 season.`,
     status: 'draft',
+    lifecycleStatus: 'application_approved',
     plan: 'free',
     verified: false,
     adminUserIds: [
@@ -304,6 +305,33 @@ function audit(input: Omit<AdminAuditEvent, 'id' | 'createdAt'>) {
   };
   investorDemoRuntime.adminAuditEvents.unshift(event);
   return event;
+}
+
+const fanOperatorInvitationMessage = 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.';
+const operatorInvitationRoles = new Set([
+  'league_owner',
+  'league_admin',
+  'team_owner',
+  'team_admin',
+  'roster_manager',
+  'result_reporter',
+  'content_manager',
+  'platform_admin',
+  'super_admin',
+]);
+
+function isFanAccount(userId: string) {
+  const user = users.find((item) => item.id === userId);
+  const demoProfile = Object.values(MOCK_PROFILES).find(
+    (profile) => profile.id === userId || profile.uid === userId,
+  );
+  return user?.role === 'fan' || demoProfile?.role === 'fan';
+}
+
+function assertCanAcceptOperatorInvitation(userId: string, roleKey: string) {
+  if (operatorInvitationRoles.has(roleKey) && isFanAccount(userId)) {
+    throw new Error(fanOperatorInvitationMessage);
+  }
 }
 
 export const mockProvider: GoalPlaceDataProvider = {
@@ -1037,6 +1065,7 @@ export const mockProvider: GoalPlaceDataProvider = {
     if (!token) throw new Error('A complete invitation link is required.');
     const assignment = teamAssignments.find((item) => item.id === assignmentId);
     if (!assignment || (assignment.userId && assignment.userId !== userId)) throw new Error('Invitation not found.');
+    assertCanAcceptOperatorInvitation(userId, 'team_admin');
     assignment.userId = userId;
     assignment.status = 'active';
     assignment.acceptedAt = new Date().toISOString();
@@ -1053,6 +1082,7 @@ export const mockProvider: GoalPlaceDataProvider = {
     const invitation = investorDemoRuntime.invitations.find((item) => item.id === invitationId)
       ?? readStoredItems<Invitation>(storedInvitationsKey).find((item) => item.id === invitationId);
     if (!invitation) throw new Error('Invitation not found.');
+    assertCanAcceptOperatorInvitation(userId, invitation.roleKey);
     if (invitation.status === 'accepted') return result(invitationId, 'Invitation already accepted.');
     if (!['sent', 'delivered', 'viewed', 'queued'].includes(invitation.status)) {
       throw new Error('Invitation is no longer active.');

@@ -16,6 +16,7 @@ export interface ApprovalItem {
 export function pendingApprovals(leagues: League[], athletes: Athlete[]): ApprovalItem[] {
   const items: ApprovalItem[] = [];
   for (const l of leagues) {
+    if (l.lifecycleStatus === 'application_approved' || l.lifecycleStatus === 'onboarding') continue;
     if (l.status === 'draft' || l.status === 'community') {
       items.push({ id: l.id, kind: 'league', title: l.name, subtitle: `${l.city} · requesting ${l.status === 'draft' ? 'listing' : 'verified status'}` });
     }

@@ -17,6 +17,7 @@ import { mockProvider } from '@/data/providers/mockProvider';
 
 type PlatformApprovalItem = ApprovalItem & {
   targetCollection: 'athletes' | 'leagues' | 'leagueAdminApplications';
+  metaLabel?: string;
 };
 
 export function PlatformApprovals() {
@@ -26,19 +27,21 @@ export function PlatformApprovals() {
     collections: ['leagues', 'athletes', 'leagueAdminApplications'],
   });
   const items = useMemo<PlatformApprovalItem[]>(() => [
-    ...pendingApprovals(leagues, athletes).map((item) => ({
-      ...item,
-      targetCollection: item.kind === 'athlete' ? 'athletes' as const : 'leagues' as const,
-    })),
     ...leagueAdminApplications
       .filter((application) => application.status === 'pending' || application.status === 'needs_information')
       .map((application) => ({
         id: application.id,
         kind: 'league' as const,
         targetCollection: 'leagueAdminApplications' as const,
+        metaLabel: 'League application',
         title: application.leagueName,
         subtitle: `${application.city} · ${application.sport} League Admin application`,
       })),
+    ...pendingApprovals(leagues, athletes).map((item) => ({
+      ...item,
+      targetCollection: item.kind === 'athlete' ? 'athletes' as const : 'leagues' as const,
+      metaLabel: item.kind === 'athlete' ? 'Athlete verification' : 'League listing',
+    })),
   ], [athletes, leagueAdminApplications, leagues]);
   const [active, setActive] = useState<PlatformApprovalItem | null>(null);
   const [note, setNote] = useState('');
@@ -94,7 +97,7 @@ export function PlatformApprovals() {
               state={STATE.pending}
               title={it.title}
               subtitle={it.subtitle}
-              meta={it.kind === 'league' ? 'League listing' : 'Athlete verification'}
+              meta={it.metaLabel ?? (it.kind === 'league' ? 'League listing' : 'Athlete verification')}
               onClick={() => setActive(it)}
             />
           ))}
@@ -107,7 +110,7 @@ export function PlatformApprovals() {
         <Sheet
           open
           onClose={() => setActive(null)}
-          title={active.kind === 'league' ? 'Approve league' : 'Verify athlete'}
+          title={active.targetCollection === 'leagueAdminApplications' ? 'Approve league application' : active.kind === 'league' ? 'Approve league' : 'Verify athlete'}
           description={active.title}
           footer={
             <div className="flex gap-2">
@@ -122,7 +125,11 @@ export function PlatformApprovals() {
         >
           <p className="text-sm text-muted">{active.subtitle}</p>
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            Approving grants {active.kind === 'league' ? 'this league verified status on the platform' : 'this athlete a verified profile'}. This is a governance decision reserved for platform admins, and it is recorded in the audit trail.
+            Approving {active.targetCollection === 'leagueAdminApplications'
+              ? 'creates a draft league and queues a League Owner invitation'
+              : active.kind === 'league'
+                ? 'grants this league verified status on the platform'
+                : 'grants this athlete a verified profile'}. This is a governance decision reserved for platform admins, and it is recorded in the audit trail.
           </p>
           <label className="mt-4 block text-xs font-semibold uppercase text-subtle">
             Decision note
