@@ -14,8 +14,11 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import type { AccessContext, AccessIndexDocument } from '@/lib/auth/access';
 import type { AccessIndexRecord } from '@/types';
 import { resolveEffectiveRole } from '@/lib/auth/clientAccess';
+import type { DemoLoginAccount } from '@/lib/auth/demoAccounts';
+import { profileForDemoAccount } from '@/lib/auth/demoAccounts';
 
 const demoRoleStorageKey = 'goalplace256.demoRole';
+const demoAccountStorageKey = 'goalplace256.demoAccount';
 const demoProfileStoragePrefix = 'goalplace256.demoProfile.';
 
 type AuthContextValue = {
@@ -28,7 +31,7 @@ type AuthContextValue = {
   loading: boolean;
   firebaseReady: boolean;
   isDemoMode: boolean;
-  setDemoRole: (role: AppRole | null) => void;
+  setDemoRole: (role: AppRole | null, account?: DemoLoginAccount) => void;
   updateLocalProfile: (updates: Partial<UserProfile>) => void;
   logout: () => Promise<void>;
 };
@@ -67,18 +70,39 @@ function clearStoredDemoRole() {
   document.cookie = `${demoRoleStorageKey}=; path=/; Max-Age=0; SameSite=Lax`;
 }
 
-function getStoredDemoProfile(role: AppRole): UserProfile {
+function getStoredDemoAccount(role: AppRole): DemoLoginAccount | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.sessionStorage?.getItem?.(demoAccountStorageKey);
+    const account = value ? JSON.parse(value) as DemoLoginAccount : null;
+    return account?.role === role ? account : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeDemoAccount(account: DemoLoginAccount) {
+  window.sessionStorage?.setItem?.(demoAccountStorageKey, JSON.stringify(account));
+}
+
+function clearStoredDemoAccount() {
+  window.sessionStorage?.removeItem?.(demoAccountStorageKey);
+}
+
+function getStoredDemoProfile(role: AppRole, account?: DemoLoginAccount): UserProfile {
   const base = MOCK_PROFILES[role];
   if (typeof window === 'undefined') return { ...base };
   try {
     const value = window.localStorage.getItem(`${demoProfileStoragePrefix}${role}`);
     const saved = value ? JSON.parse(value) as Partial<UserProfile> : {};
+    const selected = account ? profileForDemoAccount(account) : undefined;
     return {
       ...base,
       ...saved,
-      id: base.id,
-      uid: base.uid,
-      email: base.email,
+      ...(selected ?? {}),
+      id: selected?.id ?? base.id,
+      uid: selected?.uid ?? base.uid,
+      email: selected?.email ?? base.email,
       role: base.role,
       status: base.status,
     };
@@ -112,10 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, setDemoRoleState] = useState<AppRole | null>(null);
   const [storageChecked, setStorageChecked] = useState(false);
 
-  const setDemoRole = useCallback((newRole: AppRole | null) => {
+  const setDemoRole = useCallback((newRole: AppRole | null, account?: DemoLoginAccount) => {
     if (newRole && isDemoModeEnabled) {
-      const profile = getStoredDemoProfile(newRole);
+      const profile = getStoredDemoProfile(newRole, account);
       storeDemoRole(newRole);
+      if (account) storeDemoAccount(account);
+      else clearStoredDemoAccount();
       setIsDemoMode(true);
       setDemoRoleState(newRole);
       setUserProfile(profile);
@@ -126,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsDemoMode(false);
       setDemoRoleState(null);
       clearStoredDemoRole();
+      clearStoredDemoAccount();
       setUserProfile(null);
       setAccountRole(null);
       setAccessContext(undefined);
@@ -163,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedDemoRole = getStoredDemoRole();
 
       if (storedDemoRole) {
-        setDemoRole(storedDemoRole);
+        setDemoRole(storedDemoRole, getStoredDemoAccount(storedDemoRole) ?? undefined);
       } else if (!isFirebaseConfigured) {
         setAuthStatus('logged_out');
       }

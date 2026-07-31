@@ -21,8 +21,10 @@ import type { IconComponent } from '@/lib/icons';
 import {
   findDemoAccount,
   featuredDemoAccounts,
+  workspaceScopeForDemoAccount,
 } from '@/lib/auth/demoAccounts';
 import { dataMode } from '@/data/dataProvider';
+import { storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
 
 const FEATURED_DEMO_ACCOUNTS = featuredDemoAccounts();
 const DEFAULT_DEMO_EMAIL = FEATURED_DEMO_ACCOUNTS.find((account) => account.role === 'fan')?.email ?? '';
@@ -86,8 +88,10 @@ export function SignIn({
           return;
         }
         if (dataMode === 'mock') {
-          setDemoRole(account.role);
-          router.replace(getPostSignInRoute(account.role, nextPath));
+          const workspaceScope = workspaceScopeForDemoAccount(account);
+          if (workspaceScope) storeSelectedAssignmentId(workspaceScope.kind, workspaceScope.id);
+          setDemoRole(account.role, account);
+          router.replace(getPostSignInRoute(account.role, nextPath ?? account.workspace));
           return;
         }
         await login(email.trim(), password);
