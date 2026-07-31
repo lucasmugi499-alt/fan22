@@ -69,7 +69,8 @@ export function canManageTeam(auth: AuthState, teamId?: string): boolean {
 }
 
 export function canAccessTeamAdminDashboard(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+  return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'team'))
+    || hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
 export function canSubmitResult(auth: AuthState, teamId?: string, matchId = 'unknown_match'): boolean {
@@ -104,7 +105,8 @@ export function canCreateAthlete(auth: AuthState, teamId: string): boolean {
 }
 
 export function canViewLeagueAdminDashboard(auth: AuthState): boolean {
-  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+  return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'league'))
+    || hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
 export function canViewPlatformAdminDashboard(auth: AuthState): boolean {
@@ -254,10 +256,11 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasRole(auth, 'fan');
   }
   if (pathname.startsWith('/athlete-dashboard')) {
-    return hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
+    return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'athlete'))
+      || hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/league-admin')) {
-    return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+    return canViewLeagueAdminDashboard(auth);
   }
   if (pathname.startsWith('/admin')) {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);
@@ -267,7 +270,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
   }
 
   if (pathname.startsWith('/team-admin')) {
-    return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+    return canAccessTeamAdminDashboard(auth);
   }
   // All other shared surfaces are accessible to any logged-in user.
   return true;

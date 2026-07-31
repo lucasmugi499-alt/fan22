@@ -1,6 +1,8 @@
 import type { Athlete, Match, Team, UserProfile } from '@/types';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { selectedAssignmentId } from '@/lib/auth/assignmentSelection';
+import type { AccessContext } from '@/lib/auth/access';
+import { scopedIdsForAccess } from '@/lib/auth/clientAccess';
 
 /**
  * Resolves which team the current admin operates, by `adminUserIds`.
@@ -17,11 +19,17 @@ export function resolveMyTeam(
   profile: UserProfile | null,
   teams: Team[],
   matches: Match[],
-  isDemoMode = false
+  isDemoMode = false,
+  accessContext?: AccessContext,
 ): Team | null {
   if (teams.length === 0) return null;
+  const scopedTeamIds = scopedIdsForAccess(accessContext, 'team');
   if (profile) {
-    const ownedTeams = teams.filter((t) => t.adminUserIds?.includes(profile.uid) || t.adminUserIds?.includes(profile.id));
+    const ownedTeams = teams.filter((t) =>
+      scopedTeamIds.has(t.id) ||
+      t.adminUserIds?.includes(profile.uid) ||
+      t.adminUserIds?.includes(profile.id)
+    );
     const selectedId = selectedAssignmentId('team');
     const owned = ownedTeams.find((team) => team.id === selectedId) ?? ownedTeams[0];
     if (owned) return owned;

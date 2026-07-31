@@ -19,9 +19,9 @@ import { Button } from '@/components/ui/Button';
  */
 export function RouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const router = useRouter();
-  const { authStatus, userProfile, role, loading } = useAuth();
+  const { authStatus, userProfile, role, accessContext, loading } = useAuth();
 
-  const allowed = canAccessRoute({ authStatus, userProfile, role }, pathname);
+  const allowed = canAccessRoute({ authStatus, userProfile, role, accessContext }, pathname);
   const home = getDefaultRouteForRole(role);
   // A signed-in user sent to their own dashboard; a visitor sent to sign in.
   const target = authStatus === 'logged_in' && home !== pathname ? home : '/login';

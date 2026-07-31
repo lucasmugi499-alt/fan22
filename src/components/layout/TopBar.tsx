@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useUserNotifications } from '@/lib/firebase/useGoalPlaceData';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
+import { scopedIdsForAccess } from '@/lib/auth/clientAccess';
 
 const ROLE_LABEL: Record<string, string> = {
   fan: 'Fan',
@@ -26,7 +27,7 @@ const ROLE_LABEL: Record<string, string> = {
  * never primary navigation, which lives in the rail/bottom nav.
  */
 export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, accessContext } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const { items: notifications } = useUserNotifications(currentUser?.uid ?? userProfile?.uid);
   const { teams, leagues } = useGoalPlaceData({
@@ -37,10 +38,13 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
         : [],
     recordLimit: 250,
   });
+  const uid = currentUser?.uid ?? userProfile?.uid ?? '';
+  const scopedTeamIds = scopedIdsForAccess(accessContext, 'team');
+  const scopedLeagueIds = scopedIdsForAccess(accessContext, 'league');
   const assignments = role === 'team_admin'
-    ? teams.filter((team) => team.adminUserIds?.includes(currentUser?.uid ?? userProfile?.uid ?? ''))
+    ? teams.filter((team) => scopedTeamIds.has(team.id) || team.adminUserIds?.includes(uid))
     : role === 'league_admin'
-      ? leagues.filter((league) => league.adminUserIds?.includes(currentUser?.uid ?? userProfile?.uid ?? ''))
+      ? leagues.filter((league) => scopedLeagueIds.has(league.id) || league.adminUserIds?.includes(uid))
       : [];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 

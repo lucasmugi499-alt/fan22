@@ -80,6 +80,7 @@ import type { Contribution, PaymentIntent, PointsEvent } from '@/types/money';
 import { challengeNextStatus } from '@/lib/challenge';
 import { normalizeChallengeStatus } from '@/lib/status';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
+import { buildAccessIndexDocuments } from '@/lib/auth/access';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
@@ -430,6 +431,17 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getTeamAssignmentById(idValue) {
     return readStoredItems<TeamAssignment>(storedTeamAssignmentsKey).find((assignment) => assignment.id === idValue)
       ?? teamAssignments.find((assignment) => assignment.id === idValue);
+  },
+  async getAccessIndexByUser(userId) {
+    const assignments = mergedById(
+      investorDemoRuntime.accessAssignments,
+      readStoredItems<AccessAssignmentRecord>(storedAccessAssignmentsKey),
+    ).filter((assignment) => assignment.userId === userId);
+    return buildAccessIndexDocuments({
+      assignments,
+      accessVersion: 1,
+      updatedAt: new Date().toISOString(),
+    });
   },
   async getRosters(options) {
     return take(rosters

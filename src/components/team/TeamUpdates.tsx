@@ -16,10 +16,10 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import { uploadPublishedMedia } from '@/lib/firebase/storage';
 
 export function TeamUpdates() {
-  const { userProfile, currentUser, isDemoMode } = useAuth();
+  const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['feedPosts'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

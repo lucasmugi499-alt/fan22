@@ -25,10 +25,10 @@ const TABS = ['Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LeagueFixtures() {
-  const { userProfile, currentUser, isDemoMode } = useAuth();
+  const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const catalog = useGoalPlaceData({ collections: ['leagues', 'seasons'] });
-  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
+  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode, accessContext), [userProfile, catalog.leagues, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['teams', 'matches'],
     scope: { leagueId: league?.id ?? 'goalplace-pending' },

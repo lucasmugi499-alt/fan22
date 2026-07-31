@@ -9,6 +9,11 @@ import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { clearPrivateCaches } from '@/lib/offline';
+import { dataProvider } from '@/data/dataProvider';
+import { mockProvider } from '@/data/providers/mockProvider';
+import type { AccessContext, AccessIndexDocument } from '@/lib/auth/access';
+import type { AccessIndexRecord } from '@/types';
+import { resolveEffectiveRole } from '@/lib/auth/clientAccess';
 
 const demoRoleStorageKey = 'goalplace256.demoRole';
 const demoProfileStoragePrefix = 'goalplace256.demoProfile.';
@@ -18,6 +23,8 @@ type AuthContextValue = {
   currentUser: User | null;
   userProfile: UserProfile | null;
   role: AppRole | null;
+  accountRole: AppRole | null;
+  accessContext?: AccessContext;
   loading: boolean;
   firebaseReady: boolean;
   isDemoMode: boolean;
@@ -84,11 +91,21 @@ function storeDemoProfile(role: AppRole, profile: UserProfile) {
   window.localStorage.setItem(`${demoProfileStoragePrefix}${role}`, JSON.stringify(profile));
 }
 
+function accessContextFromIndexes(userId: string, indexes: AccessIndexRecord[]): AccessContext {
+  return {
+    userId,
+    indexes: indexes.map((index) => index as AccessIndexDocument),
+    accessVersion: indexes.reduce((version, index) => Math.max(version, Number(index.accessVersion ?? 1)), 1),
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
+  const [accountRole, setAccountRole] = useState<AppRole | null>(null);
+  const [accessContext, setAccessContext] = useState<AccessContext>();
+  const [accessLoading, setAccessLoading] = useState(false);
   
   // Demo Mode State
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -102,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsDemoMode(true);
       setDemoRoleState(newRole);
       setUserProfile(profile);
-      setRole(newRole);
+      setAccountRole(newRole);
       setAuthStatus('logged_in');
       setCurrentUser({ uid: profile.uid, email: profile.email } as User);
     } else {
@@ -110,7 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDemoRoleState(null);
       clearStoredDemoRole();
       setUserProfile(null);
-      setRole(null);
+      setAccountRole(null);
+      setAccessContext(undefined);
+      setAccessLoading(false);
       setAuthStatus('logged_out');
       setCurrentUser(null);
       
@@ -134,10 +153,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserProfile((profile) => {
       if (!profile) return profile;
       const nextProfile = { ...profile, ...updates };
-      if (isDemoMode && role) storeDemoProfile(role, nextProfile);
+      if (isDemoMode && accountRole) storeDemoProfile(accountRole, nextProfile);
       return nextProfile;
     });
-  }, [isDemoMode, role]);
+  }, [isDemoMode, accountRole]);
 
   useEffect(() => {
     const restoreDemoRole = window.setTimeout(() => {
@@ -170,7 +189,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) {
         void clearPrivateCaches();
         setUserProfile(null);
-        setRole(null);
+        setAccountRole(null);
+        setAccessContext(undefined);
+        setAccessLoading(false);
         setAuthStatus('logged_out');
         return;
       }
@@ -179,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profile = await getUserProfile(user.uid);
         const nextRole = await getUserRole(user, profile);
         setUserProfile(profile);
-        setRole(nextRole);
+        setAccountRole(nextRole);
         setAuthStatus('logged_in');
       } catch (e) {
         console.error("Error fetching user profile:", e);
@@ -189,8 +210,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isDemoMode, storageChecked]);
 
   useEffect(() => {
+    const uid = currentUser?.uid ?? userProfile?.uid;
+    if (authStatus !== 'logged_in' || !uid) {
+      queueMicrotask(() => {
+        setAccessContext(undefined);
+        setAccessLoading(false);
+      });
+      return;
+    }
+
+    let cancelled = false;
+    const provider = isDemoMode ? mockProvider : dataProvider;
+    queueMicrotask(() => {
+      if (!cancelled) setAccessLoading(true);
+    });
+    provider.getAccessIndexByUser(uid)
+      .then((indexes) => {
+        if (!cancelled) setAccessContext(accessContextFromIndexes(uid, indexes));
+      })
+      .catch((cause) => {
+        console.warn('GoalPlace256: scoped access context could not be loaded.', cause);
+        if (!cancelled) setAccessContext(accessContextFromIndexes(uid, []));
+      })
+      .finally(() => {
+        if (!cancelled) setAccessLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, currentUser?.uid, isDemoMode, userProfile?.uid]);
+
+  useEffect(() => {
     document.documentElement.dataset.lowData = userProfile?.lowDataMode ? 'true' : 'false';
   }, [userProfile?.lowDataMode]);
+
+  const role = useMemo(() => resolveEffectiveRole(accountRole, accessContext), [accountRole, accessContext]);
 
   const value = useMemo(
     () => ({
@@ -198,14 +253,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentUser,
       userProfile,
       role,
-      loading: authStatus === 'loading',
+      accountRole,
+      accessContext,
+      loading: authStatus === 'loading' || accessLoading,
       firebaseReady: isFirebaseConfigured,
       isDemoMode,
       setDemoRole,
       updateLocalProfile,
       logout: handleLogout,
     }),
-    [authStatus, currentUser, userProfile, role, isDemoMode, setDemoRole, updateLocalProfile, handleLogout]
+    [authStatus, currentUser, userProfile, role, accountRole, accessContext, accessLoading, isDemoMode, setDemoRole, updateLocalProfile, handleLogout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

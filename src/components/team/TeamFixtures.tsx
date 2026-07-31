@@ -23,9 +23,9 @@ const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
-  const { userProfile, isDemoMode } = useAuth();
+  const { userProfile, isDemoMode, accessContext } = useAuth();
   const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['matches'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

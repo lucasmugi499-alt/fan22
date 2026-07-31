@@ -18,10 +18,10 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 
 export function TeamRoster() {
-  const { userProfile, currentUser, isDemoMode } = useAuth();
+  const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const catalog = useGoalPlaceData({ collections: ['teams', 'seasons'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['athletes', 'rosters'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

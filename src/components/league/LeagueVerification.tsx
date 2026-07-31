@@ -30,9 +30,9 @@ const KIND_META: Record<LeagueException['kind'], string> = {
 };
 
 export function LeagueVerification({ compact = false }: { compact?: boolean }) {
-  const { userProfile, isDemoMode } = useAuth();
+  const { userProfile, isDemoMode, accessContext } = useAuth();
   const catalog = useGoalPlaceData({ collections: ['leagues'] });
-  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
+  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode, accessContext), [userProfile, catalog.leagues, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['teams', 'matches'],
     scope: { leagueId: league?.id ?? 'goalplace-pending' },

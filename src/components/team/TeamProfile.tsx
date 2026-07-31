@@ -27,10 +27,10 @@ function ugx(n: number): string {
 }
 
 export function TeamProfile() {
-  const { userProfile, isDemoMode } = useAuth();
+  const { userProfile, isDemoMode, accessContext } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode), [userProfile, catalog.teams, isDemoMode]);
+  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['athletes'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

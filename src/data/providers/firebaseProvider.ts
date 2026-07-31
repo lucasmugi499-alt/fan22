@@ -63,6 +63,7 @@ import {
   Team,
   TeamAssignment,
   Invitation,
+  AccessIndexRecord,
   Verification,
 } from '@/types';
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
@@ -385,6 +386,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return isFirebaseConfigured
       ? readDoc<TeamAssignment>('teamAssignments', id)
       : mockProvider.getTeamAssignmentById(id);
+  },
+  async getAccessIndexByUser(userId) {
+    if (!isFirebaseConfigured) return mockProvider.getAccessIndexByUser(userId);
+    requireActor(userId);
+    return readCollection<AccessIndexRecord>('accessIndex', [where('userId', '==', userId)]);
   },
   async getRosters(options) {
     if (!isFirebaseConfigured) return mockProvider.getRosters(options);

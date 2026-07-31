@@ -19,9 +19,9 @@ function ugx(n: number): string {
 }
 
 export function LeagueReports() {
-  const { userProfile, isDemoMode } = useAuth();
+  const { userProfile, isDemoMode, accessContext } = useAuth();
   const catalog = useGoalPlaceData({ collections: ['leagues', 'sponsorReports'] });
-  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode), [userProfile, catalog.leagues, isDemoMode]);
+  const league = useMemo(() => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode, accessContext), [userProfile, catalog.leagues, isDemoMode, accessContext]);
   const detail = useGoalPlaceData({
     collections: ['teams', 'athletes', 'matches', 'supportNeeds'],
     scope: { leagueId: league?.id ?? 'goalplace-pending' },

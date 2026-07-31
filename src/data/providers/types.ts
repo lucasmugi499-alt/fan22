@@ -29,6 +29,7 @@ import {
   Team,
   TeamAssignment,
   Invitation,
+  AccessIndexRecord,
   User,
   Verification,
 } from '@/types';
@@ -238,6 +239,7 @@ export interface GoalPlaceDataProvider {
   getTeamAssignments(): Promise<TeamAssignment[]>;
   getInvitationById(id: string): Promise<Invitation | undefined>;
   getTeamAssignmentById(id: string): Promise<TeamAssignment | undefined>;
+  getAccessIndexByUser(userId: string): Promise<AccessIndexRecord[]>;
   getRosters(options?: DataQueryOptions): Promise<Roster[]>;
   getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
   getStoredStandings(): Promise<StoredStanding[]>;
