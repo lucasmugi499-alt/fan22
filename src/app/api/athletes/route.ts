@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
+import { accessIndexId } from '@/lib/auth/access';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +12,25 @@ const athleteCreateSchema = z.object({
   position: z.string().trim().min(1).max(80),
   ageGroup: z.enum(['U18', 'U21', 'Senior']),
 });
+
+function indexHasCapability(
+  snapshot: FirebaseFirestore.DocumentSnapshot,
+  capability: 'team.athlete.create' | 'league.roster.verify',
+) {
+  const capabilities = snapshot.data()?.capabilities;
+  return Array.isArray(capabilities) && capabilities.includes(capability);
+}
+
+async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leagueId: string) {
+  const [teamAccess, leagueAccess, platformAccess] = await Promise.all([
+    adminDb.collection('accessIndex').doc(accessIndexId('team', teamId, userId)).get(),
+    adminDb.collection('accessIndex').doc(accessIndexId('league', leagueId, userId)).get(),
+    adminDb.collection('accessIndex').doc(accessIndexId('platform', 'global', userId)).get(),
+  ]);
+  return indexHasCapability(teamAccess, 'team.athlete.create')
+    || indexHasCapability(leagueAccess, 'league.roster.verify')
+    || indexHasCapability(platformAccess, 'team.athlete.create');
+}
 
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
@@ -28,7 +48,8 @@ export async function POST(request: Request) {
   const teamData = team.data()!;
   const league = await adminDb.collection('leagues').doc(teamData.leagueId).get();
   const assigned = teamData.adminUserIds?.includes(actor.uid) || league.data()?.adminUserIds?.includes(actor.uid);
-  if (!['platform_admin', 'super_admin'].includes(String(actor.role)) && !assigned) {
+  const scoped = await hasScopedAthleteCreateAccess(actor.uid, team.id, teamData.leagueId);
+  if (!['platform_admin', 'super_admin'].includes(String(actor.role)) && !assigned && !scoped) {
     return Response.json({ error: 'You are not assigned to this team.' }, { status: 403 });
   }
 

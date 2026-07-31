@@ -8,6 +8,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+    runTransaction: vi.fn(),
   },
 }));
 
@@ -17,6 +18,23 @@ function request(body: string, token = 'token') {
     headers: token ? { authorization: `Bearer ${token}` } : undefined,
     body,
   });
+}
+
+function snapshot(id: string, data: Record<string, unknown> | undefined) {
+  return {
+    id,
+    exists: Boolean(data),
+    data: () => data,
+  };
+}
+
+function installFirestoreMock(records: Record<string, Record<string, unknown>>) {
+  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+    doc: (id = `${collectionName}_generated`) => ({
+      id,
+      get: vi.fn(async () => snapshot(id, records[`${collectionName}/${id}`])),
+    }),
+  }) as never);
 }
 
 describe('athlete creation route hardening', () => {
@@ -63,5 +81,76 @@ describe('athlete creation route hardening', () => {
 
     expect(response.status).toBe(413);
     expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it('allows a Team Admin with scoped athlete creation access even without legacy team arrays', async () => {
+    const transaction = { set: vi.fn() };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'team_admin_1', role: 'team_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({
+      'teams/team_1': {
+        id: 'team_1',
+        name: 'Kampala Testers',
+        sport: 'football',
+        city: 'Kampala',
+        leagueId: 'league_1',
+        adminUserIds: [],
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/team_team_1_team_admin_1': {
+        userId: 'team_admin_1',
+        scopeType: 'team',
+        scopeId: 'team_1',
+        capabilities: ['team.athlete.create'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      teamId: 'team_1',
+      name: 'New Athlete',
+      position: 'Forward',
+      ageGroup: 'Senior',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, id: 'athletes_generated' });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'athletes_generated' }), expect.objectContaining({
+      name: 'New Athlete',
+      teamId: 'team_1',
+      leagueId: 'league_1',
+      verificationStatus: 'pending',
+    }));
+  });
+
+  it('rejects a Team Admin whose scoped access is for another team', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'team_admin_1', role: 'team_admin' });
+    installFirestoreMock({
+      'teams/team_1': {
+        id: 'team_1',
+        name: 'Kampala Testers',
+        sport: 'football',
+        city: 'Kampala',
+        leagueId: 'league_1',
+        adminUserIds: [],
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/team_team_2_team_admin_1': {
+        userId: 'team_admin_1',
+        scopeType: 'team',
+        scopeId: 'team_2',
+        capabilities: ['team.athlete.create'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      teamId: 'team_1',
+      name: 'New Athlete',
+      position: 'Forward',
+      ageGroup: 'Senior',
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'You are not assigned to this team.' });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
   });
 });
