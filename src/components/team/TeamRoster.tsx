@@ -36,9 +36,10 @@ export function TeamRoster() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [athleteName, setAthleteName] = useState('');
+  const [athleteEmail, setAthleteEmail] = useState('');
   const [position, setPosition] = useState('');
   const [ageGroup, setAgeGroup] = useState<'U18' | 'U21' | 'Senior'>('Senior');
-  const [claimLink, setClaimLink] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
 
   const teamAthletes = useMemo(() => (team ? rosterForTeam(team.id, athletes) : []), [team, athletes]);
   const season = team ? seasons.find((item) => item.id === teams.find((item) => item.id === team.id)?.leagueId) ?? seasons.find((item) => item.leagueId === team.leagueId && item.status !== 'completed') : undefined;
@@ -86,8 +87,8 @@ export function TeamRoster() {
   }
 
   async function createAthlete() {
-    if (!team || !athleteName.trim() || !position.trim()) {
-      toast.error('Add the athlete name and position.');
+    if (!team || !athleteName.trim() || !position.trim() || !athleteEmail.trim()) {
+      toast.error('Add the athlete name, email, and position.');
       return;
     }
     setSaving(true);
@@ -97,12 +98,17 @@ export function TeamRoster() {
         name: athleteName.trim(),
         position: position.trim(),
         ageGroup,
+        invitedEmail: athleteEmail.trim(),
       });
-      if (!created.id) throw new Error('The athlete profile was created without a claimable identifier.');
-      const link = `${window.location.origin}/athletes/${encodeURIComponent(created.id)}?claim=1`;
-      setClaimLink(link);
+      if (!created.id) throw new Error('The athlete profile was created without an invite identifier.');
+      const link = created.actionUrl
+        ? new URL(created.actionUrl, window.location.origin).toString()
+        : `${window.location.origin}/athletes/${encodeURIComponent(created.id)}`;
+      setInviteLink(link);
       await navigator.clipboard.writeText(link).catch(() => undefined);
-      toast.success('Pending athlete created. Claim link copied.');
+      toast.success(created.emailDelivery === 'sent'
+        ? 'Athlete profile created and invite email sent.'
+        : 'Athlete profile created. Invite link copied.');
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'The athlete could not be created.');
@@ -175,21 +181,22 @@ export function TeamRoster() {
 
       <Sheet
         open={creating}
-        onClose={() => { setCreating(false); setClaimLink(''); }}
-        title="Create athlete profile"
-        description="Creates a pending team profile. The athlete claims it with their own verified account."
-        footer={claimLink
-          ? <Button block icon={Copy} onClick={() => { void navigator.clipboard.writeText(claimLink); toast.success('Claim link copied.'); }}>Copy claim link</Button>
+        onClose={() => { setCreating(false); setInviteLink(''); }}
+        title="Invite athlete"
+        description="Create the team profile and send the athlete a private account setup link."
+        footer={inviteLink
+          ? <Button block icon={Copy} onClick={() => { void navigator.clipboard.writeText(inviteLink); toast.success('Invite link copied.'); }}>Copy invite link</Button>
           : <Button block icon={UserPlus} onClick={createAthlete} disabled={saving}>{saving ? 'Creating...' : 'Create and invite'}</Button>}
       >
-        {claimLink ? (
+        {inviteLink ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted">Send this link privately to the athlete. Team confirmation and League verification are still required before the account is linked.</p>
-            <input className="field" readOnly value={claimLink} />
+            <p className="text-sm text-muted">Send this link privately if the email was not delivered. The athlete must use the invited email address before League verification links the account.</p>
+            <input className="field" readOnly value={inviteLink} />
           </div>
         ) : (
           <div className="space-y-4">
             <label className="block text-xs font-semibold uppercase text-subtle">Full name<input className="field mt-2 normal-case" value={athleteName} onChange={(event) => setAthleteName(event.target.value)} /></label>
+            <label className="block text-xs font-semibold uppercase text-subtle">Athlete email<input className="field mt-2 normal-case" type="email" value={athleteEmail} onChange={(event) => setAthleteEmail(event.target.value)} /></label>
             <label className="block text-xs font-semibold uppercase text-subtle">Position<input className="field mt-2 normal-case" value={position} onChange={(event) => setPosition(event.target.value)} /></label>
             <label className="block text-xs font-semibold uppercase text-subtle">Age group<select className="field mt-2 normal-case" value={ageGroup} onChange={(event) => setAgeGroup(event.target.value as typeof ageGroup)}><option>U18</option><option>U21</option><option>Senior</option></select></label>
           </div>

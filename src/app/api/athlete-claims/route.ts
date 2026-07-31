@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { createHash } from 'crypto';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
@@ -7,7 +8,11 @@ import { accessIndexId, capabilitiesForAssignment } from '@/lib/auth/access';
 export const runtime = 'nodejs';
 
 const schema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('request'), athleteId: z.string().trim().min(1).max(180) }),
+  z.object({
+    action: z.literal('request'),
+    athleteId: z.string().trim().min(1).max(180),
+    invitationToken: z.string().trim().min(16).max(512),
+  }),
   z.object({ action: z.literal('team_confirm'), claimId: z.string().trim().min(1).max(180) }),
   z.object({ action: z.literal('league_verify'), claimId: z.string().trim().min(1).max(180) }),
   z.object({ action: z.literal('reject'), claimId: z.string().trim().min(1).max(180), reason: z.string().trim().min(4).max(300) }),
@@ -63,6 +68,10 @@ function athleteSelfAssignment(input: {
   };
 }
 
+function normalizeEmail(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -80,6 +89,20 @@ export async function POST(request: Request) {
         if (!athleteSnapshot.exists) throw new Error('Athlete profile not found.');
         const athlete = athleteSnapshot.data()!;
         if (athlete.userId) throw new Error('This athlete profile is already linked.');
+        const invitedEmail = normalizeEmail(athlete.invitedEmail);
+        if (!invitedEmail || !athlete.invitationTokenHash) {
+          throw new Error('Ask your Team Admin for an athlete invitation link.');
+        }
+        if (athlete.invitationExpiresAt && Date.parse(String(athlete.invitationExpiresAt)) <= Date.now()) {
+          throw new Error('This athlete invitation link has expired.');
+        }
+        if (normalizeEmail(actor.email) !== invitedEmail) {
+          throw new Error('Use the athlete account email that received this invitation.');
+        }
+        const tokenHash = createHash('sha256').update(input.invitationToken).digest('hex');
+        if (tokenHash !== athlete.invitationTokenHash) {
+          throw new Error('This athlete invitation link is invalid or expired.');
+        }
         const existing = await transaction.get(
           adminDb.collection('athleteClaims')
             .where('athleteId', '==', input.athleteId)
@@ -93,11 +116,12 @@ export async function POST(request: Request) {
           teamId: athlete.teamId,
           leagueId: athlete.leagueId,
           requesterUserId: actor.uid,
-          status: 'team_pending',
+          status: 'league_pending',
+          teamReviewedByUserId: athlete.createdByUserId ?? 'team_invitation',
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
-        return { id: claimRef.id, status: 'team_pending' };
+        return { id: claimRef.id, status: 'league_pending' };
       }
 
       const claimRef = adminDb.collection('athleteClaims').doc(input.claimId);

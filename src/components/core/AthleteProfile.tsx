@@ -75,7 +75,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
 
   return (
     <div className="space-y-5">
-      {searchParams.get('claim') === '1' && !athlete.userId ? (
+      {searchParams.get('claim') && !athlete.userId ? (
         <Card className="p-4">
           <AthleteClaiming athletes={[athlete]} />
         </Card>

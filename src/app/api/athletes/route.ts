@@ -1,8 +1,10 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { createHash, randomBytes } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { accessIndexId } from '@/lib/auth/access';
+import { sendAthleteInvitationEmail } from '@/server/email/athleteInvitation';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +13,7 @@ const athleteCreateSchema = z.object({
   name: z.string().trim().min(2).max(160),
   position: z.string().trim().min(1).max(80),
   ageGroup: z.enum(['U18', 'U21', 'Senior']),
+  invitedEmail: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
 });
 
 function indexHasCapability(
@@ -32,6 +35,12 @@ async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leag
     || indexHasCapability(platformAccess, 'team.athlete.create');
 }
 
+function publicBaseUrl(request: Request) {
+  return process.env.NEXT_PUBLIC_APP_URL
+    ?? request.headers.get('origin')
+    ?? new URL(request.url).origin;
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -42,7 +51,7 @@ export async function POST(request: Request) {
   if ('response' in parsed) return Response.json({ error: 'Team, name, position, and age group are required.' }, { status: parsed.response.status });
 
   const actor = auth.actor;
-  const { teamId, name, position, ageGroup } = parsed.data;
+  const { teamId, name, position, ageGroup, invitedEmail } = parsed.data;
   const team = await adminDb.collection('teams').doc(teamId).get();
   if (!team.exists) return Response.json({ error: 'Team not found.' }, { status: 404 });
   const teamData = team.data()!;
@@ -54,6 +63,10 @@ export async function POST(request: Request) {
   }
 
   const athleteRef = adminDb.collection('athletes').doc();
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const actionUrl = `/register?next=${encodeURIComponent(`/athletes/${athleteRef.id}?claim=${encodeURIComponent(token)}`)}`;
   await adminDb.runTransaction(async (transaction) => {
     transaction.set(athleteRef, {
       id: athleteRef.id,
@@ -66,6 +79,11 @@ export async function POST(request: Request) {
       country: 'Uganda',
       ageGroup,
       bio: `${name} is building a verified sporting record with ${teamData.name}.`,
+      invitedEmail,
+      invitationTokenHash: tokenHash,
+      invitationActionUrl: actionUrl,
+      invitationExpiresAt: expiresAt,
+      createdByUserId: actor.uid,
       verified: false,
       verificationStatus: 'pending',
       totalSupport: 0,
@@ -84,5 +102,31 @@ export async function POST(request: Request) {
       createdAt: FieldValue.serverTimestamp(),
     });
   });
-  return Response.json({ ok: true, id: athleteRef.id });
+  const email = await sendAthleteInvitationEmail({
+    to: invitedEmail,
+    inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
+    athleteName: name,
+    teamName: String(teamData.name ?? team.id),
+    inviterName: String(actor.name ?? actor.email ?? 'your Team Admin'),
+    expiresAt,
+    athleteId: athleteRef.id,
+  });
+  await athleteRef.set({
+    emailProvider: 'resend',
+    emailDelivery: email.status,
+    ...(email.id ? {
+      emailMessageId: email.id,
+      emailSentAt: FieldValue.serverTimestamp(),
+    } : {}),
+    ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return Response.json({
+    ok: true,
+    id: athleteRef.id,
+    actionUrl,
+    emailDelivery: email.status,
+    emailMessageId: email.id,
+    emailError: email.error,
+  });
 }

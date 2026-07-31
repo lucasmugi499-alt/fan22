@@ -537,6 +537,16 @@ export interface Athlete {
   country: "Uganda";
   ageGroup: "U18" | "U21" | "Senior";
   bio: string;
+  invitedEmail?: string;
+  invitationToken?: string;
+  invitationTokenHash?: string;
+  invitationActionUrl?: string;
+  invitationExpiresAt?: string;
+  emailProvider?: "resend" | "demo";
+  emailDelivery?: "sent" | "not_configured" | "failed";
+  emailMessageId?: string;
+  emailSentAt?: string;
+  emailError?: string;
   avatarURL?: string;
   avatarUrl?: string;
   coverURL?: string;

@@ -691,11 +691,24 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       },
       body: JSON.stringify(data),
     });
-    const body = await response.json().catch(() => ({})) as { error?: string; id?: string };
+    const body = await response.json().catch(() => ({})) as {
+      error?: string;
+      id?: string;
+      actionUrl?: string;
+      emailDelivery?: DataWriteResult['emailDelivery'];
+      emailMessageId?: string;
+      emailError?: string;
+    };
     if (!response.ok || !body.id) throw new Error(body.error ?? 'The athlete profile could not be created.');
-    return writeResult(body.id, 'Pending athlete profile created.');
+    return {
+      ...(await writeResult(body.id, 'Athlete profile created and invite ready.')),
+      actionUrl: body.actionUrl,
+      emailDelivery: body.emailDelivery,
+      emailMessageId: body.emailMessageId,
+      emailError: body.emailError,
+    };
   },
-  async requestAthleteClaim(athleteId, userId) {
+  async requestAthleteClaim(athleteId, userId, invitationToken) {
     requireActor(userId);
     const { auth } = requireFirebaseClient();
     const response = await fetch('/api/athlete-claims', {
@@ -704,7 +717,7 @@ export const firebaseProvider: GoalPlaceDataProvider = {
         authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ action: 'request', athleteId }),
+      body: JSON.stringify({ action: 'request', athleteId, invitationToken }),
     });
     const body = await response.json().catch(() => ({})) as { id?: string; status?: string; error?: string };
     if (!response.ok) throw new Error(body.error ?? 'Athlete claim could not be requested.');

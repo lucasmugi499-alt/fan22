@@ -54,6 +54,8 @@ import { investorDemoRuntime } from '../investorDemo';
 import {
   AdminAuditEvent,
   AccessAssignmentRecord,
+  Athlete,
+  AthleteClaim,
   Challenge,
   Invitation,
   League,
@@ -88,10 +90,12 @@ const storedApplicationsKey = 'goalplace256.demo.leagueAdminApplications';
 const storedLeaguesKey = 'goalplace256.demo.leagues';
 const storedSeasonsKey = 'goalplace256.demo.seasons';
 const storedTeamsKey = 'goalplace256.demo.teams';
+const storedAthletesKey = 'goalplace256.demo.athletes';
 const storedMatchesKey = 'goalplace256.demo.matches';
 const storedTeamAssignmentsKey = 'goalplace256.demo.teamAssignments';
 const storedInvitationsKey = 'goalplace256.demo.invitations';
 const storedAccessAssignmentsKey = 'goalplace256.demo.accessAssignments';
+const storedAthleteClaimsKey = 'goalplace256.demo.athleteClaims';
 const selectedLeagueKey = 'goalplace256:assignment:league';
 const resultSubmissions = new Map<string, ResultSubmission>(
   seededResultSubmissions.map((submission) => [submission.id, submission]),
@@ -103,6 +107,16 @@ const resultSubmissionListeners = new Map<
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeEmail(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+function demoUserEmail(userId: string) {
+  return users.find((user) => user.id === userId)?.email
+    ?? Object.values(MOCK_PROFILES).find((profile) => profile.uid === userId || profile.id === userId)?.email
+    ?? '';
 }
 
 function demoToast(message: string) {
@@ -176,6 +190,20 @@ function persistDemoTeam(team: Team) {
   const stored = readStoredItems<Team>(storedTeamsKey);
   replaceById(stored, team);
   writeStoredItems(storedTeamsKey, stored);
+}
+
+function persistDemoAthlete(athlete: Athlete) {
+  replaceById(athletes, athlete);
+  const stored = readStoredItems<Athlete>(storedAthletesKey);
+  replaceById(stored, athlete);
+  writeStoredItems(storedAthletesKey, stored);
+}
+
+function persistDemoAthleteClaim(claim: AthleteClaim) {
+  replaceById(investorDemoRuntime.athleteClaims, claim);
+  const stored = readStoredItems<AthleteClaim>(storedAthleteClaimsKey);
+  replaceById(stored, claim);
+  writeStoredItems(storedAthleteClaimsKey, stored);
 }
 
 function persistDemoMatch(match: Match) {
@@ -376,7 +404,8 @@ export const mockProvider: GoalPlaceDataProvider = {
       ?? getTeamById(idValue);
   },
   async getAthletes(options) {
-    return take(athletes
+    const allAthletes = mergedById(athletes, readStoredItems<Athlete>(storedAthletesKey));
+    return take(allAthletes
       .filter((athlete) =>
         (!options?.athleteId || athlete.id === options.athleteId) &&
         (!options?.teamId || athlete.teamId === options.teamId) &&
@@ -384,10 +413,15 @@ export const mockProvider: GoalPlaceDataProvider = {
       ), options?.limit, options?.afterId);
   },
   async getAthleteById(idValue) {
-    return getAthleteById(idValue);
+    return readStoredItems<Athlete>(storedAthletesKey).find((athlete) => athlete.id === idValue)
+      ?? getAthleteById(idValue);
   },
   async getAthleteClaims(options) {
-    return investorDemoRuntime.athleteClaims.filter((claim) =>
+    const allClaims = mergedById(
+      investorDemoRuntime.athleteClaims,
+      readStoredItems<AthleteClaim>(storedAthleteClaimsKey),
+    );
+    return allClaims.filter((claim) =>
       (!options?.userId || claim.requesterUserId === options.userId) &&
       (!options?.teamId || claim.teamId === options.teamId) &&
       (!options?.leagueId || claim.leagueId === options.leagueId)
@@ -830,10 +864,14 @@ export const mockProvider: GoalPlaceDataProvider = {
     return result(athleteId, 'Athlete profile updated.');
   },
   async createAthleteProfile(data) {
-    const team = teams.find((item) => item.id === data.teamId);
+    const team = teams.find((item) => item.id === data.teamId)
+      ?? readStoredItems<Team>(storedTeamsKey).find((item) => item.id === data.teamId);
     if (!team) throw new Error('Team not found.');
     const athleteId = id('athlete_demo');
-    athletes.unshift({
+    const invitationToken = id('athlete_invite');
+    const invitationActionUrl = `/register?next=${encodeURIComponent(`/athletes/${athleteId}?claim=${invitationToken}`)}`;
+    const invitedEmail = normalizeEmail(data.invitedEmail);
+    const athlete: Athlete = {
       id: athleteId,
       name: data.name,
       sport: team.sport,
@@ -844,6 +882,12 @@ export const mockProvider: GoalPlaceDataProvider = {
       country: 'Uganda',
       ageGroup: data.ageGroup,
       bio: `${data.name} is building a verified sporting record with ${team.name}.`,
+      invitedEmail,
+      invitationToken,
+      invitationActionUrl,
+      invitationExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      emailProvider: 'demo',
+      emailDelivery: 'sent',
       verified: false,
       verificationStatus: 'pending',
       totalSupport: 0,
@@ -852,27 +896,44 @@ export const mockProvider: GoalPlaceDataProvider = {
       stats: {},
       impactNeeds: [],
       createdAt: new Date().toISOString(),
-    });
-    return result(athleteId, 'Pending athlete profile created.');
+    };
+    persistDemoAthlete(athlete);
+    return {
+      ...result(athleteId, 'Athlete profile created and invite ready.'),
+      actionUrl: invitationActionUrl,
+      emailDelivery: 'sent',
+    };
   },
-  async requestAthleteClaim(athleteId, userId) {
-    const athlete = athletes.find((item) => item.id === athleteId);
+  async requestAthleteClaim(athleteId, userId, invitationToken) {
+    const athlete = athletes.find((item) => item.id === athleteId)
+      ?? readStoredItems<Athlete>(storedAthletesKey).find((item) => item.id === athleteId);
     if (!athlete) throw new Error('Athlete profile not found.');
     if (athlete.userId) throw new Error('This athlete profile is already linked.');
+    if (!athlete.invitedEmail || !athlete.invitationToken) {
+      throw new Error('Ask your Team Admin for an athlete invitation link.');
+    }
+    if (invitationToken !== athlete.invitationToken) {
+      throw new Error('This athlete invitation link is invalid or expired.');
+    }
+    if (normalizeEmail(demoUserEmail(userId)) !== normalizeEmail(athlete.invitedEmail)) {
+      throw new Error('Use the athlete account email that received this invitation.');
+    }
     const claim = {
       id: id('athlete_claim'),
       athleteId,
       teamId: athlete.teamId,
       leagueId: athlete.leagueId,
       requesterUserId: userId,
-      status: 'team_pending' as const,
+      status: 'league_pending' as const,
+      teamReviewedByUserId: 'team_invitation',
       createdAt: new Date().toISOString(),
     };
-    investorDemoRuntime.athleteClaims.unshift(claim);
+    persistDemoAthleteClaim(claim);
     return result(claim.id, claim.status);
   },
   async reviewAthleteClaim(claimId, actorUserId, action, reason) {
-    const claim = investorDemoRuntime.athleteClaims.find((item) => item.id === claimId);
+    const claim = investorDemoRuntime.athleteClaims.find((item) => item.id === claimId)
+      ?? readStoredItems<AthleteClaim>(storedAthleteClaimsKey).find((item) => item.id === claimId);
     if (!claim) throw new Error('Athlete claim not found.');
     if (action === 'team_confirm') {
       claim.status = 'league_pending';
@@ -880,8 +941,12 @@ export const mockProvider: GoalPlaceDataProvider = {
     } else if (action === 'league_verify') {
       claim.status = 'linked';
       claim.leagueReviewedByUserId = actorUserId;
-      const athlete = athletes.find((item) => item.id === claim.athleteId);
-      if (athlete) athlete.userId = claim.requesterUserId;
+      const athlete = athletes.find((item) => item.id === claim.athleteId)
+        ?? readStoredItems<Athlete>(storedAthletesKey).find((item) => item.id === claim.athleteId);
+      if (athlete) {
+        athlete.userId = claim.requesterUserId;
+        persistDemoAthlete(athlete);
+      }
       persistDemoAccessAssignment(athleteSelfAccessAssignment({
         athleteId: claim.athleteId,
         userId: claim.requesterUserId,
@@ -893,6 +958,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       claim.rejectionReason = reason;
     }
     claim.updatedAt = new Date().toISOString();
+    persistDemoAthleteClaim(claim);
     return result(claim.id, claim.status);
   },
   async updateTeamProfile(teamId, data) {

@@ -28,6 +28,7 @@ export function AthleteClaiming({
   const [claims, setClaims] = useState<AthleteClaim[]>([]);
   const [query, setQuery] = useState('');
   const [invitedAthleteId, setInvitedAthleteId] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
   const [saving, setSaving] = useState<string>();
 
   async function load() {
@@ -57,15 +58,16 @@ export function AthleteClaiming({
 
   useEffect(() => {
     if (scope || typeof window === 'undefined') return;
-    const athleteId = new URLSearchParams(window.location.search).get('claim') ?? '';
-    const invited = athletes.find((athlete) => athlete.id === athleteId);
+    const token = new URLSearchParams(window.location.search).get('claim') ?? '';
+    const invited = token ? athletes[0] : undefined;
     if (invited) {
       queueMicrotask(() => {
+        setInviteToken(token);
         setInvitedAthleteId(invited.id);
         setQuery(invited.name);
       });
     }
-    if (!athleteId && userProfile?.name && !query) {
+    if (!token && userProfile?.name && !query) {
       queueMicrotask(() => setQuery(userProfile.name));
     }
   }, [athletes, query, scope, userProfile?.name]);
@@ -83,9 +85,9 @@ export function AthleteClaiming({
     if (!userId) return;
     setSaving(athleteId);
     try {
-      await provider.requestAthleteClaim(athleteId, userId);
+      await provider.requestAthleteClaim(athleteId, userId, inviteToken);
       await load();
-      toast.success('Claim sent to the Team Admin for confirmation.');
+      toast.success('Invite accepted. Sent to League verification.');
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Claim could not be requested.');
     } finally {
@@ -155,22 +157,26 @@ export function AthleteClaiming({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-text-strong">Claim your athlete profile</h1>
-        <p className="text-sm text-muted">Find the existing roster profile that belongs to you. Team and League approval protects the career record.</p>
+        <h1 className="text-xl font-semibold text-text-strong">{inviteToken ? 'Create your athlete account' : 'Athlete invitation required'}</h1>
+        <p className="text-sm text-muted">{inviteToken
+          ? 'Accept the profile your Team Admin created for you. League verification protects the career record before the account is linked.'
+          : 'Ask your Team Admin to create your roster profile and send your private athlete account invitation.'}</p>
       </div>
-      <label className="relative block">
-        <MagnifyingGlass className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, position, or city" className="field pl-9" />
-      </label>
+      {inviteToken ? null : (
+        <label className="relative block">
+          <MagnifyingGlass className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, position, or city" className="field pl-9" />
+        </label>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
-        {candidates.map((athlete) => (
+        {(inviteToken ? candidates.filter((athlete) => athlete.id === invitedAthleteId) : candidates).map((athlete) => (
           <Card key={athlete.id} className="flex items-center justify-between gap-3 p-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-text-strong">{athlete.name}</p>
               <p className="truncate text-xs text-muted">{athlete.position} / {athlete.city}{athlete.userId ? ' / linked profile' : ''}</p>
             </div>
-            <Button size="sm" variant="secondary" disabled={saving === athlete.id || Boolean(athlete.userId)} onClick={() => void requestClaim(athlete.id)}>
-              {athlete.userId ? 'Linked' : 'Claim'}
+            <Button size="sm" variant="secondary" disabled={saving === athlete.id || Boolean(athlete.userId) || !inviteToken} onClick={() => void requestClaim(athlete.id)}>
+              {athlete.userId ? 'Linked' : inviteToken ? 'Accept invite' : 'Invite only'}
             </Button>
           </Card>
         ))}

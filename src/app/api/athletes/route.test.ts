@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { sendAthleteInvitationEmail } from '@/server/email/athleteInvitation';
 import { POST } from './route';
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -10,6 +11,10 @@ vi.mock('@/lib/firebase/admin', () => ({
     collection: vi.fn(),
     runTransaction: vi.fn(),
   },
+}));
+
+vi.mock('@/server/email/athleteInvitation', () => ({
+  sendAthleteInvitationEmail: vi.fn(async () => ({ status: 'sent', id: 'email_athlete_1' })),
 }));
 
 function request(body: string, token = 'token') {
@@ -33,6 +38,7 @@ function installFirestoreMock(records: Record<string, Record<string, unknown>>) 
     doc: (id = `${collectionName}_generated`) => ({
       id,
       get: vi.fn(async () => snapshot(id, records[`${collectionName}/${id}`])),
+      set: vi.fn(async () => undefined),
     }),
   }) as never);
 }
@@ -110,15 +116,30 @@ describe('athlete creation route hardening', () => {
       name: 'New Athlete',
       position: 'Forward',
       ageGroup: 'Senior',
+      invitedEmail: 'new.athlete@example.com',
     })));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, id: 'athletes_generated' });
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      id: 'athletes_generated',
+      actionUrl: expect.stringContaining('/register?next='),
+      emailDelivery: 'sent',
+      emailMessageId: 'email_athlete_1',
+    });
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'athletes_generated' }), expect.objectContaining({
       name: 'New Athlete',
       teamId: 'team_1',
       leagueId: 'league_1',
+      invitedEmail: 'new.athlete@example.com',
+      invitationTokenHash: expect.any(String),
+      invitationActionUrl: expect.stringContaining('/register?next='),
       verificationStatus: 'pending',
+    }));
+    expect(sendAthleteInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'new.athlete@example.com',
+      athleteName: 'New Athlete',
+      teamName: 'Kampala Testers',
     }));
   });
 
@@ -147,6 +168,7 @@ describe('athlete creation route hardening', () => {
       name: 'New Athlete',
       position: 'Forward',
       ageGroup: 'Senior',
+      invitedEmail: 'new.athlete@example.com',
     })));
 
     expect(response.status).toBe(403);

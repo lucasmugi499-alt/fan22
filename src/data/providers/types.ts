@@ -275,8 +275,9 @@ export interface GoalPlaceDataProvider {
     name: string;
     position: string;
     ageGroup: Athlete['ageGroup'];
+    invitedEmail: string;
   }): Promise<DataWriteResult>;
-  requestAthleteClaim(athleteId: string, userId: string): Promise<DataWriteResult>;
+  requestAthleteClaim(athleteId: string, userId: string, invitationToken?: string): Promise<DataWriteResult>;
   reviewAthleteClaim(
     claimId: string,
     actorUserId: string,

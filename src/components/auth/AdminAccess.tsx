@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { Invitation, SportSlug, TeamAssignment } from '@/types';
+import { assignmentKindForScope, storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
 
 const fanOperatorInvitationMessage = 'Fan accounts stay fan accounts. Sign out and use a League Admin or Team Admin account to accept this setup invitation.';
 const operatorInvitationRoles = new Set([
@@ -138,6 +139,7 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
     if (!userId) return;
     try {
       await dataProvider.acceptTeamAdminInvitation(assignmentId, userId, token);
+      if (assignment?.teamId) storeSelectedAssignmentId('team', assignment.teamId);
       setAccepted(true);
       toast.success('Team Admin invitation accepted.');
       if (typeof currentUser?.getIdToken === 'function') await currentUser.getIdToken(true);
@@ -208,6 +210,10 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
     if (!userId) return;
     try {
       await provider.acceptInvitation(invitationId, userId, token);
+      if (invitation) {
+        const assignmentKind = assignmentKindForScope(invitation.scopeType);
+        if (assignmentKind) storeSelectedAssignmentId(assignmentKind, invitation.scopeId);
+      }
       setAccepted(true);
       toast.success('Invitation accepted.');
       if (typeof currentUser?.getIdToken === 'function') await currentUser.getIdToken(true);

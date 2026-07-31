@@ -1,9 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { investorDemoRuntime } from '../investorDemo';
 import { mockProvider } from './mockProvider';
 
+function stubLocalStorage() {
+  const store = new Map<string, string>();
+  vi.stubGlobal('window', {
+    localStorage: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => { store.set(key, value); },
+      removeItem: (key: string) => { store.delete(key); },
+    },
+  });
+  return store;
+}
+
 describe('mock provider league applications', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('creates a draft demo league when a League Admin application is approved', async () => {
     const applicationId = `application_test_${Date.now()}`;
     await mockProvider.createLeagueAdminApplication({
@@ -139,26 +155,101 @@ describe('mock provider league applications', () => {
     const athlete = await mockProvider.createAthleteProfile({
       name: `Verified Runner ${suffix}`,
       position: 'Forward',
-      ageGroup: 'U17',
+      ageGroup: 'U18',
       teamId: 'team_football_01_01',
+      invitedEmail: MOCK_PROFILES.athlete.email,
     });
-    const requesterUserId = `mock_athlete_${suffix}`;
-    const claim = await mockProvider.requestAthleteClaim(athlete.id, requesterUserId);
+    const requesterUserId = MOCK_PROFILES.athlete.uid;
+    const storedAthlete = await mockProvider.getAthleteById(athlete.id!);
+    const claim = await mockProvider.requestAthleteClaim(athlete.id!, requesterUserId, storedAthlete?.invitationToken);
 
-    await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'team_confirm');
     await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'league_verify');
 
     expect(investorDemoRuntime.accessAssignments).toContainEqual(expect.objectContaining({
-      id: `assignment_athlete_${athlete.id}_${requesterUserId}`,
+      id: `assignment_athlete_${athlete.id!}_${requesterUserId}`,
       userId: requesterUserId,
       roleKey: 'athlete_self',
       scopeType: 'athlete',
-      scopeId: athlete.id,
+      scopeId: athlete.id!,
       permissionBundleId: 'athlete_self',
       status: 'active',
       grantedByUserId: MOCK_PROFILES.league_admin.uid,
       applicationId: claim.id,
     }));
-    expect(await mockProvider.getAthleteById(athlete.id)).toMatchObject({ userId: requesterUserId });
+    expect(await mockProvider.getAthleteById(athlete.id!)).toMatchObject({ userId: requesterUserId });
+  });
+
+  it('creates and links athletes for demo teams restored from local storage', async () => {
+    const stored = stubLocalStorage();
+    const teamId = `team_stored_${Date.now()}`;
+    stored.set('goalplace256.demo.teams', JSON.stringify([{
+      id: teamId,
+      name: 'Stored Browser Team',
+      sport: 'football',
+      leagueId: 'league_football_kampala',
+      city: 'Kampala',
+      country: 'Uganda',
+      description: 'Created during an investor browser walkthrough.',
+      plan: 'free',
+      verified: false,
+      adminUserIds: [],
+      totalSupport: 0,
+      supportersCount: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      leaguePoints: 0,
+      createdAt: '2026-07-31T00:00:00.000Z',
+    }]));
+
+    const created = await mockProvider.createAthleteProfile({
+      name: 'Stored Browser Athlete',
+      position: 'Forward',
+      ageGroup: 'Senior',
+      teamId,
+      invitedEmail: 'martha_nansubuga.01_01_01@demo.goalplace256.test',
+    });
+    const requesterUserId = 'user_ath_football_01_01_01';
+    const athlete = await mockProvider.getAthleteById(created.id);
+    const inviteToken = athlete?.invitationToken;
+
+    await expect(mockProvider.requestAthleteClaim(created.id, requesterUserId, 'wrong-token'))
+      .rejects.toThrow('invalid or expired');
+    await expect(mockProvider.requestAthleteClaim(created.id, MOCK_PROFILES.fan.uid, inviteToken))
+      .rejects.toThrow('Use the athlete account email');
+
+    const claim = await mockProvider.requestAthleteClaim(created.id, requesterUserId, inviteToken);
+
+    const requestedClaimIndex = investorDemoRuntime.athleteClaims.findIndex((item) => item.id === claim.id);
+    expect(requestedClaimIndex).toBeGreaterThanOrEqual(0);
+    investorDemoRuntime.athleteClaims.splice(requestedClaimIndex, 1);
+
+    expect(await mockProvider.getAthleteClaims({ teamId })).toContainEqual(expect.objectContaining({
+      id: claim.id,
+      status: 'league_pending',
+      teamReviewedByUserId: 'team_invitation',
+    }));
+
+    expect(await mockProvider.getAthleteClaims({ leagueId: 'league_football_kampala' })).toContainEqual(expect.objectContaining({
+      id: claim.id,
+      status: 'league_pending',
+    }));
+
+    await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'league_verify');
+
+    expect(await mockProvider.getAthleteById(created.id)).toMatchObject({
+      name: 'Stored Browser Athlete',
+      teamId,
+      userId: requesterUserId,
+    });
+    expect(investorDemoRuntime.accessAssignments).toContainEqual(expect.objectContaining({
+      id: `assignment_athlete_${created.id}_${requesterUserId}`,
+      userId: requesterUserId,
+      roleKey: 'athlete_self',
+      scopeType: 'athlete',
+      scopeId: created.id,
+    }));
   });
 });

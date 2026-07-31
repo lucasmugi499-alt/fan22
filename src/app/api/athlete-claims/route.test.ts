@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'crypto';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { POST } from './route';
 
@@ -35,6 +36,10 @@ function snapshot(data: Record<string, unknown> | undefined) {
     exists: Boolean(data),
     data: () => data,
   };
+}
+
+function querySnapshot(empty: boolean) {
+  return { empty };
 }
 
 describe('athlete claim access projection', () => {
@@ -117,6 +122,61 @@ describe('athlete claim access projection', () => {
     }), { merge: true });
     expect(adminAuth.setCustomUserClaims).toHaveBeenCalledWith('athlete_user_1', expect.objectContaining({
       role: 'athlete',
+    }));
+  });
+
+  it('requires the invited athlete email and token before opening league verification', async () => {
+    const token = 'invitation-token-that-is-long-enough';
+    const transaction = {
+      get: vi.fn(async (target: unknown) => {
+        if (typeof target === 'object' && target && 'collectionName' in target) {
+          const document = target as ReturnType<typeof ref>;
+          if (document.collectionName === 'athletes') {
+            return snapshot({
+              id: 'athlete_1',
+              teamId: 'team_1',
+              leagueId: 'league_1',
+              invitedEmail: 'athlete@example.com',
+              invitationTokenHash: createHash('sha256').update(token).digest('hex'),
+              invitationExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+            });
+          }
+        }
+        return querySnapshot(true);
+      }),
+      create: vi.fn(),
+      update: vi.fn(),
+      set: vi.fn(),
+    };
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: (id?: string) => ref(collectionName, id),
+      where: vi.fn().mockReturnThis(),
+    }) as never);
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'athlete_user_1',
+      role: 'fan',
+      email: 'athlete@example.com',
+      email_verified: true,
+    });
+
+    const response = await POST(request({
+      action: 'request',
+      athleteId: 'athlete_1',
+      invitationToken: token,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'league_pending',
+    });
+    expect(transaction.create).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'athleteClaims',
+    }), expect.objectContaining({
+      athleteId: 'athlete_1',
+      requesterUserId: 'athlete_user_1',
+      status: 'league_pending',
+      teamReviewedByUserId: 'team_invitation',
     }));
   });
 });
