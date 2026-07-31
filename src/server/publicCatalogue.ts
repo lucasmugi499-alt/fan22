@@ -126,16 +126,16 @@ export async function getPublicAthletes() {
 }
 
 export async function getPublicMatches() {
-  if (!usesFirebaseData()) return investorDemo.matches.slice(0, 60);
+  if (!usesFirebaseData()) return investorDemo.matches;
   return withSyntheticDemoFallback(
     async () => {
       const snapshot = await adminDb.collection('matches')
         .orderBy('scheduledAt', 'desc')
-        .limit(60)
+        .limit(700)
         .get();
       return snapshot.docs.map((item) => record<Match>(item.id, item.data()));
     },
-    () => investorDemo.matches.slice(0, 60),
+    () => investorDemo.matches,
   );
 }
 

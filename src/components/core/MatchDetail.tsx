@@ -41,6 +41,13 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { toast } from 'sonner';
 import { getSportTheme } from '@/lib/sportThemes';
+import {
+  lineupFormationLabel,
+  lineupSlots,
+  lineupStarterLimit,
+  lineupSurfaceLabel,
+  sportKey,
+} from '@/lib/sportPresentation';
 
 const EVENT_META: Record<string, { icon: IconComponent; label: string; scoring?: boolean }> = {
   goal: { icon: SoccerBall, label: 'Goal', scoring: true },
@@ -264,9 +271,9 @@ export function MatchDetail({ matchId }: { matchId: string }) {
             <h2 className="mb-4 flex items-center gap-1.5 text-[15px] font-semibold text-text-strong">
               <Users className="h-4 w-4 text-brand" weight="bold" /> Lineups
             </h2>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Lineup title={home?.name ?? 'Home team'} athleteIds={homeRoster?.athleteIds ?? []} athleteById={athleteById} />
-              <Lineup title={away?.name ?? 'Away team'} athleteIds={awayRoster?.athleteIds ?? []} athleteById={athleteById} />
+            <div className="grid gap-5 xl:grid-cols-2">
+              <Lineup title={home?.name ?? 'Home team'} athleteIds={homeRoster?.athleteIds ?? []} athleteById={athleteById} sport={String(match.sport)} />
+              <Lineup title={away?.name ?? 'Away team'} athleteIds={awayRoster?.athleteIds ?? []} athleteById={athleteById} sport={String(match.sport)} />
             </div>
           </Card>
 
@@ -349,28 +356,148 @@ function Lineup({
   title,
   athleteIds,
   athleteById,
+  sport,
 }: {
   title: string;
   athleteIds: string[];
   athleteById: Map<string, { id: string; name: string; position: string }>;
+  sport: string;
 }) {
+  const starterLimit = lineupStarterLimit(sport);
+  const starters = athleteIds.slice(0, starterLimit);
+  const bench = athleteIds.slice(starterLimit, starterLimit + 8);
+  const slots = lineupSlots(sport);
+  const surface = sportKey(sport);
+  const formation = lineupFormationLabel(sport);
+  const surfaceLabel = lineupSurfaceLabel(sport);
+
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase text-subtle">{title}</p>
-      <div className="space-y-1">
-        {athleteIds.slice(0, 15).map((id, index) => {
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-2">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-subtle">{title}</p>
+          <p className="mt-0.5 text-sm font-semibold text-text-strong">{formation}</p>
+        </div>
+        <span className="rounded-[var(--radius-pill)] border border-border bg-surface-1 px-2.5 py-1 text-[11px] font-semibold text-muted">
+          {surfaceLabel}
+        </span>
+      </div>
+
+      <div
+        className={cn(
+          'relative mx-3 mt-3 aspect-[3/4] overflow-hidden rounded-[var(--radius-md)] border border-white/15 shadow-inner',
+          surface === 'basketball'
+            ? 'bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.14),transparent_20%),linear-gradient(160deg,rgba(249,115,22,0.35),rgba(80,35,10,0.7)_45%,rgba(15,23,42,0.92))]'
+            : surface === 'rugby'
+              ? 'bg-[linear-gradient(180deg,rgba(59,130,246,0.22),rgba(8,47,73,0.82)),repeating-linear-gradient(0deg,rgba(255,255,255,0.12)_0_1px,transparent_1px_12%)]'
+              : 'bg-[linear-gradient(180deg,rgba(34,197,94,0.22),rgba(4,47,46,0.86)),repeating-linear-gradient(90deg,rgba(255,255,255,0.04)_0_1px,transparent_1px_13%)]'
+        )}
+      >
+        <SurfaceMarkings sport={surface} />
+        {starters.map((id, index) => {
           const athlete = athleteById.get(id);
+          const slot = slots[index] ?? { x: 50, y: 50 };
           return (
-            <Link key={id} href={`/athletes/${id}`} className="flex min-h-10 items-center gap-2 rounded-[var(--radius-sm)] px-2 hover:bg-surface-2">
-              <span data-numeric className="w-6 text-xs font-bold text-brand">{index + 1}</span>
-              <span className="min-w-0"><span className="block truncate text-sm font-medium text-text-strong">{athlete?.name ?? 'Squad member'}</span><span className="block truncate text-[11px] text-muted">{athlete?.position}</span></span>
+            <Link
+              key={id}
+              href={`/athletes/${id}`}
+              className="group absolute w-18 -translate-x-1/2 -translate-y-1/2 text-center focus-visible:outline-none"
+              style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+            >
+              <span className="mx-auto grid h-9 w-9 place-items-center rounded-full border border-white/45 bg-surface-0/88 text-[11px] font-black text-brand shadow-e2 transition-transform duration-[var(--dur-micro)] group-hover:-translate-y-0.5">
+                {index + 1}
+              </span>
+              <span className="mt-1 block truncate text-[10px] font-bold leading-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.65)]">
+                {shortName(athlete?.name)}
+              </span>
+              <span className="block truncate text-[9px] font-medium text-white/65">
+                {shortPosition(athlete?.position)}
+              </span>
             </Link>
           );
         })}
-        {!athleteIds.length ? <p className="text-sm text-muted">Lineup has not been published.</p> : null}
+        {!starters.length ? (
+          <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-white/70">
+            Lineup has not been published.
+          </div>
+        ) : null}
       </div>
+
+      {bench.length ? (
+        <div className="px-3 py-3">
+          <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-subtle">
+            <span>Bench</span>
+            <span>Subs</span>
+          </div>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {bench.map((id, index) => {
+              const athlete = athleteById.get(id);
+              return (
+                <Link key={id} href={`/athletes/${id}`} className="flex min-h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2 transition-colors hover:bg-surface-1">
+                  <span data-numeric className="w-5 text-xs font-bold tabular-nums text-muted">{starterLimit + index + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold text-text-strong">{athlete?.name ?? 'Squad member'}</span>
+                    <span className="block truncate text-[10px] text-muted">{athlete?.position}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function SurfaceMarkings({ sport }: { sport: 'football' | 'basketball' | 'rugby' }) {
+  if (sport === 'basketball') {
+    return (
+      <>
+        <span className="absolute inset-x-0 top-1/2 h-px bg-white/18" aria-hidden />
+        <span className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/16" aria-hidden />
+        <span className="absolute left-1/2 top-4 h-16 w-28 -translate-x-1/2 rounded-b-[999px] border border-white/18 border-t-0" aria-hidden />
+        <span className="absolute bottom-4 left-1/2 h-16 w-28 -translate-x-1/2 rounded-t-[999px] border border-white/18 border-b-0" aria-hidden />
+        <span className="absolute left-1/2 top-0 h-14 w-20 -translate-x-1/2 border-x border-b border-white/18" aria-hidden />
+        <span className="absolute bottom-0 left-1/2 h-14 w-20 -translate-x-1/2 border-x border-t border-white/18" aria-hidden />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <span className="absolute inset-x-0 top-1/2 h-px bg-white/18" aria-hidden />
+      <span className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/16" aria-hidden />
+      <span className="absolute inset-x-5 top-4 h-20 rounded-b-[var(--radius-md)] border border-white/16 border-t-0" aria-hidden />
+      <span className="absolute inset-x-5 bottom-4 h-20 rounded-t-[var(--radius-md)] border border-white/16 border-b-0" aria-hidden />
+      {sport === 'rugby' ? (
+        <>
+          <span className="absolute inset-x-0 top-[22%] h-px bg-white/14" aria-hidden />
+          <span className="absolute inset-x-0 bottom-[22%] h-px bg-white/14" aria-hidden />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function shortName(name?: string) {
+  if (!name) return 'Squad';
+  const parts = name.split(' ').filter(Boolean);
+  if (parts.length <= 1) return parts[0] ?? name;
+  return `${parts[0]?.[0]}. ${parts.at(-1)}`;
+}
+
+function shortPosition(position?: string) {
+  if (!position) return '';
+  return position
+    .replace('Goalkeeper', 'GK')
+    .replace('Defensive Midfielder', 'DM')
+    .replace('Attacking Midfielder', 'AM')
+    .replace('Central Midfielder', 'CM')
+    .replace('Centre Back', 'CB')
+    .replace('Right Back', 'RB')
+    .replace('Left Back', 'LB')
+    .replace('Right Wing', 'RW')
+    .replace('Left Wing', 'LW');
 }
 
 function SidePole({ team, fallback, sport, align }: { team?: Team; fallback: string; sport: string; align: 'left' | 'right' }) {
