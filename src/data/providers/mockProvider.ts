@@ -205,6 +205,29 @@ function persistDemoAccessAssignment(assignment: AccessAssignmentRecord) {
   writeStoredItems(storedAccessAssignmentsKey, stored);
 }
 
+function athleteSelfAccessAssignment(input: {
+  athleteId: string;
+  userId: string;
+  grantedByUserId: string;
+  claimId: string;
+}): AccessAssignmentRecord {
+  const now = new Date().toISOString();
+  return {
+    id: `assignment_athlete_${input.athleteId}_${input.userId}`,
+    userId: input.userId,
+    roleKey: 'athlete_self',
+    scopeType: 'athlete',
+    scopeId: input.athleteId,
+    permissionBundleId: 'athlete_self',
+    status: 'active',
+    grantedByUserId: input.grantedByUserId,
+    applicationId: input.claimId,
+    validFrom: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function demoLeagueIdForApplication(applicationId: string) {
   return `league_${applicationId}`;
 }
@@ -819,6 +842,12 @@ export const mockProvider: GoalPlaceDataProvider = {
       claim.leagueReviewedByUserId = actorUserId;
       const athlete = athletes.find((item) => item.id === claim.athleteId);
       if (athlete) athlete.userId = claim.requesterUserId;
+      persistDemoAccessAssignment(athleteSelfAccessAssignment({
+        athleteId: claim.athleteId,
+        userId: claim.requesterUserId,
+        grantedByUserId: actorUserId,
+        claimId: claim.id,
+      }));
     } else {
       claim.status = 'rejected';
       claim.rejectionReason = reason;

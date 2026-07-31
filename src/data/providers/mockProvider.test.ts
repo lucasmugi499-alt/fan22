@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
+import { investorDemoRuntime } from '../investorDemo';
 import { mockProvider } from './mockProvider';
 
 describe('mock provider league applications', () => {
@@ -125,5 +126,33 @@ describe('mock provider league applications', () => {
 
     await mockProvider.acceptInvitation(`invite_${applicationId}`, 'mock_team_admin_new', 'demo');
     expect((await mockProvider.getTeams({ leagueId })).find((team) => team.id === `team_${applicationId}`)?.adminUserIds).toContain('mock_team_admin_new');
+  });
+
+  it('projects athlete self access when a claim is league verified', async () => {
+    const suffix = Date.now();
+    const athlete = await mockProvider.createAthleteProfile({
+      name: `Verified Runner ${suffix}`,
+      position: 'Forward',
+      ageGroup: 'U17',
+      teamId: 'team_football_01_01',
+    });
+    const requesterUserId = `mock_athlete_${suffix}`;
+    const claim = await mockProvider.requestAthleteClaim(athlete.id, requesterUserId);
+
+    await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'team_confirm');
+    await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'league_verify');
+
+    expect(investorDemoRuntime.accessAssignments).toContainEqual(expect.objectContaining({
+      id: `assignment_athlete_${athlete.id}_${requesterUserId}`,
+      userId: requesterUserId,
+      roleKey: 'athlete_self',
+      scopeType: 'athlete',
+      scopeId: athlete.id,
+      permissionBundleId: 'athlete_self',
+      status: 'active',
+      grantedByUserId: MOCK_PROFILES.league_admin.uid,
+      applicationId: claim.id,
+    }));
+    expect(await mockProvider.getAthleteById(athlete.id)).toMatchObject({ userId: requesterUserId });
   });
 });

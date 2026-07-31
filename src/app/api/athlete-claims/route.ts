@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { accessIndexId, capabilitiesForAssignment } from '@/lib/auth/access';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,9 @@ async function synchronizeAthleteRole(uid: string) {
   await Promise.all([
     adminDb.collection('users').doc(uid).set({
       role: nextRole,
+      primaryPersona: nextRole,
+      accountStatus: 'active',
+      accessVersion: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true }),
     adminAuth.setCustomUserClaims(uid, {
@@ -31,6 +35,32 @@ async function synchronizeAthleteRole(uid: string) {
       role: nextRole,
     }),
   ]);
+}
+
+function athleteSelfAssignmentId(athleteId: string, userId: string) {
+  return `assignment_athlete_${athleteId}_${userId}`;
+}
+
+function athleteSelfAssignment(input: {
+  athleteId: string;
+  userId: string;
+  grantedByUserId: string;
+  claimId: string;
+}) {
+  return {
+    id: athleteSelfAssignmentId(input.athleteId, input.userId),
+    userId: input.userId,
+    roleKey: 'athlete_self',
+    scopeType: 'athlete',
+    scopeId: input.athleteId,
+    permissionBundleId: 'athlete_self',
+    status: 'active',
+    grantedByUserId: input.grantedByUserId,
+    applicationId: input.claimId,
+    validFrom: new Date().toISOString(),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
 }
 
 export async function POST(request: Request) {
@@ -92,11 +122,34 @@ export async function POST(request: Request) {
       }
 
       if (input.action === 'league_verify') {
+        const requesterUserId = claim.requesterUserId as string;
+        const assignment = athleteSelfAssignment({
+          athleteId: claim.athleteId as string,
+          userId: requesterUserId,
+          grantedByUserId: actor.uid,
+          claimId: claimRef.id,
+        });
+        const assignmentId = assignment.id;
+        const capabilities = capabilitiesForAssignment({
+          permissionBundleId: 'athlete_self',
+          roleKey: 'athlete_self',
+        });
         if (claim.status === 'linked') {
+          transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment, { merge: true });
+          transaction.set(adminDb.collection('accessIndex').doc(accessIndexId('athlete', claim.athleteId, requesterUserId)), {
+            userId: requesterUserId,
+            scopeType: 'athlete',
+            scopeId: claim.athleteId,
+            activeRoles: ['athlete_self'],
+            capabilities,
+            assignmentIds: [assignmentId],
+            accessVersion: FieldValue.increment(1),
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
           return {
             id: claimRef.id,
             status: 'linked',
-            requesterUserId: claim.requesterUserId as string,
+            requesterUserId,
           };
         }
         if (claim.status !== 'league_pending') throw new Error('Team confirmation is required first.');
@@ -104,7 +157,18 @@ export async function POST(request: Request) {
         const athleteRef = adminDb.collection('athletes').doc(claim.athleteId);
         const athleteSnapshot = await transaction.get(athleteRef);
         if (athleteSnapshot.data()?.userId) throw new Error('This athlete profile was linked while the claim was under review.');
-        transaction.update(athleteRef, { userId: claim.requesterUserId, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(athleteRef, { userId: requesterUserId, updatedAt: FieldValue.serverTimestamp() });
+        transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment);
+        transaction.set(adminDb.collection('accessIndex').doc(accessIndexId('athlete', claim.athleteId, requesterUserId)), {
+          userId: requesterUserId,
+          scopeType: 'athlete',
+          scopeId: claim.athleteId,
+          activeRoles: ['athlete_self'],
+          capabilities,
+          assignmentIds: [assignmentId],
+          accessVersion: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         transaction.update(claimRef, {
           status: 'linked',
           leagueReviewedByUserId: actor.uid,
@@ -127,7 +191,7 @@ export async function POST(request: Request) {
         return {
           id: claimRef.id,
           status: 'linked',
-          requesterUserId: claim.requesterUserId as string,
+          requesterUserId,
         };
       }
 
