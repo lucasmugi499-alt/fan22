@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
+import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
 
 export const runtime = 'nodejs';
 
@@ -26,6 +27,19 @@ function audit(
 
 function hasRole(actor: AuthenticatedActor, roles: string[]) {
   return roles.includes(String(actor.role));
+}
+
+function indexHasCapability(snapshot: FirebaseFirestore.DocumentSnapshot, capability: PermissionCapability) {
+  const capabilities = snapshot.data()?.capabilities;
+  return Array.isArray(capabilities) && capabilities.includes(capability);
+}
+
+async function hasScopedLeagueCapability(userId: string, leagueId: string, capability: PermissionCapability) {
+  const [leagueAccess, platformAccess] = await Promise.all([
+    adminDb.collection('accessIndex').doc(accessIndexId('league', leagueId, userId)).get(),
+    adminDb.collection('accessIndex').doc(accessIndexId('platform', 'global', userId)).get(),
+  ]);
+  return indexHasCapability(leagueAccess, capability) || indexHasCapability(platformAccess, capability);
 }
 
 function publicBaseUrl(request: Request) {
@@ -241,6 +255,7 @@ export async function POST(request: Request) {
       if (
         !hasRole(actor, ['platform_admin', 'super_admin'])
         && !leagueData?.adminUserIds?.includes(actor.uid)
+        && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team_admin.invite'))
       ) {
         return Response.json({ error: 'You do not manage this league.' }, { status: 403 });
       }
@@ -372,6 +387,7 @@ export async function POST(request: Request) {
         if (
           !hasRole(actor, ['platform_admin', 'super_admin'])
           && !league.data()?.adminUserIds?.includes(actor.uid)
+          && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team.create'))
         ) {
           return Response.json({ error: `You do not manage league ${leagueId}.` }, { status: 403 });
         }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { POST } from './route';
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -8,6 +9,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+    runTransaction: vi.fn(),
   },
 }));
 
@@ -22,6 +24,46 @@ function request(body: string, token = 'token') {
     body,
   });
 }
+
+function snapshot(id: string, data: Record<string, unknown> | undefined) {
+  return {
+    id,
+    exists: Boolean(data),
+    data: () => data,
+  };
+}
+
+function installFirestoreMock(records: Record<string, Record<string, unknown>>) {
+  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+    doc: (id = `${collectionName}_generated`) => ({
+      collectionName,
+      id,
+      get: vi.fn(async () => snapshot(id, records[`${collectionName}/${id}`])),
+      set: vi.fn(async () => undefined),
+    }),
+  }) as never);
+}
+
+const teamPayload = {
+  id: 'team_1',
+  name: 'Kampala Testers',
+  sport: 'football',
+  leagueId: 'league_1',
+  city: 'Kampala',
+  country: 'Uganda',
+  description: 'A new test team.',
+  plan: 'free',
+  verified: false,
+  adminUserIds: [],
+  totalSupport: 0,
+  supportersCount: 0,
+  wins: 0,
+  draws: 0,
+  losses: 0,
+  pointsFor: 0,
+  pointsAgainst: 0,
+  leaguePoints: 0,
+};
 
 describe('trusted admin actions route hardening', () => {
   beforeEach(() => {
@@ -74,5 +116,119 @@ describe('trusted admin actions route hardening', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'League Admin access required.' });
     expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it('allows scoped League Admins to create teams for their league', async () => {
+    const transaction = {
+      get: vi.fn(async () => snapshot('team_1', undefined)),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/league_league_1_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.team.create'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_teams',
+      teams: [teamPayload],
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, id: 'team_1', count: 1 });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'team_1' }), expect.objectContaining({
+      id: 'team_1',
+      leagueId: 'league_1',
+      adminUserIds: [],
+    }));
+  });
+
+  it('rejects League Admin team creation when scoped access belongs elsewhere', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    installFirestoreMock({
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/league_league_2_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_2',
+        capabilities: ['league.team.create'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_teams',
+      teams: [teamPayload],
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'You do not manage league league_1.' });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+  });
+
+  it('allows scoped League Admins to invite a Team Admin for their league', async () => {
+    const transaction = {
+      get: vi.fn(async () => snapshot('invite_1', undefined)),
+      set: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'league_admin_1',
+      role: 'league_admin',
+      email: 'league@example.com',
+      name: 'League Admin',
+    });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    vi.mocked(sendTeamInvitationEmail).mockResolvedValue({ status: 'sent', id: 'email_1' });
+    installFirestoreMock({
+      'leagues/league_1': { id: 'league_1', name: 'Kampala League', adminUserIds: [] },
+      'teams/team_1': { id: 'team_1', name: 'Kampala Testers', leagueId: 'league_1' },
+      'seasons/season_1': { id: 'season_1', name: '2027 Season' },
+      'accessIndex/league_league_1_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.team_admin.invite'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_team_invitation',
+      teamId: 'team_1',
+      leagueId: 'league_1',
+      seasonId: 'season_1',
+      invitedEmail: 'teamadmin@example.com',
+    })));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      ok: true,
+      emailDelivery: 'sent',
+      emailMessageId: 'email_1',
+    });
+    expect(body.actionUrl).toContain('/invitations/access/invite_');
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'invitations',
+    }), expect.objectContaining({
+      type: 'team_admin',
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: 'team_1',
+      permissionBundleId: 'full_team_admin',
+      invitedByUserId: 'league_admin_1',
+      invitedEmail: 'teamadmin@example.com',
+    }));
+    expect(sendTeamInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'teamadmin@example.com',
+      teamName: 'Kampala Testers',
+      leagueName: 'Kampala League',
+      seasonName: '2027 Season',
+    }));
   });
 });
