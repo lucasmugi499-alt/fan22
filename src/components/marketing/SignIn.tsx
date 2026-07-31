@@ -25,6 +25,7 @@ import {
 } from '@/lib/auth/demoAccounts';
 import { dataMode } from '@/data/dataProvider';
 import { storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
+import { registrationIntentForNextPath } from '@/lib/auth/invitationIntent';
 
 const FEATURED_DEMO_ACCOUNTS = featuredDemoAccounts();
 const DEFAULT_DEMO_EMAIL = FEATURED_DEMO_ACCOUNTS.find((account) => account.role === 'fan')?.email ?? '';
@@ -64,6 +65,7 @@ export function SignIn({
   const [awaitingAuthState, setAwaitingAuthState] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const localDemoLogin = demoAccessActive && dataMode === 'mock';
+  const registrationIntent = registrationIntentForNextPath(nextPath);
 
   useEffect(() => {
     if (!awaitingAuthState || authStatus !== 'logged_in') return;
@@ -114,11 +116,17 @@ export function SignIn({
           setError('Use at least eight characters for your password.');
           return;
         }
-        await registerAccount({ email: email.trim(), password, name: name.trim() });
+        await registerAccount({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          accountStatus: registrationIntent.accountStatus,
+          pendingInvitationPath: registrationIntent.kind === 'fan' ? undefined : nextPath,
+        });
         await firebaseLogout();
         setMode('signin');
         setPassword('');
-        setSuccess('Account created. Check your inbox to verify your email, then sign in.');
+        setSuccess(registrationIntent.successMessage);
         return;
       }
 
@@ -184,7 +192,7 @@ export function SignIn({
             {demoAccessActive
               ? 'Enter GoalPlace256'
               : mode === 'register'
-                ? 'Create your fan account'
+                ? registrationIntent.title
                 : mode === 'reset'
                   ? 'Reset your password'
                   : 'Welcome back'}
@@ -194,7 +202,7 @@ export function SignIn({
           ) : (
             <p className="mt-1 text-sm text-muted">
               {mode === 'register'
-                ? 'Start following local leagues, teams, athletes, and fantasy competitions.'
+                ? registrationIntent.description
                 : mode === 'reset'
                   ? 'Enter your email and we will send a secure reset link.'
                   : 'Sign in to continue to your sports home.'}
@@ -380,7 +388,7 @@ export function SignIn({
               {submitting
                 ? 'Please wait...'
                 : mode === 'register'
-                  ? 'Create fan account'
+                  ? registrationIntent.submitLabel
                   : mode === 'reset'
                     ? 'Send reset email'
                     : 'Sign in'}
@@ -396,7 +404,7 @@ export function SignIn({
             ) : (
               <>
                 <p className="text-center text-xs leading-5 text-muted">
-                  By creating an account, you agree to the <a href="/terms" className="text-brand hover:underline">Terms</a> and <a href="/privacy" className="text-brand hover:underline">Privacy notice</a>. Athlete and administrator access requires verification or invitation.
+                  By creating an account, you agree to the <a href="/terms" className="text-brand hover:underline">Terms</a> and <a href="/privacy" className="text-brand hover:underline">Privacy notice</a>. {registrationIntent.kind === 'fan' ? 'Athlete and administrator access requires verification or invitation.' : 'This account receives no privileged access until the invitation is accepted and verified.'}
                 </p>
                 <button type="button" onClick={() => setMode('signin')} className="min-h-11 w-full text-sm font-medium text-muted hover:text-brand">
                   Already have an account? Sign in
@@ -437,7 +445,7 @@ export function SignIn({
           <AccessPath
             icon={ShieldCheck}
             title="League organizer"
-            description="Create a fan account first, then submit the league and your authority for Platform Admin review."
+            description="Submit the league and authority details for Platform Admin review. If approved, you receive a separate League Admin setup invitation; fan accounts stay fan accounts."
             action="Apply to operate a league"
             onClick={() => router.push('/apply/league-admin')}
           />

@@ -58,8 +58,16 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow create: if isOwner(uid) &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'email', 'name', 'role', 'accountStatus', 'pendingInvitationPath',
+          'status', 'points', 'walletBalance',
+          'followedAthletes', 'followedTeams', 'followedLeagues',
+          'createdAt', 'updatedAt'
+        ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.role == 'fan' &&
+        (!request.resource.data.keys().hasAny(['accountStatus']) ||
+          request.resource.data.accountStatus in ['active', 'invited']) &&
         request.resource.data.status == 'active' &&
         request.resource.data.points == 0 &&
         request.resource.data.walletBalance == 0;

@@ -71,7 +71,7 @@ export function LeagueAdminApplicationForm() {
         <ShieldCheck className="mx-auto h-8 w-8 text-brand" weight="duotone" />
         <h1 className="mt-3 text-xl font-semibold text-text-strong">Operate a league on GoalPlace256</h1>
         <p className="mt-2 text-sm text-muted">Sign in to submit a league application. Platform review creates the league and assigns administrator access.</p>
-        <Link href="/login" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
+        <Link href={`/login?next=${encodeURIComponent('/apply/league-admin')}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
       </Card>
     );
   }
@@ -160,15 +160,18 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
       <Card className="mx-auto max-w-lg p-6 text-center">
         <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
         <h1 className="mt-3 text-xl font-semibold text-text-strong">Team Admin invitation</h1>
-        <p className="mt-2 text-sm text-muted">Sign in with the invited email address to review and accept this assignment.</p>
-        <Link href={`/login?next=${encodeURIComponent(next)}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in to accept</Link>
+        <p className="mt-2 text-sm text-muted">Sign in or create an invited admin account with the email address that received this assignment.</p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Link href={`/login?next=${encodeURIComponent(next)}`} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
+          <Link href={`/register?next=${encodeURIComponent(next)}`} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] border border-border bg-surface-2 px-5 text-sm font-semibold text-text-strong">Create invited account</Link>
+        </div>
       </Card>
     );
   }
   if (loading) return <Skeleton className="mx-auto h-64 max-w-lg rounded-[var(--radius-lg)]" />;
   if (!assignment) return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation may have expired or been revoked.</p></Card>;
 
-  const fanAccountBlocked = accountRole === 'fan';
+  const fanAccountBlocked = accountRole === 'fan' && userProfile?.accountStatus !== 'invited';
 
   return (
     <Card className="mx-auto max-w-lg p-6 text-center">
@@ -244,8 +247,11 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
       <Card className="mx-auto max-w-lg p-6 text-center">
         <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
         <h1 className="mt-3 text-xl font-semibold text-text-strong">GoalPlace256 invitation</h1>
-        <p className="mt-2 text-sm text-muted">Sign in with the invited email address to review and accept this assignment.</p>
-        <Link href={`/login?next=${encodeURIComponent(next)}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in to accept</Link>
+        <p className="mt-2 text-sm text-muted">Sign in or create an invited admin account with the email address that received this assignment.</p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Link href={`/login?next=${encodeURIComponent(next)}`} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
+          <Link href={`/register?next=${encodeURIComponent(next)}`} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] border border-border bg-surface-2 px-5 text-sm font-semibold text-text-strong">Create invited account</Link>
+        </div>
       </Card>
     );
   }
@@ -255,7 +261,7 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
   }
 
   const expired = Date.parse(invitation.expiresAt) <= loadedAt;
-  const fanAccountBlocked = accountRole === 'fan' && isOperatorInvitation(invitation.roleKey);
+  const fanAccountBlocked = accountRole === 'fan' && userProfile?.accountStatus !== 'invited' && isOperatorInvitation(invitation.roleKey);
   const canAccept = !accepted && invitation.status !== 'accepted' && !expired && !fanAccountBlocked;
 
   return (

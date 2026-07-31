@@ -105,8 +105,13 @@ function primaryPersonaForRole(roleKey: string) {
   return 'fan';
 }
 
-function blocksFanOperatorInvitation(actorRole: unknown, roleKey: string) {
-  return String(actorRole ?? 'fan') === 'fan' && OPERATOR_INVITATION_ROLES.has(roleKey);
+function blocksFanOperatorInvitation(
+  actorRole: unknown,
+  userData: Record<string, unknown> | undefined,
+  roleKey: string,
+) {
+  const role = String(actorRole ?? userData?.role ?? 'fan');
+  return role === 'fan' && userData?.accountStatus !== 'invited' && OPERATOR_INVITATION_ROLES.has(roleKey);
 }
 
 export async function POST(request: Request) {
@@ -139,7 +144,8 @@ export async function POST(request: Request) {
       if (data.invitedEmail && data.invitedEmail.toLowerCase() !== actor.email?.toLowerCase()) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
-      if (blocksFanOperatorInvitation(actor.role, 'team_admin')) {
+      const userSnapshot = await adminDb.collection('users').doc(actor.uid).get();
+      if (blocksFanOperatorInvitation(actor.role, userSnapshot.data(), 'team_admin')) {
         return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
       }
       if (data.status === 'active' && data.userId === actor.uid) {
@@ -336,7 +342,8 @@ export async function POST(request: Request) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
       const persona = primaryPersonaForRole(String(data.roleKey));
-      if (blocksFanOperatorInvitation(actor.role, String(data.roleKey))) {
+      const userSnapshot = await adminDb.collection('users').doc(actor.uid).get();
+      if (blocksFanOperatorInvitation(actor.role, userSnapshot.data(), String(data.roleKey))) {
         return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
       }
       if (data.status === 'accepted') {

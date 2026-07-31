@@ -36,10 +36,14 @@ export async function registerAccount({
   email,
   password,
   name,
+  accountStatus = 'active',
+  pendingInvitationPath,
 }: {
   email: string;
   password: string;
   name: string;
+  accountStatus?: 'active' | 'invited';
+  pendingInvitationPath?: string;
 }) {
   const { auth, db } = requireFirebaseClient();
   const credential = await createUserWithEmailAndPassword(auth, email, password);
@@ -51,6 +55,7 @@ export async function registerAccount({
     email,
     name,
     role: 'fan',
+    accountStatus,
     status: 'active',
     points: 0,
     walletBalance: 0,
@@ -61,6 +66,7 @@ export async function registerAccount({
 
   await setDoc(doc(db, 'users', credential.user.uid), {
     ...profile,
+    ...(pendingInvitationPath ? { pendingInvitationPath } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

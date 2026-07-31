@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle, XCircle, SealCheck } from '@phosphor-icons/react';
+import { CheckCircle, Copy, XCircle, SealCheck } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { pendingApprovals, type ApprovalItem } from '@/lib/platform/platformContext';
@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { STATE } from '@/lib/statusSystem';
 import { useAuth } from '@/context/AuthProvider';
 import { dataProvider } from '@/data/dataProvider';
@@ -46,6 +47,7 @@ export function PlatformApprovals() {
   const [active, setActive] = useState<PlatformApprovalItem | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recentInvite, setRecentInvite] = useState<{ title: string; url: string } | null>(null);
 
   async function decide(decision: 'approved' | 'rejected' | 'requested_information') {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
@@ -62,11 +64,15 @@ export function PlatformApprovals() {
         decision,
         note: note.trim() || undefined,
       });
-      if (result.actionUrl && typeof navigator !== 'undefined') {
-        await navigator.clipboard?.writeText(new URL(result.actionUrl, window.location.origin).toString()).catch(() => undefined);
+      const absoluteActionUrl = result.actionUrl && typeof window !== 'undefined'
+        ? new URL(result.actionUrl, window.location.origin).toString()
+        : result.actionUrl;
+      if (absoluteActionUrl && typeof navigator !== 'undefined') {
+        await navigator.clipboard?.writeText(absoluteActionUrl).catch(() => undefined);
       }
+      setRecentInvite(absoluteActionUrl ? { title: active.title, url: absoluteActionUrl } : null);
       toast.success(result.actionUrl
-        ? `${active.title} approved. Invitation link copied.`
+        ? `${active.title} approved. Invitation link is ready.`
         : decision === 'approved' ? `${active.title} approved.` : 'Decision recorded.');
       setActive(null);
       setNote('');
@@ -88,6 +94,33 @@ export function PlatformApprovals() {
         <h1 className="text-xl font-semibold text-text-strong">Approvals</h1>
         <p className="text-sm text-muted">Leagues and athletes cannot self-promote. The platform signs them off.</p>
       </div>
+
+      {recentInvite ? (
+        <Card className="space-y-3 border-brand/35 bg-brand-subtle/40 p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-md)] bg-brand text-on-brand">
+              <SealCheck className="h-5 w-5" weight="fill" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-text-strong">League Owner invite ready</p>
+              <p className="mt-1 text-xs leading-5 text-muted">{recentInvite.title} can now set up the League Admin account from this private link.</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <input className="field" readOnly value={recentInvite.url} />
+            <Button
+              size="sm"
+              icon={Copy}
+              onClick={() => {
+                void navigator.clipboard?.writeText(recentInvite.url);
+                toast.success('Invitation link copied.');
+              }}
+            >
+              Copy link
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       {items.length ? (
         <div className="space-y-2.5">

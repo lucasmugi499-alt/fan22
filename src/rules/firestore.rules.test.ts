@@ -442,7 +442,7 @@ describe('the trust boundary: nobody can author an official result', () => {
 });
 
 describe('profile and assignment integrity', () => {
-  it('lets a new user create only a fan profile for themselves', async () => {
+  it('lets a new user create only a fan or invited pending profile for themselves', async () => {
     const newFan = 'new_fan';
     const profile = {
       uid: newFan,
@@ -458,6 +458,15 @@ describe('profile and assignment integrity', () => {
     };
 
     await assertSucceeds(setDoc(doc(asUser(newFan), `users/${newFan}`), profile));
+    await assertSucceeds(
+      setDoc(doc(asUser('new_invited_operator'), 'users/new_invited_operator'), {
+        ...profile,
+        uid: 'new_invited_operator',
+        email: 'invited@example.com',
+        accountStatus: 'invited',
+        pendingInvitationPath: '/invitations/access/invite_1?token=redacted',
+      })
+    );
     await assertFails(
       setDoc(doc(asUser('new_admin'), 'users/new_admin'), {
         ...profile,
@@ -477,6 +486,7 @@ describe('profile and assignment integrity', () => {
 
     for (const protectedUpdate of [
       { role: 'league_admin' },
+      { accountStatus: 'invited' },
       { status: 'suspended' },
       { points: 9999 },
       { walletBalance: 9999 },
