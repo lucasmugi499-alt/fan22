@@ -256,22 +256,45 @@ export async function POST(request: Request) {
         .update(`${leagueId}:${seasonId}:${teamId}:${invitedEmail}`)
         .digest('hex')
         .slice(0, 32);
-      const invitationRef = adminDb.collection('teamAssignments').doc(`invite_${invitationKey}`);
+      const invitationId = `invite_${invitationKey}`;
+      const legacyAssignmentRef = adminDb.collection('teamAssignments').doc(invitationId);
+      const invitationRef = adminDb.collection('invitations').doc(invitationId);
       const token = randomBytes(32).toString('base64url');
       const tokenHash = createHash('sha256').update(token).digest('hex');
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const actionUrl = `/invitations/team/${invitationRef.id}?token=${encodeURIComponent(token)}`;
+      const actionUrl = `/invitations/access/${invitationId}?token=${encodeURIComponent(token)}`;
       await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(invitationRef);
         if (
           existing.exists
-          && ['invited', 'active'].includes(String(existing.data()?.status))
+          && ['queued', 'sent', 'delivered', 'viewed', 'accepted'].includes(String(existing.data()?.status))
           && (!existing.data()?.expiresAt || Date.parse(existing.data()!.expiresAt) > Date.now())
         ) {
           throw new Error('An active invitation already exists for this email, team, and season.');
         }
         transaction.set(invitationRef, {
-          id: invitationRef.id,
+          id: invitationId,
+          type: 'team_admin',
+          invitedEmail,
+          roleKey: 'team_admin',
+          scopeType: 'team',
+          scopeId: teamId,
+          permissionBundleId: 'full_team_admin',
+          tokenHash,
+          tokenVersion: 1,
+          status: 'sent',
+          invitedByUserId: actor.uid,
+          leagueId,
+          teamId,
+          seasonId,
+          legacyTeamAssignmentId: invitationId,
+          actionUrl,
+          expiresAt,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(legacyAssignmentRef, {
+          id: invitationId,
           userId: '',
           teamId,
           leagueId,
@@ -288,22 +311,33 @@ export async function POST(request: Request) {
         transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
           actor.uid,
           'invited',
-          'teamAssignments',
-          invitationRef.id,
+          'invitations',
+          invitationId,
           `Invitation expires ${expiresAt}.`,
         ));
       });
       const email = await sendTeamInvitationEmail({
         to: invitedEmail,
         inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
-        assignmentId: invitationRef.id,
+        assignmentId: invitationId,
         teamName: String(teamData?.name ?? teamId),
         leagueName: String(leagueData?.name ?? leagueId),
         seasonName: String(seasonData?.name ?? seasonId),
         inviterName: String(actor.name ?? actor.email ?? 'your League Admin'),
         expiresAt,
       });
-      await invitationRef.set({
+      await Promise.all([
+        invitationRef.set({
+          emailProvider: 'resend',
+          emailDelivery: email.status,
+          ...(email.id ? {
+            emailMessageId: email.id,
+            emailSentAt: FieldValue.serverTimestamp(),
+          } : {}),
+          ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true }),
+        legacyAssignmentRef.set({
         emailProvider: 'resend',
         emailDelivery: email.status,
         ...(email.id ? {
@@ -312,10 +346,11 @@ export async function POST(request: Request) {
         } : {}),
         ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
         updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+        }, { merge: true }),
+      ]);
       return Response.json({
         ok: true,
-        id: invitationRef.id,
+        id: invitationId,
         token,
         expiresAt,
         actionUrl,

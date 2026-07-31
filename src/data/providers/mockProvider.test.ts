@@ -116,6 +116,14 @@ describe('mock provider league applications', () => {
       leagueId,
       invitedEmail: 'teamadmin@example.com',
     });
-    expect(invitation.actionUrl).toContain(`/invitations/team/invite_${applicationId}`);
+    expect(await mockProvider.getInvitationById(`invite_${applicationId}`)).toMatchObject({
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: `team_${applicationId}`,
+    });
+    expect(invitation.actionUrl).toContain(`/invitations/access/invite_${applicationId}`);
+
+    await mockProvider.acceptInvitation(`invite_${applicationId}`, 'mock_team_admin_new', 'demo');
+    expect((await mockProvider.getTeams({ leagueId })).find((team) => team.id === `team_${applicationId}`)?.adminUserIds).toContain('mock_team_admin_new');
   });
 });

@@ -85,6 +85,14 @@ function assignmentRecord(input: {
   };
 }
 
+function primaryPersonaForRole(roleKey: string) {
+  if (roleKey === 'league_owner' || roleKey === 'league_admin') return 'league_admin';
+  if (roleKey === 'team_owner' || roleKey === 'team_admin' || roleKey === 'roster_manager' || roleKey === 'result_reporter' || roleKey === 'content_manager') return 'team_admin';
+  if (roleKey === 'athlete_self') return 'athlete';
+  if (roleKey === 'platform_admin' || roleKey === 'super_admin') return roleKey;
+  return 'fan';
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -308,9 +316,14 @@ export async function POST(request: Request) {
       if (data.invitedEmail && data.invitedEmail.toLowerCase() !== actor.email?.toLowerCase()) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
+      const persona = primaryPersonaForRole(String(data.roleKey));
       if (data.status === 'accepted') {
         if (data.roleKey === 'league_owner' || data.roleKey === 'league_admin') {
           const role = await synchronizeRoleClaim(actor.uid, 'league_admin');
+          return Response.json({ ok: true, role, scopeId: data.scopeId });
+        }
+        if (persona === 'team_admin') {
+          const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
           return Response.json({ ok: true, role, scopeId: data.scopeId });
         }
         return Response.json({ ok: true, scopeId: data.scopeId });
@@ -368,9 +381,23 @@ export async function POST(request: Request) {
             updatedAt: FieldValue.serverTimestamp(),
           });
         }
+        if (data.scopeType === 'team') {
+          transaction.update(adminDb.collection('teams').doc(data.scopeId), {
+            adminUserIds: FieldValue.arrayUnion(actor.uid),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          if (data.legacyTeamAssignmentId) {
+            transaction.set(adminDb.collection('teamAssignments').doc(data.legacyTeamAssignmentId), {
+              userId: actor.uid,
+              status: 'active',
+              acceptedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            }, { merge: true });
+          }
+        }
         transaction.set(adminDb.collection('users').doc(actor.uid), {
-          primaryPersona: data.roleKey === 'league_owner' ? 'league_admin' : data.roleKey,
-          role: data.roleKey === 'league_owner' ? 'league_admin' : data.roleKey,
+          primaryPersona: persona,
+          role: persona,
           accountStatus: 'active',
           accessVersion: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
@@ -386,6 +413,10 @@ export async function POST(request: Request) {
       });
       if (data.roleKey === 'league_owner' || data.roleKey === 'league_admin') {
         const role = await synchronizeRoleClaim(actor.uid, 'league_admin');
+        return Response.json({ ok: true, role, scopeId: data.scopeId });
+      }
+      if (persona === 'team_admin') {
+        const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
         return Response.json({ ok: true, role, scopeId: data.scopeId });
       }
       return Response.json({ ok: true, scopeId: data.scopeId });

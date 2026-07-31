@@ -952,6 +952,25 @@ export const mockProvider: GoalPlaceDataProvider = {
     return result(fixtures[0]?.id ?? id('fixture_batch'), `${fixtures.length} fixtures created.`);
   },
   async createTeamAdminInvitation(data) {
+    const invitation: Invitation = {
+      id: data.id,
+      type: 'team_admin',
+      invitedEmail: data.invitedEmail,
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: data.teamId,
+      permissionBundleId: 'full_team_admin',
+      tokenHash: 'demo',
+      tokenVersion: 1,
+      status: 'sent',
+      invitedByUserId: data.invitedByUserId ?? MOCK_PROFILES.league_admin.uid,
+      leagueId: data.leagueId,
+      actionUrl: `/invitations/access/${data.id}?token=demo`,
+      expiresAt: data.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: data.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    persistDemoInvitation(invitation);
     persistDemoTeamAssignment({
       ...data,
       emailProvider: 'demo',
@@ -968,7 +987,7 @@ export const mockProvider: GoalPlaceDataProvider = {
     });
     return {
       ...result(data.id, 'Demo Team Admin invitation sent.'),
-      actionUrl: `/invitations/team/${data.id}?token=demo`,
+      actionUrl: invitation.actionUrl,
       emailDelivery: 'sent',
       emailMessageId: `demo_${data.id}`,
     };
@@ -1025,6 +1044,13 @@ export const mockProvider: GoalPlaceDataProvider = {
       if (league && !league.adminUserIds.includes(userId)) {
         league.adminUserIds.push(userId);
         persistDemoLeague(league);
+      }
+    } else if (invitation.scopeType === 'team') {
+      const team = teams.find((item) => item.id === invitation.scopeId)
+        ?? readStoredItems<Team>(storedTeamsKey).find((item) => item.id === invitation.scopeId);
+      if (team && !team.adminUserIds.includes(userId)) {
+        team.adminUserIds.push(userId);
+        persistDemoTeam(team);
       }
     }
     audit({
