@@ -1089,6 +1089,7 @@ export interface AccessIndexRecord {
 export interface LeagueAdminApplication {
   id: string;
   userId: string;
+  applicantName?: string;
   applicantEmail?: string;
   applicantPhone?: string;
   leagueName: string;

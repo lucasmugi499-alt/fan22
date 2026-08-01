@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { Invitation, SportSlug, TeamAssignment } from '@/types';
 import { assignmentKindForScope, storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
+import { getPublicAppCheckToken } from '@/lib/firebase/client';
 
 const fanOperatorInvitationMessage = 'Fan accounts stay fan accounts. Sign out and use a League Admin or Team Admin account to accept this setup invitation.';
 const operatorInvitationRoles = new Set([
@@ -36,6 +37,8 @@ export function LeagueAdminApplicationForm() {
   const [leagueName, setLeagueName] = useState('');
   const [sport, setSport] = useState<SportSlug>('football');
   const [city, setCity] = useState('Kampala');
+  const [applicantName, setApplicantName] = useState(userProfile?.name ?? '');
+  const [applicantPhone, setApplicantPhone] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [evidenceNote, setEvidenceNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,21 +52,44 @@ export function LeagueAdminApplicationForm() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     const userId = currentUser?.uid ?? userProfile?.uid;
-    if (!userId) return;
     if (fanUsingCurrentEmail) {
       toast.error('Fan accounts stay fan accounts. Use a separate League Admin setup email.');
       return;
     }
     setSaving(true);
     try {
-      await provider.createLeagueAdminApplication({
-        userId,
-        applicantEmail: adminEmail.trim().toLowerCase(),
-        leagueName: leagueName.trim(),
-        sport,
-        city: city.trim(),
-        evidenceNote: evidenceNote.trim(),
-      });
+      if ((authStatus === 'logged_in' && userId) || provider.mode === 'mock') {
+        await provider.createLeagueAdminApplication({
+          userId: userId ?? `public_applicant_${Date.now()}`,
+          applicantName: applicantName.trim(),
+          applicantPhone: applicantPhone.trim() || undefined,
+          applicantEmail: adminEmail.trim().toLowerCase(),
+          leagueName: leagueName.trim(),
+          sport,
+          city: city.trim(),
+          evidenceNote: evidenceNote.trim(),
+        });
+      } else {
+        const appCheckToken = await getPublicAppCheckToken();
+        const response = await fetch('/api/league-admin-applications', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(appCheckToken ? { 'x-firebase-appcheck': appCheckToken } : {}),
+          },
+          body: JSON.stringify({
+            applicantName: applicantName.trim(),
+            applicantPhone: applicantPhone.trim(),
+            applicantEmail: adminEmail.trim().toLowerCase(),
+            leagueName: leagueName.trim(),
+            sport,
+            city: city.trim(),
+            evidenceNote: evidenceNote.trim(),
+          }),
+        });
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        if (!response.ok) throw new Error(result?.error ?? 'Could not submit the application.');
+      }
       setSubmitted(true);
       toast.success(isDemoMode
         ? 'Demo league application created. Approve it from Platform Admin approvals.'
@@ -75,17 +101,6 @@ export function LeagueAdminApplicationForm() {
     }
   }
 
-  if (authStatus !== 'logged_in') {
-    return (
-      <Card className="mx-auto max-w-lg p-6 text-center">
-        <ShieldCheck className="mx-auto h-8 w-8 text-brand" weight="duotone" />
-        <h1 className="mt-3 text-xl font-semibold text-text-strong">Operate a league on GoalPlace256</h1>
-        <p className="mt-2 text-sm text-muted">Sign in to submit a league application. Platform review creates the league and assigns administrator access.</p>
-        <Link href={`/login?next=${encodeURIComponent('/apply/league-admin')}`} className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">Sign in</Link>
-      </Card>
-    );
-  }
-
   if (submitted) {
     return (
       <Card className="mx-auto max-w-lg p-6 text-center">
@@ -94,7 +109,7 @@ export function LeagueAdminApplicationForm() {
         <p className="mt-2 text-sm text-muted">
           {isDemoMode
             ? 'Switch to the Platform Admin demo account and approve this application. Approval sends a League Owner setup link to the admin email; your current fan account stays unchanged.'
-            : 'A Platform Admin will review the league identity, competition structure, and administrator assignment. Approval sends a League Owner setup link; your current fan role does not change.'}
+            : 'A Platform Admin will review the league identity, competition structure, and administrator assignment. Approval sends a League Owner setup link; any existing fan role does not change.'}
         </p>
         {isDemoMode ? (
           <Link href="/admin/approvals" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">
@@ -109,7 +124,11 @@ export function LeagueAdminApplicationForm() {
     <form onSubmit={submit} className="mx-auto max-w-lg space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-text-strong">League Admin application</h1>
-        <p className="text-sm text-muted">Create a league request with real operating details. Platform Admin can approve it into a connected league record and a separate League Owner setup invite.</p>
+        <p className="text-sm text-muted">Anyone can submit a league request. Platform Admin can approve it into a connected league record and a separate League Owner setup invite.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Your name"><input required value={applicantName} onChange={(event) => setApplicantName(event.target.value)} className="field" /></Field>
+        <Field label="Phone or WhatsApp"><input value={applicantPhone} onChange={(event) => setApplicantPhone(event.target.value)} className="field" /></Field>
       </div>
       <Field label="League name"><input required value={leagueName} onChange={(event) => setLeagueName(event.target.value)} className="field" /></Field>
       <div className="grid gap-3 sm:grid-cols-2">

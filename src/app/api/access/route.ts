@@ -204,9 +204,10 @@ export async function POST(request: Request) {
       if (!['pending', 'submitted', 'under_review', 'needs_information', 'resubmitted'].includes(data.status)) {
         return Response.json({ error: 'Application has already been decided.' }, { status: 409 });
       }
-      const applicant = await adminAuth.getUser(data.userId);
-      if (!applicant.emailVerified) {
-        return Response.json({ error: 'The applicant must verify their email before approval.' }, { status: 409 });
+      const applicant = await adminAuth.getUser(data.userId).catch(() => null);
+      const invitedEmail = data.applicantEmail?.toLowerCase() ?? applicant?.email?.toLowerCase();
+      if (!invitedEmail) {
+        return Response.json({ error: 'A League Admin setup email is required before approval.' }, { status: 409 });
       }
       const now = new Date();
       const year = now.getUTCFullYear();
@@ -279,7 +280,7 @@ export async function POST(request: Request) {
         transaction.set(adminDb.collection('invitations').doc(invitationId), {
           id: invitationId,
           type: 'league_owner',
-          invitedEmail: data.applicantEmail?.toLowerCase() ?? applicant.email?.toLowerCase(),
+          invitedEmail,
           roleKey: 'league_owner',
           scopeType: 'league',
           scopeId: leagueId,

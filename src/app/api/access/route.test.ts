@@ -200,4 +200,63 @@ describe('trusted access route hardening', () => {
     expect(adminDb.runTransaction).not.toHaveBeenCalled();
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
+
+  it('approves public league applications using the setup email without requiring an applicant auth user', async () => {
+    const transaction = {
+      get: vi.fn(async () => ({
+        exists: true,
+        data: () => ({
+          id: 'application_public_1',
+          userId: 'public_applicant_123',
+          applicantEmail: 'owner@example.com',
+          leagueName: 'Public Rugby League',
+          sport: 'rugby',
+          city: 'Jinja',
+          status: 'pending',
+        }),
+      })),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminAuth.getUser).mockRejectedValue(new Error('not found'));
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: vi.fn((id?: string) => ({
+        id: id ?? `${collectionName}_generated`,
+        collectionName,
+        get: vi.fn(async () => collectionName === 'leagueAdminApplications'
+          ? {
+              exists: true,
+              data: () => ({
+                id: 'application_public_1',
+                userId: 'public_applicant_123',
+                applicantEmail: 'owner@example.com',
+                leagueName: 'Public Rugby League',
+                sport: 'rugby',
+                city: 'Jinja',
+                status: 'pending',
+              }),
+            }
+          : { exists: false, data: () => undefined }),
+      })),
+    }) as never);
+
+    const response = await POST(request(JSON.stringify({
+      action: 'approve_league_admin',
+      applicationId: 'application_public_1',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      invitationId: expect.stringContaining('invite_'),
+    });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'invitations',
+    }), expect.objectContaining({
+      roleKey: 'league_owner',
+      invitedEmail: 'owner@example.com',
+    }));
+  });
 });
