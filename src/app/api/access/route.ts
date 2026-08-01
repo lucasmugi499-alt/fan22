@@ -279,7 +279,7 @@ export async function POST(request: Request) {
         transaction.set(adminDb.collection('invitations').doc(invitationId), {
           id: invitationId,
           type: 'league_owner',
-          invitedEmail: applicant.email?.toLowerCase() ?? data.applicantEmail?.toLowerCase(),
+          invitedEmail: data.applicantEmail?.toLowerCase() ?? applicant.email?.toLowerCase(),
           roleKey: 'league_owner',
           scopeType: 'league',
           scopeId: leagueId,

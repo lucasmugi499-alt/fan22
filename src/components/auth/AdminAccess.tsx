@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { CheckCircle, EnvelopeSimple, ShieldCheck } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
@@ -31,24 +31,34 @@ function isOperatorInvitation(roleKey: string) {
 }
 
 export function LeagueAdminApplicationForm() {
-  const { authStatus, currentUser, userProfile, isDemoMode } = useAuth();
+  const { authStatus, currentUser, userProfile, isDemoMode, accountRole } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [leagueName, setLeagueName] = useState('');
   const [sport, setSport] = useState<SportSlug>('football');
   const [city, setCity] = useState('Kampala');
+  const [adminEmail, setAdminEmail] = useState('');
   const [evidenceNote, setEvidenceNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const signedInEmail = currentUser?.email ?? userProfile?.email ?? '';
+  const fanUsingCurrentEmail = useMemo(() => (
+    accountRole === 'fan' &&
+    adminEmail.trim().toLowerCase() === signedInEmail.trim().toLowerCase()
+  ), [accountRole, adminEmail, signedInEmail]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const userId = currentUser?.uid ?? userProfile?.uid;
     if (!userId) return;
+    if (fanUsingCurrentEmail) {
+      toast.error('Fan accounts stay fan accounts. Use a separate League Admin setup email.');
+      return;
+    }
     setSaving(true);
     try {
       await provider.createLeagueAdminApplication({
         userId,
-        applicantEmail: currentUser?.email ?? userProfile?.email,
+        applicantEmail: adminEmail.trim().toLowerCase(),
         leagueName: leagueName.trim(),
         sport,
         city: city.trim(),
@@ -83,8 +93,8 @@ export function LeagueAdminApplicationForm() {
         <h1 className="mt-3 text-xl font-semibold text-text-strong">Application received</h1>
         <p className="mt-2 text-sm text-muted">
           {isDemoMode
-            ? 'Switch to the Platform Admin demo account and approve this application to create the draft dummy league.'
-            : 'A Platform Admin will review the league identity, competition structure, and administrator assignment. Your current role does not change until approval.'}
+            ? 'Switch to the Platform Admin demo account and approve this application. Approval sends a League Owner setup link to the admin email; your current fan account stays unchanged.'
+            : 'A Platform Admin will review the league identity, competition structure, and administrator assignment. Approval sends a League Owner setup link; your current fan role does not change.'}
         </p>
         {isDemoMode ? (
           <Link href="/admin/approvals" className="mt-5 inline-flex h-11 items-center rounded-[var(--radius-pill)] bg-brand px-5 text-sm font-semibold text-on-brand">
@@ -99,7 +109,7 @@ export function LeagueAdminApplicationForm() {
     <form onSubmit={submit} className="mx-auto max-w-lg space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-text-strong">League Admin application</h1>
-        <p className="text-sm text-muted">Create a league request with real operating details. Platform Admin can approve it into a connected league record.</p>
+        <p className="text-sm text-muted">Create a league request with real operating details. Platform Admin can approve it into a connected league record and a separate League Owner setup invite.</p>
       </div>
       <Field label="League name"><input required value={leagueName} onChange={(event) => setLeagueName(event.target.value)} className="field" /></Field>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -110,6 +120,14 @@ export function LeagueAdminApplicationForm() {
         </Field>
         <Field label="City or district"><input required value={city} onChange={(event) => setCity(event.target.value)} className="field" /></Field>
       </div>
+      <Field label="League Admin setup email">
+        <input required type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} className="field" placeholder="owner@example.com" />
+      </Field>
+      {fanUsingCurrentEmail ? (
+        <p className="rounded-[var(--radius-md)] border border-[color:var(--state-error)] bg-[color-mix(in_srgb,var(--state-error),transparent_88%)] px-3 py-2 text-sm text-text-strong">
+          Fan accounts stay fan accounts. Use the email that should create the League Admin account after approval.
+        </p>
+      ) : null}
       <Field label="Authority and competition evidence">
         <textarea required rows={5} value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} className="field min-h-32 py-3" placeholder="Your role, league structure, and how the platform can verify this application." />
       </Field>

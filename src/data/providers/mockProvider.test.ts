@@ -25,6 +25,7 @@ describe('mock provider league applications', () => {
     await mockProvider.createLeagueAdminApplication({
       id: applicationId,
       userId: 'mock_fan',
+      applicantEmail: 'operator.ntungamo@example.com',
       leagueName: 'Ntungamo Dummy League',
       sport: 'football',
       city: 'Ntungamo',
@@ -40,6 +41,8 @@ describe('mock provider league applications', () => {
 
     const leagues = await mockProvider.getLeagues();
     const league = leagues.find((item) => item.id === `league_${applicationId}`);
+    const seasons = await mockProvider.getSeasons();
+    const season = seasons.find((item) => item.id === `season_league_${applicationId}_${new Date().getUTCFullYear()}`);
     const applications = await mockProvider.getLeagueAdminApplications();
     const application = applications.find((item) => item.id === applicationId);
 
@@ -49,6 +52,14 @@ describe('mock provider league applications', () => {
       sport: 'football',
       status: 'draft',
       verified: false,
+      currentSeasonId: season?.id,
+    });
+    expect(season).toMatchObject({
+      leagueId: `league_${applicationId}`,
+      sport: 'football',
+      status: 'registration',
+      competitionFormat: 'league',
+      scoring: { win: 3, draw: 1, loss: 0 },
     });
     expect(league?.adminUserIds).not.toContain('mock_fan');
     expect(league?.adminUserIds).toContain(MOCK_PROFILES.league_admin.uid);
@@ -60,6 +71,9 @@ describe('mock provider league applications', () => {
       reviewedByUserId: 'mock_admin',
     });
     expect(approval.actionUrl).toBe(`/invitations/access/invite_${applicationId}_league_owner?token=demo`);
+    expect(await mockProvider.getInvitationById(`invite_${applicationId}_league_owner`)).toMatchObject({
+      invitedEmail: 'operator.ntungamo@example.com',
+    });
 
     await expect(mockProvider.acceptInvitation(`invite_${applicationId}_league_owner`, 'mock_fan', 'demo'))
       .rejects.toThrow('Fan accounts stay fan accounts');

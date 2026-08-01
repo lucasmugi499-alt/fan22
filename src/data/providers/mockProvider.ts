@@ -63,6 +63,7 @@ import {
   Match,
   ResultSubmission,
   Season,
+  SportSlug,
   SupportNeed,
   Team,
   TeamAssignment,
@@ -261,7 +262,19 @@ function demoLeagueIdForApplication(applicationId: string) {
   return `league_${applicationId}`;
 }
 
+function demoSeasonIdForApplication(applicationId: string) {
+  return `season_league_${applicationId}_${new Date().getUTCFullYear()}`;
+}
+
+function demoScoringFor(sport: SportSlug) {
+  if (sport === 'basketball') return { win: 2, draw: null, loss: 0 };
+  if (sport === 'rugby') return { win: 4, draw: 2, loss: 0 };
+  return { win: 3, draw: 1, loss: 0 };
+}
+
 function draftLeagueFromApplication(application: LeagueAdminApplication): League {
+  const year = new Date().getUTCFullYear();
+  const seasonId = demoSeasonIdForApplication(application.id);
   return {
     id: demoLeagueIdForApplication(application.id),
     name: application.leagueName,
@@ -278,7 +291,8 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
       MOCK_PROFILES.platform_admin.uid,
       MOCK_PROFILES.super_admin.uid,
     ],
-    season: 'Not launched',
+    season: `${year} Season`,
+    currentSeasonId: seasonId,
     teamsCount: 0,
     athletesCount: 0,
     matchesCount: 0,
@@ -292,6 +306,21 @@ function draftLeagueFromApplication(application: LeagueAdminApplication): League
       requiresRefereeConfirmation: false,
       allowsPerformancePledges: false,
     },
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function draftSeasonFromApplication(application: LeagueAdminApplication): Season {
+  const year = new Date().getUTCFullYear();
+  return {
+    id: demoSeasonIdForApplication(application.id),
+    leagueId: demoLeagueIdForApplication(application.id),
+    name: `${year} Season`,
+    sport: application.sport,
+    status: 'registration',
+    startDate: new Date().toISOString().slice(0, 10),
+    competitionFormat: 'league',
+    scoring: demoScoringFor(application.sport),
     createdAt: new Date().toISOString(),
   };
 }
@@ -1325,12 +1354,14 @@ export const mockProvider: GoalPlaceDataProvider = {
       application.updatedAt = new Date().toISOString();
       if (input.decision === 'approved') {
         const league = draftLeagueFromApplication(application);
+        const season = draftSeasonFromApplication(application);
         const invitation = invitationFromApplication(application);
         application.leagueId = league.id;
         application.organizationId = invitation.organizationId;
         application.invitationId = invitation.id;
         application.invitationActionUrl = invitation.actionUrl;
         persistDemoLeague(league);
+        persistDemoSeason(season);
         persistDemoInvitation(invitation);
       }
       persistDemoApplication(application);

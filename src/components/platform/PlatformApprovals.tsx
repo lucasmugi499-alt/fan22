@@ -19,6 +19,7 @@ import { mockProvider } from '@/data/providers/mockProvider';
 type PlatformApprovalItem = ApprovalItem & {
   targetCollection: 'athletes' | 'leagues' | 'leagueAdminApplications';
   metaLabel?: string;
+  setupEmail?: string;
 };
 
 export function PlatformApprovals() {
@@ -35,8 +36,9 @@ export function PlatformApprovals() {
         kind: 'league' as const,
         targetCollection: 'leagueAdminApplications' as const,
         metaLabel: 'League application',
+        setupEmail: application.applicantEmail,
         title: application.leagueName,
-        subtitle: `${application.city} · ${application.sport} League Admin application`,
+        subtitle: `${application.city} · ${application.sport} · setup ${application.applicantEmail ?? 'email pending'}`,
       })),
     ...pendingApprovals(leagues, athletes).map((item) => ({
       ...item,
@@ -47,7 +49,7 @@ export function PlatformApprovals() {
   const [active, setActive] = useState<PlatformApprovalItem | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [recentInvite, setRecentInvite] = useState<{ title: string; url: string } | null>(null);
+  const [recentInvite, setRecentInvite] = useState<{ title: string; url: string; email?: string } | null>(null);
 
   async function decide(decision: 'approved' | 'rejected' | 'requested_information') {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
@@ -70,7 +72,7 @@ export function PlatformApprovals() {
       if (absoluteActionUrl && typeof navigator !== 'undefined') {
         await navigator.clipboard?.writeText(absoluteActionUrl).catch(() => undefined);
       }
-      setRecentInvite(absoluteActionUrl ? { title: active.title, url: absoluteActionUrl } : null);
+      setRecentInvite(absoluteActionUrl ? { title: active.title, url: absoluteActionUrl, email: active.setupEmail } : null);
       toast.success(result.actionUrl
         ? `${active.title} approved. Invitation link is ready.`
         : decision === 'approved' ? `${active.title} approved.` : 'Decision recorded.');
@@ -103,7 +105,9 @@ export function PlatformApprovals() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-text-strong">League Owner invite ready</p>
-              <p className="mt-1 text-xs leading-5 text-muted">{recentInvite.title} can now set up the League Admin account from this private link.</p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {recentInvite.title} can now set up the League Admin account{recentInvite.email ? ` for ${recentInvite.email}` : ''} from this private link.
+              </p>
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -157,6 +161,14 @@ export function PlatformApprovals() {
           }
         >
           <p className="text-sm text-muted">{active.subtitle}</p>
+          {active.setupEmail ? (
+            <dl className="mt-3 rounded-[var(--radius-md)] bg-surface-2 p-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted">League Admin setup email</dt>
+                <dd className="font-semibold text-text-strong">{active.setupEmail}</dd>
+              </div>
+            </dl>
+          ) : null}
           <p className="mt-3 text-sm leading-relaxed text-muted">
             Approving {active.targetCollection === 'leagueAdminApplications'
               ? 'creates a draft league and queues a League Owner invitation'
