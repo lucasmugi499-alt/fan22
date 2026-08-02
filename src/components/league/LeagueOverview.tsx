@@ -16,6 +16,7 @@ import { RichStandings } from '@/components/premium/RichStandings';
 import { LeagueVerification } from '@/components/league/LeagueVerification';
 import { cn } from '@/lib/utils';
 import { LeagueOperations } from '@/components/league/LeagueOperations';
+import { FantasyActivationControl } from '@/components/fantasy/FantasyActivationControl';
 
 export function LeagueOverview() {
   const { userProfile, isDemoMode, accessContext } = useAuth();
@@ -74,6 +75,8 @@ export function LeagueOverview() {
       </div>
 
       <LeagueOperations league={league} season={activeSeason} onSaved={retry} />
+
+      <FantasyActivationControl mode="league" league={league} seasons={seasons} />
 
       <section className="space-y-2.5">
         <div className="flex items-center justify-between">

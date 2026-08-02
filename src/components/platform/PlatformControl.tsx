@@ -33,6 +33,7 @@ import { STATE } from '@/lib/statusSystem';
 import { cn } from '@/lib/utils';
 import { buildPlatformOrganizationTree, teamOperationalState } from '@/lib/platform/platformOperations';
 import type { League, LeagueStatus, PlanType, SportSlug, Team, TeamAssignment, User, VerificationStatus } from '@/types';
+import { FantasyActivationControl } from '@/components/fantasy/FantasyActivationControl';
 
 const fieldClass = 'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand';
 const areaClass = 'mt-1.5 min-h-24 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand';
@@ -642,6 +643,8 @@ export function PlatformControl() {
           <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4 text-sm text-muted">Create or approve a league to start the organization tree.</div>
         )}
       </Card>
+
+      <FantasyActivationControl mode="platform" leagues={leagues} seasons={seasons} />
 
       <Card className="p-4">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

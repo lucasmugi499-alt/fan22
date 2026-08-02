@@ -149,7 +149,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Complete match-squad and athlete-event capture for non-scoring appearances
 - [x] Trusted fantasy pipeline integration tests for lineup locking, transfers, scoring, and corrections
 - [ ] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
-- [ ] League and Platform Admin activation workflow browser QA
+- [x] League and Platform Admin activation workflow browser QA
 - [ ] Candidate fantasy rules and indexes promoted only after staging validation
 
 Fantasy is free to play. Fantasy Credits have no cash value and cannot be purchased,

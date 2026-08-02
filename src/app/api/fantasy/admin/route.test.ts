@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { POST } from './route';
+import { GET, POST } from './route';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -32,6 +32,12 @@ function request(body: Record<string, unknown>) {
     method: 'POST',
     headers: { authorization: 'Bearer token' },
     body: JSON.stringify(body),
+  });
+}
+
+function getRequest() {
+  return new Request('https://goalplace256.test/api/fantasy/admin', {
+    headers: { authorization: 'Bearer token' },
   });
 }
 
@@ -195,5 +201,254 @@ describe('fantasy admin activation route', () => {
       blockers: ['Recorded stat coverage is missing: appearance.'],
     });
     expect(adminDb.bulkWriter).not.toHaveBeenCalled();
+  });
+
+  it('limits League Admin launch state to scoped leagues', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'league_user',
+      role: 'league_admin',
+    });
+    const collections: Record<string, unknown> = {
+      users: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('league_user', { role: 'league_admin' })),
+        }),
+      },
+      accessIndex: {
+        where: () => ({
+          get: vi.fn().mockResolvedValue(querySnapshot([
+            doc('scope_1', {
+              userId: 'league_user',
+              scopeType: 'league',
+              scopeId: 'league_allowed',
+              activeRoles: ['league_admin'],
+              capabilities: ['league.season.manage'],
+              assignmentIds: ['assignment_1'],
+              accessVersion: 1,
+              updatedAt: '2026-08-02T00:00:00.000Z',
+            }),
+          ])),
+        }),
+      },
+      leagues: {
+        get: vi.fn().mockResolvedValue(querySnapshot([
+          doc('league_allowed', { id: 'league_allowed', name: 'Allowed League', adminUserIds: [] }),
+          doc('league_blocked', { id: 'league_blocked', name: 'Blocked League', adminUserIds: [] }),
+        ])),
+      },
+      seasons: {
+        get: vi.fn().mockResolvedValue(querySnapshot([
+          doc('season_allowed', { id: 'season_allowed', leagueId: 'league_allowed' }),
+          doc('season_blocked', { id: 'season_blocked', leagueId: 'league_blocked' }),
+        ])),
+      },
+      fantasyCompetitions: {
+        get: vi.fn().mockResolvedValue(querySnapshot([
+          doc('competition_allowed', {
+            id: 'competition_allowed',
+            leagueId: 'league_allowed',
+            sport: 'football',
+            variant: 'association_football',
+            scoringProfileId: 'profile_1',
+            scoringProfileVersion: 1,
+            squadRulesId: 'rules_1',
+            dataLevel: 'basic',
+            recordedStatKeys: ['appearance'],
+            status: 'proposed',
+            isFreeToPlay: true,
+            creditsLabel: 'Fantasy Credits',
+            createdAt: '2026-08-02T00:00:00.000Z',
+          }),
+          doc('competition_blocked', {
+            id: 'competition_blocked',
+            leagueId: 'league_blocked',
+            sport: 'football',
+            variant: 'association_football',
+            scoringProfileId: 'profile_1',
+            scoringProfileVersion: 1,
+            squadRulesId: 'rules_1',
+            dataLevel: 'basic',
+            recordedStatKeys: ['appearance'],
+            status: 'proposed',
+            isFreeToPlay: true,
+            creditsLabel: 'Fantasy Credits',
+            createdAt: '2026-08-02T00:00:00.000Z',
+          }),
+        ])),
+      },
+      fantasyScoringProfiles: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+      fantasySquadRules: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+      fantasyPlayers: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+      fantasyPlayerPrices: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+      fantasyRounds: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+    };
+    vi.mocked(adminDb.collection).mockImplementation((name: string) => collections[name] as never);
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.leagues.map((league: { id: string }) => league.id)).toEqual(['league_allowed']);
+    expect(body.seasons.map((season: { id: string }) => season.id)).toEqual(['season_allowed']);
+    expect(body.competitions.map((competition: { id: string }) => competition.id)).toEqual(['competition_allowed']);
+  });
+
+  it('allows scoped League Admins to prepare fantasy proposals', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'league_user',
+      role: 'league_admin',
+    });
+    const competitionSet = vi.fn().mockResolvedValue(undefined);
+    const writer = {
+      create: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(adminDb.bulkWriter).mockReturnValue(writer as never);
+    const collections: Record<string, unknown> = {
+      users: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('league_user', { role: 'league_admin' })),
+        }),
+      },
+      accessIndex: {
+        where: () => ({
+          get: vi.fn().mockResolvedValue(querySnapshot([
+            doc('scope_1', {
+              userId: 'league_user',
+              scopeType: 'league',
+              scopeId: 'league_1',
+              activeRoles: ['league_admin'],
+              capabilities: ['league.season.manage'],
+              assignmentIds: ['assignment_1'],
+              accessVersion: 1,
+              updatedAt: '2026-08-02T00:00:00.000Z',
+            }),
+          ])),
+        }),
+      },
+      leagues: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('league_1', {
+            id: 'league_1',
+            sport: 'football',
+            adminUserIds: [],
+          })),
+        }),
+      },
+      seasons: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('season_1', {
+            id: 'season_1',
+            leagueId: 'league_1',
+            sport: 'football',
+          })),
+        }),
+      },
+      fantasyScoringProfiles: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('profile_1', {
+            id: 'profile_1',
+            sport: 'football',
+            variant: 'association_football',
+            name: 'Football Lite',
+            version: 1,
+            status: 'approved',
+            captainMultiplier: 1.5,
+            createdAt: '2026-07-29T00:00:00.000Z',
+            publishedAt: '2026-07-29T00:00:00.000Z',
+            rules: [{
+              id: 'appearance',
+              stat: 'appearance',
+              label: 'Appearance',
+              points: 2,
+              requiredDataLevel: 'basic',
+              requiredStatKey: 'appearance',
+              enabled: true,
+            }],
+          })),
+        }),
+      },
+      fantasySquadRules: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('rules_1', {
+            id: 'rules_1',
+            sport: 'football',
+            variant: 'association_football',
+            version: 1,
+            squadSize: 1,
+            startingSize: 1,
+            benchSize: 0,
+            budgetCredits: 100,
+            maxFromRealTeam: 3,
+            captainRequired: true,
+            viceCaptainRequired: true,
+            transferAllowancePerRound: 2,
+            deadlineStrategy: 'first_round_kickoff',
+            positionGroups: [
+              { id: 'forward', label: 'Forwards', positions: ['Forward'], minimum: 1, maximum: 1 },
+            ],
+            createdAt: '2026-07-29T00:00:00.000Z',
+          })),
+        }),
+      },
+      fantasyCompetitions: {
+        doc: () => ({
+          id: 'competition_1',
+          set: competitionSet,
+        }),
+      },
+      athletes: {
+        where: () => ({
+          get: vi.fn().mockResolvedValue(querySnapshot([
+            doc('athlete_1', {
+              id: 'athlete_1',
+              leagueId: 'league_1',
+              teamId: 'team_1',
+              position: 'Forward',
+            }),
+          ])),
+        }),
+      },
+      matches: {
+        where: () => ({
+          get: vi.fn().mockResolvedValue(querySnapshot([
+            doc('match_1', {
+              id: 'match_1',
+              leagueId: 'league_1',
+              seasonId: 'season_1',
+              scheduledAt: '2026-08-03T12:00:00.000Z',
+            }),
+          ])),
+        }),
+      },
+      fantasyPlayers: { doc: (id: string) => ({ id }) },
+      fantasyPlayerPrices: { doc: (id: string) => ({ id }) },
+      fantasyRounds: { doc: (id: string) => ({ id }) },
+    };
+    vi.mocked(adminDb.collection).mockImplementation((name: string) => collections[name] as never);
+
+    const response = await POST(request({
+      action: 'propose',
+      name: 'Kampala Fantasy Pilot',
+      shortName: 'Kampala Fantasy',
+      sport: 'football',
+      variant: 'association_football',
+      leagueId: 'league_1',
+      seasonId: 'season_1',
+      scoringProfileId: 'profile_1',
+      squadRulesId: 'rules_1',
+      dataLevel: 'basic',
+      recordedStatKeys: ['appearance'],
+    }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      id: 'competition_1',
+      status: 'proposed',
+      rosterReadiness: 1,
+      roundReadiness: 1,
+    });
+    expect(competitionSet).toHaveBeenCalled();
+    expect(writer.create).toHaveBeenCalledTimes(3);
   });
 });

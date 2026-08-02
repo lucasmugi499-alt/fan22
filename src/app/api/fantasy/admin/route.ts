@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { validateFantasyActivation } from '@/lib/fantasy/activation';
 import { positionGroupFor } from '@/lib/fantasy/profiles';
+import type { AccessIndexDocument } from '@/lib/auth/access';
 import type {
   FantasyCompetition,
   FantasyPlayer,
@@ -42,6 +43,155 @@ function asIso(value: unknown) {
   return String(value);
 }
 
+function normalizeFirestoreValue(
+  id: string,
+  data: FirebaseFirestore.DocumentData,
+): Record<string, unknown> & { id: string } {
+  return {
+    id,
+    ...Object.fromEntries(Object.entries(data).map(([key, value]) => [key, asSerializable(value)])),
+  };
+}
+
+function asSerializable(value: unknown): unknown {
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+  if (Array.isArray(value)) return value.map(asSerializable);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [key, asSerializable(nested)]),
+    );
+  }
+  return value;
+}
+
+async function scopedLeagueIdsForActor(userId: string) {
+  try {
+    const collection = adminDb.collection('accessIndex') as unknown as {
+      where?: (field: string, op: FirebaseFirestore.WhereFilterOp, value: unknown) => {
+        get: () => Promise<{ docs: Array<{ data: () => FirebaseFirestore.DocumentData }> }>;
+      };
+    };
+    if (!collection.where) return new Set<string>();
+    const snapshot = await collection.where('userId', '==', userId).get();
+    return new Set(
+      snapshot.docs
+        .map((item) => item.data() as AccessIndexDocument)
+        .filter((index) =>
+          index.scopeType === 'league'
+          && (
+            index.capabilities?.includes('league.season.manage')
+            || index.capabilities?.includes('league.profile.manage')
+            || index.activeRoles?.some((role) => ['league_owner', 'league_admin', 'league_operator'].includes(role))
+          ),
+        )
+        .map((index) => index.scopeId),
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function legacyAdminIds(league: FirebaseFirestore.DocumentData | undefined) {
+  return Array.isArray(league?.adminUserIds) ? league.adminUserIds.map(String) : [];
+}
+
+function canAdministerLeague(
+  role: string | undefined,
+  actorUid: string,
+  leagueId: string,
+  league: FirebaseFirestore.DocumentData | undefined,
+  scopedLeagueIds: Set<string>,
+) {
+  if (role === 'platform_admin' || role === 'super_admin') return true;
+  if (role !== 'league_admin') return false;
+  return scopedLeagueIds.has(leagueId) || legacyAdminIds(league).includes(actorUid);
+}
+
+export async function GET(request: Request) {
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return auth.response;
+  const actor = auth.actor;
+  const profile = await adminDb.collection('users').doc(actor.uid).get();
+  const role = (actor.role ?? profile.data()?.role) as string | undefined;
+  if (!['league_admin', 'platform_admin', 'super_admin'].includes(role ?? '')) {
+    return Response.json({ error: 'League or platform administration access required.' }, { status: 403 });
+  }
+
+  const [
+    leaguesSnapshot,
+    seasonsSnapshot,
+    competitionsSnapshot,
+    profilesSnapshot,
+    rulesSnapshot,
+    playersSnapshot,
+    pricesSnapshot,
+    roundsSnapshot,
+    scopedLeagueIds,
+  ] = await Promise.all([
+    adminDb.collection('leagues').get(),
+    adminDb.collection('seasons').get(),
+    adminDb.collection('fantasyCompetitions').get(),
+    adminDb.collection('fantasyScoringProfiles').get(),
+    adminDb.collection('fantasySquadRules').get(),
+    adminDb.collection('fantasyPlayers').get(),
+    adminDb.collection('fantasyPlayerPrices').get(),
+    adminDb.collection('fantasyRounds').get(),
+    role === 'league_admin' ? scopedLeagueIdsForActor(actor.uid) : Promise.resolve(new Set<string>()),
+  ]);
+  const allLeagues = leaguesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const visibleLeagues = role === 'league_admin'
+    ? allLeagues.filter((league) =>
+      canAdministerLeague(role, actor.uid, String(league.id), league, scopedLeagueIds),
+    )
+    : allLeagues;
+  const visibleLeagueIds = new Set(visibleLeagues.map((league) => String(league.id)));
+  const competitions = competitionsSnapshot.docs
+    .map((item) => normalizeFirestoreValue(item.id, item.data()))
+    .filter((competition) => visibleLeagueIds.has(String(competition.leagueId)));
+  const scoringProfiles = profilesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const squadRules = rulesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const players = playersSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const prices = pricesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const rounds = roundsSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+  const readinessByCompetition = Object.fromEntries(
+    competitions.map((competition) => [
+      String(competition.id),
+      validateFantasyActivation({
+        competition: competition as unknown as FantasyCompetition,
+        scoringProfile: scoringProfiles.find((profile) =>
+          String(profile.id) === String(competition.scoringProfileId),
+        ) as unknown as FantasyScoringProfile | undefined ?? null,
+        squadRules: squadRules.find((rules) =>
+          String(rules.id) === String(competition.squadRulesId),
+        ) as unknown as FantasySquadRules | undefined ?? null,
+        players: players.filter((player) =>
+          String(player.competitionId) === String(competition.id),
+        ) as unknown as FantasyPlayer[],
+        prices: prices.filter((price) =>
+          String(price.competitionId) === String(competition.id),
+        ) as unknown as FantasyPlayerPrice[],
+        rounds: rounds.filter((round) =>
+          String(round.competitionId) === String(competition.id),
+        ) as unknown as FantasyRound[],
+      }),
+    ]),
+  );
+
+  return Response.json({
+    role,
+    leagues: visibleLeagues,
+    seasons: seasonsSnapshot.docs
+      .map((item) => normalizeFirestoreValue(item.id, item.data()))
+      .filter((season) => visibleLeagueIds.has(String(season.leagueId))),
+    competitions,
+    scoringProfiles,
+    squadRules,
+    readinessByCompetition,
+  }, { headers: { 'cache-control': 'no-store' } });
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -74,7 +224,13 @@ export async function POST(request: Request) {
     }
     if (
       role === 'league_admin'
-      && !(Array.isArray(league.data()?.adminUserIds) && league.data()!.adminUserIds.includes(actor.uid))
+      && !canAdministerLeague(
+        role,
+        actor.uid,
+        input.leagueId,
+        league.data(),
+        await scopedLeagueIdsForActor(actor.uid),
+      )
     ) {
       return Response.json({ error: 'You do not administer this league.' }, { status: 403 });
     }

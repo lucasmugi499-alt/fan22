@@ -59,12 +59,45 @@ export function RichStandings({
   const columns = standingColumns(sport);
   const leader = rows[0];
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <p className="text-sm font-semibold text-text-strong">{sportDisplayName(sport)} table</p>
         <p className="text-xs text-muted">Official results only</p>
       </div>
-      <div className="overflow-x-auto [scrollbar-width:thin]">
+      <div className="divide-y divide-border sm:hidden">
+        <div className="grid grid-cols-[minmax(0,1fr)_3rem_3rem_3.5rem] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+          <span>Club</span>
+          <span className="text-center">PL</span>
+          <span className="text-center">GD</span>
+          <span className="text-center">PTS</span>
+        </div>
+        {rows.map((r, i) => {
+          const rank = i + 1;
+          const mine = r.teamId === highlightTeamId;
+          const teamSport = sportById?.(r.teamId);
+          const form = formFor(r.teamId, matches);
+          return (
+            <div key={r.teamId} className={cn('grid grid-cols-[minmax(0,1fr)_3rem_3rem_3.5rem] gap-2 px-3 py-3 text-sm', mine && 'bg-brand-subtle')}>
+              <Link href={`/teams/${r.teamId}`} className="min-w-0">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span data-numeric className="w-5 shrink-0 text-xs font-bold tabular-nums text-muted">{rank}</span>
+                  <Crest name={r.teamName} sport={teamSport} size={26} />
+                  <span className={cn('truncate font-semibold', mine ? 'text-brand' : 'text-text-strong')}>{r.teamName}</span>
+                </span>
+                <span className="mt-1 flex items-center gap-1 pl-7">
+                  {form.length ? form.map((f, k) => (
+                    <span key={k} className={cn('grid h-4 w-4 place-items-center rounded-[3px] text-[9px] font-bold', FORM_COLOR[f])}>{f}</span>
+                  )) : <span className="text-xs text-subtle">No form</span>}
+                </span>
+              </Link>
+              <span data-numeric className="self-center text-center tabular-nums text-muted">{standingCellValue(r, 'played', leader)}</span>
+              <span data-numeric className={cn('self-center text-center tabular-nums text-muted', r.difference > 0 && 'text-[var(--state-verified)]')}>{standingCellValue(r, 'difference', leader)}</span>
+              <span data-numeric className="self-center text-center font-bold tabular-nums text-text-strong">{standingCellValue(r, 'points', leader)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden min-w-0 max-w-full overflow-x-auto [scrollbar-width:thin] sm:block">
         <table className="min-w-[780px] w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr className="text-[11px] font-semibold uppercase tracking-wide text-subtle">
