@@ -96,6 +96,21 @@ describe('loadGoalPlaceData', () => {
     expect(provider.getFeedPosts).not.toHaveBeenCalled();
   });
 
+  it('does not request any public collections when an empty collection set is selected', async () => {
+    const provider = providerWithCalls();
+
+    await loadGoalPlaceData(provider, {
+      role: 'fan',
+      collections: [],
+    });
+
+    expect(provider.getAthletes).not.toHaveBeenCalled();
+    expect(provider.getTeams).not.toHaveBeenCalled();
+    expect(provider.getLeagues).not.toHaveBeenCalled();
+    expect(provider.getSeasons).not.toHaveBeenCalled();
+    expect(provider.getMatches).not.toHaveBeenCalled();
+  });
+
   it('does not request an unselected platform collection for an admin', async () => {
     const provider = providerWithCalls();
     vi.mocked(provider.getReports).mockResolvedValueOnce([]);

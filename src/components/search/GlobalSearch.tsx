@@ -39,11 +39,12 @@ export function GlobalSearch({
 }
 
 function GlobalSearchDialog({ onClose, role }: { onClose: () => void; role: AppRole | null }) {
-  const { athletes, teams, leagues, matches, seasons, loading } = useGoalPlaceData({
-    collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons'],
-    recordLimit: 1_200,
-  });
   const [query, setQuery] = useState('');
+  const shouldLoadRecords = query.trim().length >= 2;
+  const { athletes, teams, leagues, matches, seasons, loading } = useGoalPlaceData({
+    collections: shouldLoadRecords ? ['athletes', 'teams', 'leagues', 'matches', 'seasons'] : [],
+    recordLimit: 60,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
 
