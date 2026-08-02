@@ -188,6 +188,7 @@ blocked until the unchecked staging gates above are complete.
 - [x] No broken public routes, console errors, image failures, or horizontal overflow
 - [x] Demo-role workflow QA passes
 - [ ] Firebase-authenticated role workflow QA passes in staging
+  - Runner added: `npm run staging:role-smoke`. Keep unchecked until it passes against the hosted staging app and the evidence report is attached.
 - [ ] Firebase-authenticated fantasy workflow QA passes in staging
 - [x] Synthetic-data disclosure is present where required
 - [x] Current code review has no unresolved demo-environment high-severity findings

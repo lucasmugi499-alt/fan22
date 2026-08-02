@@ -33,6 +33,17 @@ That command exercises the deployed API with a real Fan Firebase ID token, sched
 authorization, lineup locking, transfer validation, official scoring, and correction
 re-scoring. See `docs/FANTASY_STAGING_SMOKE.md` for required credentials and evidence.
 
+Role-workflow staging candidates must also pass:
+
+```bash
+npm run staging:role-smoke
+```
+
+That command exercises public league application, Platform Operator approval,
+Organization Operator invitation acceptance, scoped access-context projection, team
+creation, Team Admin invitation, and expected rejection when a Fan account tries to accept
+operator access. See `docs/ROLE_STAGING_SMOKE.md`.
+
 ## Environment Topology
 
 The current investor demo uses Firebase App Hosting in `us-east4`. The default Firebase
