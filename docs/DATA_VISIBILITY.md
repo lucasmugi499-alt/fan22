@@ -24,4 +24,5 @@ ledger entries, and settlement state are never client-owned fields.
 
 Sensitive evidence uses controlled Storage paths and trusted signed upload sessions.
 Browser clients cannot directly create entity public media, published media or match
-evidence objects. Public provenance responses withhold private actor identifiers.
+evidence objects. Public result provenance responses are rate-limited, cached, bounded,
+and withhold private actor identifiers, internal notes, and internal-only workflow events.

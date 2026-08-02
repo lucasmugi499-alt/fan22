@@ -118,6 +118,11 @@ mobile data. The client must compress before upload.
 `confirmed → official` is the only transition producing an official result, and no client
 can perform it.
 
+The public provenance endpoint returns a bounded public projection of the transition
+timeline. It strips internal user IDs and notes, excludes internal-only workflow events,
+applies rate limits, and ships cache headers. Operational investigation data remains in
+the private result-submission event stream.
+
 Host: a Firestore **`onWrite` Cloud Function** (see Decision 2), applying the plan returned
 by `planFinalization()` inside a single transaction. The Admin SDK bypasses security rules,
 which is exactly the asymmetry the trust boundary requires.
