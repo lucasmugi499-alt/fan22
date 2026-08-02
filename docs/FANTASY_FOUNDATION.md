@@ -4,6 +4,11 @@ GoalPlace Fantasy is a free engagement layer for football, basketball, Rugby 15s
 Rugby 7s. It has no entry fee, cash prize, cash pool, betting odds, purchasable credits,
 money conversion, or paid advantage.
 
+Fantasy browse surfaces are public: the hub, how-it-works, competition overview, players,
+points, leaderboards and public mini-league pages can be inspected without an account.
+Lineup creation, transfers, mini-league creation and joining remain Fan-account actions
+enforced by the server APIs.
+
 ## Trust Flow
 
 ```text

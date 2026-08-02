@@ -214,9 +214,25 @@ export const PUBLIC_DISCOVERY_ROUTES = [
   '/support',
 ];
 
+export function isPublicFantasyRoute(pathname: string): boolean {
+  if (
+    pathname === '/fantasy'
+    || pathname === '/fantasy/how-it-works'
+    || pathname === '/fantasy/mini-leagues'
+    || pathname.startsWith('/fantasy/mini-leagues/')
+  ) {
+    return true;
+  }
+  return pathname.startsWith('/fantasy/competitions/')
+    && !pathname.endsWith('/team');
+}
+
 export function isPublicDiscoveryRoute(pathname: string): boolean {
-  return PUBLIC_DISCOVERY_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  return (
+    PUBLIC_DISCOVERY_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+    || isPublicFantasyRoute(pathname)
   );
 }
 
