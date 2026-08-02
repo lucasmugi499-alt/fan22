@@ -33,17 +33,9 @@ service firebase.storage {
         (isAdmin() || (signedIn() && request.auth.uid == userId));
     }
 
-    // Match evidence backing a result submission.
-    //
-    // This previously had nowhere to live: the only writable paths were /public (world
-    // readable AND writable by any signed-in user, so an opposing team could read or
-    // overwrite disputed-match evidence) and /users. Evidence is scoped to the match and
-    // the uploading team, readable only by signed-in users, and never overwritable or
-    // deletable by the uploader — evidence that can be swapped after a dispute opens is
-    // not evidence.
-    //
-    // The 15MB cap is deliberately lower than the 50MB media ceiling: uploads happen from
-    // the touchline on Ugandan mobile data, and the client compresses before sending.
+    // Match evidence and entity media are written through trusted signed-upload sessions.
+    // Browser rules deliberately cannot grant arbitrary entity writes because this app uses
+    // the fg256 Firestore database and Storage Rules can only read the default database.
     function validEvidence() {
       return request.resource != null &&
         request.resource.size < 15 * 1024 * 1024 &&
@@ -51,8 +43,8 @@ service firebase.storage {
     }
 
     match /matchEvidence/{matchId}/{teamId}/{userId}/{fileName} {
-      allow read: if signedIn();
-      allow create: if resource == null && signedIn() && request.auth.uid == userId && validEvidence();
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow create: if false;
       allow update: if false;
       allow delete: if isAdmin();
       allow write: if resource != null && request.resource == null && isAdmin();
@@ -60,14 +52,7 @@ service firebase.storage {
 
     match /publishedMedia/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
-      allow create: if resource == null &&
-        signedIn() &&
-        ownerType in ['user', 'athlete', 'team', 'league'] &&
-        request.auth.uid == userId &&
-        validEvidence() &&
-        request.resource.metadata.ownerType == ownerType &&
-        request.resource.metadata.ownerId == ownerId &&
-        request.resource.metadata.uploadedBy == userId;
+      allow create: if false;
       allow update: if false;
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
       allow write: if resource != null &&
@@ -84,14 +69,7 @@ service firebase.storage {
 
     match /public/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
-      allow create: if resource == null &&
-        signedIn() &&
-        validPublicOwner(ownerType) &&
-        request.auth.uid == userId &&
-        validMedia() &&
-        request.resource.metadata.ownerType == ownerType &&
-        request.resource.metadata.ownerId == ownerId &&
-        request.resource.metadata.uploadedBy == userId;
+      allow create: if false;
       allow update: if false;
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
       allow write: if resource != null &&

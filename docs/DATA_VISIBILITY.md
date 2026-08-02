@@ -22,5 +22,6 @@
 Official athlete statistics, verification state, authority assignments, money, points,
 ledger entries, and settlement state are never client-owned fields.
 
-Sensitive evidence uses controlled Storage paths. Public provenance responses withhold
-private actor identifiers.
+Sensitive evidence uses controlled Storage paths and trusted signed upload sessions.
+Browser clients cannot directly create entity public media, published media or match
+evidence objects. Public provenance responses withhold private actor identifiers.

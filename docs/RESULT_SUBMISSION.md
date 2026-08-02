@@ -104,10 +104,11 @@ forgery, attendance forgery, and feed-counter tampering.
 `storage.rules`, path `matchEvidence/{matchId}/{teamId}/{userId}/{fileName}`.
 
 Previously evidence had nowhere safe to go: the only writable paths were `/public`
-(world-readable *and* writable by any signed-in user — an opposing team could read or
-overwrite disputed-match evidence) and `/users`. The new path is create-only:
-`allow update: if false`, deletable only by admins. Evidence that can be swapped after a
-dispute opens is not evidence.
+(world-readable *and* writable by any signed-in user) and `/users`. Evidence now uses
+trusted signed upload sessions from `/api/uploads/session`. The server verifies the
+caller's scoped assignment, match/team relationship and capability, then mints one
+short-lived upload URL for the exact object path. Browser clients cannot directly create,
+replace or delete match evidence through Storage Rules.
 
 Cap is 15MB, below the 50MB media ceiling, because uploads happen from the touchline on
 mobile data. The client must compress before upload.

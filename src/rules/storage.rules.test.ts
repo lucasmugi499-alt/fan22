@@ -55,8 +55,8 @@ beforeEach(async () => {
 });
 
 describe('public media upload boundary', () => {
-  it('lets signed-in users publish scoped public media with matching immutable ownership metadata', async () => {
-    await assertSucceeds(
+  it('refuses direct browser writes to entity public media paths', async () => {
+    await assertFails(
       ref('user_a', 'public/teams/team_a/user_a/badge.jpg').put(
         bytes(128),
         metadata('image/jpeg', {
@@ -131,10 +131,13 @@ describe('public media upload boundary', () => {
 });
 
 describe('match evidence boundary', () => {
-  it('lets the uploader create match evidence but not replace or delete it', async () => {
+  it('blocks direct browser creation, replacement and uploader deletion for match evidence', async () => {
     const evidence = ref('team_admin', 'matchEvidence/match_1/team_a/team_admin/evidence.jpg');
 
-    await assertSucceeds(evidence.put(bytes(128), metadata('image/jpeg')));
+    await assertFails(evidence.put(bytes(128), metadata('image/jpeg')));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage(BUCKET_URL).ref('matchEvidence/match_1/team_a/team_admin/evidence.jpg').put(bytes(128), metadata('image/jpeg'));
+    });
     await assertFails(evidence.put(bytes(128), metadata('image/jpeg')));
     await assertFails(evidence.delete());
   });
@@ -156,6 +159,18 @@ describe('match evidence boundary', () => {
 
     await assertSucceeds(ref('platform_admin', path, { role: 'platform_admin' }).delete());
   });
+
+  it('keeps match evidence reads scoped to the uploader and platform admins', async () => {
+    const path = 'matchEvidence/match_1/team_a/team_admin/private-evidence.jpg';
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage(BUCKET_URL).ref(path).put(bytes(128), metadata('image/jpeg'));
+    });
+
+    await assertSucceeds(ref('team_admin', path).getMetadata());
+    await assertSucceeds(ref('platform_admin', path, { role: 'platform_admin' }).getMetadata());
+    await assertFails(ref('other_user', path).getMetadata());
+    await assertFails(ref(undefined, path).getMetadata());
+  });
 });
 
 describe('private and approved media boundaries', () => {
@@ -176,6 +191,7 @@ describe('private and approved media boundaries', () => {
     });
 
     await assertSucceeds(ref(undefined, path).getMetadata());
+    await assertFails(ref('user_a', 'publishedMedia/team/team_1/user_a/other.jpg').put(bytes(128), metadata('image/jpeg')));
     await assertFails(ref('user_a', 'approvedMedia/leagues/league_1/other.jpg').put(bytes(128), metadata('image/jpeg')));
     await assertSucceeds(
       ref('platform_admin', 'approvedMedia/leagues/league_1/other.jpg', { role: 'platform_admin' }).put(

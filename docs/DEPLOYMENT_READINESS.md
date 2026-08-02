@@ -65,8 +65,9 @@ Implemented:
 
 - `firebase-tools` lockfile updated from `15.24.0` to `15.25.0`
 - vulnerable transitive `sharp` under Next overridden to `0.35.3`
-- Storage rules are now covered by emulator tests for scoped public media, private user
-  media, approved media, match evidence immutability, content type, and size limits.
+- Storage rules are now covered by emulator tests for private user media, approved media,
+  server-issued media upload boundaries, match evidence read isolation, immutability,
+  content type, and size limits.
 
 Still registered:
 

@@ -1,7 +1,42 @@
 'use client';
 
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { requireFirebaseClient } from './client';
+
+type UploadSessionResponse = {
+  uploadUrl: string;
+  storagePath: string;
+  downloadUrl?: string;
+};
+
+async function requestUploadSession(body: Record<string, unknown>) {
+  const { auth } = requireFirebaseClient();
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Sign in again before uploading media.');
+  const response = await fetch('/api/uploads/session', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({})) as Partial<UploadSessionResponse> & { error?: string };
+  if (!response.ok || !data.uploadUrl || !data.storagePath) {
+    throw new Error(data.error ?? 'GoalPlace256 could not authorize this upload.');
+  }
+  return data as UploadSessionResponse;
+}
+
+async function putSignedObject(uploadUrl: string, file: File) {
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'content-type': file.type,
+    },
+    body: file,
+  });
+  if (!response.ok) throw new Error(`Upload failed with status ${response.status}.`);
+}
 
 export async function uploadMatchEvidence({
   matchId,
@@ -14,7 +49,8 @@ export async function uploadMatchEvidence({
   userId: string;
   files: File[];
 }) {
-  const { storage } = requireFirebaseClient();
+  const { auth } = requireFirebaseClient();
+  if (auth.currentUser?.uid !== userId) throw new Error('Sign in again before uploading match evidence.');
   const refs: string[] = [];
   for (const file of files) {
     if (!file.type.match(/^(image|video)\//)) {
@@ -23,13 +59,16 @@ export async function uploadMatchEvidence({
     if (file.size >= 15 * 1024 * 1024) {
       throw new Error(`${file.name} is larger than the 15 MB field-evidence limit.`);
     }
-    const extension = file.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
-    const path = `matchEvidence/${matchId}/${teamId}/${userId}/${crypto.randomUUID()}.${extension}`;
-    await uploadBytes(ref(storage, path), file, {
+    const session = await requestUploadSession({
+      kind: 'match_evidence',
+      matchId,
+      teamId,
+      fileName: file.name,
       contentType: file.type,
-      customMetadata: { matchId, teamId, uploadedBy: userId },
+      size: file.size,
     });
-    refs.push(path);
+    await putSignedObject(session.uploadUrl, file);
+    refs.push(session.storagePath);
   }
   return refs;
 }
@@ -51,13 +90,16 @@ export async function uploadPublishedMedia({
   if (file.size >= 15 * 1024 * 1024) {
     throw new Error(`${file.name} is larger than the 15 MB media limit.`);
   }
-  const { storage } = requireFirebaseClient();
-  const extension = file.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
-  const path = `publishedMedia/${ownerType}/${ownerId}/${userId}/${crypto.randomUUID()}.${extension}`;
-  const target = ref(storage, path);
-  await uploadBytes(target, file, {
+  const { auth } = requireFirebaseClient();
+  if (auth.currentUser?.uid !== userId) throw new Error('Sign in again before uploading media.');
+  const session = await requestUploadSession({
+    kind: 'published_media',
+    ownerType,
+    ownerId,
+    fileName: file.name,
     contentType: file.type,
-    customMetadata: { ownerType, ownerId, uploadedBy: userId },
+    size: file.size,
   });
-  return getDownloadURL(target);
+  await putSignedObject(session.uploadUrl, file);
+  return session.downloadUrl ?? session.storagePath;
 }
