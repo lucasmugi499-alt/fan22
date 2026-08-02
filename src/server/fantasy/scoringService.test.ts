@@ -265,6 +265,7 @@ describe('fantasy scoring service integration', () => {
       rank: 1,
       totalPoints: 13.5,
     });
+    expect(store.get('fantasyLeaderboards/fantasy_rugby_fantasy_rugby_fan_1')).not.toHaveProperty('previousRank');
 
     store.set('matches/match_1', {
       ...store.get('matches/match_1')!,

@@ -343,8 +343,9 @@ async function rebuildFantasyLeaderboard(db: Firestore, competitionId: string) {
     ]),
   );
   const operations: BatchOperation[] = totals.map(
-    ({ team, totalPoints, roundsPlayed }, index) =>
-      (batch) => batch.set(
+    ({ team, totalPoints, roundsPlayed }, index) => {
+      const previousRank = previousRanks.get(team.id);
+      return (batch) => batch.set(
         db.collection('fantasyLeaderboards').doc(`${competitionId}_${team.id}`),
         {
           id: `${competitionId}_${team.id}`,
@@ -354,11 +355,12 @@ async function rebuildFantasyLeaderboard(db: Firestore, competitionId: string) {
           teamName: team.name,
           totalPoints,
           rank: index + 1,
-          previousRank: previousRanks.get(team.id),
+          ...(previousRank === undefined ? {} : { previousRank }),
           roundsPlayed,
           updatedAt: new Date().toISOString(),
         },
-      ),
+      );
+    },
   );
   await commitChunked(db, operations);
 }
