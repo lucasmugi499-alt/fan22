@@ -95,8 +95,8 @@ describe('fantasy Auth/Firestore staging smoke helpers', () => {
 
   it('documents the expected leaderboard totals for staging evidence review', () => {
     expect(expectedTotals()).toEqual({
-      firstOfficialTotal: 13.5,
-      correctedTotal: 21,
+      firstOfficialTotal: 17.5,
+      correctedTotal: 25,
     });
   });
 

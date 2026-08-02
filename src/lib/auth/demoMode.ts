@@ -9,5 +9,9 @@ import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
  * NEXT_PUBLIC_ENABLE_DEMO_LOGIN=true (used for pilot/demo deployments).
  */
 export const isDemoModeEnabled =
-  goalPlaceEnvironment() !== 'production' &&
-  (process.env.NODE_ENV === 'development' || environmentFlags().allowDemoLogin);
+  (process.env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT ?? goalPlaceEnvironment()) !== 'production' &&
+  (
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === 'true' ||
+    environmentFlags().allowDemoLogin
+  );

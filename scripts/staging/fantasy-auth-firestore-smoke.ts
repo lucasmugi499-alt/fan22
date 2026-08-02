@@ -370,8 +370,8 @@ export function buildSeedRecords(ids: SmokeIds, now = new Date()): SeedRecord[] 
 
 export function expectedTotals() {
   return {
-    firstOfficialTotal: 13.5,
-    correctedTotal: 21,
+    firstOfficialTotal: 17.5,
+    correctedTotal: 25,
   };
 }
 
