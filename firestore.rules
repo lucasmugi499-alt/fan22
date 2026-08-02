@@ -187,17 +187,17 @@ service cloud.firestore {
           resource.data.invitedEmail is string &&
           request.auth.token.email is string &&
           resource.data.invitedEmail == request.auth.token.email);
-      allow create, update, delete: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /accessAssignments/{assignmentId} {
       allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow create, update, delete: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /accessIndex/{indexId} {
       allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow create, update, delete: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /sponsors/{sponsorId} {
@@ -227,12 +227,13 @@ service cloud.firestore {
     }
 
     match /adminLogs/{logId} {
-      allow create, read: if isPlatformAdmin();
-      allow update, delete: if isSuperAdmin();
+      allow read: if isPlatformAdmin();
+      allow write: if false;
     }
 
     match /{document=**} {
-      allow read, write: if isSuperAdmin();
+      allow read: if isSuperAdmin();
+      allow write: if false;
     }
   }
 }

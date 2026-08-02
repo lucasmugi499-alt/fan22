@@ -8,6 +8,7 @@ import {
 import { readFileSync } from 'node:fs';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -872,6 +873,37 @@ describe('new operational write surfaces', () => {
       action: 'rejected',
     }));
     await assertFails(getDoc(doc(asUser(OUTSIDER), 'adminAuditEvents/decision')));
+  });
+
+  it('prevents Super Admin browser clients from using the catch-all as a write bypass', async () => {
+    const superAdmin = asUserWithClaims('super', { role: 'super_admin' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'serverOnlyRecords/secret'), {
+        value: 'server-owned',
+      });
+      await setDoc(doc(ctx.firestore(), 'adminLogs/existing'), {
+        actorUserId: 'platform',
+        action: 'legacy_event',
+      });
+      await setDoc(doc(ctx.firestore(), 'accessAssignments/assignment_1'), {
+        userId: OUTSIDER,
+        roleKey: 'team_admin',
+        scopeType: 'team',
+        scopeId: 'team_a',
+        status: 'active',
+      });
+    });
+
+    await assertSucceeds(getDoc(doc(superAdmin, 'serverOnlyRecords/secret')));
+    await assertFails(setDoc(doc(superAdmin, 'serverOnlyRecords/forged'), { value: 'forged' }));
+    await assertFails(updateDoc(doc(superAdmin, 'serverOnlyRecords/secret'), { value: 'rewritten' }));
+    await assertFails(setDoc(doc(superAdmin, 'adminLogs/forged'), {
+      actorUserId: 'super',
+      action: 'forged',
+    }));
+    await assertFails(updateDoc(doc(superAdmin, 'adminLogs/existing'), { action: 'rewritten' }));
+    await assertFails(deleteDoc(doc(superAdmin, 'adminLogs/existing')));
+    await assertFails(updateDoc(doc(superAdmin, 'accessAssignments/assignment_1'), { status: 'revoked' }));
   });
 
   it('lets notification owners change only read state', async () => {

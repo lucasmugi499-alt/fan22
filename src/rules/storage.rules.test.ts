@@ -185,3 +185,21 @@ describe('private and approved media boundaries', () => {
     );
   });
 });
+
+describe('storage catch-all boundary', () => {
+  it('does not let Super Admin browser clients write arbitrary objects through the fallback rule', async () => {
+    const path = 'serverOnlyExports/payment-ledger.csv';
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage(BUCKET_URL).ref(path).put(bytes(128), metadata('text/csv'));
+    });
+
+    await assertSucceeds(ref('super_admin', path, { role: 'super_admin' }).getMetadata());
+    await assertFails(
+      ref('super_admin', 'serverOnlyExports/forged.csv', { role: 'super_admin' }).put(
+        bytes(128),
+        metadata('text/csv'),
+      ),
+    );
+    await assertFails(ref('super_admin', path, { role: 'super_admin' }).delete());
+  });
+});

@@ -63,11 +63,11 @@ No destructive data migration is included in Phase 1A.
 | Combined release gate | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run deploy:ready` passed. |
 | Corrected account-class decision | Pass | Current slice updates docs/code/tests to fixed account classes. |
 | Safe invitation preview | Pass | Current slice adds `/api/access/invitations/[invitationId]`, verified in `npm test` and production route map. |
+| Super Admin direct write removal | Pass | Firestore and Storage catch-all writes now fail for Super Admin browser clients; `npm run test:rules` passed 83 tests with Java 21. |
+| Immutable audit hardening | Pass | `adminAuditEvents` and legacy `adminLogs` are server-write-only; Super Admin browser update/delete attempts are covered by rules tests. |
 
 ## Remaining Phase 1 Work
 
 - Invitation acceptance update so only Organization Operator accounts receive league/team scoped assignments.
 - Assignment suspension, revocation, and expiry mutation APIs.
-- Server-only immutable audit enforcement and rules hardening.
-- Removal of Super Admin direct browser writes.
 - Full compatibility report across existing demo and Firebase users.
