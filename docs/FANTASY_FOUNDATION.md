@@ -32,6 +32,11 @@ Before a live competition enables appearance, active-squad, duration, assist, ca
 clean-sheet, rebound, or similar rules, Matchday Field Mode must capture and verify those
 events for the complete match squad.
 
+The Platform Admin activation route now runs a server-side readiness check before it can
+publish player prices or mark a competition active. The check blocks activation when the
+approved scoring profile, squad rules, roster, prices, rounds, position groups or recorded
+stat coverage cannot support every rule enabled by the competition's declared data level.
+
 ## Supported Configurations
 
 - Football: 15-player squad, 11 starters, 100 Fantasy Credits

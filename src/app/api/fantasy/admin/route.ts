@@ -1,8 +1,16 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { validateFantasyActivation } from '@/lib/fantasy/activation';
 import { positionGroupFor } from '@/lib/fantasy/profiles';
-import type { FantasySquadRules } from '@/types/fantasy';
+import type {
+  FantasyCompetition,
+  FantasyPlayer,
+  FantasyPlayerPrice,
+  FantasyRound,
+  FantasyScoringProfile,
+  FantasySquadRules,
+} from '@/types/fantasy';
 import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
 
 export const runtime = 'nodejs';
@@ -188,16 +196,31 @@ export async function POST(request: Request) {
     adminDb.collection('fantasySquadRules').doc(competition.data()!.squadRulesId).get(),
     adminDb.collection('fantasyPlayers').where('competitionId', '==', competition.id).get(),
     adminDb.collection('fantasyPlayerPrices').where('competitionId', '==', competition.id).get(),
-    adminDb.collection('fantasyRounds').where('competitionId', '==', competition.id).count().get(),
+    adminDb.collection('fantasyRounds').where('competitionId', '==', competition.id).get(),
   ]);
-  if (
-    profileSnapshot.data()?.status !== 'approved'
-    || !rulesSnapshot.exists
-    || playersSnapshot.size < Number(rulesSnapshot.data()?.squadSize ?? 1)
-    || pricesSnapshot.size < playersSnapshot.size
-    || roundsSnapshot.data().count < 1
-  ) {
-    return Response.json({ error: 'Roster, rounds, or locked scoring configuration is incomplete.' }, { status: 409 });
+  const readiness = validateFantasyActivation({
+    competition: { id: competition.id, ...competition.data()! } as FantasyCompetition,
+    scoringProfile: profileSnapshot.exists
+      ? { id: profileSnapshot.id, ...profileSnapshot.data()! } as FantasyScoringProfile
+      : null,
+    squadRules: rulesSnapshot.exists
+      ? { id: rulesSnapshot.id, ...rulesSnapshot.data()! } as FantasySquadRules
+      : null,
+    players: playersSnapshot.docs.map((player) =>
+      ({ id: player.id, ...player.data()! } as FantasyPlayer),
+    ),
+    prices: pricesSnapshot.docs.map((price) =>
+      ({ id: price.id, ...price.data()! } as FantasyPlayerPrice),
+    ),
+    rounds: roundsSnapshot.docs.map((round) =>
+      ({ id: round.id, ...round.data()! } as FantasyRound),
+    ).sort((left, right) => left.number - right.number),
+  });
+  if (!readiness.ready) {
+    return Response.json({
+      error: 'Roster, rounds, or locked scoring configuration is incomplete.',
+      blockers: readiness.blockers,
+    }, { status: 409 });
   }
   const publishedAt = new Date().toISOString();
   const priceWriter = adminDb.bulkWriter();
@@ -211,6 +234,8 @@ export async function POST(request: Request) {
   await competitionRef.update({
     status: 'active',
     approvedByUserId: actor.uid,
+    activationReadiness: readiness.summary,
+    activationWarnings: readiness.warnings,
     activatedAt: FieldValue.serverTimestamp(),
   });
   await adminDb.collection('fantasyAuditEvents').add({
@@ -220,7 +245,9 @@ export async function POST(request: Request) {
     actorRole: role,
     scoringProfileId: competition.data()!.scoringProfileId,
     scoringProfileVersion: competition.data()!.scoringProfileVersion,
+    readiness: readiness.summary,
+    warnings: readiness.warnings,
     createdAt: FieldValue.serverTimestamp(),
   });
-  return Response.json({ id: competition.id, status: 'active' });
+  return Response.json({ id: competition.id, status: 'active', readiness: readiness.summary });
 }
