@@ -554,16 +554,30 @@ export function useUserContributions(userId?: string | null) {
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [items, setItems] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(Boolean(userId));
+  const [error, setError] = useState<Error>();
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     if (!userId) return;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(undefined);
+      }
+    });
     provider.getContributionsByUser(userId)
       .then((contributions) => {
-        if (!cancelled) setItems(contributions);
+        if (!cancelled) {
+          setItems(contributions);
+          setError(undefined);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setItems([]);
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause : new Error('Contribution activity is unavailable.'));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -571,7 +585,7 @@ export function useUserContributions(userId?: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [provider, userId]);
+  }, [attempt, provider, userId]);
 
-  return { items: userId ? items : [], loading: userId ? loading : false };
+  return { items: userId ? items : [], loading: userId ? loading : false, error, retry };
 }

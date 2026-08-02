@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useUserContributions } from '@/lib/firebase/useGoalPlaceData';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { DemoDataNote } from '@/components/ui/DemoDataNote';
 
 const STATUS_COPY = {
@@ -27,7 +27,7 @@ const STATUS_COPY = {
 export function ContributionActivity() {
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const userId = currentUser?.uid ?? userProfile?.uid;
-  const { items, loading } = useUserContributions(userId);
+  const { items, loading, error, retry } = useUserContributions(userId);
 
   return (
     <div className="space-y-4">
@@ -49,6 +49,8 @@ export function ContributionActivity() {
       <h2 className="text-[15px] font-semibold text-text-strong">Contributions</h2>
       {loading ? (
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16 w-full rounded-[var(--radius-md)]" />)}</div>
+      ) : error && !items.length ? (
+        <ErrorState description={error.message} onRetry={retry} />
       ) : items.length ? (
         <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1">
           {items.map((item) => {

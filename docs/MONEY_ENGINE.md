@@ -43,6 +43,10 @@ recognizes the collected money. It writes a held settlement journal that debits 
 clearing and credits `refund_payable` for the full charged amount. It does not credit
 `recipient_payable` or `platform_fee_revenue` until compliance resolves the case.
 
+Contribution history errors must be visible to the supporter. A permission, network, or
+provider-history read failure should render a retryable error state, never the same empty
+state used for an account with no support activity.
+
 Money is stored as positive integer UGX units. The checkout displays:
 
 - Full recipient support amount
