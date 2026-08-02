@@ -52,7 +52,7 @@ No destructive data migration is included in Phase 1A.
 | --- | --- | --- |
 | Deterministic projection tests | Pass | `npm test -- src/lib/auth/access.test.ts src/server/access/resolver.test.ts src/app/api/access/context/route.test.ts` passed 9 tests. |
 | Trusted context route tests | Pass | `npm test -- src/lib/auth/access.test.ts src/server/access/resolver.test.ts src/app/api/access/context/route.test.ts` passed 9 tests. |
-| Full unit suite | Pass | `npm test` passed 60 files and 695 tests. |
+| Full unit suite | Pass | `npm test` passed 61 files and 704 tests. |
 | Lint | Pass | `npm run lint` passed. |
 | Firestore/storage rules | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run test:rules` passed 2 files and 81 tests. |
 | Functions typecheck | Pass | `npm run functions:typecheck` passed. |
@@ -65,9 +65,9 @@ No destructive data migration is included in Phase 1A.
 | Safe invitation preview | Pass | Current slice adds `/api/access/invitations/[invitationId]`, verified in `npm test` and production route map. |
 | Super Admin direct write removal | Pass | Firestore and Storage catch-all writes now fail for Super Admin browser clients; `npm run test:rules` passed 83 tests with Java 21. |
 | Immutable audit hardening | Pass | `adminAuditEvents` and legacy `adminLogs` are server-write-only; Super Admin browser update/delete attempts are covered by rules tests. |
+| Assignment lifecycle API | Pass | `transition_access_assignment` supports platform-admin suspension, revocation, expiry, and reactivation while rebuilding the exact scoped `accessIndex`. |
+| Invitation acceptance projection rebuild | Pass | `accept_invitation` now rebuilds the scoped `accessIndex` from active assignments instead of merging roles/capabilities with `arrayUnion`. |
 
 ## Remaining Phase 1 Work
 
-- Invitation acceptance update so only Organization Operator accounts receive league/team scoped assignments.
-- Assignment suspension, revocation, and expiry mutation APIs.
 - Full compatibility report across existing demo and Firebase users.

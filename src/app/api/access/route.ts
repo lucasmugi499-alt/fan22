@@ -3,7 +3,15 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
-import { PERMISSION_BUNDLES, accessIndexId, capabilitiesForAssignment } from '@/lib/auth/access';
+import {
+  PERMISSION_BUNDLES,
+  accessIndexId,
+  buildAccessIndexDocuments,
+  type AccessAssignment,
+  type AccessAssignmentStatus,
+  type AccessRoleKey,
+  type AccessScopeType,
+} from '@/lib/auth/access';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
 import type { AccountClass } from '@/types';
 
@@ -53,6 +61,52 @@ const accessActionSchema = z.discriminatedUnion('action', [
     token: z.string().trim().min(20).max(512),
   }),
 ]);
+
+type FirestoreValue = {
+  toDate?: () => Date;
+};
+
+function isoFromFirestoreValue(value: unknown, fallback: string) {
+  if (typeof value === 'string') return value;
+  const maybeTimestamp = value as FirestoreValue | undefined;
+  const date = maybeTimestamp?.toDate?.();
+  return date instanceof Date ? date.toISOString() : fallback;
+}
+
+function accessAssignmentFromData(id: string, data: FirebaseFirestore.DocumentData, fallbackNow: string): AccessAssignment {
+  return {
+    id: typeof data.id === 'string' ? data.id : id,
+    userId: String(data.userId ?? ''),
+    roleKey: String(data.roleKey ?? '') as AccessRoleKey,
+    scopeType: String(data.scopeType ?? '') as AccessScopeType,
+    scopeId: String(data.scopeId ?? ''),
+    permissionBundleId: String(data.permissionBundleId ?? data.roleKey ?? ''),
+    status: String(data.status ?? 'pending') as AccessAssignmentStatus,
+    grantedByUserId: String(data.grantedByUserId ?? ''),
+    invitationId: typeof data.invitationId === 'string' ? data.invitationId : undefined,
+    applicationId: typeof data.applicationId === 'string' ? data.applicationId : undefined,
+    validFrom: isoFromFirestoreValue(data.validFrom, fallbackNow),
+    validUntil: data.validUntil ? isoFromFirestoreValue(data.validUntil, fallbackNow) : undefined,
+    suspendedAt: data.suspendedAt ? isoFromFirestoreValue(data.suspendedAt, fallbackNow) : undefined,
+    revokedAt: data.revokedAt ? isoFromFirestoreValue(data.revokedAt, fallbackNow) : undefined,
+    revocationReason: typeof data.revocationReason === 'string' ? data.revocationReason : undefined,
+    createdAt: isoFromFirestoreValue(data.createdAt, fallbackNow),
+    updatedAt: isoFromFirestoreValue(data.updatedAt, fallbackNow),
+  };
+}
+
+function emptyAccessIndex(scopeType: AccessScopeType, scopeId: string, userId: string, updatedAt: string) {
+  return {
+    userId,
+    scopeType,
+    scopeId,
+    activeRoles: [],
+    capabilities: [],
+    assignmentIds: [],
+    accessVersion: 1,
+    updatedAt,
+  };
+}
 
 async function synchronizeRoleClaim(uid: string, role: 'team_admin' | 'league_admin') {
   const account = await adminAuth.getUser(uid);
@@ -427,29 +481,42 @@ export async function POST(request: Request) {
         invitationId: body.invitationId,
         applicationId: data.applicationId,
       });
-      const capabilities = capabilitiesForAssignment({
-        permissionBundleId: bundle.id,
-        roleKey: data.roleKey,
-      });
       const indexId = accessIndexId(data.scopeType, data.scopeId, actor.uid);
-      const indexPatch = {
-        userId: actor.uid,
-        scopeType: data.scopeType,
-        scopeId: data.scopeId,
-        activeRoles: FieldValue.arrayUnion(data.roleKey),
-        ...(capabilities.length ? { capabilities: FieldValue.arrayUnion(...capabilities) } : {}),
-        assignmentIds: FieldValue.arrayUnion(assignmentId),
-        accessVersion: FieldValue.increment(1),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const projectedAssignment = accessAssignmentFromData(assignmentId, assignment, nowIso);
 
       await adminDb.runTransaction(async (transaction) => {
         const current = await transaction.get(invitationRef);
         if (!current.exists || !['sent', 'delivered', 'viewed', 'queued'].includes(String(current.data()?.status))) {
           throw new Error('Invitation is no longer active.');
         }
+        const scopedAssignmentsQuery = adminDb
+          .collection('accessAssignments')
+          .where('userId', '==', actor.uid)
+          .where('scopeType', '==', data.scopeType)
+          .where('scopeId', '==', data.scopeId);
+        const scopedAssignments = await transaction.get(scopedAssignmentsQuery);
+        const assignments = scopedAssignments.docs.map((doc) =>
+          doc.id === assignmentId
+            ? projectedAssignment
+            : accessAssignmentFromData(doc.id, doc.data(), nowIso)
+        );
+        if (!assignments.some((item) => item.id === assignmentId)) {
+          assignments.push(projectedAssignment);
+        }
+        const rebuilt = buildAccessIndexDocuments({
+          assignments,
+          accessVersion: 1,
+          updatedAt: nowIso,
+          now,
+        })[0];
         transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment);
-        transaction.set(adminDb.collection('accessIndex').doc(indexId), indexPatch, { merge: true });
+        transaction.set(adminDb.collection('accessIndex').doc(indexId), {
+          ...(rebuilt ?? emptyAccessIndex(data.scopeType, data.scopeId, actor.uid, nowIso)),
+          accessVersion: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: false });
         transaction.update(invitationRef, {
           status: 'accepted',
           acceptedAt: FieldValue.serverTimestamp(),

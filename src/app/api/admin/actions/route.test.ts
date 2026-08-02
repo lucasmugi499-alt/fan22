@@ -314,4 +314,111 @@ describe('trusted admin actions route hardening', () => {
       targetId: 'user_1',
     }));
   });
+
+  it('rejects access assignment lifecycle changes from non-platform admins', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'transition_access_assignment',
+      assignmentId: 'assignment_1',
+      status: 'suspended',
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
+    expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds scoped access projections when an assignment is suspended', async () => {
+    const assignmentA = {
+      id: 'assignment_a',
+      userId: 'operator_1',
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: 'team_1',
+      permissionBundleId: 'full_team_admin',
+      status: 'active',
+      grantedByUserId: 'league_admin_1',
+      validFrom: '2026-07-30T00:00:00.000Z',
+      createdAt: '2026-07-30T00:00:00.000Z',
+      updatedAt: '2026-07-30T00:00:00.000Z',
+    };
+    const assignmentB = {
+      ...assignmentA,
+      id: 'assignment_b',
+      roleKey: 'result_reporter',
+      permissionBundleId: 'results_only',
+    };
+    const scopedQuery = { kind: 'scopedAssignments' };
+    const collectionMock = (collectionName: string) => ({
+      doc: vi.fn((id = `${collectionName}_generated`) => ({
+        collectionName,
+        id,
+        get: vi.fn(async () => snapshot(id, undefined)),
+      })),
+      where: vi.fn(() => ({
+        where: vi.fn(() => ({
+          where: vi.fn(() => scopedQuery),
+        })),
+      })),
+    });
+    const transaction = {
+      get: vi.fn(async (ref: { id?: string; kind?: string }) => {
+        if (ref.kind === 'scopedAssignments') {
+          return {
+            docs: [
+              { id: 'assignment_a', data: () => assignmentA },
+              { id: 'assignment_b', data: () => assignmentB },
+            ],
+          };
+        }
+        return snapshot(ref.id ?? 'assignment_a', assignmentA);
+      }),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminDb.collection).mockImplementation(collectionMock as never);
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+
+    const response = await POST(request(JSON.stringify({
+      action: 'transition_access_assignment',
+      assignmentId: 'assignment_a',
+      status: 'suspended',
+      note: 'Season role ended.',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      id: 'assignment_a',
+      status: 'suspended',
+    });
+    expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'accessAssignments',
+      id: 'assignment_a',
+    }), expect.objectContaining({
+      status: 'suspended',
+    }));
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'accessIndex',
+      id: 'team_team_1_operator_1',
+    }), expect.objectContaining({
+      userId: 'operator_1',
+      scopeType: 'team',
+      scopeId: 'team_1',
+      activeRoles: ['result_reporter'],
+      assignmentIds: ['assignment_b'],
+      capabilities: expect.arrayContaining(['team.result.submit']),
+    }), { merge: false });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'adminAuditEvents',
+    }), expect.objectContaining({
+      actorUserId: 'platform_1',
+      action: 'suspended',
+      targetCollection: 'accessAssignments',
+      targetId: 'assignment_a',
+    }));
+  });
 });
