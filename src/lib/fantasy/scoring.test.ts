@@ -131,6 +131,49 @@ describe('multi-sport fantasy scoring', () => {
     ]);
   });
 
+  it('scores richer verified stat-line records when the competition records those stats', () => {
+    const events = scoreOfficialFantasyPerformance({
+      competition: {
+        ...competition,
+        dataLevel: 'standard',
+        recordedStatKeys: ['active_squad', 'appearance', 'try', 'conversion', 'penalty_goal', 'win_participation', 'yellow_card', 'minutes_played'],
+      },
+      profile: rugbyProfile,
+      roundId: 'round_1',
+      performance: {
+        ...performance,
+        dataCoverage: 'verified_stat_line',
+        minutesPlayed: 66,
+        stats: {
+          ...performance.stats,
+          conversion: 1,
+          penalty_goal: 1,
+          yellow_card: 1,
+          minutes_played: 66,
+        },
+        sourceEventIds: {
+          ...performance.sourceEventIds,
+          conversion: 'event_conversion',
+          penalty_goal: 'event_penalty',
+          yellow_card: 'event_yellow',
+          minutes_played: 'event_minutes',
+        },
+      },
+      createdAt: '2026-07-29T12:00:00.000Z',
+    });
+
+    expect(events.map((event) => event.scoringRuleId)).toEqual([
+      'active_squad',
+      'appearance',
+      'minimum_duration',
+      'try',
+      'conversion',
+      'penalty_goal',
+      'win_participation',
+      'yellow_card',
+    ]);
+  });
+
   it('does not count provisional points in official totals', () => {
     const provisional = scoreOfficialFantasyPerformance({
       competition,

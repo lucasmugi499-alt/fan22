@@ -1,6 +1,6 @@
 import { Firestore, Transaction } from 'firebase-admin/firestore';
 import { planFinalization } from '../lib/resultSubmission';
-import { Athlete, Match, ResultSubmission } from '../types';
+import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
 
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';
@@ -68,6 +68,51 @@ function activeSquadEventType(sport: 'football' | 'basketball' | 'rugby') {
   return `${sport}.active_squad`;
 }
 
+const SPORT_STAT_EVENT_TYPES: Record<'football' | 'basketball' | 'rugby', Record<string, string>> = {
+  football: {
+    minutes_played: 'football.minutes_played',
+    assist: 'football.assist',
+    yellow_card: 'football.yellow_card',
+    red_card: 'football.red_card',
+    own_goal: 'football.own_goal',
+  },
+  basketball: {
+    minutes_played: 'basketball.minutes_played',
+    rebound: 'basketball.rebound',
+    assist: 'basketball.assist',
+    steal: 'basketball.steal',
+    block: 'basketball.block',
+    turnover: 'basketball.turnover',
+    technical_foul: 'basketball.technical_fouls',
+    ejection: 'basketball.ejection',
+  },
+  rugby: {
+    minutes_played: 'rugby.minutes_played',
+    conversion: 'rugby.conversion_made',
+    penalty_goal: 'rugby.penalty_goal_made',
+    drop_goal: 'rugby.drop_goal_made',
+    assist: 'rugby.assist',
+    yellow_card: 'rugby.yellow_card',
+    red_card: 'rugby.red_card',
+  },
+};
+
+const STANDARD_STAT_KEYS = new Set([
+  'minutes_played',
+  'assist',
+  'rebound',
+  'conversion',
+  'penalty_goal',
+  'drop_goal',
+  'yellow_card',
+  'red_card',
+  'own_goal',
+  'technical_foul',
+  'ejection',
+]);
+
+const ADVANCED_STAT_KEYS = new Set(['steal', 'block', 'turnover']);
+
 function sanitizedActiveSquads(submission: ResultSubmission, match: Match) {
   const validTeams = new Set([match.homeTeamId, match.awayTeamId]);
   const result = new Map<string, { athleteId: string; teamId: string }>();
@@ -79,6 +124,163 @@ function sanitizedActiveSquads(submission: ResultSubmission, match: Match) {
     }
   }
   return result;
+}
+
+function sanitizedStatLines(
+  submission: ResultSubmission,
+  match: Match,
+  sport: 'football' | 'basketball' | 'rugby',
+) {
+  const validTeams = new Set([match.homeTeamId, match.awayTeamId]);
+  const supportedStats = SPORT_STAT_EVENT_TYPES[sport];
+  const result = new Map<string, AthleteStatLine>();
+
+  for (const line of submission.athleteStatLines ?? []) {
+    if (
+      !line
+      || typeof line.athleteId !== 'string'
+      || !line.athleteId.trim()
+      || typeof line.teamId !== 'string'
+      || !validTeams.has(line.teamId)
+    ) {
+      continue;
+    }
+
+    const stats: Record<string, number> = {};
+    if (typeof line.minutesPlayed === 'number' && Number.isFinite(line.minutesPlayed)) {
+      const minutes = Math.max(0, Math.trunc(line.minutesPlayed));
+      if (minutes > 0) stats.minutes_played = minutes;
+    }
+    for (const [statKey, value] of Object.entries(line.stats ?? {})) {
+      if (!supportedStats[statKey] || typeof value !== 'number' || !Number.isFinite(value)) continue;
+      const normalized = Math.max(0, Math.trunc(value));
+      if (normalized > 0) stats[statKey] = normalized;
+    }
+    if (!Object.keys(stats).length && !line.playerOfMatch) continue;
+
+    const existing = result.get(line.athleteId);
+    result.set(line.athleteId, {
+      athleteId: line.athleteId,
+      teamId: existing?.teamId ?? line.teamId,
+      minutesPlayed: Math.max(existing?.minutesPlayed ?? 0, stats.minutes_played ?? 0),
+      stats: {
+        ...(existing?.stats ?? {}),
+        ...Object.fromEntries(
+          Object.entries(stats).map(([key, value]) => [
+            key,
+            value + (existing?.stats[key] ?? 0),
+          ]),
+        ),
+      },
+      playerOfMatch: Boolean(existing?.playerOfMatch || line.playerOfMatch),
+    });
+  }
+
+  return result;
+}
+
+function officialStatLineEvents({
+  match,
+  submission,
+  sport,
+  statLines,
+  finalizedAt,
+  resultVersion,
+  startSequence = 1,
+}: {
+  match: Match;
+  submission: ResultSubmission;
+  sport: 'football' | 'basketball' | 'rugby';
+  statLines: Map<string, AthleteStatLine>;
+  finalizedAt: string;
+  resultVersion: number;
+  startSequence?: number;
+}) {
+  const events: OfficialSportEventRecord[] = [];
+  let sequence = startSequence;
+  const eventTypes = SPORT_STAT_EVENT_TYPES[sport];
+
+  for (const line of statLines.values()) {
+    const statEntries = Object.entries(line.stats)
+      .filter(([statKey, value]) => eventTypes[statKey] && value > 0);
+    for (const [statKey, value] of statEntries) {
+      const eventCount = statKey === 'minutes_played' ? 1 : value;
+      for (let index = 0; index < eventCount; index += 1) {
+        const eventId = `${match.id}_v${resultVersion}_event_${String(sequence).padStart(4, '0')}`;
+        events.push({
+          id: eventId,
+          eventType: eventTypes[statKey],
+          eventSchemaVersion: '1.0.0',
+          sportDefinitionVersion: '1.0.0',
+          sportId: sport,
+          competitionId: match.leagueId,
+          seasonId: match.seasonId,
+          matchId: match.id,
+          sequence,
+          teamId: line.teamId,
+          primaryAthleteId: line.athleteId,
+          payload: {
+            value: statKey === 'minutes_played' ? value : 1,
+            statKey,
+            source: 'result_submission_stat_line',
+          },
+          sourceClaimId: submission.id,
+          submittedByUserId: submission.submittedByUserId,
+          submittedByTeamId: submission.submittedByTeamId,
+          evidenceRefs: submission.evidenceRefs,
+          officialResultVersion: resultVersion,
+          officialEventVersion: 1,
+          verificationStatus: 'official',
+          idempotencyKey: `${submission.id}:v${resultVersion}:stat:${line.teamId}:${line.athleteId}:${statKey}:${index + 1}`,
+          createdAt: finalizedAt,
+          finalizedAt,
+        });
+        sequence += 1;
+      }
+    }
+    if (line.playerOfMatch) {
+      const eventId = `${match.id}_v${resultVersion}_event_${String(sequence).padStart(4, '0')}`;
+      events.push({
+        id: eventId,
+        eventType: `${sport}.player_of_match`,
+        eventSchemaVersion: '1.0.0',
+        sportDefinitionVersion: '1.0.0',
+        sportId: sport,
+        competitionId: match.leagueId,
+        seasonId: match.seasonId,
+        matchId: match.id,
+        sequence,
+        teamId: line.teamId,
+        primaryAthleteId: line.athleteId,
+        payload: {
+          value: 1,
+          statKey: 'player_of_match',
+          source: 'result_submission_stat_line',
+        },
+        sourceClaimId: submission.id,
+        submittedByUserId: submission.submittedByUserId,
+        submittedByTeamId: submission.submittedByTeamId,
+        evidenceRefs: submission.evidenceRefs,
+        officialResultVersion: resultVersion,
+        officialEventVersion: 1,
+        verificationStatus: 'official',
+        idempotencyKey: `${submission.id}:v${resultVersion}:stat:${line.teamId}:${line.athleteId}:player_of_match`,
+        createdAt: finalizedAt,
+        finalizedAt,
+      });
+      sequence += 1;
+    }
+  }
+
+  return events;
+}
+
+function statLineDataLevel(statLine?: AthleteStatLine) {
+  if (!statLine) return 'basic';
+  const keys = Object.keys(statLine.stats);
+  if (keys.some((key) => ADVANCED_STAT_KEYS.has(key))) return 'advanced';
+  if (keys.some((key) => STANDARD_STAT_KEYS.has(key)) || statLine.playerOfMatch) return 'standard';
+  return 'basic';
 }
 
 function officialActiveSquadEvents({
@@ -248,6 +450,9 @@ export async function finalizeSubmission(
       sport === 'football' || sport === 'basketball' || sport === 'rugby'
     ) ? sport : undefined;
     const activeSquads = sanitizedActiveSquads(submission, match);
+    const statLines = fantasySport
+      ? sanitizedStatLines(submission, match, fantasySport)
+      : new Map<string, AthleteStatLine>();
     const scorerTotals = new Map<string, { count: number; teamId: string }>();
     for (const scorer of submission.scorers) {
       const current = scorerTotals.get(scorer.athleteId);
@@ -262,6 +467,7 @@ export async function finalizeSubmission(
       teamId: string;
       activeSquadEventId?: string;
       scoringSourceEventId?: string;
+      statLine?: AthleteStatLine;
     }[] = [];
     const activeSquadEvents = fantasySport
       ? officialActiveSquadEvents({
@@ -282,6 +488,17 @@ export async function finalizeSubmission(
         startSequence: activeSquadEvents.length + 1,
       })
       : [];
+    const statLineEvents = fantasySport
+      ? officialStatLineEvents({
+        match,
+        submission,
+        sport: fantasySport,
+        statLines,
+        finalizedAt,
+        resultVersion: plan.resultVersion,
+        startSequence: activeSquadEvents.length + scorerEvents.length + 1,
+      })
+      : [];
     const activeSquadEventByAthlete = new Map(
       activeSquadEvents.map((event) => [event.primaryAthleteId, event.id]),
     );
@@ -291,22 +508,33 @@ export async function finalizeSubmission(
         scoringSourceEventByAthlete.set(event.primaryAthleteId, event.id);
       }
     }
+    const statSourceEventsByAthlete = new Map<string, Record<string, string>>();
+    for (const event of statLineEvents) {
+      const statKey = String(event.payload.statKey ?? '');
+      if (!statKey) continue;
+      const current = statSourceEventsByAthlete.get(event.primaryAthleteId) ?? {};
+      if (!current[statKey]) current[statKey] = event.id;
+      statSourceEventsByAthlete.set(event.primaryAthleteId, current);
+    }
     if (fantasySport) {
       const athleteIds = new Set([
         ...activeSquads.keys(),
         ...scorerTotals.keys(),
+        ...statLines.keys(),
       ]);
       for (const athleteId of athleteIds) {
         const athleteSnapshot = await tx.get(db.collection('athletes').doc(athleteId));
         if (!athleteSnapshot.exists) continue;
         const scorer = scorerTotals.get(athleteId);
         const active = activeSquads.get(athleteId);
+        const statLine = statLines.get(athleteId);
         officialPerformances.push({
           athlete: { id: athleteSnapshot.id, ...athleteSnapshot.data() } as Athlete,
           count: scorer?.count ?? 0,
-          teamId: active?.teamId ?? scorer?.teamId ?? match.homeTeamId,
+          teamId: active?.teamId ?? scorer?.teamId ?? statLine?.teamId ?? match.homeTeamId,
           activeSquadEventId: activeSquadEventByAthlete.get(athleteId),
           scoringSourceEventId: scoringSourceEventByAthlete.get(athleteId),
+          statLine,
         });
       }
     }
@@ -356,7 +584,7 @@ export async function finalizeSubmission(
     });
 
     if (fantasySport) {
-      for (const event of [...activeSquadEvents, ...scorerEvents]) {
+      for (const event of [...activeSquadEvents, ...scorerEvents, ...statLineEvents]) {
         tx.create(db.collection(OFFICIAL_SPORT_EVENTS).doc(event.id), event);
       }
 
@@ -365,13 +593,22 @@ export async function finalizeSubmission(
         : fantasySport === 'rugby'
           ? 'try'
           : 'points_scored';
-      for (const { athlete, count, teamId, activeSquadEventId, scoringSourceEventId } of officialPerformances) {
+      for (const { athlete, count, teamId, activeSquadEventId, scoringSourceEventId, statLine } of officialPerformances) {
         const positionGroup = officialPositionGroup(fantasySport, athlete.position);
         const teamWon =
           (teamId === match.homeTeamId && plan.match.score.home > plan.match.score.away)
           || (teamId === match.awayTeamId && plan.match.score.away > plan.match.score.home);
         const performanceId = `${match.id}_v${plan.resultVersion}_${athlete.id}`;
         const participationSourceEventId = activeSquadEventId ?? scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:participation`;
+        const statSources = statSourceEventsByAthlete.get(athlete.id) ?? {};
+        const lineStats = statLine?.stats ?? {};
+        const minutesPlayed = statLine?.minutesPlayed ?? lineStats.minutes_played ?? 0;
+        const playerOfMatch = Boolean(statLine?.playerOfMatch || match.topPerformerId === athlete.id);
+        const richStats = {
+          ...lineStats,
+          ...(minutesPlayed > 0 ? { minutes_played: minutesPlayed } : {}),
+          player_of_match: playerOfMatch ? 1 : 0,
+        };
         tx.set(db.collection('officialAthleteMatchStats').doc(performanceId), {
           id: performanceId,
           matchId: match.id,
@@ -382,24 +619,26 @@ export async function finalizeSubmission(
           positionGroup,
           officialResultVersion: plan.resultVersion,
           verificationStatus: 'verified',
-          dataLevel: 'basic',
-          dataCoverage: activeSquadEventId ? 'match_squad_basic' : 'scorer_only',
-          activeSquad: Boolean(activeSquadEventId) || count > 0,
+          dataLevel: statLineDataLevel(statLine),
+          dataCoverage: statLine ? 'verified_stat_line' : activeSquadEventId ? 'match_squad_basic' : 'scorer_only',
+          activeSquad: Boolean(activeSquadEventId) || count > 0 || Boolean(statLine),
           didPlay: true,
-          minutesPlayed: 0,
+          minutesPlayed,
           teamWon,
-          playerOfMatch: match.topPerformerId === athlete.id,
+          playerOfMatch,
           stats: {
-            active_squad: activeSquadEventId || count > 0 ? 1 : 0,
+            active_squad: activeSquadEventId || count > 0 || statLine ? 1 : 0,
             appearance: 1,
             [statKey]: count,
             win_participation: teamWon ? 1 : 0,
+            ...richStats,
           },
           sourceEventIds: {
             active_squad: participationSourceEventId,
             appearance: participationSourceEventId,
             [statKey]: scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:${statKey}`,
             win_participation: participationSourceEventId,
+            ...statSources,
           },
           finalizedAt: plan.submission.finalizedAt,
         });

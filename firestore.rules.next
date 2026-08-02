@@ -97,8 +97,8 @@ service cloud.firestore {
     function newSubmissionFields() {
       return [
         'matchId', 'leagueId', 'seasonId', 'submittedByTeamId', 'opponentTeamId',
-        'submittedByUserId', 'homeScore', 'awayScore', 'scorers', 'evidenceRefs',
-        'evidenceNote', 'status', 'revision', 'submittedAsFinal',
+        'submittedByUserId', 'homeScore', 'awayScore', 'scorers', 'activeSquads',
+        'athleteStatLines', 'evidenceRefs', 'evidenceNote', 'status', 'revision', 'submittedAsFinal',
         'confirmationDeadline', 'resultVersion', 'submittedAt'
       ];
     }
@@ -115,6 +115,8 @@ service cloud.firestore {
         request.resource.data.awayScore is int &&
         request.resource.data.awayScore >= 0 &&
         request.resource.data.scorers is list &&
+        (!request.resource.data.keys().hasAny(['activeSquads']) || request.resource.data.activeSquads is map) &&
+        (!request.resource.data.keys().hasAny(['athleteStatLines']) || request.resource.data.athleteStatLines is list) &&
         request.resource.data.evidenceRefs is list &&
         get(matchPath(matchId)).data.status in ['completed', 'live'] &&
         get(matchPath(matchId)).data.verificationStatus != 'verified' &&

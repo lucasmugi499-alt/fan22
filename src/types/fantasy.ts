@@ -302,9 +302,10 @@ export interface FantasyOfficialAthletePerformance {
    * `scorer_only` records contain trusted scoring events but are not evidence of a
    * complete match squad. `match_squad_basic` records come from a verified final-report
    * active squad, but still do not include duration, card, assist, rebound, or full
-   * box-score detail.
+   * box-score detail. `verified_stat_line` records come from a finalized match report
+   * carrying sport-specific per-athlete stats.
    */
-  dataCoverage?: 'complete' | 'scorer_only' | 'match_squad_basic';
+  dataCoverage?: 'complete' | 'scorer_only' | 'match_squad_basic' | 'verified_stat_line';
   activeSquad: boolean;
   didPlay: boolean;
   minutesPlayed: number;

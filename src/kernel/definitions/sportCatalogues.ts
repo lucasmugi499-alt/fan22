@@ -12,6 +12,7 @@ const CREATED_AT = '2026-07-30T00:00:00.000Z';
 
 export const FOOTBALL_BASIC_EVENTS = [
   'football.active_squad',
+  'football.minutes_played',
   'football.lineup_named',
   'football.starter',
   'football.substitution_on',
@@ -56,12 +57,14 @@ export const BASKETBALL_STANDARD_EVENTS = [
   'basketball.block',
   'basketball.turnover',
   'basketball.foul',
+  'basketball.ejection',
   'basketball.substitution',
   'basketball.timeout',
 ] as const;
 
 export const RUGBY_BASIC_EVENTS = [
   'rugby.active_squad',
+  'rugby.minutes_played',
   'rugby.lineup_named',
   'rugby.starter',
   'rugby.substitution_on',
@@ -74,6 +77,7 @@ export const RUGBY_BASIC_EVENTS = [
   'rugby.penalty_goal_missed',
   'rugby.drop_goal_made',
   'rugby.drop_goal_missed',
+  'rugby.assist',
   'rugby.yellow_card',
   'rugby.red_card',
   'rugby.player_of_match',

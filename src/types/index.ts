@@ -174,6 +174,16 @@ export interface ScorerEntry {
   minute?: number;
 }
 
+export interface AthleteStatLine {
+  athleteId: string;
+  teamId: string;
+  /** Verified minutes when the report carries them. */
+  minutesPlayed?: number;
+  /** Sport-specific stat keys, e.g. assist, rebound, conversion, yellow_card. */
+  stats: Record<string, number>;
+  playerOfMatch?: boolean;
+}
+
 /**
  * A claim about a match result, made by one team and answered by the other.
  *
@@ -211,6 +221,11 @@ export interface ResultSubmission {
    * report and becomes official only after opponent confirmation or league resolution.
    */
   activeSquads?: Record<string, string[]>;
+  /**
+   * Sport-specific per-athlete box-score/event claims captured by Matchday Field Mode.
+   * These are trusted only after the submission is confirmed or resolved and finalized.
+   */
+  athleteStatLines?: AthleteStatLine[];
   evidenceRefs: string[];
   evidenceNote?: string;
 

@@ -85,6 +85,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] One-minute mobile Matchday Field Mode
 - [x] Offline result draft and queued retry
 - [x] Scorer selection and evidence attachment
+- [x] Sport-specific athlete stat-line capture for verified final reports
 - [x] Opponent confirmation card with a live deadline
 - [x] Real roster editing and team update publishing
 - [x] Team profile editing

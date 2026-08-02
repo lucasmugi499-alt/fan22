@@ -18,6 +18,7 @@ import {
   ResultSubmissionEvent,
   Roster,
   ScorerEntry,
+  AthleteStatLine,
   Season,
   Sport,
   SportSlug,
@@ -120,6 +121,7 @@ export type CreateResultSubmissionInput = {
   awayScore: number;
   scorers?: ScorerEntry[];
   activeSquads?: Record<string, string[]>;
+  athleteStatLines?: AthleteStatLine[];
   evidenceRefs?: string[];
   evidenceNote?: string;
 };

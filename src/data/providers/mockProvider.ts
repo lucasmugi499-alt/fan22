@@ -1560,6 +1560,7 @@ export const mockProvider: GoalPlaceDataProvider = {
       awayScore: data.awayScore,
       scorers: data.scorers ?? [],
       activeSquads: data.activeSquads ?? {},
+      athleteStatLines: data.athleteStatLines ?? [],
       evidenceRefs: data.evidenceRefs ?? [],
       evidenceNote: data.evidenceNote,
       status: 'pending_confirmation',

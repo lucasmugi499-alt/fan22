@@ -29,7 +29,7 @@ import {
   queueResultDraft,
   readQueuedResultDraft,
 } from '@/lib/offline';
-import type { Match, ResultSubmission, ScorerEntry, Team } from '@/types';
+import type { AthleteStatLine, Match, ResultSubmission, ScorerEntry, SportSlug, Team } from '@/types';
 
 type Stage = 'idle' | 'saving' | 'finalizing';
 type Mode = 'submit' | 'respond' | 'waiting' | 'review' | 'view';
@@ -69,6 +69,7 @@ export function ResultSubmissionSheet({
   const [submitStep, setSubmitStep] = useState(0);
   const [scorerCounts, setScorerCounts] = useState<Record<string, number>>({});
   const [activeSquads, setActiveSquads] = useState<Record<string, string[]>>({});
+  const [statLineInputs, setStatLineInputs] = useState<Record<string, Record<string, string>>>({});
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [queued, setQueued] = useState(false);
@@ -124,6 +125,7 @@ export function ResultSubmissionSheet({
       setEvidenceNote(draft.input.evidenceNote ?? '');
       setScorerCounts(Object.fromEntries((draft.input.scorers ?? []).map((item) => [item.athleteId, item.count])));
       setActiveSquads(draft.input.activeSquads ?? {});
+      setStatLineInputs(statLineInputFromDraft(draft.input.athleteStatLines ?? []));
       setQueued(true);
     });
     return () => { cancelled = true; };
@@ -187,6 +189,8 @@ export function ResultSubmissionSheet({
   );
   const homeAthletes = eligibleScorers.filter((athlete) => athlete.teamId === match.homeTeamId);
   const awayAthletes = eligibleScorers.filter((athlete) => athlete.teamId === match.awayTeamId);
+  const sportSlug = normalizeSportSlug(match.sport);
+  const statMetrics = sportStatMetrics(sportSlug);
   const normalizedActiveSquads = useMemo(() => {
     const normalizeTeam = (teamId: string, teamAthletes: typeof eligibleScorers) => {
       const selected = activeSquads[teamId];
@@ -204,6 +208,12 @@ export function ResultSubmissionSheet({
       teamId: athletes.find((athlete) => athlete.id === athleteId)?.teamId ?? myTeamId,
       count,
     }));
+  const athleteStatLines = useMemo(() => buildAthleteStatLines({
+    activeSquads: normalizedActiveSquads,
+    athletes: eligibleScorers,
+    inputs: statLineInputs,
+    metrics: statMetrics,
+  }), [eligibleScorers, normalizedActiveSquads, statLineInputs, statMetrics]);
 
   function toggleSquadAthlete(teamId: string, athleteId: string) {
     setActiveSquads((current) => {
@@ -216,6 +226,17 @@ export function ResultSubmissionSheet({
         : [...selected, athleteId];
       return { ...current, [teamId]: nextSelected };
     });
+  }
+
+  function updateStatLineInput(athleteId: string, statKey: string, value: string) {
+    const normalized = value === '' ? '' : String(Math.max(0, Number(value) || 0));
+    setStatLineInputs((current) => ({
+      ...current,
+      [athleteId]: {
+        ...(current[athleteId] ?? {}),
+        [statKey]: normalized,
+      },
+    }));
   }
 
   async function submit() {
@@ -239,6 +260,7 @@ export function ResultSubmissionSheet({
         awayScore: a,
         scorers,
         activeSquads: normalizedActiveSquads,
+        athleteStatLines,
         evidenceNote: evidenceNote.trim() || undefined,
       };
       if (!online) {
@@ -354,7 +376,7 @@ export function ResultSubmissionSheet({
                 Back
               </Button>
             ) : null}
-            {submitStep < 4 ? (
+            {submitStep < 5 ? (
               <Button block iconTrailing={ArrowRight} onClick={() => setSubmitStep((step) => step + 1)} disabled={stage !== 'idle'}>
                 Continue
               </Button>
@@ -393,8 +415,8 @@ export function ResultSubmissionSheet({
         </div>
       ) : mode === 'submit' ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-5 gap-1">
-            {['Score', 'Squad', 'Scorers', 'Evidence', 'Preview'].map((label, index) => (
+          <div className="grid grid-cols-6 gap-1">
+            {['Score', 'Squad', 'Scorers', 'Stats', 'Evidence', 'Preview'].map((label, index) => (
               <div key={label}>
                 <div className={`h-1 rounded-full ${index <= submitStep ? 'bg-brand' : 'bg-surface-3'}`} />
                 <p className={`mt-1 text-center text-[10px] ${index === submitStep ? 'text-brand' : 'text-subtle'}`}>{label}</p>
@@ -449,6 +471,27 @@ export function ResultSubmissionSheet({
             </div>
           ) : null}
           {submitStep === 3 ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">
+                Add the extra official stats available on the match report. Leave unknown fields blank.
+              </p>
+              <StatLineEditor
+                title={homeName}
+                athletes={homeAthletes.filter((athlete) => normalizedActiveSquads[match.homeTeamId].includes(athlete.id))}
+                metrics={statMetrics}
+                values={statLineInputs}
+                onChange={updateStatLineInput}
+              />
+              <StatLineEditor
+                title={awayName}
+                athletes={awayAthletes.filter((athlete) => normalizedActiveSquads[match.awayTeamId].includes(athlete.id))}
+                metrics={statMetrics}
+                values={statLineInputs}
+                onChange={updateStatLineInput}
+              />
+            </div>
+          ) : null}
+          {submitStep === 4 ? (
             <div className="space-y-4">
               <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface-2 p-4 text-center">
                 <Camera className="h-7 w-7 text-brand" weight="duotone" />
@@ -460,7 +503,7 @@ export function ResultSubmissionSheet({
               <label className="block text-xs font-semibold uppercase text-subtle">Evidence note<textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} rows={3} className="field mt-2 min-h-24 py-3 normal-case" placeholder="Referee notes, scorer details, or context for the opposing team." /></label>
             </div>
           ) : null}
-          {submitStep === 4 ? (
+          {submitStep === 5 ? (
             <div className="space-y-4">
               <ScoreLine
                 homeName={homeName}
@@ -470,7 +513,7 @@ export function ResultSubmissionSheet({
               />
               <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm text-muted">
                 <p className="flex items-center gap-2 font-semibold text-text-strong"><CheckCircle className="h-4 w-4 text-brand" /> Final report preview</p>
-                <p className="mt-2">{scorers.length} scorer entr{scorers.length === 1 ? 'y' : 'ies'} / {activeSquadCount(normalizedActiveSquads)} active-squad athletes / {evidenceFiles.length} evidence file{evidenceFiles.length === 1 ? '' : 's'}.</p>
+                <p className="mt-2">{scorers.length} scorer entr{scorers.length === 1 ? 'y' : 'ies'} / {activeSquadCount(normalizedActiveSquads)} active-squad athletes / {athleteStatLines.length} stat line{athleteStatLines.length === 1 ? '' : 's'} / {evidenceFiles.length} evidence file{evidenceFiles.length === 1 ? '' : 's'}.</p>
                 <p className="mt-1">Submitting confirms the match has ended. The score will not be official until the opposing Team Admin responds and the trusted finalizer completes.</p>
               </div>
             </div>
@@ -592,6 +635,103 @@ function activeSquadCount(activeSquads: Record<string, string[]>) {
   return Object.values(activeSquads).reduce((total, ids) => total + ids.length, 0);
 }
 
+type StatMetric = {
+  key: string;
+  label: string;
+  shortLabel: string;
+};
+
+function normalizeSportSlug(sport: Match['sport']): SportSlug {
+  const normalized = String(sport).toLowerCase();
+  if (normalized === 'basketball') return 'basketball';
+  if (normalized === 'rugby') return 'rugby';
+  return 'football';
+}
+
+function sportStatMetrics(sport: SportSlug): StatMetric[] {
+  if (sport === 'basketball') {
+    return [
+      { key: 'minutes_played', label: 'Minutes played', shortLabel: 'Min' },
+      { key: 'rebound', label: 'Rebounds', shortLabel: 'Reb' },
+      { key: 'assist', label: 'Assists', shortLabel: 'Ast' },
+      { key: 'steal', label: 'Steals', shortLabel: 'Stl' },
+      { key: 'block', label: 'Blocks', shortLabel: 'Blk' },
+      { key: 'turnover', label: 'Turnovers', shortLabel: 'TO' },
+      { key: 'technical_foul', label: 'Technical fouls', shortLabel: 'Tech' },
+      { key: 'ejection', label: 'Ejections', shortLabel: 'Ej' },
+    ];
+  }
+  if (sport === 'rugby') {
+    return [
+      { key: 'minutes_played', label: 'Minutes played', shortLabel: 'Min' },
+      { key: 'conversion', label: 'Conversions', shortLabel: 'Con' },
+      { key: 'penalty_goal', label: 'Penalty goals', shortLabel: 'Pen' },
+      { key: 'drop_goal', label: 'Drop goals', shortLabel: 'Drop' },
+      { key: 'assist', label: 'Assists', shortLabel: 'Ast' },
+      { key: 'yellow_card', label: 'Yellow cards', shortLabel: 'YC' },
+      { key: 'red_card', label: 'Red cards', shortLabel: 'RC' },
+    ];
+  }
+  return [
+    { key: 'minutes_played', label: 'Minutes played', shortLabel: 'Min' },
+    { key: 'assist', label: 'Assists', shortLabel: 'Ast' },
+    { key: 'yellow_card', label: 'Yellow cards', shortLabel: 'YC' },
+    { key: 'red_card', label: 'Red cards', shortLabel: 'RC' },
+    { key: 'own_goal', label: 'Own goals', shortLabel: 'OG' },
+  ];
+}
+
+function statLineInputFromDraft(lines: AthleteStatLine[]) {
+  return Object.fromEntries(lines.map((line) => [
+    line.athleteId,
+    {
+      ...(line.minutesPlayed ? { minutes_played: String(line.minutesPlayed) } : {}),
+      ...Object.fromEntries(
+        Object.entries(line.stats ?? {}).map(([key, value]) => [key, String(value)]),
+      ),
+    },
+  ]));
+}
+
+function buildAthleteStatLines({
+  activeSquads,
+  athletes,
+  inputs,
+  metrics,
+}: {
+  activeSquads: Record<string, string[]>;
+  athletes: Array<{ id: string; teamId: string }>;
+  inputs: Record<string, Record<string, string>>;
+  metrics: StatMetric[];
+}) {
+  const activeAthleteIds = new Set(Object.values(activeSquads).flat());
+  const athleteById = new Map(athletes.map((athlete) => [athlete.id, athlete]));
+  return Array.from(activeAthleteIds).flatMap((athleteId): AthleteStatLine[] => {
+    const athlete = athleteById.get(athleteId);
+    if (!athlete) return [];
+    const input = inputs[athleteId] ?? {};
+    const stats: Record<string, number> = {};
+    let minutesPlayed: number | undefined;
+    for (const metric of metrics) {
+      const value = Number(input[metric.key] ?? 0);
+      if (!Number.isFinite(value) || value <= 0) continue;
+      const normalized = Math.trunc(value);
+      if (metric.key === 'minutes_played') {
+        minutesPlayed = normalized;
+      } else {
+        stats[metric.key] = normalized;
+      }
+    }
+    if (!minutesPlayed && !Object.keys(stats).length) return [];
+    return [{
+      athleteId,
+      teamId: athlete.teamId,
+      ...(minutesPlayed ? { minutesPlayed } : {}),
+      stats,
+    }];
+  });
+}
+
 function SquadSelector({
   title,
   athletes,
@@ -632,6 +772,59 @@ function SquadSelector({
         }) : (
           <p className="rounded-[var(--radius-sm)] border border-border bg-surface-1 px-3 py-2 text-xs text-muted">
             No athletes loaded for this team yet.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function StatLineEditor({
+  title,
+  athletes,
+  metrics,
+  values,
+  onChange,
+}: {
+  title: string;
+  athletes: Array<{ id: string; name: string; position: string }>;
+  metrics: StatMetric[];
+  values: Record<string, Record<string, string>>;
+  onChange: (athleteId: string, statKey: string, value: string) => void;
+}) {
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="truncate text-sm font-semibold text-text-strong">{title}</h3>
+        <span className="shrink-0 text-xs font-medium text-muted">{athletes.length} active</span>
+      </div>
+      <div className="max-h-[40dvh] space-y-3 overflow-y-auto pr-1">
+        {athletes.length ? athletes.map((athlete) => (
+          <div key={athlete.id} className="rounded-[var(--radius-sm)] border border-border bg-surface-1 p-2">
+            <div className="mb-2 min-w-0">
+              <p className="truncate text-sm font-medium text-text-strong">{athlete.name}</p>
+              <p className="truncate text-xs text-muted">{athlete.position}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {metrics.map((metric) => (
+                <label key={metric.key} className="block text-[10px] font-semibold uppercase text-subtle" title={metric.label}>
+                  {metric.shortLabel}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={values[athlete.id]?.[metric.key] ?? ''}
+                    onChange={(event) => onChange(athlete.id, metric.key, event.target.value)}
+                    className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border-strong bg-surface-2 px-2 text-center text-sm font-bold tabular-nums text-text-strong outline-none focus:border-brand"
+                    aria-label={`${athlete.name} ${metric.label}`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        )) : (
+          <p className="rounded-[var(--radius-sm)] border border-border bg-surface-1 px-3 py-2 text-xs text-muted">
+            Select active-squad athletes first.
           </p>
         )}
       </div>

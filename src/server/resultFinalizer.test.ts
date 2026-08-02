@@ -85,6 +85,18 @@ const submission = {
     team_home: ['athlete_1', 'athlete_2'],
     team_away: ['athlete_3'],
   },
+  athleteStatLines: [
+    {
+      athleteId: 'athlete_1',
+      teamId: 'team_home',
+      minutesPlayed: 66,
+      stats: {
+        conversion: 1,
+        penalty_goal: 1,
+        yellow_card: 1,
+      },
+    },
+  ],
   evidenceRefs: ['matchEvidence/match_1/team_home/team_admin_1/photo.jpg'],
   status: 'confirmed',
   revision: 1,
@@ -166,12 +178,53 @@ describe('trusted result finalizer', () => {
       sequence: 5,
       primaryAthleteId: 'athlete_1',
     });
+    expect(records.get('officialSportEvents/match_1_v1_event_0006')).toMatchObject({
+      eventType: 'rugby.minutes_played',
+      sequence: 6,
+      primaryAthleteId: 'athlete_1',
+      payload: {
+        value: 66,
+        statKey: 'minutes_played',
+        source: 'result_submission_stat_line',
+      },
+    });
+    expect(records.get('officialSportEvents/match_1_v1_event_0007')).toMatchObject({
+      eventType: 'rugby.conversion_made',
+      sequence: 7,
+      primaryAthleteId: 'athlete_1',
+    });
+    expect(records.get('officialSportEvents/match_1_v1_event_0008')).toMatchObject({
+      eventType: 'rugby.penalty_goal_made',
+      sequence: 8,
+      primaryAthleteId: 'athlete_1',
+    });
+    expect(records.get('officialSportEvents/match_1_v1_event_0009')).toMatchObject({
+      eventType: 'rugby.yellow_card',
+      sequence: 9,
+      primaryAthleteId: 'athlete_1',
+    });
     expect(writes).toContainEqual(expect.objectContaining({
       op: 'set',
       path: 'officialAthleteMatchStats/match_1_v1_athlete_1',
       data: expect.objectContaining({
-        dataCoverage: 'match_squad_basic',
-        stats: expect.objectContaining({ active_squad: 1, appearance: 1, try: 2 }),
+        dataLevel: 'standard',
+        dataCoverage: 'verified_stat_line',
+        minutesPlayed: 66,
+        stats: expect.objectContaining({
+          active_squad: 1,
+          appearance: 1,
+          try: 2,
+          conversion: 1,
+          penalty_goal: 1,
+          yellow_card: 1,
+          minutes_played: 66,
+        }),
+        sourceEventIds: expect.objectContaining({
+          minutes_played: 'match_1_v1_event_0006',
+          conversion: 'match_1_v1_event_0007',
+          penalty_goal: 'match_1_v1_event_0008',
+          yellow_card: 'match_1_v1_event_0009',
+        }),
       }),
     }));
     expect(writes).toContainEqual(expect.objectContaining({

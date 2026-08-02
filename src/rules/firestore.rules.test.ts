@@ -162,6 +162,40 @@ describe('result submission: creating a claim', () => {
     );
   });
 
+  it('lets the submitting team include active squads and athlete stat lines', async () => {
+    await assertSucceeds(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc({
+        activeSquads: {
+          team_a: ['athlete_a_1'],
+          team_b: ['athlete_b_1'],
+        },
+        athleteStatLines: [
+          {
+            athleteId: 'athlete_a_1',
+            teamId: 'team_a',
+            minutesPlayed: 64,
+            stats: {
+              assist: 1,
+              yellow_card: 1,
+            },
+          },
+        ],
+      }))
+    );
+  });
+
+  it('refuses malformed athlete stat lines', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc({
+        athleteStatLines: {
+          athlete_a_1: {
+            assist: 1,
+          },
+        },
+      }))
+    );
+  });
+
   it('refuses a claim from someone who runs neither team', async () => {
     await assertFails(
       setDoc(doc(asUser(OUTSIDER), 'resultSubmissions/match_001'), submissionDoc({
