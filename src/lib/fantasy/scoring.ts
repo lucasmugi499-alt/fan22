@@ -62,8 +62,14 @@ export function scoreOfficialFantasyPerformance({
   }
 
   const coveredRules = enabledFantasyRules(competition, profile).filter((rule) => {
-    if (performance.dataCoverage !== 'scorer_only') return true;
-    return ['goal', 'try', 'points_scored'].includes(rule.requiredStatKey);
+    if (performance.dataCoverage === 'scorer_only') {
+      return ['goal', 'try', 'points_scored'].includes(rule.requiredStatKey);
+    }
+    if (performance.dataCoverage === 'match_squad_basic') {
+      return ['active_squad', 'appearance', 'goal', 'try', 'points_scored', 'win_participation']
+        .includes(rule.requiredStatKey);
+    }
+    return true;
   });
 
   return coveredRules.flatMap((rule) => {

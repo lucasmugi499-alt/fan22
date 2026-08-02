@@ -28,14 +28,17 @@ published prices, or competition activation.
 ## Data Quality
 
 Each competition declares a `dataLevel` and `recordedStatKeys`. Scoring rules are enabled
-only when both meet the rule's requirements. The existing final match report reliably
-captures scorer events, so the finalizer emits canonical official sport events and marks
-the generated athlete records as `scorer_only`. They may award goals, tries, or recorded
-basketball points, but they do not pretend to provide complete squad appearance coverage.
+only when both meet the rule's requirements. The final match report now captures active
+match squads as well as scorer events. The trusted finalizer emits canonical
+`active_squad` official sport events and marks those athlete records as
+`match_squad_basic`: they may award active-squad, appearance, scorer and win-participation
+rules, but they do not pretend to provide duration, card, assist, rebound or full
+box-score detail. Older scorer-only records remain labelled `scorer_only` and can award
+only scorer statistics.
 
-Before a live competition enables appearance, active-squad, duration, assist, card,
-clean-sheet, rebound, or similar rules, Matchday Field Mode must capture and verify those
-events for the complete match squad.
+Before a live competition enables duration, assist, card, clean-sheet, rebound, or
+similar richer rules, Matchday Field Mode must capture and verify those events for the
+complete match squad.
 
 The Platform Admin activation route now runs a server-side readiness check before it can
 publish player prices or mark a competition active. The check blocks activation when the

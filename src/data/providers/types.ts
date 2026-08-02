@@ -119,6 +119,7 @@ export type CreateResultSubmissionInput = {
   homeScore: number;
   awayScore: number;
   scorers?: ScorerEntry[];
+  activeSquads?: Record<string, string[]>;
   evidenceRefs?: string[];
   evidenceNote?: string;
 };

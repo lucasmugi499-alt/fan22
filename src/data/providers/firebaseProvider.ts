@@ -1102,6 +1102,7 @@ export const firebaseProvider: GoalPlaceDataProvider = {
         homeScore: data.homeScore,
         awayScore: data.awayScore,
         scorers: data.scorers ?? [],
+        activeSquads: data.activeSquads ?? {},
         evidenceRefs: data.evidenceRefs ?? [],
         ...(data.evidenceNote ? { evidenceNote: data.evidenceNote } : {}),
         status: 'pending_confirmation',

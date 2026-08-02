@@ -300,10 +300,11 @@ export interface FantasyOfficialAthletePerformance {
   dataLevel: FantasyDataLevel;
   /**
    * `scorer_only` records contain trusted scoring events but are not evidence of a
-   * complete match squad. Competitions must not enable full-squad participation rules
-   * from this source alone.
+   * complete match squad. `match_squad_basic` records come from a verified final-report
+   * active squad, but still do not include duration, card, assist, rebound, or full
+   * box-score detail.
    */
-  dataCoverage?: 'complete' | 'scorer_only';
+  dataCoverage?: 'complete' | 'scorer_only' | 'match_squad_basic';
   activeSquad: boolean;
   didPlay: boolean;
   minutesPlayed: number;

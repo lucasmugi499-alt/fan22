@@ -81,6 +81,10 @@ const submission = {
   scorers: [
     { athleteId: 'athlete_1', teamId: 'team_home', count: 2, minute: 12 },
   ],
+  activeSquads: {
+    team_home: ['athlete_1', 'athlete_2'],
+    team_away: ['athlete_3'],
+  },
   evidenceRefs: ['matchEvidence/match_1/team_home/team_admin_1/photo.jpg'],
   status: 'confirmed',
   revision: 1,
@@ -102,18 +106,47 @@ describe('trusted result finalizer', () => {
         name: 'Amina Trymaker',
         position: 'Fly-half',
       },
+      'athletes/athlete_2': {
+        id: 'athlete_2',
+        name: 'Noah Non Scorer',
+        position: 'Lock',
+      },
+      'athletes/athlete_3': {
+        id: 'athlete_3',
+        name: 'Grace Defender',
+        position: 'Back Row',
+      },
     });
 
     const outcome = await finalizeSubmission(db as never, 'match_1');
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     expect(records.get('officialSportEvents/match_1_v1_event_0001')).toMatchObject({
-      eventType: 'rugby.try',
+      eventType: 'rugby.active_squad',
       sportId: 'rugby',
       competitionId: 'league_1',
       seasonId: 'season_1',
       matchId: 'match_1',
       sequence: 1,
+      teamId: 'team_home',
+      primaryAthleteId: 'athlete_1',
+      payload: {
+        value: 1,
+        source: 'result_submission_active_squad',
+      },
+    });
+    expect(records.get('officialSportEvents/match_1_v1_event_0002')).toMatchObject({
+      eventType: 'rugby.active_squad',
+      sequence: 2,
+      primaryAthleteId: 'athlete_2',
+    });
+    expect(records.get('officialSportEvents/match_1_v1_event_0004')).toMatchObject({
+      eventType: 'rugby.try',
+      sportId: 'rugby',
+      competitionId: 'league_1',
+      seasonId: 'season_1',
+      matchId: 'match_1',
+      sequence: 4,
       teamId: 'team_home',
       primaryAthleteId: 'athlete_1',
       sourceClaimId: 'match_1',
@@ -128,17 +161,27 @@ describe('trusted result finalizer', () => {
         source: 'result_submission_scorer',
       },
     });
-    expect(records.get('officialSportEvents/match_1_v1_event_0002')).toMatchObject({
+    expect(records.get('officialSportEvents/match_1_v1_event_0005')).toMatchObject({
       eventType: 'rugby.try',
-      sequence: 2,
+      sequence: 5,
       primaryAthleteId: 'athlete_1',
     });
     expect(writes).toContainEqual(expect.objectContaining({
       op: 'set',
       path: 'officialAthleteMatchStats/match_1_v1_athlete_1',
       data: expect.objectContaining({
-        dataCoverage: 'scorer_only',
-        stats: expect.objectContaining({ try: 2 }),
+        dataCoverage: 'match_squad_basic',
+        stats: expect.objectContaining({ active_squad: 1, appearance: 1, try: 2 }),
+      }),
+    }));
+    expect(writes).toContainEqual(expect.objectContaining({
+      op: 'set',
+      path: 'officialAthleteMatchStats/match_1_v1_athlete_2',
+      data: expect.objectContaining({
+        dataCoverage: 'match_squad_basic',
+        activeSquad: true,
+        didPlay: true,
+        stats: expect.objectContaining({ active_squad: 1, appearance: 1, try: 0 }),
       }),
     }));
   });

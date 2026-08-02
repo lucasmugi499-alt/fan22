@@ -107,6 +107,30 @@ describe('multi-sport fantasy scoring', () => {
     expect(events.map((event) => event.scoringRuleId)).toEqual(['try']);
   });
 
+  it('allows match-squad basic records to score participation without richer box-score stats', () => {
+    const events = scoreOfficialFantasyPerformance({
+      competition: {
+        ...competition,
+        dataLevel: 'basic',
+        recordedStatKeys: ['active_squad', 'appearance', 'try', 'win_participation', 'yellow_card'],
+      },
+      profile: rugbyProfile,
+      roundId: 'round_1',
+      performance: {
+        ...performance,
+        dataCoverage: 'match_squad_basic',
+      },
+      createdAt: '2026-07-29T12:00:00.000Z',
+    });
+
+    expect(events.map((event) => event.scoringRuleId)).toEqual([
+      'active_squad',
+      'appearance',
+      'try',
+      'win_participation',
+    ]);
+  });
+
   it('does not count provisional points in official totals', () => {
     const provisional = scoreOfficialFantasyPerformance({
       competition,

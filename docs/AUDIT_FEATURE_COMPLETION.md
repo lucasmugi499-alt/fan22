@@ -145,7 +145,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Server-controlled transfers with round allowances
 - [x] Candidate Firestore rules block all client-authored official Fantasy Points
 - [x] Demo competitions for football, basketball, and rugby
-- [ ] Complete match-squad and athlete-event capture for non-scoring appearances
+- [x] Complete match-squad and athlete-event capture for non-scoring appearances
 - [ ] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
 - [ ] League and Platform Admin activation workflow browser QA
 - [ ] Candidate fantasy rules and indexes promoted only after staging validation

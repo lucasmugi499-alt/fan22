@@ -68,14 +68,15 @@ export function ResultSubmissionSheet({
   const [stage, setStage] = useState<Stage>('idle');
   const [submitStep, setSubmitStep] = useState(0);
   const [scorerCounts, setScorerCounts] = useState<Record<string, number>>({});
+  const [activeSquads, setActiveSquads] = useState<Record<string, string[]>>({});
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [queued, setQueued] = useState(false);
   const [online, setOnline] = useState(true);
   const { athletes } = useGoalPlaceData({
     collections: ['athletes'],
-    scope: { teamId: myTeamId },
-    recordLimit: 100,
+    scope: { leagueId: match.leagueId },
+    recordLimit: 250,
   });
   const actorUserId = currentUser?.uid ?? userProfile?.uid;
   const draftNamespace = useMemo(() => privateCacheNamespace({
@@ -122,6 +123,7 @@ export function ResultSubmissionSheet({
       setEvidenceFiles(draft.files);
       setEvidenceNote(draft.input.evidenceNote ?? '');
       setScorerCounts(Object.fromEntries((draft.input.scorers ?? []).map((item) => [item.athleteId, item.count])));
+      setActiveSquads(draft.input.activeSquads ?? {});
       setQueued(true);
     });
     return () => { cancelled = true; };
@@ -183,6 +185,18 @@ export function ResultSubmissionSheet({
   const eligibleScorers = athletes.filter(
     (athlete) => athlete.teamId === match.homeTeamId || athlete.teamId === match.awayTeamId,
   );
+  const homeAthletes = eligibleScorers.filter((athlete) => athlete.teamId === match.homeTeamId);
+  const awayAthletes = eligibleScorers.filter((athlete) => athlete.teamId === match.awayTeamId);
+  const normalizedActiveSquads = useMemo(() => {
+    const normalizeTeam = (teamId: string, teamAthletes: typeof eligibleScorers) => {
+      const selected = activeSquads[teamId];
+      return selected ?? teamAthletes.map((athlete) => athlete.id);
+    };
+    return {
+      [match.homeTeamId]: normalizeTeam(match.homeTeamId, homeAthletes),
+      [match.awayTeamId]: normalizeTeam(match.awayTeamId, awayAthletes),
+    };
+  }, [activeSquads, awayAthletes, homeAthletes, match.awayTeamId, match.homeTeamId]);
   const scorers: ScorerEntry[] = Object.entries(scorerCounts)
     .filter(([, count]) => count > 0)
     .map(([athleteId, count]) => ({
@@ -190,6 +204,19 @@ export function ResultSubmissionSheet({
       teamId: athletes.find((athlete) => athlete.id === athleteId)?.teamId ?? myTeamId,
       count,
     }));
+
+  function toggleSquadAthlete(teamId: string, athleteId: string) {
+    setActiveSquads((current) => {
+      const teamAthletes = eligibleScorers
+        .filter((athlete) => athlete.teamId === teamId)
+        .map((athlete) => athlete.id);
+      const selected = current[teamId] ?? teamAthletes;
+      const nextSelected = selected.includes(athleteId)
+        ? selected.filter((id) => id !== athleteId)
+        : [...selected, athleteId];
+      return { ...current, [teamId]: nextSelected };
+    });
+  }
 
   async function submit() {
     const h = Number(homeScore);
@@ -211,6 +238,7 @@ export function ResultSubmissionSheet({
         homeScore: h,
         awayScore: a,
         scorers,
+        activeSquads: normalizedActiveSquads,
         evidenceNote: evidenceNote.trim() || undefined,
       };
       if (!online) {
@@ -326,7 +354,7 @@ export function ResultSubmissionSheet({
                 Back
               </Button>
             ) : null}
-            {submitStep < 3 ? (
+            {submitStep < 4 ? (
               <Button block iconTrailing={ArrowRight} onClick={() => setSubmitStep((step) => step + 1)} disabled={stage !== 'idle'}>
                 Continue
               </Button>
@@ -365,8 +393,8 @@ export function ResultSubmissionSheet({
         </div>
       ) : mode === 'submit' ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-1">
-            {['Score', 'Scorers', 'Evidence', 'Preview'].map((label, index) => (
+          <div className="grid grid-cols-5 gap-1">
+            {['Score', 'Squad', 'Scorers', 'Evidence', 'Preview'].map((label, index) => (
               <div key={label}>
                 <div className={`h-1 rounded-full ${index <= submitStep ? 'bg-brand' : 'bg-surface-3'}`} />
                 <p className={`mt-1 text-center text-[10px] ${index === submitStep ? 'text-brand' : 'text-subtle'}`}>{label}</p>
@@ -389,6 +417,23 @@ export function ResultSubmissionSheet({
             </>
           ) : null}
           {submitStep === 1 ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">Confirm the athletes who were in the match squad or appeared in the official report. These become official participation events only after verification.</p>
+              <SquadSelector
+                title={homeName}
+                athletes={homeAthletes}
+                selectedIds={normalizedActiveSquads[match.homeTeamId]}
+                onToggle={(athleteId) => toggleSquadAthlete(match.homeTeamId, athleteId)}
+              />
+              <SquadSelector
+                title={awayName}
+                athletes={awayAthletes}
+                selectedIds={normalizedActiveSquads[match.awayTeamId]}
+                onToggle={(athleteId) => toggleSquadAthlete(match.awayTeamId, athleteId)}
+              />
+            </div>
+          ) : null}
+          {submitStep === 2 ? (
             <div>
               <p className="mb-3 flex items-center gap-2 text-sm text-muted"><UserCircle className="h-4 w-4 text-brand" /> Add scorers or point leaders where the match report includes them.</p>
               <div className="max-h-[48dvh] space-y-2 overflow-y-auto">
@@ -403,7 +448,7 @@ export function ResultSubmissionSheet({
               </div>
             </div>
           ) : null}
-          {submitStep === 2 ? (
+          {submitStep === 3 ? (
             <div className="space-y-4">
               <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface-2 p-4 text-center">
                 <Camera className="h-7 w-7 text-brand" weight="duotone" />
@@ -415,7 +460,7 @@ export function ResultSubmissionSheet({
               <label className="block text-xs font-semibold uppercase text-subtle">Evidence note<textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} rows={3} className="field mt-2 min-h-24 py-3 normal-case" placeholder="Referee notes, scorer details, or context for the opposing team." /></label>
             </div>
           ) : null}
-          {submitStep === 3 ? (
+          {submitStep === 4 ? (
             <div className="space-y-4">
               <ScoreLine
                 homeName={homeName}
@@ -425,7 +470,7 @@ export function ResultSubmissionSheet({
               />
               <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm text-muted">
                 <p className="flex items-center gap-2 font-semibold text-text-strong"><CheckCircle className="h-4 w-4 text-brand" /> Final report preview</p>
-                <p className="mt-2">{scorers.length} scorer entr{scorers.length === 1 ? 'y' : 'ies'} / {evidenceFiles.length} evidence file{evidenceFiles.length === 1 ? '' : 's'}.</p>
+                <p className="mt-2">{scorers.length} scorer entr{scorers.length === 1 ? 'y' : 'ies'} / {activeSquadCount(normalizedActiveSquads)} active-squad athletes / {evidenceFiles.length} evidence file{evidenceFiles.length === 1 ? '' : 's'}.</p>
                 <p className="mt-1">Submitting confirms the match has ended. The score will not be official until the opposing Team Admin responds and the trusted finalizer completes.</p>
               </div>
             </div>
@@ -540,5 +585,56 @@ function Row({ name, score }: { name: string; score: number | null }) {
         {score ?? '-'}
       </span>
     </div>
+  );
+}
+
+function activeSquadCount(activeSquads: Record<string, string[]>) {
+  return Object.values(activeSquads).reduce((total, ids) => total + ids.length, 0);
+}
+
+function SquadSelector({
+  title,
+  athletes,
+  selectedIds,
+  onToggle,
+}: {
+  title: string;
+  athletes: Array<{ id: string; name: string; position: string }>;
+  selectedIds: string[];
+  onToggle: (athleteId: string) => void;
+}) {
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="truncate text-sm font-semibold text-text-strong">{title}</h3>
+        <span className="shrink-0 text-xs font-medium text-muted">{selectedIds.length} selected</span>
+      </div>
+      <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+        {athletes.length ? athletes.map((athlete) => {
+          const selected = selectedIds.includes(athlete.id);
+          return (
+            <label
+              key={athlete.id}
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[var(--radius-sm)] px-2 py-1.5 hover:bg-surface-3"
+            >
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggle(athlete.id)}
+                className="h-4 w-4 accent-[var(--brand)]"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-text-strong">{athlete.name}</span>
+                <span className="block truncate text-xs text-muted">{athlete.position}</span>
+              </span>
+            </label>
+          );
+        }) : (
+          <p className="rounded-[var(--radius-sm)] border border-border bg-surface-1 px-3 py-2 text-xs text-muted">
+            No athletes loaded for this team yet.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

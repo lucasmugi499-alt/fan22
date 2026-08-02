@@ -206,6 +206,11 @@ export interface ResultSubmission {
   correctedAwayScore?: number;
 
   scorers: ScorerEntry[];
+  /**
+   * Match-specific active squad/appearance claim by team. This is captured with the final
+   * report and becomes official only after opponent confirmation or league resolution.
+   */
+  activeSquads?: Record<string, string[]>;
   evidenceRefs: string[];
   evidenceNote?: string;
 

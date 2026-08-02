@@ -11,6 +11,7 @@ const SYSTEM_USER_ID = 'system:goalplace-kernel';
 const CREATED_AT = '2026-07-30T00:00:00.000Z';
 
 export const FOOTBALL_BASIC_EVENTS = [
+  'football.active_squad',
   'football.lineup_named',
   'football.starter',
   'football.substitution_on',
@@ -27,6 +28,7 @@ export const FOOTBALL_BASIC_EVENTS = [
 ] as const;
 
 export const BASKETBALL_BASIC_EVENTS = [
+  'basketball.active_squad',
   'basketball.appearance',
   'basketball.starter',
   'basketball.minutes_played',
@@ -59,6 +61,7 @@ export const BASKETBALL_STANDARD_EVENTS = [
 ] as const;
 
 export const RUGBY_BASIC_EVENTS = [
+  'rugby.active_squad',
   'rugby.lineup_named',
   'rugby.starter',
   'rugby.substitution_on',
@@ -236,11 +239,29 @@ export const DATA_COLLECTION_PROFILES: DataCollectionProfile[] = [
 
 export const STATISTIC_DEFINITIONS: StatisticDefinition[] = [
   {
+    ...baseVersioned('stat.football.appearances', 'football', 'Football appearance count from verified active match squad.'),
+    code: 'football.appearances',
+    entityType: 'athlete',
+    valueType: 'integer',
+    sourceEventTypes: ['football.active_squad', 'football.starter', 'football.substitution_on'],
+    aggregation: 'conditional_count',
+    minimumCollectionLevel: 'basic',
+  },
+  {
+    ...baseVersioned('stat.basketball.appearances', 'basketball', 'Basketball appearance count from verified active match squad.'),
+    code: 'basketball.appearances',
+    entityType: 'athlete',
+    valueType: 'integer',
+    sourceEventTypes: ['basketball.active_squad', 'basketball.appearance', 'basketball.starter'],
+    aggregation: 'conditional_count',
+    minimumCollectionLevel: 'basic',
+  },
+  {
     ...baseVersioned('stat.rugby.appearances', 'rugby', 'Rugby appearance count from official participation.'),
     code: 'rugby.appearances',
     entityType: 'athlete',
     valueType: 'integer',
-    sourceEventTypes: ['rugby.starter', 'rugby.substitution_on'],
+    sourceEventTypes: ['rugby.active_squad', 'rugby.starter', 'rugby.substitution_on'],
     aggregation: 'conditional_count',
     minimumCollectionLevel: 'basic',
   },
