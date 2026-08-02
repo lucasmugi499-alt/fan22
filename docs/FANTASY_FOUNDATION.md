@@ -10,6 +10,7 @@ money conversion, or paid advantage.
 Team Admin report
 -> opponent confirmation or League Admin resolution
 -> trusted official finalization
+-> canonical official sport events
 -> official athlete match statistics
 -> versioned Fantasy Point events
 -> locked lineup score
@@ -23,9 +24,9 @@ published prices, or competition activation.
 
 Each competition declares a `dataLevel` and `recordedStatKeys`. Scoring rules are enabled
 only when both meet the rule's requirements. The existing final match report reliably
-captures scorer events, so the finalizer marks those generated athlete records as
-`scorer_only`. They may award goals, tries, or recorded basketball points, but they do not
-pretend to provide complete squad appearance coverage.
+captures scorer events, so the finalizer emits canonical official sport events and marks
+the generated athlete records as `scorer_only`. They may award goals, tries, or recorded
+basketball points, but they do not pretend to provide complete squad appearance coverage.
 
 Before a live competition enables appearance, active-squad, duration, assist, card,
 clean-sheet, rebound, or similar rules, Matchday Field Mode must capture and verify those

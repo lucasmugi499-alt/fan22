@@ -5,6 +5,36 @@ import { Athlete, Match, ResultSubmission } from '../types';
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';
 const FINALIZATIONS = 'finalizations';
+const OFFICIAL_SPORT_EVENTS = 'officialSportEvents';
+
+type OfficialSportEventRecord = {
+  id: string;
+  eventType: string;
+  eventSchemaVersion: string;
+  sportDefinitionVersion: string;
+  sportId: 'football' | 'basketball' | 'rugby';
+  competitionId: string;
+  seasonId: string;
+  matchId: string;
+  sequence: number;
+  gameClock?: {
+    minute?: number;
+    remaining?: boolean;
+  };
+  teamId: string;
+  primaryAthleteId: string;
+  payload: Record<string, unknown>;
+  sourceClaimId: string;
+  submittedByUserId: string;
+  submittedByTeamId: string;
+  evidenceRefs: string[];
+  officialResultVersion: number;
+  officialEventVersion: number;
+  verificationStatus: 'official';
+  idempotencyKey: string;
+  createdAt: string;
+  finalizedAt: string;
+};
 
 function officialPositionGroup(
   sport: 'football' | 'basketball' | 'rugby',
@@ -26,6 +56,71 @@ function officialPositionGroup(
   if (['Blindside Flanker', 'Openside Flanker', 'Number 8', 'Back Row', 'Utility Forward'].includes(position)) return 'back_row';
   if (['Scrum-half', 'Fly-half'].includes(position)) return 'half_back';
   return 'back';
+}
+
+function scorerEventType(sport: 'football' | 'basketball' | 'rugby') {
+  if (sport === 'football') return 'football.goal';
+  if (sport === 'rugby') return 'rugby.try';
+  return 'basketball.points';
+}
+
+function officialScorerEvents({
+  match,
+  submission,
+  sport,
+  finalizedAt,
+}: {
+  match: Match;
+  submission: ResultSubmission;
+  sport: 'football' | 'basketball' | 'rugby';
+  finalizedAt: string;
+}) {
+  const events: OfficialSportEventRecord[] = [];
+  let sequence = 1;
+  const eventType = scorerEventType(sport);
+
+  for (const scorer of submission.scorers) {
+    const eventCount = sport === 'basketball' ? 1 : Math.max(0, Math.trunc(scorer.count));
+    for (let index = 0; index < eventCount; index += 1) {
+      const eventId = `${match.id}_v${submission.resultVersion}_event_${String(sequence).padStart(4, '0')}`;
+      events.push({
+        id: eventId,
+        eventType,
+        eventSchemaVersion: '1.0.0',
+        sportDefinitionVersion: '1.0.0',
+        sportId: sport,
+        competitionId: match.leagueId,
+        seasonId: match.seasonId,
+        matchId: match.id,
+        sequence,
+        ...(typeof scorer.minute === 'number' ? {
+          gameClock: {
+            minute: scorer.minute,
+            remaining: false,
+          },
+        } : {}),
+        teamId: scorer.teamId,
+        primaryAthleteId: scorer.athleteId,
+        payload: {
+          value: sport === 'basketball' ? scorer.count : 1,
+          source: 'result_submission_scorer',
+        },
+        sourceClaimId: submission.id,
+        submittedByUserId: submission.submittedByUserId,
+        submittedByTeamId: submission.submittedByTeamId,
+        evidenceRefs: submission.evidenceRefs,
+        officialResultVersion: submission.resultVersion,
+        officialEventVersion: 1,
+        verificationStatus: 'official',
+        idempotencyKey: `${submission.id}:v${submission.resultVersion}:event:${sequence}`,
+        createdAt: finalizedAt,
+        finalizedAt,
+      });
+      sequence += 1;
+    }
+  }
+
+  return events;
 }
 
 export type FinalizeOutcome =
@@ -63,6 +158,7 @@ export async function finalizeSubmission(
     }
 
     const { plan } = decision;
+    const finalizedAt = plan.submission.finalizedAt;
     const ledgerRef = db.collection(FINALIZATIONS).doc(plan.finalizationKey);
     const ledgerSnap = await tx.get(ledgerRef);
     if (ledgerSnap.exists) {
@@ -143,10 +239,19 @@ export async function finalizeSubmission(
       matchId: submission.matchId,
       submissionId: submission.id,
       resultVersion: submission.resultVersion,
-      finalizedAt: plan.submission.finalizedAt,
+      finalizedAt,
     });
 
     if (fantasySport) {
+      for (const event of officialScorerEvents({
+        match,
+        submission,
+        sport: fantasySport,
+        finalizedAt,
+      })) {
+        tx.create(db.collection(OFFICIAL_SPORT_EVENTS).doc(event.id), event);
+      }
+
       const statKey = fantasySport === 'football'
         ? 'goal'
         : fantasySport === 'rugby'

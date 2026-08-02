@@ -15,6 +15,11 @@ Clients may submit claims through trusted APIs. Only server-owned operations may
 
 Every official output should record the rule version and source version that produced it. When a correction happens, GoalPlace creates a new official version, supersedes old derived events, rebuilds affected projections and keeps the previous values available for explanation.
 
+The trusted result finalizer now emits immutable `officialSportEvents` from settled
+scorer claims before maintaining the legacy `officialAthleteMatchStats` projection. The
+legacy projection remains for current fantasy compatibility; the canonical event stream is
+the source for deeper sport-specific projections and replay.
+
 ## Kernel Modules
 
 The first implementation lives in `src/kernel`:
