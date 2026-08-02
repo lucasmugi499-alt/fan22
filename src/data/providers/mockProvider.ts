@@ -53,6 +53,7 @@ import {
 import { investorDemoRuntime } from '../investorDemo';
 import {
   AdminAuditEvent,
+  type AccountClass,
   AccessAssignmentRecord,
   Athlete,
   AthleteClaim,
@@ -84,6 +85,7 @@ import { challengeNextStatus } from '@/lib/challenge';
 import { normalizeChallengeStatus } from '@/lib/status';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { buildAccessIndexDocuments } from '@/lib/auth/access';
+import { accountClassForRole } from '@/lib/auth/accountClass';
 
 const followed = new Set<string>();
 const saved = new Set<string>();
@@ -364,7 +366,8 @@ function audit(input: Omit<AdminAuditEvent, 'id' | 'createdAt'>) {
   return event;
 }
 
-const fanOperatorInvitationMessage = 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.';
+const organizationOperatorInvitationMessage = 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.';
+const platformOperatorInvitationMessage = 'This invitation requires a GoalPlace256 Platform Operator account.';
 const operatorInvitationRoles = new Set([
   'league_owner',
   'league_admin',
@@ -377,17 +380,32 @@ const operatorInvitationRoles = new Set([
   'super_admin',
 ]);
 
-function isFanAccount(userId: string) {
+function demoAccountClass(userId: string): AccountClass | null {
   const user = users.find((item) => item.id === userId);
   const demoProfile = Object.values(MOCK_PROFILES).find(
     (profile) => profile.id === userId || profile.uid === userId,
   );
-  return user?.role === 'fan' || demoProfile?.role === 'fan';
+  if (user?.accountClass) return user.accountClass;
+  if (demoProfile?.accountClass) return demoProfile.accountClass;
+  const role = user?.role ?? demoProfile?.role;
+  return role ? accountClassForRole(role) : null;
+}
+
+function requiredAccountClassForRole(roleKey: string): AccountClass | null {
+  if (roleKey === 'platform_admin' || roleKey === 'super_admin') return 'platform_operator';
+  if (operatorInvitationRoles.has(roleKey)) return 'organization_operator';
+  return null;
 }
 
 function assertCanAcceptOperatorInvitation(userId: string, roleKey: string) {
-  if (operatorInvitationRoles.has(roleKey) && isFanAccount(userId)) {
-    throw new Error(fanOperatorInvitationMessage);
+  const requiredClass = requiredAccountClassForRole(roleKey);
+  if (!requiredClass) return;
+  const accountClass = demoAccountClass(userId);
+  if (accountClass === null) return;
+  if (accountClass !== requiredClass) {
+    throw new Error(requiredClass === 'platform_operator'
+      ? platformOperatorInvitationMessage
+      : organizationOperatorInvitationMessage);
   }
 }
 

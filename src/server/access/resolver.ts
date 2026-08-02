@@ -11,10 +11,12 @@ import {
   buildAccessIndexDocuments,
 } from '@/lib/auth/access';
 import { AccessEngineMode, accessEngineMode, returnsLegacyProjection } from '@/lib/auth/accessMode';
-import type { AppRole } from '@/types';
+import { resolveAccountClass } from '@/lib/auth/accountClass';
+import type { AccountClass, AppRole } from '@/types';
 
 export type TrustedAccessContext = AccessContext & {
   accountRole: AppRole | null;
+  accountClass: AccountClass;
   primaryPersona: AppRole | null;
   mode: AccessEngineMode;
 };
@@ -98,6 +100,10 @@ async function loadUserProfile(userId: string) {
   const data = snapshot.exists ? snapshot.data() ?? {} : {};
   return {
     accountRole: (typeof data.role === 'string' ? data.role : null) as AppRole | null,
+    accountClass: resolveAccountClass({
+      accountClass: data.accountClass,
+      role: typeof data.role === 'string' ? data.role : null,
+    }),
     primaryPersona: (typeof data.primaryPersona === 'string' ? data.primaryPersona : null) as AppRole | null,
     accessVersion: Number(data.accessVersion ?? 1),
   };
@@ -168,6 +174,7 @@ export async function resolveTrustedAccessContext(
     ...selectedContext,
     accessVersion: Math.max(selectedContext.accessVersion, profile.accessVersion),
     accountRole: profile.accountRole,
+    accountClass: profile.accountClass,
     primaryPersona: profile.primaryPersona,
     mode,
   };

@@ -76,7 +76,10 @@ describe('mock provider league applications', () => {
     });
 
     await expect(mockProvider.acceptInvitation(`invite_${applicationId}_league_owner`, 'mock_fan', 'demo'))
-      .rejects.toThrow('Fan accounts stay fan accounts');
+      .rejects.toThrow('Organization Operator account');
+
+    await expect(mockProvider.acceptInvitation(`invite_${applicationId}_league_owner`, MOCK_PROFILES.athlete.uid, 'demo'))
+      .rejects.toThrow('Organization Operator account');
 
     await mockProvider.acceptInvitation(`invite_${applicationId}_league_owner`, 'mock_league_operator_new', 'demo');
     const acceptedLeagues = await mockProvider.getLeagues();
@@ -158,7 +161,7 @@ describe('mock provider league applications', () => {
     expect(invitation.actionUrl).toContain(`/invitations/access/invite_${applicationId}`);
 
     await expect(mockProvider.acceptInvitation(`invite_${applicationId}`, MOCK_PROFILES.fan.uid, 'demo'))
-      .rejects.toThrow('Fan accounts stay fan accounts');
+      .rejects.toThrow('Organization Operator account');
 
     await mockProvider.acceptInvitation(`invite_${applicationId}`, 'mock_team_admin_new', 'demo');
     expect((await mockProvider.getTeams({ leagueId })).find((team) => team.id === `team_${applicationId}`)?.adminUserIds).toContain('mock_team_admin_new');

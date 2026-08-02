@@ -4,11 +4,14 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { PERMISSION_BUNDLES, accessIndexId, capabilitiesForAssignment } from '@/lib/auth/access';
+import { resolveAccountClass } from '@/lib/auth/accountClass';
+import type { AccountClass } from '@/types';
 
 export const runtime = 'nodejs';
 
 const PRIVILEGED_ROLES = ['league_admin', 'platform_admin', 'super_admin'];
-const FAN_ACCOUNT_OPERATOR_INVITATION_ERROR = 'Fan accounts stay fan accounts. Sign out and set up a League Admin or Team Admin account with this invitation.';
+const ORGANIZATION_OPERATOR_INVITATION_ERROR = 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.';
+const PLATFORM_OPERATOR_INVITATION_ERROR = 'This invitation requires a GoalPlace256 Platform Operator account.';
 const OPERATOR_INVITATION_ROLES = new Set([
   'league_owner',
   'league_admin',
@@ -17,6 +20,19 @@ const OPERATOR_INVITATION_ROLES = new Set([
   'roster_manager',
   'result_reporter',
   'content_manager',
+  'platform_admin',
+  'super_admin',
+]);
+const ORGANIZATION_OPERATOR_ROLES = new Set([
+  'league_owner',
+  'league_admin',
+  'team_owner',
+  'team_admin',
+  'roster_manager',
+  'result_reporter',
+  'content_manager',
+]);
+const PLATFORM_OPERATOR_ROLES = new Set([
   'platform_admin',
   'super_admin',
 ]);
@@ -105,13 +121,28 @@ function primaryPersonaForRole(roleKey: string) {
   return 'fan';
 }
 
-function blocksFanOperatorInvitation(
+function requiredAccountClassForRole(roleKey: string): AccountClass | null {
+  if (ORGANIZATION_OPERATOR_ROLES.has(roleKey)) return 'organization_operator';
+  if (PLATFORM_OPERATOR_ROLES.has(roleKey)) return 'platform_operator';
+  if (roleKey === 'athlete_self' || roleKey === 'athlete_guardian') return 'athlete';
+  return OPERATOR_INVITATION_ROLES.has(roleKey) ? 'organization_operator' : null;
+}
+
+function accountClassViolation(
   actorRole: unknown,
   userData: Record<string, unknown> | undefined,
   roleKey: string,
 ) {
-  const role = String(actorRole ?? userData?.role ?? 'fan');
-  return role === 'fan' && userData?.accountStatus !== 'invited' && OPERATOR_INVITATION_ROLES.has(roleKey);
+  const requiredClass = requiredAccountClassForRole(roleKey);
+  if (!requiredClass) return null;
+  const accountClass = resolveAccountClass({
+    accountClass: userData?.accountClass,
+    role: String(actorRole ?? userData?.role ?? 'fan'),
+  });
+  if (accountClass === requiredClass) return null;
+  return requiredClass === 'platform_operator'
+    ? PLATFORM_OPERATOR_INVITATION_ERROR
+    : ORGANIZATION_OPERATOR_INVITATION_ERROR;
 }
 
 export async function POST(request: Request) {
@@ -145,8 +176,9 @@ export async function POST(request: Request) {
         return Response.json({ error: 'Sign in with the email address that received this invitation.' }, { status: 403 });
       }
       const userSnapshot = await adminDb.collection('users').doc(actor.uid).get();
-      if (blocksFanOperatorInvitation(actor.role, userSnapshot.data(), 'team_admin')) {
-        return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
+      const violation = accountClassViolation(actor.role, userSnapshot.data(), 'team_admin');
+      if (violation) {
+        return Response.json({ error: violation }, { status: 409 });
       }
       if (data.status === 'active' && data.userId === actor.uid) {
         const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
@@ -168,12 +200,14 @@ export async function POST(request: Request) {
           adminUserIds: FieldValue.arrayUnion(actor.uid),
           updatedAt: FieldValue.serverTimestamp(),
         });
-        if (!PRIVILEGED_ROLES.includes(String(actor.role ?? ''))) {
-          transaction.set(adminDb.collection('users').doc(actor.uid), {
-            role: 'team_admin',
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
-        }
+        transaction.set(adminDb.collection('users').doc(actor.uid), {
+          accountClass: 'organization_operator',
+          primaryPersona: 'team_admin',
+          role: 'team_admin',
+          accountStatus: 'active',
+          accessVersion: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         transaction.set(adminDb.collection('adminAuditEvents').doc(), {
           actorUserId: actor.uid,
           action: 'accepted',
@@ -208,6 +242,21 @@ export async function POST(request: Request) {
       const invitedEmail = data.applicantEmail?.toLowerCase() ?? applicant?.email?.toLowerCase();
       if (!invitedEmail) {
         return Response.json({ error: 'A League Admin setup email is required before approval.' }, { status: 409 });
+      }
+      const existingInvitedAccount = await adminAuth.getUserByEmail(invitedEmail).catch(() => null);
+      if (existingInvitedAccount) {
+        const existingUser = await adminDb.collection('users').doc(existingInvitedAccount.uid).get();
+        const existingClass = resolveAccountClass({
+          accountClass: existingUser.data()?.accountClass,
+          role: typeof existingInvitedAccount.customClaims?.role === 'string'
+            ? existingInvitedAccount.customClaims.role
+            : existingUser.data()?.role,
+        });
+        if (existingClass !== 'organization_operator') {
+          return Response.json({
+            error: 'This email already belongs to a non-operator account. Request a separate operational email before approving this league.',
+          }, { status: 409 });
+        }
       }
       const now = new Date();
       const year = now.getUTCFullYear();
@@ -344,8 +393,9 @@ export async function POST(request: Request) {
       }
       const persona = primaryPersonaForRole(String(data.roleKey));
       const userSnapshot = await adminDb.collection('users').doc(actor.uid).get();
-      if (blocksFanOperatorInvitation(actor.role, userSnapshot.data(), String(data.roleKey))) {
-        return Response.json({ error: FAN_ACCOUNT_OPERATOR_INVITATION_ERROR }, { status: 409 });
+      const violation = accountClassViolation(actor.role, userSnapshot.data(), String(data.roleKey));
+      if (violation) {
+        return Response.json({ error: violation }, { status: 409 });
       }
       if (data.status === 'accepted') {
         if (data.roleKey === 'league_owner' || data.roleKey === 'league_admin') {
@@ -382,6 +432,16 @@ export async function POST(request: Request) {
         roleKey: data.roleKey,
       });
       const indexId = accessIndexId(data.scopeType, data.scopeId, actor.uid);
+      const indexPatch = {
+        userId: actor.uid,
+        scopeType: data.scopeType,
+        scopeId: data.scopeId,
+        activeRoles: FieldValue.arrayUnion(data.roleKey),
+        ...(capabilities.length ? { capabilities: FieldValue.arrayUnion(...capabilities) } : {}),
+        assignmentIds: FieldValue.arrayUnion(assignmentId),
+        accessVersion: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
 
       await adminDb.runTransaction(async (transaction) => {
         const current = await transaction.get(invitationRef);
@@ -389,16 +449,7 @@ export async function POST(request: Request) {
           throw new Error('Invitation is no longer active.');
         }
         transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment);
-        transaction.set(adminDb.collection('accessIndex').doc(indexId), {
-          userId: actor.uid,
-          scopeType: data.scopeType,
-          scopeId: data.scopeId,
-          activeRoles: [data.roleKey],
-          capabilities,
-          assignmentIds: [assignmentId],
-          accessVersion: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        transaction.set(adminDb.collection('accessIndex').doc(indexId), indexPatch, { merge: true });
         transaction.update(invitationRef, {
           status: 'accepted',
           acceptedAt: FieldValue.serverTimestamp(),
@@ -426,6 +477,7 @@ export async function POST(request: Request) {
           }
         }
         transaction.set(adminDb.collection('users').doc(actor.uid), {
+          accountClass: requiredAccountClassForRole(String(data.roleKey)) ?? 'organization_operator',
           primaryPersona: persona,
           role: persona,
           accountStatus: 'active',

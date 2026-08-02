@@ -121,6 +121,7 @@ export function SignIn({
           password,
           name: name.trim(),
           accountStatus: registrationIntent.accountStatus,
+          accountClass: registrationIntent.accountClass,
           pendingInvitationPath: registrationIntent.kind === 'fan' ? undefined : nextPath,
         });
         await firebaseLogout();

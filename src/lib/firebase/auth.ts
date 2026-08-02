@@ -11,7 +11,8 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { AppRole, UserProfile } from '@/types';
+import { AccountClass, AppRole, UserProfile } from '@/types';
+import { initialRoleForAccountClass } from '@/lib/auth/accountClass';
 import { auth, db, isFirebaseConfigured, requireFirebaseClient } from './client';
 
 export const demoAccounts: Array<{ label: string; email: string; role: AppRole; internal?: boolean }> = [
@@ -37,12 +38,14 @@ export async function registerAccount({
   password,
   name,
   accountStatus = 'active',
+  accountClass = 'fan',
   pendingInvitationPath,
 }: {
   email: string;
   password: string;
   name: string;
   accountStatus?: 'active' | 'invited';
+  accountClass?: AccountClass;
   pendingInvitationPath?: string;
 }) {
   const { auth, db } = requireFirebaseClient();
@@ -54,7 +57,8 @@ export async function registerAccount({
     uid: credential.user.uid,
     email,
     name,
-    role: 'fan',
+    role: initialRoleForAccountClass(accountClass),
+    accountClass,
     accountStatus,
     status: 'active',
     points: 0,

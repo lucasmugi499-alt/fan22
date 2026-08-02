@@ -2,14 +2,16 @@
 
 ## Approved Identity Decision
 
-GoalPlace256 now targets the hybrid identity model approved for Phase 1:
+GoalPlace256 now targets the fixed account-class model approved for Phase 1:
 
-- A normal human account keeps fan capability by default.
-- League, team, athlete, and guardian authority comes from scoped assignments.
-- `primaryPersona` is a navigation preference only.
-- Platform Admin and Super Admin remain dedicated hardened operator accounts.
+- `fan`: public registration, fantasy, support, feed activity, follows, discovery, and fan notifications.
+- `athlete`: invitation or profile claim only, Career Passport, performance records, support needs, challenges, and athlete notifications.
+- `organization_operator`: invitation or approved league-application onboarding only. This account class may hold multiple scoped league/team/staff assignments.
+- `platform_operator`: hardened platform governance accounts for Platform Admin, Super Admin, trust, finance, support, and system operations.
 
-This means fan behavior must survive when a person also receives a league, team, or athlete assignment. Assignment records decide authority; the profile role must not be treated as the source of scoped power.
+Fan accounts cannot become Team Admin or League Admin accounts. Athlete accounts cannot become organization operators. Platform operators cannot participate in fan or ordinary organization experiences. The same human may hold separate accounts with different verified emails and an optional internal `personId`, but sessions, notifications, history, audit trails, and permissions remain separate security principals.
+
+Within an Organization Operator account, scoped assignment switching is allowed. For example, one operator account may be League Admin for one league, Team Admin for one team, and Results Reporter for another team.
 
 ## Phase 1 Rollout Modes
 
@@ -31,6 +33,7 @@ This slice implements the first migration footing:
 - Demo sessions continue using local mock access indexes.
 - Deterministic assignment projection with sorted indexes, roles, capabilities, and assignment IDs.
 - Divergence logging between legacy and assignment projections in compare mode.
+- Trusted context includes the resolved account class so clients can separate fan, athlete, organization operator, and platform operator experiences.
 
 ## Rollback
 
@@ -58,11 +61,12 @@ No destructive data migration is included in Phase 1A.
 | Demo validation | Pass | `npm run demo:validate` passed. |
 | Security audit gate | Pass | `npm run security:audit` passed with registered temporary exceptions. |
 | Combined release gate | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run deploy:ready` passed. |
+| Corrected account-class decision | Pass | Current slice updates docs/code/tests to fixed account classes. |
+| Safe invitation preview | Pass | Current slice adds `/api/access/invitations/[invitationId]`, verified in `npm test` and production route map. |
 
 ## Remaining Phase 1 Work
 
-- Safe invitation preview.
-- Invitation acceptance update so normal human accounts keep fan identity while receiving scoped assignments.
+- Invitation acceptance update so only Organization Operator accounts receive league/team scoped assignments.
 - Assignment suspension, revocation, and expiry mutation APIs.
 - Server-only immutable audit enforcement and rules hardening.
 - Removal of Super Admin direct browser writes.

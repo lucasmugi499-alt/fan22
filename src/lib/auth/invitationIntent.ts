@@ -1,3 +1,5 @@
+import type { AccountClass } from '@/types';
+
 export type RegistrationIntentKind = 'fan' | 'athlete_invitation' | 'operator_invitation';
 
 export type RegistrationIntent = {
@@ -7,6 +9,7 @@ export type RegistrationIntent = {
   submitLabel: string;
   successMessage: string;
   accountStatus: 'active' | 'invited';
+  accountClass: AccountClass;
 };
 
 const FAN_REGISTRATION_INTENT: RegistrationIntent = {
@@ -16,6 +19,7 @@ const FAN_REGISTRATION_INTENT: RegistrationIntent = {
   submitLabel: 'Create fan account',
   successMessage: 'Account created. Check your inbox to verify your email, then sign in.',
   accountStatus: 'active',
+  accountClass: 'fan',
 };
 
 const ATHLETE_REGISTRATION_INTENT: RegistrationIntent = {
@@ -25,15 +29,17 @@ const ATHLETE_REGISTRATION_INTENT: RegistrationIntent = {
   submitLabel: 'Create athlete account',
   successMessage: 'Athlete account created. Verify your email, then sign in from the invite link to accept your profile.',
   accountStatus: 'invited',
+  accountClass: 'athlete',
 };
 
 const OPERATOR_REGISTRATION_INTENT: RegistrationIntent = {
   kind: 'operator_invitation',
-  title: 'Create your invited admin account',
-  description: 'Use the invited email address. Admin access activates only after the server validates this invitation.',
-  submitLabel: 'Create admin account',
-  successMessage: 'Invited account created. Verify your email, then sign in from the invite link to accept the assignment.',
+  title: 'Create your operator account',
+  description: 'Use the invited operational email address. Access activates only after the server validates this invitation.',
+  submitLabel: 'Create operator account',
+  successMessage: 'Operator account created. Verify your email, then sign in from the invite link to accept the assignment.',
   accountStatus: 'invited',
+  accountClass: 'organization_operator',
 };
 
 export function registrationIntentForNextPath(nextPath?: string): RegistrationIntent {

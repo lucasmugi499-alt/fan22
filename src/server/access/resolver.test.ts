@@ -105,6 +105,7 @@ describe('trusted access resolver', () => {
     const context = await resolveTrustedAccessContext('user_1', { mode: 'compare', now });
 
     expect(context.mode).toBe('compare');
+    expect(context.accountClass).toBe('fan');
     expect(context.indexes).toHaveLength(1);
     expect(context.indexes[0]).toMatchObject({
       scopeType: 'team',
@@ -119,7 +120,12 @@ describe('trusted access resolver', () => {
 
   it('uses assignment projections in assignments mode and excludes inactive assignments', async () => {
     mockCollections({
-      user: { role: 'fan', primaryPersona: 'league_admin', accessVersion: 9 },
+      user: {
+        role: 'team_admin',
+        accountClass: 'organization_operator',
+        primaryPersona: 'league_admin',
+        accessVersion: 9,
+      },
       assignments: [
         {
           id: 'assignment_b',
@@ -172,7 +178,8 @@ describe('trusted access resolver', () => {
     const context = await resolveTrustedAccessContext('user_1', { mode: 'assignments', now });
 
     expect(context.mode).toBe('assignments');
-    expect(context.accountRole).toBe('fan');
+    expect(context.accountRole).toBe('team_admin');
+    expect(context.accountClass).toBe('organization_operator');
     expect(context.primaryPersona).toBe('league_admin');
     expect(context.accessVersion).toBe(9);
     expect(context.indexes).toHaveLength(1);

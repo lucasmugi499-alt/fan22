@@ -7,6 +7,7 @@ describe('registrationIntentForNextPath', () => {
       kind: 'fan',
       submitLabel: 'Create fan account',
       accountStatus: 'active',
+      accountClass: 'fan',
     });
     expect(registrationIntentForNextPath('/home')).toMatchObject({ kind: 'fan' });
   });
@@ -16,14 +17,16 @@ describe('registrationIntentForNextPath', () => {
       kind: 'athlete_invitation',
       title: 'Create your athlete account',
       accountStatus: 'invited',
+      accountClass: 'athlete',
     });
   });
 
   it('recognises trusted operator invitations as invited admin setup', () => {
     expect(registrationIntentForNextPath('/invitations/access/invite_1?token=token_1')).toMatchObject({
       kind: 'operator_invitation',
-      submitLabel: 'Create admin account',
+      submitLabel: 'Create operator account',
       accountStatus: 'invited',
+      accountClass: 'organization_operator',
     });
     expect(registrationIntentForNextPath('/invitations/team/team_invite_1?token=token_1')).toMatchObject({
       kind: 'operator_invitation',

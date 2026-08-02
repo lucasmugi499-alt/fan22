@@ -11,6 +11,12 @@ export type UserRole =
 
 export type AppRole = UserRole;
 
+export type AccountClass =
+  | "fan"
+  | "athlete"
+  | "organization_operator"
+  | "platform_operator";
+
 export type ProfileStatus = "active" | "pending" | "suspended";
 
 export type SportType = "Football" | "Basketball" | "Rugby";
@@ -308,6 +314,7 @@ export interface UserProfile {
    * Authorization for scoped operations should use access assignments.
    */
   role: AppRole;
+  accountClass?: AccountClass;
   primaryPersona?: AppRole;
   accountStatus?: "invited" | "active" | "suspended" | "disabled" | "deletion_pending";
   personId?: string;
@@ -368,6 +375,7 @@ export interface User {
   name?: string;
   /** Legacy primary persona. Scoped access lives in `accessAssignments`. */
   role: UserRole;
+  accountClass?: AccountClass;
   primaryPersona?: AppRole;
   accountStatus?: "invited" | "active" | "suspended" | "disabled" | "deletion_pending";
   personId?: string;

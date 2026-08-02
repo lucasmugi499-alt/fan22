@@ -10,11 +10,12 @@ import { useAuth } from '@/context/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import type { Invitation, SportSlug, TeamAssignment } from '@/types';
+import type { AccountClass, Invitation, SportSlug, TeamAssignment } from '@/types';
 import { assignmentKindForScope, storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
 import { getPublicAppCheckToken } from '@/lib/firebase/client';
+import { resolveAccountClass } from '@/lib/auth/accountClass';
 
-const fanOperatorInvitationMessage = 'Fan accounts stay fan accounts. Sign out and use a League Admin or Team Admin account to accept this setup invitation.';
+const operatorInvitationMessage = 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.';
 const operatorInvitationRoles = new Set([
   'league_owner',
   'league_admin',
@@ -26,9 +27,43 @@ const operatorInvitationRoles = new Set([
   'platform_admin',
   'super_admin',
 ]);
+const platformInvitationRoles = new Set(['platform_admin', 'super_admin']);
 
 function isOperatorInvitation(roleKey: string) {
   return operatorInvitationRoles.has(roleKey);
+}
+
+function requiredAccountClassLabel(roleKey: string) {
+  return platformInvitationRoles.has(roleKey) ? 'Platform Operator' : 'Organization Operator';
+}
+
+function requiredAccountClassForInvitation(roleKey: string): AccountClass {
+  return platformInvitationRoles.has(roleKey) ? 'platform_operator' : 'organization_operator';
+}
+
+function operatorInvitationMessageFor(roleKey: string) {
+  return `This invitation requires a GoalPlace256 ${requiredAccountClassLabel(roleKey)} account. Sign out and create or access the correct operator account using the invited email.`;
+}
+
+async function fetchSafeInvitationPreview<T>(
+  path: string,
+  token: string,
+  currentUser: { getIdToken: () => Promise<string> } | null,
+  kind?: 'team',
+): Promise<T | undefined> {
+  if (!currentUser) throw new Error('Sign in again before opening this invitation.');
+  const idToken = await currentUser.getIdToken();
+  const response = await fetch(
+    `${path}?token=${encodeURIComponent(token)}${kind ? `&kind=${kind}` : ''}`,
+    {
+      cache: 'no-store',
+      headers: { authorization: `Bearer ${idToken}` },
+    },
+  );
+  if (response.status === 404) return undefined;
+  const body = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Invitation preview is unavailable.');
+  return body;
 }
 
 export function LeagueAdminApplicationForm() {
@@ -165,11 +200,16 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
   useEffect(() => {
     if (authStatus !== 'logged_in') return;
     let cancelled = false;
-    dataProvider.getTeamAssignmentById(assignmentId)
+    fetchSafeInvitationPreview<TeamAssignment>(
+      `/api/access/invitations/${encodeURIComponent(assignmentId)}`,
+      token,
+      currentUser,
+      'team',
+    )
       .then((item) => { if (!cancelled) setAssignment(item); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [assignmentId, authStatus]);
+  }, [assignmentId, authStatus, currentUser, token]);
 
   async function accept() {
     const userId = currentUser?.uid ?? userProfile?.uid;
@@ -208,21 +248,22 @@ export function TeamInvitationAcceptance({ assignmentId, token }: { assignmentId
   if (loading) return <Skeleton className="mx-auto h-64 max-w-lg rounded-[var(--radius-lg)]" />;
   if (!assignment) return <Card className="mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-2 text-sm text-muted">This invitation may have expired or been revoked.</p></Card>;
 
-  const fanAccountBlocked = accountRole === 'fan' && userProfile?.accountStatus !== 'invited';
+  const accountClass = resolveAccountClass({ profile: userProfile, role: accountRole });
+  const accountClassBlocked = accountClass !== 'organization_operator';
 
   return (
     <Card className="mx-auto max-w-lg p-6 text-center">
       <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
-      <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted ? 'Invitation accepted' : fanAccountBlocked ? 'Use an admin account' : 'Team Admin invitation'}</h1>
+      <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted ? 'Invitation accepted' : accountClassBlocked ? 'Use an operator account' : 'Team Admin invitation'}</h1>
       <p className="mt-2 text-sm text-muted">
         {accepted
           ? 'Your assignment and trusted Team Admin access are active. Opening the Team Console now.'
-          : fanAccountBlocked
-            ? fanOperatorInvitationMessage
+          : accountClassBlocked
+            ? operatorInvitationMessage
           : `You have been invited to administer team ${assignment.teamId} for the ${assignment.seasonId} season.`}
       </p>
-      {!accepted && fanAccountBlocked ? <Button className="mt-5" variant="secondary" onClick={useDifferentAccount}>Use a different account</Button> : null}
-      {!accepted && !fanAccountBlocked && authStatus === 'logged_in' ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
+      {!accepted && accountClassBlocked ? <Button className="mt-5" variant="secondary" onClick={useDifferentAccount}>Use operator account</Button> : null}
+      {!accepted && !accountClassBlocked && authStatus === 'logged_in' ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
     </Card>
   );
 }
@@ -239,11 +280,17 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
   useEffect(() => {
     if (authStatus !== 'logged_in') return;
     let cancelled = false;
-    provider.getInvitationById(invitationId)
-      .then((item) => { if (!cancelled) setInvitation(item); })
+    const invitationPromise = isDemoMode
+      ? provider.getInvitationById(invitationId)
+      : fetchSafeInvitationPreview<Invitation>(
+        `/api/access/invitations/${encodeURIComponent(invitationId)}`,
+        token,
+        currentUser,
+      );
+    invitationPromise.then((item) => { if (!cancelled) setInvitation(item); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [authStatus, invitationId, provider]);
+  }, [authStatus, invitationId, provider, isDemoMode, currentUser, token]);
 
   async function accept() {
     const userId = currentUser?.uid ?? userProfile?.uid;
@@ -298,18 +345,20 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
   }
 
   const expired = Date.parse(invitation.expiresAt) <= loadedAt;
-  const fanAccountBlocked = accountRole === 'fan' && userProfile?.accountStatus !== 'invited' && isOperatorInvitation(invitation.roleKey);
-  const canAccept = !accepted && invitation.status !== 'accepted' && !expired && !fanAccountBlocked;
+  const accountClass = resolveAccountClass({ profile: userProfile, role: accountRole });
+  const accountClassBlocked = isOperatorInvitation(invitation.roleKey)
+    && accountClass !== requiredAccountClassForInvitation(invitation.roleKey);
+  const canAccept = !accepted && invitation.status !== 'accepted' && !expired && !accountClassBlocked;
 
   return (
     <Card className="mx-auto max-w-lg p-6 text-center">
       <EnvelopeSimple className="mx-auto h-9 w-9 text-brand" weight="duotone" />
-      <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted || invitation.status === 'accepted' ? 'Invitation accepted' : fanAccountBlocked ? 'Use an admin account' : 'GoalPlace256 invitation'}</h1>
+      <h1 className="mt-3 text-xl font-semibold text-text-strong">{accepted || invitation.status === 'accepted' ? 'Invitation accepted' : accountClassBlocked ? 'Use an operator account' : 'GoalPlace256 invitation'}</h1>
       <p className="mt-2 text-sm text-muted">
         {accepted || invitation.status === 'accepted'
           ? 'Your scoped assignment is active. Opening your workspace now.'
-          : fanAccountBlocked
-            ? fanOperatorInvitationMessage
+          : accountClassBlocked
+            ? operatorInvitationMessageFor(invitation.roleKey)
           : `You have been invited as ${invitation.roleKey.replace(/_/g, ' ')} for ${invitation.scopeType} ${invitation.scopeId}.`}
       </p>
       <dl className="mt-5 grid gap-2 rounded-[var(--radius-md)] bg-surface-2 p-4 text-left text-sm">
@@ -317,7 +366,7 @@ export function AccessInvitationAcceptance({ invitationId, token }: { invitation
         <div className="flex justify-between gap-3"><dt className="text-muted">Scope</dt><dd className="font-semibold text-text-strong">{invitation.scopeType}:{invitation.scopeId}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-muted">Status</dt><dd className="font-semibold capitalize text-text-strong">{expired ? 'expired' : invitation.status.replace(/_/g, ' ')}</dd></div>
       </dl>
-      {fanAccountBlocked ? <Button className="mt-5" variant="secondary" onClick={useDifferentAccount}>Use a different account</Button> : null}
+      {accountClassBlocked ? <Button className="mt-5" variant="secondary" onClick={useDifferentAccount}>Use operator account</Button> : null}
       {canAccept ? <Button className="mt-5" icon={CheckCircle} onClick={accept}>Accept assignment</Button> : null}
     </Card>
   );

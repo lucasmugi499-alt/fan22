@@ -37,7 +37,8 @@ describe('trusted access context route', () => {
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'user_1', role: 'fan' });
     vi.mocked(resolveTrustedAccessContext).mockResolvedValue({
       userId: 'user_1',
-      accountRole: 'fan',
+      accountRole: 'league_admin',
+      accountClass: 'organization_operator',
       primaryPersona: 'league_admin',
       mode: 'compare',
       accessVersion: 4,
@@ -59,7 +60,8 @@ describe('trusted access context route', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({
       userId: 'user_1',
-      accountRole: 'fan',
+      accountRole: 'league_admin',
+      accountClass: 'organization_operator',
       primaryPersona: 'league_admin',
       mode: 'compare',
       accessVersion: 4,
