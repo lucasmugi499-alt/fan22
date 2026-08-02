@@ -272,9 +272,27 @@ export function userSeed(uid: string, email: string, accountClass: 'fan' | 'orga
   };
 }
 
+export function validateProjectCompatibility(input: {
+  planProjectId: string;
+  hostedProjectId?: string;
+  credentialProjectId?: string;
+}) {
+  if (input.credentialProjectId && input.credentialProjectId !== input.planProjectId) {
+    throw new Error(
+      `The Admin SDK credential belongs to "${input.credentialProjectId}", but this smoke is targeting "${input.planProjectId}".`,
+    );
+  }
+  if (input.hostedProjectId && input.hostedProjectId !== input.planProjectId) {
+    throw new Error(
+      `The hosted app is using Firebase project "${input.hostedProjectId}", but this smoke is targeting "${input.planProjectId}".`,
+    );
+  }
+}
+
 async function run() {
   const plan = resolveRoleSmokePlan(parseArgs(process.argv.slice(2)));
   const ids = buildRoleSmokeIds(plan.runId);
+  await assertProjectCompatibility(plan);
   const app = createAdminApp(plan);
   const auth = getAuth(app);
   const db = getFirestore(app, plan.databaseId);
@@ -584,6 +602,28 @@ function normalizeRunId(value: string) {
 
 function isProductionProject(projectId: string, projectMap: ProjectMap) {
   return projectId === projectMap.projects?.prod || PROD_PROJECT_PATTERN.test(projectId);
+}
+
+async function assertProjectCompatibility(plan: RoleSmokePlan) {
+  validateProjectCompatibility({
+    planProjectId: plan.projectId,
+    credentialProjectId: credentialProjectId(),
+    hostedProjectId: await hostedProjectId(plan.baseUrl),
+  });
+}
+
+function credentialProjectId() {
+  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!credentialsPath || !fs.existsSync(credentialsPath)) return undefined;
+  const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8')) as { project_id?: string };
+  return credentials.project_id;
+}
+
+async function hostedProjectId(baseUrl: string) {
+  const response = await fetch(`${baseUrl}/api/environment`).catch(() => null);
+  if (!response?.ok) return undefined;
+  const body = await response.json().catch(() => null) as { firebaseProjectId?: string } | null;
+  return body?.firebaseProjectId;
 }
 
 function syntheticClientIp(seed: string) {

@@ -5,6 +5,7 @@ import {
   expectedTotals,
   parseArgs,
   resolveSmokePlan,
+  validateProjectCompatibility,
 } from './fantasy-auth-firestore-smoke';
 
 const projectMap = {
@@ -123,5 +124,21 @@ describe('fantasy Auth/Firestore staging smoke helpers', () => {
       keep: true,
       json: true,
     });
+  });
+
+  it('blocks project mismatches before the hosted smoke writes data', () => {
+    expect(() => validateProjectCompatibility({
+      planProjectId: 'studio-534174814-9df36',
+      credentialProjectId: 'manifest-quasar-479416-s7',
+    })).toThrow(/credential belongs/);
+    expect(() => validateProjectCompatibility({
+      planProjectId: 'manifest-quasar-479416-s7',
+      hostedProjectId: 'studio-534174814-9df36',
+    })).toThrow(/hosted app is using/);
+    expect(() => validateProjectCompatibility({
+      planProjectId: 'studio-534174814-9df36',
+      credentialProjectId: 'studio-534174814-9df36',
+      hostedProjectId: 'studio-534174814-9df36',
+    })).not.toThrow();
   });
 });
