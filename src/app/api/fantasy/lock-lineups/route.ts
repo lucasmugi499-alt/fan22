@@ -12,14 +12,17 @@ export async function POST(request: Request) {
   });
   if (unauthorized) return unauthorized;
 
+  const now = new Date().toISOString();
   const openRounds = await adminDb.collection('fantasyRounds')
     .where('status', '==', 'open')
-    .where('deadlineAt', '<=', new Date().toISOString())
-    .limit(100)
+    .limit(250)
     .get();
   let lineupsLocked = 0;
-  for (const round of openRounds.docs) {
+  const lockableRounds = openRounds.docs.filter((round) =>
+    typeof round.data().deadlineAt === 'string' && round.data().deadlineAt <= now,
+  );
+  for (const round of lockableRounds) {
     lineupsLocked += await lockFantasyRoundLineups(adminDb, round.id);
   }
-  return Response.json({ roundsLocked: openRounds.size, lineupsLocked });
+  return Response.json({ roundsLocked: lockableRounds.length, lineupsLocked });
 }
