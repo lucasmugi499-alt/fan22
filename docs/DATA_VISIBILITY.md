@@ -4,6 +4,10 @@
 |---|---:|---:|---:|---:|---:|
 | Sports, leagues, seasons, teams, athletes | Yes | Yes | Yes | Profile allowlists only | Yes |
 | Matches | Yes | Yes | Yes | Fixture allowlist for League Admin | Official result only |
+
+Notification reads are private and bounded. Firebase clients request the newest 30 user
+notifications ordered by `createdAt`, and live subscriptions use the same newest-first
+bounded pattern so a long account history does not become an unbounded page load.
 | Result submissions | No | Involved teams | Owning league/platform | Claims and governed responses | Finalization |
 | Result events | Status/role/timestamp only | Involved teams | Owning league/platform | Append-only matching transition | Yes |
 | Support needs | Yes | Creator | Team/league/platform | Proposal and verified recipient updates | Approval and raised amount |

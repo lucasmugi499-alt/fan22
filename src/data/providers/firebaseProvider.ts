@@ -364,7 +364,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async getNotificationsByUser(userId) {
     if (!isFirebaseConfigured) return mockProvider.getNotificationsByUser(userId);
-    return readCollection<Notification>('notifications', [where('userId', '==', userId)]);
+    return readCollection<Notification>('notifications', [
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limitQuery(30),
+    ]);
   },
   async getReports() {
     return isFirebaseConfigured ? readCollection<Report>('reports') : mockProvider.getReports();
