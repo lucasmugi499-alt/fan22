@@ -65,6 +65,71 @@ export async function parseJsonBody<T extends z.ZodTypeAny>(
   return { data: parsed.data };
 }
 
+export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
+  request: Request,
+  schema: T,
+  options: {
+    maxBytes: number;
+    invalidBodyError: string;
+    authError?: string;
+    rateLimit?: {
+      bucket: string;
+      limit: number;
+      windowSeconds: number;
+      identity?: (input: {
+        actor: AuthenticatedActor;
+        data: z.infer<T>;
+        appId: string;
+        request: Request;
+      }) => string[];
+    };
+  },
+): Promise<{ actor: AuthenticatedActor; data: z.infer<T>; appId: string } | { response: Response }> {
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) {
+    const authResponse = auth.response ?? jsonError('Authentication required.', 401);
+    return {
+      response: options.authError
+        ? jsonError(options.authError, authResponse.status)
+        : authResponse,
+    };
+  }
+
+  const parsed = await parseJsonBody(request, schema, { maxBytes: options.maxBytes });
+  if ('response' in parsed) {
+    return {
+      response: jsonError(options.invalidBodyError, parsed.response.status),
+    };
+  }
+
+  const appCheck = await verifyOptionalAppCheck(request);
+  if ('response' in appCheck) {
+    return { response: appCheck.response ?? jsonError('App Check required.', 401) };
+  }
+
+  if (options.rateLimit) {
+    const limited = await enforceRateLimit({
+      bucket: options.rateLimit.bucket,
+      identity: [
+        auth.actor.uid,
+        appCheck.appId,
+        clientIpFrom(request),
+        ...(options.rateLimit.identity?.({
+          actor: auth.actor,
+          data: parsed.data,
+          appId: appCheck.appId,
+          request,
+        }) ?? []),
+      ],
+      limit: options.rateLimit.limit,
+      windowSeconds: options.rateLimit.windowSeconds,
+    });
+    if (limited) return { response: limited };
+  }
+
+  return { actor: auth.actor, data: parsed.data, appId: appCheck.appId };
+}
+
 export function safeSecretEquals(supplied: string | null, expected: string | undefined) {
   if (!expected || !supplied) return false;
   const left = Buffer.from(expected);

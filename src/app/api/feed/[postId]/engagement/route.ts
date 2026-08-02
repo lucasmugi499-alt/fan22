@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -20,13 +20,20 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ postId: string }> },
 ) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, schema, { maxBytes: 2 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid feed action.' }, { status: parsed.response.status });
-  const actor = auth.actor;
   const { postId } = await context.params;
-  const input = parsed.data;
+  const mutation = await requireAuthenticatedMutation(request, schema, {
+    maxBytes: 2 * 1024,
+    invalidBodyError: 'Invalid feed action.',
+    rateLimit: {
+      bucket: 'feed_engagement',
+      limit: 40,
+      windowSeconds: 60,
+      identity: ({ data }) => [postId, data.action],
+    },
+  });
+  if ('response' in mutation) return mutation.response;
+  const actor = mutation.actor;
+  const input = mutation.data;
   const postRef = adminDb.collection('feedPosts').doc(postId);
   const eventId = `${postId}_${actor.uid}`;
   const reactionRef = adminDb.collection('feedReactions').doc(eventId);

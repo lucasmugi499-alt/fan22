@@ -3,7 +3,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { cappedPointsAward, kampalaPeriod, pointsIdempotencyKey } from '@/lib/money';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import type { Match } from '@/types';
 
 export const runtime = 'nodejs';
@@ -22,15 +22,23 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return Response.json({ error: 'Sign in before checking in.' }, { status: auth.response?.status ?? 401 });
-  const actor = auth.actor;
+  const { matchId } = await params;
+  const mutation = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 1024,
+    authError: 'Sign in before checking in.',
+    invalidBodyError: 'This venue code is invalid.',
+    rateLimit: {
+      bucket: 'match_attendance',
+      limit: 12,
+      windowSeconds: 60,
+      identity: () => [matchId],
+    },
+  });
+  if ('response' in mutation) return mutation.response;
+  const actor = mutation.actor;
   const secret = process.env.GOALPLACE_ATTENDANCE_SECRET;
   if (!secret) return Response.json({ error: 'Venue check-in is not configured.' }, { status: 503 });
-  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 1024 });
-  if ('response' in parsed) return Response.json({ error: 'This venue code is invalid.' }, { status: parsed.response.status });
-  const { matchId } = await params;
-  const parts = parsed.data.attendanceToken.split('.');
+  const parts = mutation.data.attendanceToken.split('.');
   if (parts.length !== 3 || parts[0] !== matchId) {
     return Response.json({ error: 'This venue code is invalid.' }, { status: 400 });
   }

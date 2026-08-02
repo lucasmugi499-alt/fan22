@@ -7,6 +7,7 @@ Use them for new or migrated route handlers instead of one-off parsing, role che
 ## Primitives
 
 - `requireAuthenticatedUser(request)`
+- `requireAuthenticatedMutation(request, schema, options)`
 - `requireRole(actor, roles)`
 - `parseJsonBody(request, schema, { maxBytes })`
 - `verifyOptionalAppCheck(request)`
@@ -63,8 +64,12 @@ GOALPLACE_SCHEDULER_AUTH_MODE=shared_secret
 
 Migrated routes:
 
+- `/api/feed/[postId]/engagement`
 - `/api/fantasy/lock-lineups`
 - `/api/fantasy/score-finalized`
+- `/api/matches/[matchId]/attendance`
+- `/api/matches/[matchId]/attendance-token`
 - `/api/payments/reconcile`
+- `/api/points/events`
 
 Shared-secret fallback exists only to keep the current demo runnable while Cloud Scheduler OIDC targets are provisioned.

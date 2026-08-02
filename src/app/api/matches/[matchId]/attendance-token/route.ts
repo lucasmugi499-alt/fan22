@@ -1,24 +1,32 @@
 import { createHmac } from 'node:crypto';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { z } from 'zod';
+import { adminDb } from '@/lib/firebase/admin';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import type { AppRole, Match } from '@/types';
 
 export const runtime = 'nodejs';
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get('authorization');
-  return authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-}
+const bodySchema = z.unknown();
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
-  const token = bearerToken(request);
-  const actor = token ? await adminAuth.verifyIdToken(token).catch(() => null) : null;
-  if (!actor) return Response.json({ error: 'Authentication required.' }, { status: 401 });
+  const { matchId } = await params;
+  const mutation = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 256,
+    invalidBodyError: 'Invalid venue QR request.',
+    rateLimit: {
+      bucket: 'attendance_token',
+      limit: 10,
+      windowSeconds: 60,
+      identity: () => [matchId],
+    },
+  });
+  if ('response' in mutation) return mutation.response;
+  const actor = mutation.actor;
   const secret = process.env.GOALPLACE_ATTENDANCE_SECRET;
   if (!secret) return Response.json({ error: 'Venue check-in is not configured on this build.' }, { status: 503 });
-  const { matchId } = await params;
   const matchSnapshot = await adminDb.collection('matches').doc(matchId).get();
   if (!matchSnapshot.exists) return Response.json({ error: 'Match not found.' }, { status: 404 });
   const match = { id: matchSnapshot.id, ...matchSnapshot.data() } as Match;

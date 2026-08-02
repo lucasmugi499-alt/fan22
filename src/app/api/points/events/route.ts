@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import {
   cappedPointsAward,
   kampalaPeriod,
@@ -78,12 +78,19 @@ async function eligible(
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid points event.' }, { status: parsed.response.status });
-  const actor = auth.actor;
-  const input = parsed.data;
+  const mutation = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Invalid points event.',
+    rateLimit: {
+      bucket: 'points_events',
+      limit: 20,
+      windowSeconds: 60,
+      identity: ({ data }) => [data.actionType, data.relatedEntityId ?? 'none'],
+    },
+  });
+  if ('response' in mutation) return mutation.response;
+  const actor = mutation.actor;
+  const input = mutation.data;
   if (input.userId !== actor.uid) {
     return Response.json({ error: 'Points can only be recorded for the signed-in account.' }, { status: 403 });
   }

@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { clientIpFrom, parseJsonBody, requireSchedulerRequest, safeSecretEquals } from './security';
+import { adminAppCheck, adminAuth, adminDb } from '@/lib/firebase/admin';
+import {
+  clientIpFrom,
+  parseJsonBody,
+  requireAuthenticatedMutation,
+  requireSchedulerRequest,
+  safeSecretEquals,
+} from './security';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: vi.fn() },
   adminAppCheck: { verifyToken: vi.fn() },
-  adminDb: {},
+  adminDb: {
+    collection: vi.fn(),
+  },
 }));
 
 describe('api security primitives', () => {
@@ -37,6 +46,36 @@ describe('api security primitives', () => {
   it('compares shared scheduler secrets without accepting length mismatches', () => {
     expect(safeSecretEquals('secret', 'secret')).toBe(true);
     expect(safeSecretEquals('secret-extra', 'secret')).toBe(false);
+  });
+
+  it('rejects malformed authenticated mutations before App Check or rate-limit writes', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'user_1', role: 'fan' });
+    const request = new Request('https://example.test/api/test', {
+      method: 'POST',
+      headers: { authorization: 'Bearer token' },
+      body: '{',
+    });
+
+    const result = await requireAuthenticatedMutation(
+      request,
+      z.object({ action: z.literal('save') }),
+      {
+        maxBytes: 100,
+        invalidBodyError: 'Invalid test action.',
+        rateLimit: {
+          bucket: 'test',
+          limit: 1,
+          windowSeconds: 60,
+        },
+      },
+    );
+
+    expect('response' in result ? result.response.status : 0).toBe(400);
+    expect(await ('response' in result ? result.response.json() : null)).toEqual({
+      error: 'Invalid test action.',
+    });
+    expect(adminAppCheck.verifyToken).not.toHaveBeenCalled();
+    expect(adminDb.collection).not.toHaveBeenCalled();
   });
 
   it('supports the legacy scheduler secret path while OIDC is being provisioned', async () => {
