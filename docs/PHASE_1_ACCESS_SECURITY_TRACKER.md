@@ -68,7 +68,10 @@ No destructive data migration is included in Phase 1A.
 | Assignment lifecycle API | Pass | `transition_access_assignment` supports platform-admin suspension, revocation, expiry, and reactivation while rebuilding the exact scoped `accessIndex`. |
 | Invitation acceptance projection rebuild | Pass | `accept_invitation` now rebuilds the scoped `accessIndex` from active assignments instead of merging roles/capabilities with `arrayUnion`. |
 | Demo/Firebase compatibility report | Pass | `npm run access:compat` audits users, account classes, scoped assignments, and deterministic access-index projections; bundled demo reports 1,068 assignments, 1,068 indexes, 0 blockers, and 0 warnings. |
+| Live manifest compatibility report | Pass | `npx tsx --env-file=.env.local scripts/access/compatibility-report.ts --firebase --project manifest-quasar-479416-s7 --database fg256` returned 0 blockers after the investor demo merge. Warnings are limited to pre-existing partial demo records left in place by the non-destructive seed. |
+| Live role smoke | Pass | `npm run staging:role-smoke -- --project manifest-quasar-479416-s7 --allow-production` passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app`; evidence is `reports/staging/role-auth-firestore-smoke-role_20260802224456_6ad0e51d.json`. |
+| Live fantasy smoke | Pass | `npm run staging:fantasy-smoke -- --project manifest-quasar-479416-s7 --allow-production` passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app`; evidence is `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`. |
 
 ## Remaining Phase 1 Work
 
-Phase 1 audit blockers are complete. Keep `GOALPLACE_ACCESS_ENGINE_MODE=compare` until a live Firebase compatibility report is captured for the target environment with `npm run access:compat -- --firebase --project <project> --database fg256`.
+Phase 1 audit blockers are complete. Keep `GOALPLACE_ACCESS_ENGINE_MODE=compare` for the investor demo while legacy partial demo records still exist in the live database. Move to `assignments` after a deliberate production data cleanup or migration pass reduces the live compatibility report to 0 blockers and 0 warnings.

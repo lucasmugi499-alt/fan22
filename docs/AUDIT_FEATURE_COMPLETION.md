@@ -148,10 +148,12 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Demo competitions for football, basketball, and rugby
 - [x] Complete match-squad and athlete-event capture for non-scoring appearances
 - [x] Trusted fantasy pipeline integration tests for lineup locking, transfers, scoring, and corrections
-- [ ] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
-  - Runner added: `npm run staging:fantasy-smoke`. Keep unchecked until it passes against the hosted staging app and the evidence report is attached.
+- [x] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
+  - Passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app` on Firebase project `manifest-quasar-479416-s7`, database `fg256`.
+  - Evidence: `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`.
 - [x] League and Platform Admin activation workflow browser QA
-- [ ] Candidate fantasy rules and indexes promoted only after staging validation
+- [x] Candidate fantasy rules and indexes promoted only after staging validation
+  - The live App Hosting build `fan22-build-2026-08-02-007` is using the manifest Firebase project and passed the fantasy Auth/Firestore smoke after deployment.
 
 Fantasy is free to play. Fantasy Credits have no cash value and cannot be purchased,
 transferred, withdrawn, or converted to GoalPlace Points. Contributions and financial
@@ -187,9 +189,12 @@ blocked until the unchecked staging gates above are complete.
 - [x] Browser QA passes at 390px mobile and 1440px desktop widths
 - [x] No broken public routes, console errors, image failures, or horizontal overflow
 - [x] Demo-role workflow QA passes
-- [ ] Firebase-authenticated role workflow QA passes in staging
-  - Runner added: `npm run staging:role-smoke`. Keep unchecked until it passes against the hosted staging app and the evidence report is attached.
-- [ ] Firebase-authenticated fantasy workflow QA passes in staging
+- [x] Firebase-authenticated role workflow QA passes in staging
+  - Passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app` on Firebase project `manifest-quasar-479416-s7`, database `fg256`.
+  - Evidence: `reports/staging/role-auth-firestore-smoke-role_20260802224456_6ad0e51d.json`.
+- [x] Firebase-authenticated fantasy workflow QA passes in staging
+  - Passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app` on Firebase project `manifest-quasar-479416-s7`, database `fg256`.
+  - Evidence: `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`.
 - [x] Synthetic-data disclosure is present where required
 - [x] Current code review has no unresolved demo-environment high-severity findings
 - [ ] Only after the real-money blockers above are closed: enable provider collection or payout
