@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminAppCheck, adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   clientIpFrom,
+  isFanAccountPrincipal,
   parseJsonBody,
   requireAuthenticatedMutation,
   requireSchedulerRequest,
@@ -46,6 +47,27 @@ describe('api security primitives', () => {
   it('compares shared scheduler secrets without accepting length mismatches', () => {
     expect(safeSecretEquals('secret', 'secret')).toBe(true);
     expect(safeSecretEquals('secret-extra', 'secret')).toBe(false);
+  });
+
+  it('recognizes Fan principals by role and immutable account class', () => {
+    expect(isFanAccountPrincipal({ uid: 'fan_1', role: 'fan', accountClass: 'fan' })).toBe(true);
+    expect(isFanAccountPrincipal({ uid: 'fan_1', role: 'fan' }, { role: 'fan', accountClass: 'fan' })).toBe(true);
+  });
+
+  it('rejects Fan role/account-class mismatches', () => {
+    expect(isFanAccountPrincipal(
+      { uid: 'operator_1', role: 'fan', accountClass: 'organization_operator' },
+      { role: 'fan', accountClass: 'fan' },
+    )).toBe(false);
+    expect(isFanAccountPrincipal(
+      { uid: 'operator_1', role: 'team_admin', accountClass: 'fan' },
+      { role: 'fan', accountClass: 'fan' },
+    )).toBe(false);
+  });
+
+  it('does not promote unclassified principals through the legacy fan fallback', () => {
+    expect(isFanAccountPrincipal({ uid: 'unknown_1' })).toBe(false);
+    expect(isFanAccountPrincipal({ uid: 'unknown_1' }, {})).toBe(false);
   });
 
   it('rejects malformed authenticated mutations before App Check or rate-limit writes', async () => {

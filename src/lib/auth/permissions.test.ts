@@ -10,8 +10,13 @@ import {
   canAccessSponsorDashboard,
   canAccessSuperAdmin,
   canCreateFixture,
+  canCreateFanPost,
+  canFollow,
+  canPledge,
   canRegisterAsRole,
+  canSave,
   canSupport,
+  canUseFanSystems,
   canVerifyFinalResult,
   canVerifyMatch,
   getDefaultRouteForRole,
@@ -81,10 +86,31 @@ describe('capability matrix', () => {
 });
 
 describe('canSupport', () => {
-  it('allows any authenticated user but no one else', () => {
-    for (const role of ALL_ROLES) expect(canSupport(authAs(role))).toBe(true);
+  it('keeps fan engagement inside fan accounts', () => {
+    for (const role of ALL_ROLES) {
+      const expected = role === 'fan';
+      expect(canUseFanSystems(authAs(role))).toBe(expected);
+      expect(canSupport(authAs(role))).toBe(expected);
+      expect(canPledge(authAs(role))).toBe(expected);
+      expect(canFollow(authAs(role))).toBe(expected);
+      expect(canSave(authAs(role))).toBe(expected);
+      expect(canCreateFanPost(authAs(role))).toBe(expected);
+    }
     expect(canSupport(LOGGED_OUT)).toBe(false);
     expect(canSupport(LOADING)).toBe(false);
+  });
+
+  it('does not treat a fan role on an operator account as fan access', () => {
+    const mismatched = {
+      ...authAs('fan'),
+      userProfile: {
+        ...MOCK_PROFILES.fan,
+        accountClass: 'organization_operator' as const,
+      },
+    };
+
+    expect(canUseFanSystems(mismatched)).toBe(false);
+    expect(canSupport(mismatched)).toBe(false);
   });
 });
 
@@ -139,7 +165,7 @@ describe('canAccessRoute', () => {
     ['/league-admin', ['league_admin', 'platform_admin', 'super_admin']],
     ['/team-admin', ['team_admin', 'league_admin', 'platform_admin', 'super_admin']],
     ['/athlete-dashboard', ['athlete', 'platform_admin', 'super_admin']],
-    ['/wallet', ['fan', 'athlete', 'platform_admin', 'super_admin']],
+    ['/wallet', ['fan', 'athlete']],
     ['/fantasy/competitions/demo-id/team', ['fan']],
   ];
 

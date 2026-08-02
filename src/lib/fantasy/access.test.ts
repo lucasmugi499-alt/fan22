@@ -5,6 +5,7 @@ describe('fantasy participant access', () => {
   it('allows Fan accounts', () => {
     expect(isFantasyFanRole(undefined, 'fan')).toBe(true);
     expect(isFantasyFanRole('fan', 'fan')).toBe(true);
+    expect(isFantasyFanRole('fan', 'fan', 'fan', 'fan')).toBe(true);
   });
 
   it.each(['athlete', 'team_admin', 'league_admin', 'platform_admin', 'super_admin'])(
@@ -16,5 +17,10 @@ describe('fantasy participant access', () => {
 
   it('trusts a privileged claim over a stale Fan profile', () => {
     expect(isFantasyFanRole('league_admin', 'fan')).toBe(false);
+  });
+
+  it('denies role/account-class mismatches', () => {
+    expect(isFantasyFanRole('fan', 'fan', 'organization_operator', 'fan')).toBe(false);
+    expect(isFantasyFanRole(undefined, 'fan', undefined, 'platform_operator')).toBe(false);
   });
 });

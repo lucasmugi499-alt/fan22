@@ -4,6 +4,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { OAuth2Client } from 'google-auth-library';
 import type { z } from 'zod';
 import { adminAppCheck, adminAuth, adminDb } from '@/lib/firebase/admin';
+import { resolveAccountClass } from '@/lib/auth/accountClass';
+import type { AppRole, UserProfile } from '@/types';
 
 export type AuthenticatedActor = Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
 
@@ -43,6 +45,47 @@ export function requireRole(actor: AuthenticatedActor, roles: string[], message 
   return roles.includes(String(actor.role))
     ? null
     : jsonError(message, 403);
+}
+
+type PrincipalProfile = Pick<UserProfile, 'accountClass' | 'role'>;
+
+export function isFanAccountPrincipal(
+  actor: AuthenticatedActor,
+  profile?: FirebaseFirestore.DocumentData | null,
+): boolean {
+  const claimRole = typeof actor.role === 'string' ? actor.role : null;
+  const claimAccountClass = typeof actor.accountClass === 'string' ? actor.accountClass : null;
+  const profileRole = typeof profile?.role === 'string' ? profile.role : null;
+  const profileAccountClass = typeof profile?.accountClass === 'string' ? profile.accountClass : null;
+  const principalProfile: PrincipalProfile | null = profile ? {
+    accountClass: profile.accountClass as UserProfile['accountClass'],
+    role: (profileRole ?? 'fan') as AppRole,
+  } : null;
+  const accountClass = resolveAccountClass({
+    accountClass: actor.accountClass,
+    role: claimRole ?? profileRole,
+    profile: principalProfile,
+  });
+  const hasFanEvidence = claimRole === 'fan'
+    || profileRole === 'fan'
+    || claimAccountClass === 'fan'
+    || profileAccountClass === 'fan';
+
+  return hasFanEvidence
+    && accountClass === 'fan'
+    && (!claimRole || claimRole === 'fan')
+    && (!profileRole || profileRole === 'fan');
+}
+
+export async function requireFanAccountPrincipal(
+  actor: AuthenticatedActor,
+  message = 'This action is available to Fan accounts only.',
+) {
+  const profile = await adminDb.collection('users').doc(actor.uid).get();
+  if (!isFanAccountPrincipal(actor, profile.data())) {
+    return { response: jsonError(message, 403) } as const;
+  }
+  return { profile } as const;
 }
 
 export async function parseJsonBody<T extends z.ZodTypeAny>(

@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireAuthenticatedMutation } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +34,8 @@ export async function POST(
   if ('response' in mutation) return mutation.response;
   const actor = mutation.actor;
   const input = mutation.data;
+  const fanAccount = await requireFanAccountPrincipal(actor, 'Feed engagement is available to Fan accounts only.');
+  if ('response' in fanAccount) return fanAccount.response;
   const postRef = adminDb.collection('feedPosts').doc(postId);
   const eventId = `${postId}_${actor.uid}`;
   const reactionRef = adminDb.collection('feedReactions').doc(eventId);

@@ -1,4 +1,5 @@
 import { AppRole, UserProfile } from '@/types';
+import { resolveAccountClass } from './accountClass';
 import type { AccessContext } from './access';
 import {
   canInviteTeamAdminInScope,
@@ -30,27 +31,35 @@ export function hasAnyRole(auth: AuthState, roles: AppRole[]): boolean {
   return isLoggedIn(auth) && auth.role !== null && roles.includes(auth.role);
 }
 
+export function hasAccountClass(auth: AuthState, accountClass: UserProfile['accountClass']): boolean {
+  return isLoggedIn(auth) && resolveAccountClass({ profile: auth.userProfile, role: auth.role }) === accountClass;
+}
+
+export function canUseFanSystems(auth: AuthState): boolean {
+  return hasRole(auth, 'fan') && hasAccountClass(auth, 'fan');
+}
+
 // Interactions
 export function canSupport(auth: AuthState): boolean {
-  return isLoggedIn(auth); // Only logged in fans/users can support (technically admins/athletes can too as fans)
+  return canUseFanSystems(auth);
 }
 
 export const canSupportAthlete = canSupport;
 
 export function canPledge(auth: AuthState): boolean {
-  return isLoggedIn(auth);
+  return canUseFanSystems(auth);
 }
 
 export function canComment(auth: AuthState): boolean {
-  return isLoggedIn(auth);
+  return canUseFanSystems(auth);
 }
 
 export function canSave(auth: AuthState): boolean {
-  return isLoggedIn(auth);
+  return canUseFanSystems(auth);
 }
 
 export function canFollow(auth: AuthState): boolean {
-  return isLoggedIn(auth);
+  return canUseFanSystems(auth);
 }
 
 // Posts
@@ -59,7 +68,7 @@ export function canCreateOfficialPost(auth: AuthState): boolean {
 }
 
 export function canCreateFanPost(auth: AuthState): boolean {
-  return isLoggedIn(auth); // All users can create fan posts
+  return canUseFanSystems(auth);
 }
 
 // Admin / Management
@@ -282,7 +291,7 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     return hasAnyRole(auth, ['platform_admin', 'super_admin']);
   }
   if (pathname.startsWith('/wallet')) {
-    return hasAnyRole(auth, ['fan', 'athlete', 'platform_admin', 'super_admin']);
+    return hasAnyRole(auth, ['fan', 'athlete']);
   }
 
   if (pathname.startsWith('/team-admin')) {

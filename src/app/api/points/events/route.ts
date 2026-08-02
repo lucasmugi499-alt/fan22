@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireAuthenticatedMutation } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 import {
   cappedPointsAward,
   kampalaPeriod,
@@ -91,6 +91,8 @@ export async function POST(request: Request) {
   if ('response' in mutation) return mutation.response;
   const actor = mutation.actor;
   const input = mutation.data;
+  const fanAccount = await requireFanAccountPrincipal(actor, 'Fan points are available to Fan accounts only.');
+  if ('response' in fanAccount) return fanAccount.response;
   if (input.userId !== actor.uid) {
     return Response.json({ error: 'Points can only be recorded for the signed-in account.' }, { status: 403 });
   }

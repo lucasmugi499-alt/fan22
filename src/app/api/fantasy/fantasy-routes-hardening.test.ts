@@ -22,6 +22,19 @@ function request(path: string, body: string, token = 'token') {
   });
 }
 
+function installUserProfile(profile: Record<string, unknown>) {
+  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+    doc: (id: string) => ({
+      id,
+      get: vi.fn(async () => ({
+        id,
+        exists: collectionName === 'users',
+        data: () => collectionName === 'users' ? profile : undefined,
+      })),
+    }),
+  }) as never);
+}
+
 describe('fantasy route hardening', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,5 +86,42 @@ describe('fantasy route hardening', () => {
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error });
     expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['/api/fantasy/teams', postTeam, {
+      competitionId: 'competition_1',
+      roundId: 'round_1',
+      teamName: 'No Scope FC',
+      squadAthleteIds: ['athlete_1'],
+      startingAthleteIds: ['athlete_1'],
+      benchAthleteIds: [],
+      captainAthleteId: 'athlete_1',
+      viceCaptainAthleteId: 'athlete_1',
+    }],
+    ['/api/fantasy/transfers', postTransfer, {
+      competitionId: 'competition_1',
+      roundId: 'round_1',
+      athleteOutId: 'athlete_1',
+      athleteInId: 'athlete_2',
+    }],
+    ['/api/fantasy/mini-leagues', postMiniLeague, {
+      action: 'join',
+      inviteCode: 'ABCDEF',
+    }],
+  ] as const)('rejects operator accounts before fantasy writes for POST %s', async (path, handler, body) => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'operator_1',
+      role: 'team_admin',
+      accountClass: 'organization_operator',
+    });
+    installUserProfile({ role: 'team_admin', accountClass: 'organization_operator' });
+
+    const response = await handler(request(path, JSON.stringify(body)));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'GoalPlace Fantasy is available to Fan accounts only.',
+    });
   });
 });

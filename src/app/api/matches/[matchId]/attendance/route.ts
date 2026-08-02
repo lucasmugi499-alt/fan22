@@ -3,7 +3,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { cappedPointsAward, kampalaPeriod, pointsIdempotencyKey } from '@/lib/money';
-import { requireAuthenticatedMutation } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 import type { Match } from '@/types';
 
 export const runtime = 'nodejs';
@@ -36,6 +36,8 @@ export async function POST(
   });
   if ('response' in mutation) return mutation.response;
   const actor = mutation.actor;
+  const fanAccount = await requireFanAccountPrincipal(actor, 'Matchday fan check-in is available to Fan accounts only.');
+  if ('response' in fanAccount) return fanAccount.response;
   const secret = process.env.GOALPLACE_ATTENDANCE_SECRET;
   if (!secret) return Response.json({ error: 'Venue check-in is not configured.' }, { status: 503 });
   const parts = mutation.data.attendanceToken.split('.');

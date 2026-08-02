@@ -2,8 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { isFantasyFanRole } from '@/lib/fantasy/access';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -93,10 +92,8 @@ export async function POST(request: Request) {
   const actor = auth.actor;
   const parsed = await parseJsonBody(request, requestSchema, { maxBytes: 4 * 1024 });
   if ('response' in parsed) return Response.json({ error: 'Invalid mini-league request.' }, { status: parsed.response.status });
-  const profile = await adminDb.collection('users').doc(actor.uid).get();
-  if (!isFantasyFanRole(actor.role, profile.data()?.role)) {
-    return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
-  }
+  const fanAccount = await requireFanAccountPrincipal(actor, 'GoalPlace Fantasy is available to Fan accounts only.');
+  if ('response' in fanAccount) return fanAccount.response;
 
   if (parsed.data.action === 'create') {
     const competition = await adminDb.collection('fantasyCompetitions')

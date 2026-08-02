@@ -5,7 +5,7 @@ import { contributionQuote, requiresEnhancedReview } from '@/lib/money';
 import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderConfigurationError } from '@/server/payments/providers';
 import { recordProviderAttempt } from '@/server/payments/providerAttempts';
 import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -45,6 +45,10 @@ export async function POST(request: Request) {
   if ('response' in parsed) return Response.json({ error: 'Invalid contribution request.' }, { status: parsed.response.status });
   const input = parsed.data;
   if (input.supporterUserId !== actor.uid) return Response.json({ error: 'The supporter must be the signed-in account.' }, { status: 403 });
+  if (input.purpose !== 'sponsor_grant') {
+    const fanAccount = await requireFanAccountPrincipal(actor, 'Support contributions are available to Fan accounts only.');
+    if ('response' in fanAccount) return fanAccount.response;
+  }
 
   try {
     const provider = paymentProviderFromEnvironment(input.provider);

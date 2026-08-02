@@ -9,8 +9,7 @@ import type {
   FantasyRound,
   FantasySquadRules,
 } from '@/types/fantasy';
-import { isFantasyFanRole } from '@/lib/fantasy/access';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -36,11 +35,8 @@ export async function POST(request: Request) {
   if (fantasyRecordHasFinancialFields(parsed.data)) {
     return Response.json({ error: 'Invalid fantasy squad.' }, { status: 400 });
   }
-  const profile = await adminDb.collection('users').doc(actor.uid).get();
-  const profileRole = profile.data()?.role;
-  if (!isFantasyFanRole(actor.role, profileRole)) {
-    return Response.json({ error: 'GoalPlace Fantasy is available to Fan accounts only.' }, { status: 403 });
-  }
+  const fanAccount = await requireFanAccountPrincipal(actor, 'GoalPlace Fantasy is available to Fan accounts only.');
+  if ('response' in fanAccount) return fanAccount.response;
   const input = parsed.data;
   const [competitionSnapshot, roundSnapshot] = await Promise.all([
     adminDb.collection('fantasyCompetitions').doc(input.competitionId).get(),
