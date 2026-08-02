@@ -42,6 +42,13 @@ events for the complete match squad.
 All values live in versioned scoring profiles and squad rules. UI components do not own
 official scoring values.
 
+## Mini-League Catalogue
+
+The public mini-league catalogue is intentionally bounded. Firebase mode reads only the
+first page of public active mini-leagues and uses aggregate member counts for visible
+cards. Raw member rows and competition leaderboards are loaded only from the individual
+mini-league detail route.
+
 ## Deployment Gate
 
 Do not activate production fantasy until:

@@ -177,31 +177,36 @@ export async function getFantasyPlayerCards(competitionId: string) {
 
 export async function getFantasyMiniLeagueCatalogue() {
   if (!usesFirebaseFantasy()) {
+    const memberCounts = fantasyMiniLeagueMembers.reduce<Record<string, number>>((counts, member) => {
+      if (member.status === 'active') counts[member.miniLeagueId] = (counts[member.miniLeagueId] ?? 0) + 1;
+      return counts;
+    }, {});
     return {
       miniLeagues: fantasyMiniLeagues,
-      members: fantasyMiniLeagueMembers,
-      leaderboards: fantasyLeaderboards,
+      memberCounts,
     };
   }
   const publicLeagues = await adminDb.collection('fantasyMiniLeagues')
     .where('visibility', '==', 'public')
     .where('status', '==', 'active')
+    .limit(20)
     .get();
   const miniLeagues = publicLeagues.docs.map((item) =>
     record<FantasyMiniLeague>(item.id, item.data()),
   );
-  const [membersSnapshot, leaderboardSnapshot] = await Promise.all([
-    adminDb.collection('fantasyMiniLeagueMembers').where('status', '==', 'active').get(),
-    adminDb.collection('fantasyLeaderboards').get(),
-  ]);
+  const memberCounts = Object.fromEntries(await Promise.all(
+    miniLeagues.map(async (league) => {
+      const countSnapshot = await adminDb.collection('fantasyMiniLeagueMembers')
+        .where('miniLeagueId', '==', league.id)
+        .where('status', '==', 'active')
+        .count()
+        .get();
+      return [league.id, countSnapshot.data().count] as const;
+    }),
+  ));
   return {
     miniLeagues,
-    members: membersSnapshot.docs.map((item) =>
-      record<FantasyMiniLeagueMember>(item.id, item.data()),
-    ),
-    leaderboards: leaderboardSnapshot.docs.map((item) =>
-      record<FantasyLeaderboardEntry>(item.id, item.data()),
-    ),
+    memberCounts,
   };
 }
 

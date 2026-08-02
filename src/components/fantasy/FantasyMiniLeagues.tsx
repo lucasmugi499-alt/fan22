@@ -10,11 +10,11 @@ import type {
 
 export function FantasyMiniLeagues({
   miniLeagues,
-  members,
+  memberCounts,
   competitions,
 }: {
   miniLeagues: FantasyMiniLeague[];
-  members: FantasyMiniLeagueMember[];
+  memberCounts: Record<string, number>;
   competitions: import('@/types/fantasy').FantasyCompetition[];
 }) {
   return (
@@ -24,7 +24,6 @@ export function FantasyMiniLeagues({
       <p className="mt-2 max-w-2xl text-muted">Free private tables for friends, clubs, and communities. No paid entry or cash pool.</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {miniLeagues.map((league) => {
-          const leagueMembers = members.filter((item) => item.miniLeagueId === league.id);
           return (
             <Link key={league.id} href={`/fantasy/mini-leagues/${league.id}`} className="border border-border bg-surface-1 p-5 hover:border-brand">
               <div className="flex items-center justify-between">
@@ -33,7 +32,7 @@ export function FantasyMiniLeagues({
               </div>
               <h2 className="mt-6 text-xl font-bold text-text-strong">{league.name}</h2>
               <p className="mt-2 text-sm leading-6 text-muted">{league.description}</p>
-              <p className="mt-4 flex items-center gap-2 text-xs text-subtle"><UsersThree className="h-4 w-4" /> {leagueMembers.length}/{league.memberLimit} managers</p>
+              <p className="mt-4 flex items-center gap-2 text-xs text-subtle"><UsersThree className="h-4 w-4" /> {memberCounts[league.id] ?? 0}/{league.memberLimit} managers</p>
             </Link>
           );
         })}

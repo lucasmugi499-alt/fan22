@@ -15,5 +15,5 @@ export default async function FantasyMiniLeaguesPage() {
     getFantasyMiniLeagueCatalogue(),
     getFantasyCompetitions(),
   ]);
-  return <FantasyMiniLeagues miniLeagues={catalogue.miniLeagues} members={catalogue.members} competitions={competitions} />;
+  return <FantasyMiniLeagues miniLeagues={catalogue.miniLeagues} memberCounts={catalogue.memberCounts} competitions={competitions} />;
 }
