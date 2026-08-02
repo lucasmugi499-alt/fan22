@@ -5,7 +5,7 @@
   "environments": {
     "demo": {
       "label": "Investor Demo",
-      "firebaseProjectId": "studio-534174814-9df36",
+      "firebaseProjectId": "manifest-quasar-479416-s7",
       "firestoreDatabaseId": "fg256",
       "appHostingConfig": "apphosting.demo.yaml",
       "expectedDataOrigin": "synthetic_demo",

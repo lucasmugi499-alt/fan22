@@ -31,10 +31,10 @@ describe('environment guard', () => {
   it('reports App Hosting runtime Firebase values when public build vars are unavailable', () => {
     expect(publicEnvironment({
       GOALPLACE_ENVIRONMENT: 'demo',
-      GOALPLACE_ADMIN_PROJECT_ID: 'studio-534174814-9df36',
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
     } as NodeJS.ProcessEnv)).toMatchObject({
       environment: 'demo',
-      firebaseProjectId: 'studio-534174814-9df36',
+      firebaseProjectId: 'manifest-quasar-479416-s7',
       dataMode: 'firebase',
     });
   });

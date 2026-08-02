@@ -56,27 +56,27 @@ env:
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBTJtRq6mBajX6pM93vo8FJ858owLfObwE
+    value: AIzaSyDnGSTCffXgwlI5DDwivqcVC8Iuy0aDPc8
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: studio-534174814-9df36.firebaseapp.com
+    value: manifest-quasar-479416-s7.firebaseapp.com
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: studio-534174814-9df36
+    value: manifest-quasar-479416-s7
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: studio-534174814-9df36.firebasestorage.app
+    value: manifest-quasar-479416-s7.firebasestorage.app
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "1022620974291"
+    value: "622986074502"
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:1022620974291:web:a492881a24b43e450fe826
+    value: 1:622986074502:web:af207af8fd2d053f437407
     availability:
       - BUILD
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
@@ -84,7 +84,7 @@ env:
     availability:
       - BUILD
   - variable: GOALPLACE_ADMIN_PROJECT_ID
-    value: studio-534174814-9df36
+    value: manifest-quasar-479416-s7
     availability:
       - RUNTIME
   - variable: GOALPLACE_FIRESTORE_DATABASE_ID
@@ -92,7 +92,7 @@ env:
     availability:
       - RUNTIME
   - variable: GOALPLACE_APP_BASE_URL
-    value: https://s7.us-east4.hosted.app
+    value: https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app
     availability:
       - RUNTIME
   - variable: GOALPLACE_EMAIL_FROM
