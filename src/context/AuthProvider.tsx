@@ -9,7 +9,6 @@ import { AuthStatus } from '@/lib/auth/permissions';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
 import { isDemoModeEnabled } from '@/lib/auth/demoMode';
 import { clearPrivateCaches } from '@/lib/offline';
-import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import type { AccessContext, AccessIndexDocument } from '@/lib/auth/access';
 import type { AccessIndexRecord } from '@/types';
@@ -120,6 +119,23 @@ function accessContextFromIndexes(userId: string, indexes: AccessIndexRecord[]):
     userId,
     indexes: indexes.map((index) => index as AccessIndexDocument),
     accessVersion: indexes.reduce((version, index) => Math.max(version, Number(index.accessVersion ?? 1)), 1),
+  };
+}
+
+async function fetchTrustedAccessContext(user: User): Promise<AccessContext> {
+  const token = await user.getIdToken();
+  const response = await fetch('/api/access/context', {
+    headers: { authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await response.json().catch(() => ({})) as Partial<AccessContext> & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Scoped access context is unavailable.');
+  return {
+    userId: body.userId ?? user.uid,
+    indexes: Array.isArray(body.indexes) ? body.indexes as AccessIndexDocument[] : [],
+    accessVersion: Number(body.accessVersion ?? 1),
+    teamLeagueIds: body.teamLeagueIds,
+    athleteTeamIds: body.athleteTeamIds,
   };
 }
 
@@ -247,13 +263,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
-    const provider = isDemoMode ? mockProvider : dataProvider;
     queueMicrotask(() => {
       if (!cancelled) setAccessLoading(true);
     });
-    provider.getAccessIndexByUser(uid)
-      .then((indexes) => {
-        if (!cancelled) setAccessContext(accessContextFromIndexes(uid, indexes));
+    const accessContextPromise = isDemoMode
+      ? mockProvider.getAccessIndexByUser(uid).then((indexes) => accessContextFromIndexes(uid, indexes))
+      : currentUser
+        ? fetchTrustedAccessContext(currentUser)
+        : Promise.resolve(accessContextFromIndexes(uid, []));
+
+    accessContextPromise
+      .then((context) => {
+        if (!cancelled) setAccessContext(context);
       })
       .catch((cause) => {
         console.warn('GoalPlace256: scoped access context could not be loaded.', cause);
@@ -266,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authStatus, currentUser?.uid, isDemoMode, userProfile?.uid]);
+  }, [authStatus, currentUser, isDemoMode, userProfile?.uid]);
 
   useEffect(() => {
     document.documentElement.dataset.lowData = userProfile?.lowDataMode ? 'true' : 'false';

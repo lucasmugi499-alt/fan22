@@ -1,0 +1,183 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { adminDb } from '@/lib/firebase/admin';
+import { resolveTrustedAccessContext } from './resolver';
+
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: {
+    collection: vi.fn(),
+  },
+}));
+
+function querySnapshot(docs: Array<{ id: string; data: Record<string, unknown> }>) {
+  return {
+    docs: docs.map((doc) => ({
+      id: doc.id,
+      data: () => doc.data,
+    })),
+  };
+}
+
+function userSnapshot(data: Record<string, unknown>) {
+  return {
+    exists: true,
+    data: () => data,
+  };
+}
+
+function mockCollections({
+  user = { role: 'fan', primaryPersona: 'fan', accessVersion: 1 },
+  assignments = [],
+  indexes = [],
+}: {
+  user?: Record<string, unknown>;
+  assignments?: Array<{ id: string; data: Record<string, unknown> }>;
+  indexes?: Array<{ id: string; data: Record<string, unknown> }>;
+}) {
+  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => {
+    if (collectionName === 'users') {
+      return {
+        doc: vi.fn(() => ({
+          get: vi.fn(async () => userSnapshot(user)),
+        })),
+      } as never;
+    }
+    if (collectionName === 'accessAssignments') {
+      return {
+        where: vi.fn(() => ({
+          get: vi.fn(async () => querySnapshot(assignments)),
+        })),
+      } as never;
+    }
+    if (collectionName === 'accessIndex') {
+      return {
+        where: vi.fn(() => ({
+          get: vi.fn(async () => querySnapshot(indexes)),
+        })),
+      } as never;
+    }
+    throw new Error(`Unexpected collection ${collectionName}`);
+  });
+}
+
+const now = new Date('2026-07-30T12:00:00.000Z');
+
+describe('trusted access resolver', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('returns the legacy projection in compare mode and logs assignment divergences', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockCollections({
+      assignments: [{
+        id: 'assignment_league_1',
+        data: {
+          userId: 'user_1',
+          roleKey: 'league_owner',
+          scopeType: 'league',
+          scopeId: 'league_1',
+          permissionBundleId: 'league_owner',
+          status: 'active',
+          grantedByUserId: 'platform_1',
+          validFrom: '2026-07-30T00:00:00.000Z',
+          createdAt: '2026-07-30T00:00:00.000Z',
+          updatedAt: '2026-07-30T00:00:00.000Z',
+        },
+      }],
+      indexes: [{
+        id: 'team_team_1_user_1',
+        data: {
+          userId: 'user_1',
+          scopeType: 'team',
+          scopeId: 'team_1',
+          activeRoles: ['team_admin'],
+          capabilities: ['team.profile.manage'],
+          assignmentIds: ['assignment_team_1'],
+          accessVersion: 3,
+          updatedAt: '2026-07-30T01:00:00.000Z',
+        },
+      }],
+    });
+
+    const context = await resolveTrustedAccessContext('user_1', { mode: 'compare', now });
+
+    expect(context.mode).toBe('compare');
+    expect(context.indexes).toHaveLength(1);
+    expect(context.indexes[0]).toMatchObject({
+      scopeType: 'team',
+      scopeId: 'team_1',
+      activeRoles: ['team_admin'],
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'GoalPlace256 access authorization divergence',
+      expect.objectContaining({ userId: 'user_1' }),
+    );
+  });
+
+  it('uses assignment projections in assignments mode and excludes inactive assignments', async () => {
+    mockCollections({
+      user: { role: 'fan', primaryPersona: 'league_admin', accessVersion: 9 },
+      assignments: [
+        {
+          id: 'assignment_b',
+          data: {
+            userId: 'user_1',
+            roleKey: 'result_reporter',
+            scopeType: 'team',
+            scopeId: 'team_1',
+            permissionBundleId: 'results_only',
+            status: 'active',
+            grantedByUserId: 'league_1',
+            validFrom: '2026-07-30T00:00:00.000Z',
+            createdAt: '2026-07-30T00:00:00.000Z',
+            updatedAt: '2026-07-30T00:00:00.000Z',
+          },
+        },
+        {
+          id: 'assignment_a',
+          data: {
+            userId: 'user_1',
+            roleKey: 'team_admin',
+            scopeType: 'team',
+            scopeId: 'team_1',
+            permissionBundleId: 'full_team_admin',
+            status: 'active',
+            grantedByUserId: 'league_1',
+            validFrom: '2026-07-30T00:00:00.000Z',
+            createdAt: '2026-07-30T00:00:00.000Z',
+            updatedAt: '2026-07-30T00:00:00.000Z',
+          },
+        },
+        {
+          id: 'assignment_suspended',
+          data: {
+            userId: 'user_1',
+            roleKey: 'league_owner',
+            scopeType: 'league',
+            scopeId: 'league_1',
+            permissionBundleId: 'league_owner',
+            status: 'suspended',
+            grantedByUserId: 'platform_1',
+            validFrom: '2026-07-30T00:00:00.000Z',
+            createdAt: '2026-07-30T00:00:00.000Z',
+            updatedAt: '2026-07-30T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    const context = await resolveTrustedAccessContext('user_1', { mode: 'assignments', now });
+
+    expect(context.mode).toBe('assignments');
+    expect(context.accountRole).toBe('fan');
+    expect(context.primaryPersona).toBe('league_admin');
+    expect(context.accessVersion).toBe(9);
+    expect(context.indexes).toHaveLength(1);
+    expect(context.indexes[0].assignmentIds).toEqual(['assignment_a', 'assignment_b']);
+    expect(context.indexes[0].activeRoles).toEqual(['result_reporter', 'team_admin']);
+    expect(context.indexes[0].capabilities).toContain('team.result.submit');
+  });
+});

@@ -35,8 +35,8 @@ describe('access assignments and scope-aware authorization', () => {
   it('projects active assignments into deterministic accessIndex documents', () => {
     const indexes = buildAccessIndexDocuments({
       assignments: [
-        assignment({ id: 'assignment_1' }),
         assignment({ id: 'assignment_2', permissionBundleId: 'results_only', roleKey: 'result_reporter' }),
+        assignment({ id: 'assignment_1' }),
         assignment({ id: 'expired', status: 'expired' }),
       ],
       accessVersion: 4,
@@ -53,6 +53,26 @@ describe('access assignments and scope-aware authorization', () => {
     expect(indexes[0].assignmentIds).toEqual(['assignment_1', 'assignment_2']);
     expect(indexes[0].capabilities).toContain('team.result.submit');
     expect(accessIndexId('team', 'team_a', 'user_1')).toBe('team_team_a_user_1');
+  });
+
+  it('excludes suspended, revoked, expired, and not-yet-valid assignments from projections', () => {
+    const indexes = buildAccessIndexDocuments({
+      assignments: [
+        assignment({ id: 'active_assignment' }),
+        assignment({ id: 'suspended_assignment', status: 'suspended', suspendedAt: now }),
+        assignment({ id: 'revoked_assignment', status: 'revoked', revokedAt: now }),
+        assignment({ id: 'expired_by_status', status: 'expired' }),
+        assignment({ id: 'expired_by_time', validUntil: '2026-07-30T11:59:59.000Z' }),
+        assignment({ id: 'future_assignment', validFrom: '2026-07-30T12:00:01.000Z' }),
+      ],
+      accessVersion: 7,
+      updatedAt: now,
+      now: new Date(now),
+    });
+
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0].assignmentIds).toEqual(['active_assignment']);
+    expect(indexes[0].activeRoles).toEqual(['team_admin']);
   });
 
   it('does not let a Team Admin manage another team merely by role label', () => {

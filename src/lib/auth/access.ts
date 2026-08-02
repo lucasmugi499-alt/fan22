@@ -216,7 +216,7 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
 
 const bundleById = new Map(PERMISSION_BUNDLES.map((bundle) => [bundle.id, bundle]));
 
-function isActive(assignment: AccessAssignment, now: Date) {
+export function isActiveAccessAssignment(assignment: AccessAssignment, now: Date) {
   if (assignment.status !== 'active') return false;
   if (Date.parse(assignment.validFrom) > now.getTime()) return false;
   if (assignment.validUntil && Date.parse(assignment.validUntil) <= now.getTime()) return false;
@@ -241,8 +241,15 @@ export function buildAccessIndexDocuments({
   now?: Date;
 }) {
   const grouped = new Map<string, AccessIndexDocument>();
-  for (const assignment of assignments) {
-    if (!isActive(assignment, now)) continue;
+  const activeAssignments = [...assignments]
+    .filter((assignment) => isActiveAccessAssignment(assignment, now))
+    .sort((left, right) => {
+      const scope = `${left.scopeType}:${left.scopeId}:${left.userId}`.localeCompare(`${right.scopeType}:${right.scopeId}:${right.userId}`);
+      if (scope !== 0) return scope;
+      return left.id.localeCompare(right.id);
+    });
+
+  for (const assignment of activeAssignments) {
     const key = `${assignment.scopeType}_${assignment.scopeId}_${assignment.userId}`;
     const existing = grouped.get(key) ?? {
       userId: assignment.userId,
@@ -254,12 +261,14 @@ export function buildAccessIndexDocuments({
       accessVersion,
       updatedAt,
     };
-    existing.activeRoles = [...new Set([...existing.activeRoles, assignment.roleKey])];
-    existing.capabilities = [...new Set([...existing.capabilities, ...capabilitiesForAssignment(assignment)])];
-    existing.assignmentIds = [...new Set([...existing.assignmentIds, assignment.id])];
+    existing.activeRoles = [...new Set([...existing.activeRoles, assignment.roleKey])].sort();
+    existing.capabilities = [...new Set([...existing.capabilities, ...capabilitiesForAssignment(assignment)])].sort();
+    existing.assignmentIds = [...new Set([...existing.assignmentIds, assignment.id])].sort();
     grouped.set(key, existing);
   }
-  return [...grouped.values()];
+  return [...grouped.values()].sort((left, right) =>
+    `${left.scopeType}:${left.scopeId}:${left.userId}`.localeCompare(`${right.scopeType}:${right.scopeId}:${right.userId}`),
+  );
 }
 
 export function accessIndexId(scopeType: AccessScopeType, scopeId: string, userId: string) {
