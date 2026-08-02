@@ -84,7 +84,7 @@ import type { Contribution, PaymentIntent, PointsEvent } from '@/types/money';
 import { challengeNextStatus } from '@/lib/challenge';
 import { normalizeChallengeStatus } from '@/lib/status';
 import { MOCK_PROFILES } from '@/lib/auth/mockAuth';
-import { buildAccessIndexDocuments } from '@/lib/auth/access';
+import { buildAccessIndexDocuments, type AccessRoleKey, type AccessScopeType } from '@/lib/auth/access';
 import { accountClassForRole } from '@/lib/auth/accountClass';
 
 const followed = new Set<string>();
@@ -259,6 +259,98 @@ function athleteSelfAccessAssignment(input: {
     updatedAt: now,
   };
 }
+
+function activeDemoAccessAssignment(input: {
+  id: string;
+  userId: string;
+  roleKey: AccessRoleKey;
+  scopeType: AccessScopeType;
+  scopeId: string;
+  permissionBundleId: string;
+  grantedByUserId?: string;
+}): AccessAssignmentRecord {
+  const timestamp = '2026-08-01T00:00:00.000Z';
+  return {
+    ...input,
+    grantedByUserId: input.grantedByUserId ?? 'system_demo_seed',
+    status: 'active',
+    validFrom: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function seededDemoAccessAssignments() {
+  const userRole = new Map(users.map((user) => [user.id, user.role]));
+  const assignments: AccessAssignmentRecord[] = [];
+
+  for (const user of users) {
+    if (user.role === 'platform_admin') {
+      assignments.push(activeDemoAccessAssignment({
+        id: `assignment_demo_platform_${user.id}`,
+        userId: user.id,
+        roleKey: 'platform_admin',
+        scopeType: 'platform',
+        scopeId: 'global',
+        permissionBundleId: 'platform_admin',
+      }));
+    }
+    if (user.role === 'super_admin') {
+      assignments.push(activeDemoAccessAssignment({
+        id: `assignment_demo_super_${user.id}`,
+        userId: user.id,
+        roleKey: 'super_admin',
+        scopeType: 'platform',
+        scopeId: 'global',
+        permissionBundleId: 'super_admin_governance',
+      }));
+    }
+  }
+
+  for (const league of leagues) {
+    for (const userId of league.adminUserIds) {
+      if (userRole.get(userId) !== 'league_admin') continue;
+      assignments.push(activeDemoAccessAssignment({
+        id: `assignment_demo_league_${league.id}_${userId}`,
+        userId,
+        roleKey: 'league_admin',
+        scopeType: 'league',
+        scopeId: league.id,
+        permissionBundleId: 'league_admin',
+      }));
+    }
+  }
+
+  for (const team of teams) {
+    for (const userId of team.adminUserIds) {
+      if (userRole.get(userId) !== 'team_admin') continue;
+      assignments.push(activeDemoAccessAssignment({
+        id: `assignment_demo_team_${team.id}_${userId}`,
+        userId,
+        roleKey: 'team_admin',
+        scopeType: 'team',
+        scopeId: team.id,
+        permissionBundleId: 'full_team_admin',
+      }));
+    }
+  }
+
+  for (const athlete of athletes) {
+    if (!athlete.userId || userRole.get(athlete.userId) !== 'athlete') continue;
+    assignments.push(activeDemoAccessAssignment({
+      id: `assignment_demo_athlete_${athlete.id}_${athlete.userId}`,
+      userId: athlete.userId,
+      roleKey: 'athlete_self',
+      scopeType: 'athlete',
+      scopeId: athlete.id,
+      permissionBundleId: 'athlete_self',
+    }));
+  }
+
+  return assignments;
+}
+
+const demoSeededAccessAssignments = seededDemoAccessAssignments();
 
 function demoLeagueIdForApplication(applicationId: string) {
   return `league_${applicationId}`;
@@ -544,7 +636,10 @@ export const mockProvider: GoalPlaceDataProvider = {
   async getAccessIndexByUser(userId) {
     const assignments = mergedById(
       investorDemoRuntime.accessAssignments,
-      readStoredItems<AccessAssignmentRecord>(storedAccessAssignmentsKey),
+      mergedById(
+        demoSeededAccessAssignments,
+        readStoredItems<AccessAssignmentRecord>(storedAccessAssignmentsKey),
+      ),
     ).filter((assignment) => assignment.userId === userId);
     return buildAccessIndexDocuments({
       assignments,

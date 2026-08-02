@@ -23,6 +23,7 @@ type DemoAccount = {
   role: string;
   workspace?: string;
 };
+type AccountClass = 'fan' | 'athlete' | 'organization_operator' | 'platform_operator';
 
 type Args = {
   project?: string;
@@ -88,6 +89,50 @@ const FIREBASE_CONFIG = path.join(
   'configstore',
   'firebase-tools.json',
 );
+
+function accountClassForDemoRole(role: string): AccountClass {
+  if (role === 'athlete' || role === 'athlete_self' || role === 'athlete_guardian') return 'athlete';
+  if (
+    role === 'league_owner' ||
+    role === 'league_admin' ||
+    role === 'league_operator' ||
+    role === 'league_verifier' ||
+    role === 'team_owner' ||
+    role === 'team_admin' ||
+    role === 'roster_manager' ||
+    role === 'result_reporter' ||
+    role === 'content_manager'
+  ) {
+    return 'organization_operator';
+  }
+  if (
+    role === 'platform_admin' ||
+    role === 'platform_reviewer' ||
+    role === 'platform_support' ||
+    role === 'super_admin'
+  ) {
+    return 'platform_operator';
+  }
+  return 'fan';
+}
+
+function withAccessProfileFields(database: DatabaseExport): DatabaseExport {
+  const userRows = database.users;
+  if (!Array.isArray(userRows)) return database;
+  return {
+    ...database,
+    users: userRows.map((user) => {
+      const role = typeof user.role === 'string' ? user.role : 'fan';
+      return {
+        ...user,
+        accountClass: typeof user.accountClass === 'string' ? user.accountClass : accountClassForDemoRole(role),
+        primaryPersona: typeof user.primaryPersona === 'string' ? user.primaryPersona : role,
+        accountStatus: typeof user.accountStatus === 'string' ? user.accountStatus : 'active',
+        accessVersion: typeof user.accessVersion === 'number' ? user.accessVersion : 1,
+      };
+    }),
+  };
+}
 
 function parseArgs(argv: string[]): Args {
   const value = (flag: string) => {
@@ -549,7 +594,10 @@ function importAuthUsers(
           : account.email.split('@')[0],
       passwordHash,
       salt: salt.toString('base64'),
-      customAttributes: JSON.stringify({ role: account.role }),
+      customAttributes: JSON.stringify({
+        role: account.role,
+        accountClass: accountClassForDemoRole(account.role),
+      }),
     };
   });
 
@@ -623,7 +671,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   requireSafeTarget(args);
   const source = path.resolve(args.source ?? DEFAULT_SOURCE);
-  const database = {
+  const database = withAccessProfileFields({
     ...readJson<DatabaseExport>(path.join(source, 'database.json')),
     fantasyCompetitions: fantasyDemo.competitions,
     fantasyScoringProfiles: fantasyDemo.scoringProfiles,
@@ -641,7 +689,7 @@ async function main() {
     fantasyMiniLeagueMembers: fantasyDemo.miniLeagueMembers,
     fantasyAchievements: fantasyDemo.achievements,
     fantasyCorrections: fantasyDemo.corrections,
-  } as unknown as DatabaseExport;
+  } as unknown as DatabaseExport);
   const accounts = readJson<DemoAccount[]>(path.join(source, 'demo-accounts.json'));
   const counts = validatePackage(database, accounts);
 

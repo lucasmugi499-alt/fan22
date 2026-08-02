@@ -67,7 +67,8 @@ No destructive data migration is included in Phase 1A.
 | Immutable audit hardening | Pass | `adminAuditEvents` and legacy `adminLogs` are server-write-only; Super Admin browser update/delete attempts are covered by rules tests. |
 | Assignment lifecycle API | Pass | `transition_access_assignment` supports platform-admin suspension, revocation, expiry, and reactivation while rebuilding the exact scoped `accessIndex`. |
 | Invitation acceptance projection rebuild | Pass | `accept_invitation` now rebuilds the scoped `accessIndex` from active assignments instead of merging roles/capabilities with `arrayUnion`. |
+| Demo/Firebase compatibility report | Pass | `npm run access:compat` audits users, account classes, scoped assignments, and deterministic access-index projections; bundled demo reports 1,068 assignments, 1,068 indexes, 0 blockers, and 0 warnings. |
 
 ## Remaining Phase 1 Work
 
-- Full compatibility report across existing demo and Firebase users.
+Phase 1 audit blockers are complete. Keep `GOALPLACE_ACCESS_ENGINE_MODE=compare` until a live Firebase compatibility report is captured for the target environment with `npm run access:compat -- --firebase --project <project> --database fg256`.

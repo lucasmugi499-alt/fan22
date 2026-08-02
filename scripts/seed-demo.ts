@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 type DemoRole = 'fan' | 'athlete' | 'team_admin' | 'league_admin' | 'sponsor' | 'platform_admin' | 'super_admin';
+type DemoAccountClass = 'fan' | 'athlete' | 'organization_operator' | 'platform_operator';
 
 type DemoUser = {
   email: string;
@@ -21,6 +22,13 @@ const demoUsers: DemoUser[] = [
   { email: 'admin@goalplace256.com', name: 'Platform Admin Demo', role: 'platform_admin', points: 9000, walletBalance: 0 },
   { email: 'superadmin@goalplace256.com', name: 'Super Admin Demo', role: 'super_admin', points: 12000, walletBalance: 0 },
 ];
+
+function accountClassForDemoRole(role: DemoRole): DemoAccountClass {
+  if (role === 'athlete') return 'athlete';
+  if (role === 'team_admin' || role === 'league_admin') return 'organization_operator';
+  if (role === 'platform_admin' || role === 'super_admin') return 'platform_operator';
+  return 'fan';
+}
 
 function serviceAccountCredential() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -72,7 +80,10 @@ async function seedDemoUsers(password: string) {
     ids[demoUser.role] = authUser.uid;
 
     const adminRole = demoUser.role === 'platform_admin' || demoUser.role === 'super_admin' ? demoUser.role : null;
-    await auth.setCustomUserClaims(authUser.uid, adminRole ? { role: adminRole } : {});
+    const accountClass = accountClassForDemoRole(demoUser.role);
+    await auth.setCustomUserClaims(authUser.uid, adminRole
+      ? { role: adminRole, accountClass }
+      : { accountClass });
     await db.collection('users').doc(authUser.uid).set(
       {
         id: authUser.uid,
@@ -80,7 +91,11 @@ async function seedDemoUsers(password: string) {
         email: demoUser.email,
         name: demoUser.name,
         role: demoUser.role,
+        accountClass,
+        primaryPersona: demoUser.role,
         status: demoUser.role === 'fan' || adminRole ? 'active' : 'pending',
+        accountStatus: demoUser.role === 'fan' || adminRole ? 'active' : 'invited',
+        accessVersion: 1,
         points: demoUser.points,
         walletBalance: demoUser.walletBalance,
         followedAthletes: ['athlete-brian-okello'],

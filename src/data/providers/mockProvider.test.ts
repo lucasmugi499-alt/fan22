@@ -20,6 +20,33 @@ describe('mock provider league applications', () => {
     vi.unstubAllGlobals();
   });
 
+  it('projects seeded demo access assignments from league, team, athlete, and platform relationships', async () => {
+    await expect(mockProvider.getAccessIndexByUser('user_platform_001')).resolves.toContainEqual(expect.objectContaining({
+      scopeType: 'platform',
+      scopeId: 'global',
+      activeRoles: ['platform_admin'],
+      capabilities: expect.arrayContaining(['platform.application.review']),
+    }));
+    await expect(mockProvider.getAccessIndexByUser('user_league_admin_001')).resolves.toContainEqual(expect.objectContaining({
+      scopeType: 'league',
+      scopeId: 'league_football_kampala',
+      activeRoles: ['league_admin'],
+      capabilities: expect.arrayContaining(['league.team.create']),
+    }));
+    await expect(mockProvider.getAccessIndexByUser('user_team_admin_01_01')).resolves.toContainEqual(expect.objectContaining({
+      scopeType: 'team',
+      scopeId: 'team_football_01_01',
+      activeRoles: ['team_admin'],
+      capabilities: expect.arrayContaining(['team.athlete.create']),
+    }));
+    await expect(mockProvider.getAccessIndexByUser('user_ath_football_01_01_01')).resolves.toContainEqual(expect.objectContaining({
+      scopeType: 'athlete',
+      scopeId: 'ath_football_01_01_01',
+      activeRoles: ['athlete_self'],
+      capabilities: expect.arrayContaining(['athlete.profile.manage']),
+    }));
+  });
+
   it('creates a draft demo league when a League Admin application is approved', async () => {
     const applicationId = `application_test_${Date.now()}`;
     await mockProvider.createLeagueAdminApplication({
