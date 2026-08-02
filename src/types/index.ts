@@ -372,6 +372,7 @@ export interface User {
   accountStatus?: "invited" | "active" | "suspended" | "disabled" | "deletion_pending";
   personId?: string;
   accessVersion?: number;
+  onboardingStatus?: "not_started" | "in_progress" | "completed";
   photoURL?: string;
   avatarUrl?: string;
   city: string;

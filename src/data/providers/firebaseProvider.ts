@@ -656,13 +656,13 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     return writeResult(ref.id);
   },
   async updateUserProfile(userId, data) {
-    requireActor(userId);
+    const actorUserId = requireActor();
     const { db } = requireFirebaseClient();
     await updateDoc(doc(db, 'users', userId), {
       ...data,
       updatedAt: serverTimestamp(),
     });
-    if (data.onboardingCompletedAt) {
+    if (actorUserId === userId && data.onboardingCompletedAt) {
       await firebaseProvider.recordPointsAction({
         userId,
         actionType: 'fan_onboarding_completed',

@@ -4,11 +4,18 @@ import Link from 'next/link';
 import { useMemo, useState, type FormEvent } from 'react';
 import {
   Buildings,
+  CaretRight,
   CheckCircle,
   Flag,
+  ListChecks,
   PaperPlaneTilt,
   PlusCircle,
+  Prohibit,
+  SealCheck,
   ShieldCheck,
+  TreeStructure,
+  UserCircle,
+  UsersThree,
   Warning,
   XCircle,
 } from '@phosphor-icons/react';
@@ -24,7 +31,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { QueueItem } from '@/components/core/QueueItem';
 import { STATE } from '@/lib/statusSystem';
 import { cn } from '@/lib/utils';
-import type { League, LeagueStatus, PlanType, SportSlug, TeamAssignment } from '@/types';
+import { buildPlatformOrganizationTree, teamOperationalState } from '@/lib/platform/platformOperations';
+import type { League, LeagueStatus, PlanType, SportSlug, Team, TeamAssignment, User, VerificationStatus } from '@/types';
 
 const fieldClass = 'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand';
 const areaClass = 'mt-1.5 min-h-24 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand';
@@ -36,6 +44,17 @@ type LeagueEditDraft = {
   description: string;
   status: LeagueStatus;
   plan: PlanType;
+};
+
+type TeamEditDraft = {
+  teamId: string;
+  name: string;
+  city: string;
+  location: string;
+  description: string;
+  plan: Team['plan'];
+  verified: boolean;
+  verificationStatus: VerificationStatus;
 };
 
 function slugPart(value: string) {
@@ -60,21 +79,41 @@ export function PlatformControl() {
     matches,
     reports,
     teamAssignments,
+    users = [],
     loading,
     retry,
   } = useGoalPlaceData({
-    collections: ['leagues', 'teams', 'seasons', 'athletes', 'matches', 'reports', 'teamAssignments'],
+    collections: ['leagues', 'teams', 'seasons', 'athletes', 'matches', 'reports', 'teamAssignments', 'users'],
     recordLimit: 1200,
   });
 
   const approvals = useMemo(() => pendingApprovals(leagues, athletes), [leagues, athletes]);
   const reportsOpen = useMemo(() => openReports(reports), [reports]);
   const disputes = useMemo(() => disputedMatches(matches), [matches]);
+  const organizationTree = useMemo(() => buildPlatformOrganizationTree({
+    leagues,
+    seasons,
+    teams,
+    athletes,
+    matches,
+    teamAssignments,
+  }), [athletes, leagues, matches, seasons, teamAssignments, teams]);
   const sortedAssignments = useMemo(
     () => [...teamAssignments].sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)),
     [teamAssignments],
   );
+  const sortedUsers = useMemo(
+    () => [...users].sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)),
+    [users],
+  );
+  const accountStats = useMemo(() => ({
+    active: users.filter((user) => (user.accountStatus ?? 'active') === 'active').length,
+    invited: users.filter((user) => (user.accountStatus ?? 'active') === 'invited').length,
+    restricted: users.filter((user) => ['suspended', 'disabled', 'deletion_pending'].includes(user.accountStatus ?? '')).length,
+  }), [users]);
   const firstLeagueId = leagues[0]?.id ?? '';
+  const [selectedTreeLeagueId, setSelectedTreeLeagueId] = useState('');
+  const selectedLeagueNode = organizationTree.find((node) => node.league.id === selectedTreeLeagueId) ?? organizationTree[0];
 
   const [creatingLeague, setCreatingLeague] = useState(false);
   const [leagueName, setLeagueName] = useState('');
@@ -99,11 +138,43 @@ export function PlatformControl() {
 
   const [teamLeagueId, setTeamLeagueId] = useState('');
   const activeTeamLeague = leagues.find((league) => league.id === (teamLeagueId || firstLeagueId));
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const selectedTeamNode = selectedLeagueNode?.teams.find((node) => node.team.id === selectedTeamId) ?? selectedLeagueNode?.teams[0];
+  const activeTeam = selectedTeamNode?.team;
+  const [teamDraft, setTeamDraft] = useState<TeamEditDraft | null>(null);
+  const teamEditValues: TeamEditDraft = teamDraft && teamDraft.teamId === activeTeam?.id
+    ? teamDraft
+    : {
+        teamId: activeTeam?.id ?? '',
+        name: activeTeam?.name ?? '',
+        city: activeTeam?.city ?? '',
+        location: activeTeam?.location ?? '',
+        description: activeTeam?.description ?? '',
+        plan: activeTeam?.plan ?? 'free',
+        verified: activeTeam?.verified ?? false,
+        verificationStatus: activeTeam ? teamOperationalState(activeTeam) : 'pending',
+      };
   const [teamName, setTeamName] = useState('');
   const [teamCity, setTeamCity] = useState('');
   const [teamAdminEmail, setTeamAdminEmail] = useState('');
   const [creatingTeam, setCreatingTeam] = useState(false);
+  const [savingTeam, setSavingTeam] = useState(false);
   const [revokingId, setRevokingId] = useState('');
+  const [savingUserId, setSavingUserId] = useState('');
+
+  function selectOperationalLeague(leagueId: string) {
+    const node = organizationTree.find((item) => item.league.id === leagueId);
+    setSelectedTreeLeagueId(leagueId);
+    setTeamLeagueId(leagueId);
+    selectEditLeague(leagueId);
+    setSelectedTeamId(node?.teams[0]?.team.id ?? '');
+    setTeamDraft(null);
+  }
+
+  function selectOperationalTeam(teamId: string) {
+    setSelectedTeamId(teamId);
+    setTeamDraft(null);
+  }
 
   function selectEditLeague(leagueId: string) {
     const league = leagues.find((item) => item.id === leagueId);
@@ -121,6 +192,13 @@ export function PlatformControl() {
   function patchEditDraft(patch: Partial<LeagueEditDraft>) {
     setEditDraft({
       ...editValues,
+      ...patch,
+    });
+  }
+
+  function patchTeamDraft(patch: Partial<TeamEditDraft>) {
+    setTeamDraft({
+      ...teamEditValues,
       ...patch,
     });
   }
@@ -190,6 +268,77 @@ export function PlatformControl() {
       toast.error(cause instanceof Error ? cause.message : 'League could not be updated.');
     } finally {
       setSavingLeague(false);
+    }
+  }
+
+  async function setLeagueStatus(league: League, status: LeagueStatus) {
+    setSavingLeague(true);
+    try {
+      await provider.updateLeagueProfile(league.id, {
+        status,
+        verified: status === 'verified' || status === 'partner',
+      });
+      toast.success(status === 'suspended' ? 'League blocked.' : status === 'verified' ? 'League verified.' : 'League status updated.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'League status could not be updated.');
+    } finally {
+      setSavingLeague(false);
+    }
+  }
+
+  async function saveTeam(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeTeam) return;
+    setSavingTeam(true);
+    try {
+      await provider.updateTeamProfile(activeTeam.id, {
+        name: teamEditValues.name.trim(),
+        city: teamEditValues.city.trim(),
+        location: teamEditValues.location.trim(),
+        description: teamEditValues.description.trim(),
+        plan: teamEditValues.plan,
+        verified: teamEditValues.verified,
+        verificationStatus: teamEditValues.verificationStatus,
+      });
+      toast.success('Team record updated.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Team record could not be updated.');
+    } finally {
+      setSavingTeam(false);
+    }
+  }
+
+  async function setTeamVerification(team: Team, verificationStatus: VerificationStatus) {
+    setSavingTeam(true);
+    try {
+      await provider.updateTeamProfile(team.id, {
+        verificationStatus,
+        verified: verificationStatus === 'verified',
+      });
+      toast.success(verificationStatus === 'rejected' ? 'Team blocked.' : verificationStatus === 'verified' ? 'Team verified.' : 'Team moved back to review.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Team moderation failed.');
+    } finally {
+      setSavingTeam(false);
+    }
+  }
+
+  async function setAccountStatus(user: User, accountStatus: NonNullable<User['accountStatus']>) {
+    setSavingUserId(user.id);
+    try {
+      await provider.updateUserProfile(user.id, {
+        accountStatus,
+        status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended',
+      });
+      toast.success(accountStatus === 'active' ? 'Account activated.' : accountStatus === 'suspended' ? 'Account suspended.' : 'Account disabled.');
+      retry();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Account status could not be updated.');
+    } finally {
+      setSavingUserId('');
     }
   }
 
@@ -312,12 +461,234 @@ export function PlatformControl() {
       </header>
 
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
         <Metric icon={CheckCircle} label="Approvals" value={approvals.length} tone={approvals.length ? 'pending' : 'default'} />
         <Metric icon={Flag} label="Open reports" value={reportsOpen.length} tone={reportsOpen.length ? 'disputed' : 'default'} />
         <Metric icon={Warning} label="Disputes" value={disputes.length} tone={disputes.length ? 'pending' : 'default'} />
         <Metric icon={Buildings} label="Leagues" value={leagues.length} />
+        <Metric icon={UsersThree} label="Accounts" value={users.length} tone={accountStats.restricted ? 'disputed' : 'default'} />
       </div>
+
+      <Card className="p-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong">
+              <TreeStructure className="h-5 w-5 text-brand" weight="duotone" />
+              Organization tree
+            </h2>
+            <p className="text-xs text-muted">Every league, season, team, admin invitation, athlete, and result queue in one control surface.</p>
+          </div>
+          <Link href="/admin/trust" className="hidden text-sm font-semibold text-brand hover:underline sm:inline">Open result control</Link>
+        </div>
+
+        {selectedLeagueNode ? (
+          <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="space-y-2">
+              {organizationTree.map((node) => {
+                const selected = node.league.id === selectedLeagueNode.league.id;
+                return (
+                  <button
+                    key={node.league.id}
+                    type="button"
+                    onClick={() => selectOperationalLeague(node.league.id)}
+                    className={cn(
+                      'w-full rounded-[var(--radius-md)] border p-3 text-left transition',
+                      selected ? 'border-brand/45 bg-brand-subtle/45' : 'border-border bg-surface-2 hover:border-brand/35',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-text-strong">{node.league.name}</p>
+                        <p className="mt-1 text-xs text-muted">{node.league.city} · {node.league.sport} · {node.seasonsCount} season{node.seasonsCount === 1 ? '' : 's'}</p>
+                      </div>
+                      <CaretRight className={cn('mt-0.5 h-4 w-4 shrink-0', selected ? 'text-brand' : 'text-subtle')} weight="bold" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                      <TreeStat label="Teams" value={node.teams.length} />
+                      <TreeStat label="Athletes" value={node.athletesCount} />
+                      <TreeStat label="Results" value={node.officialResults} />
+                      <TreeStat label="Flags" value={node.disputedResults + node.pendingInvites} tone={node.disputedResults || node.pendingInvites ? 'warning' : 'default'} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="min-w-0 space-y-4">
+              <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-subtle">Selected league</p>
+                    <h3 className="mt-1 truncate text-lg font-semibold text-text-strong">{selectedLeagueNode.league.name}</h3>
+                    <p className="mt-1 text-sm text-muted">{selectedLeagueNode.league.status} · {selectedLeagueNode.league.plan} · {selectedLeagueNode.matchesCount} matches · {selectedLeagueNode.officialResults} official results</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" icon={SealCheck} onClick={() => setLeagueStatus(selectedLeagueNode.league, 'verified')} disabled={savingLeague}>
+                      Verify
+                    </Button>
+                    <Button size="sm" variant="secondary" icon={Prohibit} onClick={() => setLeagueStatus(selectedLeagueNode.league, 'suspended')} disabled={savingLeague}>
+                      Block league
+                    </Button>
+                    <Button size="sm" icon={CheckCircle} onClick={() => setLeagueStatus(selectedLeagueNode.league, 'community')} disabled={savingLeague}>
+                      Reactivate
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-text-strong">
+                      <UsersThree className="h-4 w-4 text-brand" weight="duotone" />
+                      Teams
+                    </p>
+                    <span className="text-xs text-muted">{selectedLeagueNode.teams.length} total</span>
+                  </div>
+                  {selectedLeagueNode.teams.length ? selectedLeagueNode.teams.map((node) => {
+                    const selected = node.team.id === activeTeam?.id;
+                    const status = teamOperationalState(node.team);
+                    return (
+                      <button
+                        key={node.team.id}
+                        type="button"
+                        onClick={() => selectOperationalTeam(node.team.id)}
+                        className={cn(
+                          'grid w-full gap-3 rounded-[var(--radius-md)] border p-3 text-left transition sm:grid-cols-[minmax(0,1fr)_auto]',
+                          selected ? 'border-brand/45 bg-brand-subtle/35' : 'border-border bg-surface-2 hover:border-brand/35',
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-strong">{node.team.name}</p>
+                          <p className="mt-1 text-xs text-muted">{node.team.city} · {node.athletesCount} athletes · {node.matchesCount} matches · {node.activeAdmins} active admins</p>
+                        </div>
+                        <div className="flex items-center gap-2 sm:justify-end">
+                          <StatusPill label={status} tone={status === 'verified' ? 'good' : status === 'rejected' || status === 'disputed' ? 'bad' : 'neutral'} />
+                          {node.pendingInvites ? <StatusPill label={`${node.pendingInvites} invites`} tone="warn" /> : null}
+                        </div>
+                      </button>
+                    );
+                  }) : (
+                    <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4 text-sm text-muted">No teams in this league yet.</div>
+                  )}
+                </div>
+
+                <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-text-strong">
+                    <ListChecks className="h-4 w-4 text-brand" weight="duotone" />
+                    Team record control
+                  </p>
+                  {activeTeam ? (
+                    <form onSubmit={saveTeam} className="mt-3 space-y-3">
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                        Team name
+                        <input required minLength={2} value={teamEditValues.name} onChange={(event) => patchTeamDraft({ name: event.target.value })} className={fieldClass} />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                          City
+                          <input required value={teamEditValues.city} onChange={(event) => patchTeamDraft({ city: event.target.value })} className={fieldClass} />
+                        </label>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                          Venue or area
+                          <input value={teamEditValues.location} onChange={(event) => patchTeamDraft({ location: event.target.value })} className={fieldClass} />
+                        </label>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                          Verification
+                          <select value={teamEditValues.verificationStatus} onChange={(event) => patchTeamDraft({
+                            verificationStatus: event.target.value as VerificationStatus,
+                            verified: event.target.value === 'verified',
+                          })} className={fieldClass}>
+                            <option value="pending">Pending</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Blocked</option>
+                            <option value="disputed">Disputed</option>
+                          </select>
+                        </label>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                          Plan
+                          <select value={teamEditValues.plan} onChange={(event) => patchTeamDraft({ plan: event.target.value as Team['plan'] })} className={fieldClass}>
+                            <option value="free">Free</option>
+                            <option value="pro">Pro</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-subtle">
+                        Record note
+                        <textarea value={teamEditValues.description} onChange={(event) => patchTeamDraft({ description: event.target.value })} className={areaClass} />
+                      </label>
+                      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                        <Button type="button" size="sm" variant="secondary" icon={SealCheck} onClick={() => setTeamVerification(activeTeam, 'verified')} disabled={savingTeam}>
+                          Verify team
+                        </Button>
+                        <Button type="button" size="sm" variant="secondary" icon={Prohibit} onClick={() => setTeamVerification(activeTeam, 'rejected')} disabled={savingTeam}>
+                          Block team
+                        </Button>
+                        <Button type="submit" size="sm" icon={CheckCircle} disabled={savingTeam}>
+                          Save record
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted">Select a team to update public records, verification, plan, and operational notes.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4 text-sm text-muted">Create or approve a league to start the organization tree.</div>
+        )}
+      </Card>
+
+      <Card className="p-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong">
+              <UserCircle className="h-5 w-5 text-brand" weight="duotone" />
+              Account control
+            </h2>
+            <p className="text-xs text-muted">Review identity, lifecycle, onboarding state, and restricted accounts without changing a fan into an operator.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center sm:w-[320px]">
+            <TreeStat label="Active" value={accountStats.active} />
+            <TreeStat label="Invited" value={accountStats.invited} tone={accountStats.invited ? 'warning' : 'default'} />
+            <TreeStat label="Restricted" value={accountStats.restricted} tone={accountStats.restricted ? 'warning' : 'default'} />
+          </div>
+        </div>
+
+        <div className="grid gap-2 lg:grid-cols-2">
+          {sortedUsers.slice(0, 10).map((user) => {
+            const accountStatus = user.accountStatus ?? 'active';
+            const restricted = ['suspended', 'disabled', 'deletion_pending'].includes(accountStatus);
+            return (
+              <div key={user.id} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-text-strong">{user.displayName || user.name || user.email}</p>
+                    <p className="mt-1 truncate text-xs text-muted">{user.email} · {user.role.replace(/_/g, ' ')} · {user.onboardingStatus ?? user.status}</p>
+                  </div>
+                  <StatusPill label={accountStatus} tone={restricted ? 'bad' : accountStatus === 'invited' ? 'warn' : 'good'} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" icon={CheckCircle} onClick={() => setAccountStatus(user, 'active')} disabled={savingUserId === user.id || accountStatus === 'active'}>
+                    Activate
+                  </Button>
+                  <Button size="sm" variant="secondary" icon={Warning} onClick={() => setAccountStatus(user, 'suspended')} disabled={savingUserId === user.id || accountStatus === 'suspended'}>
+                    Suspend
+                  </Button>
+                  <Button size="sm" variant="danger" icon={Prohibit} onClick={() => setAccountStatus(user, 'disabled')} disabled={savingUserId === user.id || accountStatus === 'disabled'}>
+                    Disable
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {!sortedUsers.length ? <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-4 text-sm text-muted">No account records loaded for this admin session.</p> : null}
+        </div>
+      </Card>
 
       <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
         <Card className="p-4">
@@ -506,6 +877,34 @@ function Metric({ icon: Icon, label, value, tone = 'default' }: { icon: typeof F
       <p data-numeric className={cn('tabular text-2xl font-bold tabular-nums', color)}>{value}</p>
       <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</p>
     </Card>
+  );
+}
+
+function TreeStat({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'warning' }) {
+  return (
+    <div className={cn(
+      'rounded-[var(--radius-sm)] border px-2 py-2',
+      tone === 'warning'
+        ? 'border-[color-mix(in_srgb,var(--state-pending),transparent_55%)] bg-[color-mix(in_srgb,var(--state-pending),transparent_88%)]'
+        : 'border-border bg-surface-3',
+    )}>
+      <p data-numeric className="text-sm font-bold tabular-nums text-text-strong">{value}</p>
+      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-subtle">{label}</p>
+    </div>
+  );
+}
+
+function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 'good' | 'warn' | 'bad' | 'neutral' }) {
+  return (
+    <span className={cn(
+      'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize',
+      tone === 'good' && 'bg-brand-subtle text-brand',
+      tone === 'warn' && 'bg-[color-mix(in_srgb,var(--state-pending),transparent_84%)] text-[var(--state-pending)]',
+      tone === 'bad' && 'bg-[color-mix(in_srgb,var(--state-error),transparent_84%)] text-[var(--state-error)]',
+      tone === 'neutral' && 'bg-surface-3 text-muted',
+    )}>
+      {label.replace(/_/g, ' ')}
+    </span>
   );
 }
 

@@ -17,7 +17,7 @@ function providerWithCalls() {
     getReports: vi.fn().mockRejectedValue(new Error('restricted reports should not load')),
     getVerifications: vi.fn().mockRejectedValue(new Error('restricted verifications should not load')),
     getSports: empty,
-    getUsers: empty,
+    getUsers: vi.fn().mockRejectedValue(new Error('restricted users should not load')),
     getUserById: vi.fn().mockResolvedValue(undefined),
     getSponsors: empty,
     getAwardCategories: empty,
@@ -63,17 +63,20 @@ describe('loadGoalPlaceData', () => {
 
     expect(provider.getReports).not.toHaveBeenCalled();
     expect(provider.getVerifications).not.toHaveBeenCalled();
+    expect(provider.getUsers).not.toHaveBeenCalled();
   });
 
   it('requests platform-only collections for platform admin data loads', async () => {
     const provider = providerWithCalls();
     vi.mocked(provider.getReports).mockResolvedValueOnce([]);
     vi.mocked(provider.getVerifications).mockResolvedValueOnce([]);
+    vi.mocked(provider.getUsers).mockResolvedValueOnce([]);
 
     await loadGoalPlaceData(provider, { role: 'platform_admin' });
 
     expect(provider.getReports).toHaveBeenCalledOnce();
     expect(provider.getVerifications).toHaveBeenCalledOnce();
+    expect(provider.getUsers).toHaveBeenCalledOnce();
   });
 
   it('requests only the collections selected by a screen', async () => {
@@ -104,6 +107,7 @@ describe('loadGoalPlaceData', () => {
 
     expect(provider.getReports).toHaveBeenCalledOnce();
     expect(provider.getVerifications).not.toHaveBeenCalled();
+    expect(provider.getUsers).not.toHaveBeenCalled();
   });
 
   it('uses limited ranking and feed queries when a screen requests them', async () => {

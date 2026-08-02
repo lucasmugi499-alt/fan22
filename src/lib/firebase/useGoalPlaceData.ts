@@ -28,6 +28,7 @@ import {
   SupportNeed,
   Team,
   TeamAssignment,
+  User,
   Verification,
 } from '@/types';
 import { useAuth } from '@/context/AuthProvider';
@@ -189,6 +190,7 @@ const initialData = {
   adminAuditEvents: [] as AdminAuditEvent[],
   sponsors: [] as Sponsor[],
   teamAssignments: [] as TeamAssignment[],
+  users: [] as User[],
 };
 
 export type GoalPlaceDataCollection = keyof typeof initialData;
@@ -251,6 +253,7 @@ export async function loadGoalPlaceData(
     adminAuditEvents,
     sponsors,
     teamAssignments,
+    users,
   ] = await Promise.all([
     loadAthletes(),
     shouldLoad('teams') ? provider.getTeams({ ...scope, limit: recordLimit }) : Promise.resolve([] as Team[]),
@@ -296,6 +299,9 @@ export async function loadGoalPlaceData(
     shouldLoad('teamAssignments') && shouldLoadPlatformCollections && typeof provider.getTeamAssignments === 'function'
       ? provider.getTeamAssignments()
       : Promise.resolve([] as TeamAssignment[]),
+    shouldLoad('users') && shouldLoadPlatformCollections
+      ? provider.getUsers()
+      : Promise.resolve([] as User[]),
   ]);
 
   return {
@@ -319,6 +325,7 @@ export async function loadGoalPlaceData(
     adminAuditEvents,
     sponsors,
     teamAssignments,
+    users,
   };
 }
 
@@ -478,6 +485,7 @@ export function useGoalPlaceData({
       adminAuditEvents: items.adminAuditEvents,
       sponsors: items.sponsors,
       teamAssignments: items.teamAssignments,
+      users: items.users,
       loading,
       error,
       retry,

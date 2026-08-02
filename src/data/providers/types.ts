@@ -30,7 +30,9 @@ import {
   TeamAssignment,
   Invitation,
   AccessIndexRecord,
+  ProfileStatus,
   User,
+  UserProfile,
   Verification,
 } from '@/types';
 import { StandingRow } from '../mockDatabase';
@@ -168,6 +170,9 @@ export type EditableUserProfile = {
   name?: string;
   displayName?: string;
   city?: string;
+  accountStatus?: User['accountStatus'];
+  onboardingStatus?: UserProfile['onboardingStatus'];
+  status?: ProfileStatus;
   avatarUrl?: string;
   sportPreferences?: SportSlug[];
   followedAthletes?: string[];
@@ -185,7 +190,7 @@ export type EditableAthleteProfile = Pick<
 
 export type EditableTeamProfile = Pick<
   Team,
-  'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail'
+  'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail' | 'verified' | 'verificationStatus' | 'plan'
 >;
 
 export type EditableLeagueProfile = Pick<
