@@ -1,9 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
+import { platformAuditEvent, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import {
   accessIndexId,
   buildAccessIndexDocuments,
@@ -196,6 +197,7 @@ const adminActionSchema = z.discriminatedUnion('action', [
     status: z.enum(['draft', 'community', 'verified', 'partner', 'suspended']).optional(),
     plan: z.enum(['free', 'pro', 'partner']).optional(),
     verified: z.boolean().optional(),
+    note: z.string().trim().max(1200).optional().default(''),
   }),
   z.object({
     action: z.literal('update_team_profile'),
@@ -207,11 +209,13 @@ const adminActionSchema = z.discriminatedUnion('action', [
     plan: z.enum(['free', 'pro']).optional(),
     verified: z.boolean().optional(),
     verificationStatus: z.enum(['pending', 'verified', 'rejected', 'disputed']).optional(),
+    note: z.string().trim().max(1200).optional().default(''),
   }),
   z.object({
     action: z.literal('update_user_account'),
     userId: z.string().trim().min(1).max(160),
     accountStatus: z.enum(['invited', 'active', 'suspended', 'disabled', 'deletion_pending']),
+    note: z.string().trim().max(1200).optional().default(''),
   }),
   z.object({
     action: z.literal('review_approval'),
@@ -251,170 +255,216 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === 'create_league') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const unique = createHash('sha256')
-        .update(`${body.name}:${body.city}:${body.sport}:${actor.uid}:${now.toISOString()}`)
-        .digest('hex')
-        .slice(0, 8);
-      const leagueId = `league_${slugPart(body.name)}_${unique}`;
-      const seasonId = `season_${leagueId}_${year}`;
-      await adminDb.runTransaction(async (transaction) => {
-        transaction.set(adminDb.collection('leagues').doc(leagueId), {
-          id: leagueId,
-          name: body.name,
-          sport: body.sport,
-          city: body.city,
-          country: 'Uganda',
-          description: body.description,
-          status: body.status,
-          plan: body.plan,
-          verified: body.status === 'verified' || body.status === 'partner',
-          adminUserIds: [],
-          season: `${year} Season`,
-          currentSeasonId: seasonId,
-          teamsCount: 0,
-          athletesCount: 0,
-          matchesCount: 0,
-          matchCompletionRate: 0,
-          verifiedResultsRate: 0,
-          goalPlaceIndex: 45,
-          ranking: 1,
-          totalSupport: 0,
-          supportersCount: 0,
-          verificationRules: {
-            requiresLeagueAdminApproval: true,
-            requiresRefereeConfirmation: false,
-            allowsPerformancePledges: true,
-          },
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('seasons').doc(seasonId), {
-          id: seasonId,
-          leagueId,
-          name: `${year} Season`,
-          sport: body.sport,
-          status: 'registration',
-          startDate: now.toISOString().slice(0, 10),
-          competitionFormat: 'league',
-          scoring: body.sport === 'basketball'
-            ? { win: 2, draw: null, loss: 0 }
-            : body.sport === 'rugby'
-              ? { win: 4, draw: 2, loss: 0 }
-              : { win: 3, draw: 1, loss: 0 },
-          createdAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          'created',
-          'leagues',
-          leagueId,
-          `Created ${body.name} from Platform Admin console.`,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'organization.create',
+        handler: async ({ requestId }) => {
+          const now = new Date();
+          const year = now.getUTCFullYear();
+          const unique = createHash('sha256')
+            .update(`${body.name}:${body.city}:${body.sport}:${actor.uid}:${now.toISOString()}`)
+            .digest('hex')
+            .slice(0, 8);
+          const leagueId = `league_${slugPart(body.name)}_${unique}`;
+          const seasonId = `season_${leagueId}_${year}`;
+          await adminDb.runTransaction(async (transaction) => {
+            transaction.set(adminDb.collection('leagues').doc(leagueId), {
+              id: leagueId,
+              name: body.name,
+              sport: body.sport,
+              city: body.city,
+              country: 'Uganda',
+              description: body.description,
+              status: body.status,
+              plan: body.plan,
+              verified: body.status === 'verified' || body.status === 'partner',
+              adminUserIds: [],
+              season: `${year} Season`,
+              currentSeasonId: seasonId,
+              teamsCount: 0,
+              athletesCount: 0,
+              matchesCount: 0,
+              matchCompletionRate: 0,
+              verifiedResultsRate: 0,
+              goalPlaceIndex: 45,
+              ranking: 1,
+              totalSupport: 0,
+              supportersCount: 0,
+              verificationRules: {
+                requiresLeagueAdminApproval: true,
+                requiresRefereeConfirmation: false,
+                allowsPerformancePledges: true,
+              },
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('seasons').doc(seasonId), {
+              id: seasonId,
+              leagueId,
+              name: `${year} Season`,
+              sport: body.sport,
+              status: 'registration',
+              startDate: now.toISOString().slice(0, 10),
+              competitionFormat: 'league',
+              scoring: body.sport === 'basketball'
+                ? { win: 2, draw: null, loss: 0 }
+                : body.sport === 'rugby'
+                  ? { win: 4, draw: 2, loss: 0 }
+                  : { win: 3, draw: 1, loss: 0 },
+              createdAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: 'created',
+              targetCollection: 'leagues',
+              targetId: leagueId,
+              note: `Created ${body.name} from Platform Admin console.`,
+              afterSummary: { name: body.name, city: body.city, sport: body.sport, status: body.status, plan: body.plan },
+            }));
+          });
+          return Response.json({ ok: true, id: leagueId, seasonId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: leagueId, seasonId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'update_league_profile') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { leagueId } = body;
-      const updates = {
-        name: body.name,
-        city: body.city,
-        description: body.description,
-        status: body.status,
-        plan: body.plan,
-        verified: body.verified,
-      };
-      const cleanUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([, value]) => value !== undefined),
-      );
-      if (!Object.keys(cleanUpdates).length) {
-        return Response.json({ error: 'Provide at least one league field to update.' }, { status: 400 });
-      }
-      const leagueRef = adminDb.collection('leagues').doc(leagueId);
-      await adminDb.runTransaction(async (transaction) => {
-        const league = await transaction.get(leagueRef);
-        if (!league.exists) throw new Error('League not found.');
-        transaction.update(leagueRef, {
-          ...cleanUpdates,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          'updated',
-          'leagues',
-          leagueId,
-          'Updated league profile from Platform Admin console.',
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'league.update_identity',
+        reason: body.note,
+        requireReason: body.status === 'suspended',
+        handler: async ({ requestId, reason }) => {
+          const { leagueId } = body;
+          const updates = {
+            name: body.name,
+            city: body.city,
+            description: body.description,
+            status: body.status,
+            plan: body.plan,
+            verified: body.verified,
+          };
+          const cleanUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([, value]) => value !== undefined),
+          );
+          if (!Object.keys(cleanUpdates).length) {
+            return Response.json({ error: 'Provide at least one league field to update.' }, { status: 400 });
+          }
+          const leagueRef = adminDb.collection('leagues').doc(leagueId);
+          await adminDb.runTransaction(async (transaction) => {
+            const league = await transaction.get(leagueRef);
+            if (!league.exists) throw new Error('League not found.');
+            transaction.update(leagueRef, {
+              ...cleanUpdates,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: body.status === 'suspended' ? 'suspended' : 'updated',
+              targetCollection: 'leagues',
+              targetId: leagueId,
+              note: reason || 'Updated league profile from Platform Admin console.',
+              beforeSummary: { status: league.data()?.status, plan: league.data()?.plan },
+              afterSummary: cleanUpdates,
+            }));
+          });
+          return Response.json({ ok: true, id: leagueId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: leagueId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'update_team_profile') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { teamId } = body;
-      const updates = {
-        name: body.name,
-        city: body.city,
-        location: body.location,
-        description: body.description,
-        plan: body.plan,
-        verified: body.verified,
-        verificationStatus: body.verificationStatus,
-      };
-      const cleanUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([, value]) => value !== undefined),
-      );
-      if (!Object.keys(cleanUpdates).length) {
-        return Response.json({ error: 'Provide at least one team field to update.' }, { status: 400 });
-      }
-      const teamRef = adminDb.collection('teams').doc(teamId);
-      await adminDb.runTransaction(async (transaction) => {
-        const team = await transaction.get(teamRef);
-        if (!team.exists) throw new Error('Team not found.');
-        transaction.update(teamRef, {
-          ...cleanUpdates,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          body.verificationStatus === 'rejected' ? 'blocked' : body.verificationStatus === 'verified' ? 'verified' : 'updated',
-          'teams',
-          teamId,
-          'Updated team record from Platform Admin console.',
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'team.update_verification',
+        reason: body.note,
+        requireReason: Boolean(body.verificationStatus || body.verified !== undefined || body.plan !== undefined),
+        handler: async ({ requestId, reason }) => {
+          const { teamId } = body;
+          const updates = {
+            name: body.name,
+            city: body.city,
+            location: body.location,
+            description: body.description,
+            plan: body.plan,
+            verified: body.verified,
+            verificationStatus: body.verificationStatus,
+          };
+          const cleanUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([, value]) => value !== undefined),
+          );
+          if (!Object.keys(cleanUpdates).length) {
+            return Response.json({ error: 'Provide at least one team field to update.' }, { status: 400 });
+          }
+          const teamRef = adminDb.collection('teams').doc(teamId);
+          await adminDb.runTransaction(async (transaction) => {
+            const team = await transaction.get(teamRef);
+            if (!team.exists) throw new Error('Team not found.');
+            transaction.update(teamRef, {
+              ...cleanUpdates,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: body.verificationStatus === 'rejected' ? 'blocked' : body.verificationStatus === 'verified' ? 'verified' : 'updated',
+              targetCollection: 'teams',
+              targetId: teamId,
+              note: reason || 'Updated team record from Platform Admin console.',
+              beforeSummary: { verificationStatus: team.data()?.verificationStatus, verified: team.data()?.verified, plan: team.data()?.plan },
+              afterSummary: cleanUpdates,
+            }));
+          });
+          return Response.json({ ok: true, id: teamId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: teamId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'update_user_account') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { userId, accountStatus } = body;
-      const userRef = adminDb.collection('users').doc(userId);
-      await adminDb.runTransaction(async (transaction) => {
-        const user = await transaction.get(userRef);
-        if (!user.exists) throw new Error('User account not found.');
-        transaction.update(userRef, {
-          accountStatus,
-          status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended',
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          accountStatus === 'active' ? 'activated' : accountStatus === 'suspended' ? 'suspended' : 'disabled',
-          'users',
-          userId,
-          `Account lifecycle set to ${accountStatus}.`,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'account.lifecycle',
+        reason: body.note,
+        requireReason: true,
+        handler: async ({ requestId, reason }) => {
+          const { userId, accountStatus } = body;
+          const userRef = adminDb.collection('users').doc(userId);
+          await adminDb.runTransaction(async (transaction) => {
+            const user = await transaction.get(userRef);
+            if (!user.exists) throw new Error('User account not found.');
+            transaction.update(userRef, {
+              accountStatus,
+              status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended',
+              accessVersion: FieldValue.increment(1),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: accountStatus === 'active' ? 'activated' : accountStatus === 'suspended' ? 'suspended' : 'disabled',
+              targetCollection: 'users',
+              targetId: userId,
+              note: reason,
+              beforeSummary: { accountStatus: user.data()?.accountStatus, status: user.data()?.status },
+              afterSummary: { accountStatus, status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended' },
+            }));
+          });
+          if (['suspended', 'disabled', 'deletion_pending'].includes(accountStatus)) {
+            await adminAuth.revokeRefreshTokens(userId);
+          }
+          if (accountStatus === 'disabled' || accountStatus === 'deletion_pending') {
+            await adminAuth.updateUser(userId, { disabled: true });
+          } else if (accountStatus === 'active') {
+            await adminAuth.updateUser(userId, { disabled: false }).catch(() => undefined);
+          }
+          return Response.json({ ok: true, id: userId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: userId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'create_team_invitation') {
@@ -594,155 +644,195 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'review_approval') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { targetCollection, targetId, decision, note } = body;
-      if (targetCollection === 'leagueAdminApplications' && decision === 'approved') {
-        return Response.json({ error: 'League Admin approval uses the access workflow.' }, { status: 409 });
-      }
-      const targetRef = adminDb.collection(targetCollection).doc(targetId);
-      await adminDb.runTransaction(async (transaction) => {
-        const target = await transaction.get(targetRef);
-        if (!target.exists) throw new Error('Target record not found.');
-        const update = targetCollection === 'athletes'
-          ? { verified: decision === 'approved', verificationStatus: decision === 'approved' ? 'verified' : 'pending' }
-          : targetCollection === 'leagues'
-            ? { verified: decision === 'approved', status: decision === 'approved' ? 'verified' : 'draft' }
-            : {
-                status: decision === 'requested_information' ? 'needs_information' : decision,
-                reviewedByUserId: actor.uid,
-              };
-        transaction.update(targetRef, { ...update, updatedAt: FieldValue.serverTimestamp() });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          decision,
-          targetCollection,
-          targetId,
-          note,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'application.review',
+        reason: body.note,
+        requireReason: body.decision !== 'approved',
+        handler: async ({ requestId, reason }) => {
+          const { targetCollection, targetId, decision, note } = body;
+          if (targetCollection === 'leagueAdminApplications' && decision === 'approved') {
+            return Response.json({ error: 'League Admin approval uses the access workflow.' }, { status: 409 });
+          }
+          const targetRef = adminDb.collection(targetCollection).doc(targetId);
+          await adminDb.runTransaction(async (transaction) => {
+            const target = await transaction.get(targetRef);
+            if (!target.exists) throw new Error('Target record not found.');
+            const update = targetCollection === 'athletes'
+              ? { verified: decision === 'approved', verificationStatus: decision === 'approved' ? 'verified' : 'pending' }
+              : targetCollection === 'leagues'
+                ? { verified: decision === 'approved', status: decision === 'approved' ? 'verified' : 'draft' }
+                : {
+                    status: decision === 'requested_information' ? 'needs_information' : decision,
+                    reviewedByUserId: actor.uid,
+                  };
+            transaction.update(targetRef, { ...update, updatedAt: FieldValue.serverTimestamp() });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: decision,
+              targetCollection,
+              targetId,
+              note: reason || note,
+              beforeSummary: { status: target.data()?.status, verificationStatus: target.data()?.verificationStatus },
+              afterSummary: update,
+            }));
+          });
+          return Response.json({ ok: true, id: targetId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: targetId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'revoke_team_assignment') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { assignmentId, note } = body;
-      const assignmentRef = adminDb.collection('teamAssignments').doc(assignmentId);
-      await adminDb.runTransaction(async (transaction) => {
-        const assignment = await transaction.get(assignmentRef);
-        if (!assignment.exists) throw new Error('Team assignment not found.');
-        if (assignment.data()?.status === 'revoked') throw new Error('Team assignment is already revoked.');
-        transaction.update(assignmentRef, {
-          status: 'revoked',
-          revokedAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          'revoked',
-          'teamAssignments',
-          assignmentId,
-          note,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'assignment.revoke',
+        reason: body.note,
+        requireReason: true,
+        handler: async ({ requestId, reason }) => {
+          const { assignmentId } = body;
+          const assignmentRef = adminDb.collection('teamAssignments').doc(assignmentId);
+          await adminDb.runTransaction(async (transaction) => {
+            const assignment = await transaction.get(assignmentRef);
+            if (!assignment.exists) throw new Error('Team assignment not found.');
+            if (assignment.data()?.status === 'revoked') throw new Error('Team assignment is already revoked.');
+            transaction.update(assignmentRef, {
+              status: 'revoked',
+              revokedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: 'revoked',
+              targetCollection: 'teamAssignments',
+              targetId: assignmentId,
+              note: reason,
+              beforeSummary: { status: assignment.data()?.status, teamId: assignment.data()?.teamId, userId: assignment.data()?.userId },
+              afterSummary: { status: 'revoked' },
+            }));
+          });
+          return Response.json({ ok: true, id: assignmentId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: assignmentId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'transition_access_assignment') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { assignmentId, note, status } = body;
-      const assignmentRef = adminDb.collection('accessAssignments').doc(assignmentId);
-      const now = new Date();
-      const nowIso = now.toISOString();
-      await adminDb.runTransaction(async (transaction) => {
-        const assignmentSnapshot = await transaction.get(assignmentRef);
-        if (!assignmentSnapshot.exists) throw new Error('Access assignment not found.');
-        const current = assignmentFromData(assignmentSnapshot.id, assignmentSnapshot.data()!, nowIso);
-        const nextAssignment: AccessAssignment = {
-          ...current,
-          status,
-          updatedAt: nowIso,
-          ...(status === 'active' ? {
-            suspendedAt: undefined,
-            revokedAt: undefined,
-            revocationReason: undefined,
-            validUntil: undefined,
-          } : {}),
-          ...(status === 'suspended' ? { suspendedAt: nowIso } : {}),
-          ...(status === 'revoked' ? { revokedAt: nowIso, revocationReason: note || 'Revoked by Platform Admin.' } : {}),
-          ...(status === 'expired' ? { validUntil: nowIso } : {}),
-        };
-        const scopedAssignmentsQuery = adminDb
-          .collection('accessAssignments')
-          .where('userId', '==', current.userId)
-          .where('scopeType', '==', current.scopeType)
-          .where('scopeId', '==', current.scopeId);
-        const scopedAssignments = await transaction.get(scopedAssignmentsQuery);
-        const assignments = scopedAssignments.docs.map((doc) =>
-          doc.id === assignmentId
-            ? nextAssignment
-            : assignmentFromData(doc.id, doc.data(), nowIso)
-        );
-        if (!assignments.some((assignment) => assignment.id === assignmentId)) {
-          assignments.push(nextAssignment);
-        }
-        const rebuilt = buildAccessIndexDocuments({
-          assignments,
-          accessVersion: 1,
-          updatedAt: nowIso,
-          now,
-        })[0];
-        const indexRef = adminDb.collection('accessIndex').doc(accessIndexId(
-          current.scopeType,
-          current.scopeId,
-          current.userId,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'assignment.transition',
+        reason: body.note,
+        requireReason: true,
+        handler: async ({ requestId, reason }) => {
+          const { assignmentId, status } = body;
+          const assignmentRef = adminDb.collection('accessAssignments').doc(assignmentId);
+          const now = new Date();
+          const nowIso = now.toISOString();
+          await adminDb.runTransaction(async (transaction) => {
+            const assignmentSnapshot = await transaction.get(assignmentRef);
+            if (!assignmentSnapshot.exists) throw new Error('Access assignment not found.');
+            const current = assignmentFromData(assignmentSnapshot.id, assignmentSnapshot.data()!, nowIso);
+            const nextAssignment: AccessAssignment = {
+              ...current,
+              status,
+              updatedAt: nowIso,
+              ...(status === 'active' ? {
+                suspendedAt: undefined,
+                revokedAt: undefined,
+                revocationReason: undefined,
+                validUntil: undefined,
+              } : {}),
+              ...(status === 'suspended' ? { suspendedAt: nowIso } : {}),
+              ...(status === 'revoked' ? { revokedAt: nowIso, revocationReason: reason || 'Revoked by Platform Admin.' } : {}),
+              ...(status === 'expired' ? { validUntil: nowIso } : {}),
+            };
+            const scopedAssignmentsQuery = adminDb
+              .collection('accessAssignments')
+              .where('userId', '==', current.userId)
+              .where('scopeType', '==', current.scopeType)
+              .where('scopeId', '==', current.scopeId);
+            const scopedAssignments = await transaction.get(scopedAssignmentsQuery);
+            const assignments = scopedAssignments.docs.map((doc) =>
+              doc.id === assignmentId
+                ? nextAssignment
+                : assignmentFromData(doc.id, doc.data(), nowIso)
+            );
+            if (!assignments.some((assignment) => assignment.id === assignmentId)) {
+              assignments.push(nextAssignment);
+            }
+            const rebuilt = buildAccessIndexDocuments({
+              assignments,
+              accessVersion: 1,
+              updatedAt: nowIso,
+              now,
+            })[0];
+            const indexRef = adminDb.collection('accessIndex').doc(accessIndexId(
+              current.scopeType,
+              current.scopeId,
+              current.userId,
+            ));
 
-        transaction.update(assignmentRef, transitionPatch(status, nowIso, note));
-        transaction.set(indexRef, {
-          ...(rebuilt ?? accessIndexEmpty(current.scopeType, current.scopeId, current.userId, nowIso)),
-          accessVersion: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: false });
-        transaction.set(adminDb.collection('users').doc(current.userId), {
-          accessVersion: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          status,
-          'accessAssignments',
-          assignmentId,
-          note || `Access assignment ${status}.`,
-        ));
+            transaction.update(assignmentRef, transitionPatch(status, nowIso, reason));
+            transaction.set(indexRef, {
+              ...(rebuilt ?? accessIndexEmpty(current.scopeType, current.scopeId, current.userId, nowIso)),
+              accessVersion: FieldValue.increment(1),
+              updatedAt: FieldValue.serverTimestamp(),
+            }, { merge: false });
+            transaction.set(adminDb.collection('users').doc(current.userId), {
+              accessVersion: FieldValue.increment(1),
+              updatedAt: FieldValue.serverTimestamp(),
+            }, { merge: true });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: status,
+              targetCollection: 'accessAssignments',
+              targetId: assignmentId,
+              note: reason,
+              beforeSummary: { status: current.status, roleKey: current.roleKey, scopeType: current.scopeType, scopeId: current.scopeId },
+              afterSummary: { status, accessIndexRebuilt: true },
+            }));
+          });
+          return Response.json({ ok: true, id: assignmentId, status, requestId });
+        },
       });
-      return Response.json({ ok: true, id: assignmentId, status });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     if (body.action === 'resolve_report') {
-      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
-      if (forbidden) return forbidden;
-      const { reportId, decision, note } = body;
-      const reportRef = adminDb.collection('reports').doc(reportId);
-      await adminDb.runTransaction(async (transaction) => {
-        const report = await transaction.get(reportRef);
-        if (!report.exists) throw new Error('Report not found.');
-        transaction.update(reportRef, {
-          status: decision,
-          updatedAt: FieldValue.serverTimestamp(),
-          ...(note ? { actionHistory: FieldValue.arrayUnion(note) } : {}),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          decision,
-          'reports',
-          reportId,
-          note,
-        ));
+      const guarded = await securePlatformCommand({
+        actor,
+        command: 'trust_case.decision',
+        reason: body.note,
+        requireReason: true,
+        handler: async ({ requestId, reason }) => {
+          const { reportId, decision } = body;
+          const reportRef = adminDb.collection('reports').doc(reportId);
+          await adminDb.runTransaction(async (transaction) => {
+            const report = await transaction.get(reportRef);
+            if (!report.exists) throw new Error('Report not found.');
+            transaction.update(reportRef, {
+              status: decision,
+              updatedAt: FieldValue.serverTimestamp(),
+              actionHistory: FieldValue.arrayUnion(reason),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: decision,
+              targetCollection: 'reports',
+              targetId: reportId,
+              note: reason,
+              beforeSummary: { status: report.data()?.status, severity: report.data()?.severity },
+              afterSummary: { status: decision },
+            }));
+          });
+          return Response.json({ ok: true, id: reportId, requestId });
+        },
       });
-      return Response.json({ ok: true, id: reportId });
+      return 'response' in guarded ? guarded.response : guarded.result;
     }
 
     return Response.json({ error: 'Unsupported admin action.' }, { status: 400 });

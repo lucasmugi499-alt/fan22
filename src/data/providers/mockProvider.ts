@@ -989,15 +989,16 @@ export const mockProvider: GoalPlaceDataProvider = {
       (profile) => profile.id === userId || profile.uid === userId,
     );
     if (!user && !demoProfile) throw new Error('User profile not found.');
-    if (user) Object.assign(user, data);
-    if (demoProfile) Object.assign(demoProfile, data);
+    const { platformActionReason, ...profileUpdates } = data;
+    if (user) Object.assign(user, profileUpdates);
+    if (demoProfile) Object.assign(demoProfile, profileUpdates);
     if (data.accountStatus) {
       audit({
         actorUserId: MOCK_PROFILES.platform_admin.uid,
         action: data.accountStatus === 'active' ? 'activated' : data.accountStatus === 'suspended' ? 'suspended' : 'disabled',
         targetCollection: 'users',
         targetId: userId,
-        note: `Demo account lifecycle set to ${data.accountStatus}.`,
+        note: platformActionReason || `Demo account lifecycle set to ${data.accountStatus}.`,
       });
     }
     if (data.onboardingCompletedAt) {
@@ -1115,14 +1116,15 @@ export const mockProvider: GoalPlaceDataProvider = {
   async updateTeamProfile(teamId, data) {
     const team = teams.find((item) => item.id === teamId);
     if (!team) throw new Error('Team profile not found.');
-    Object.assign(team, data);
+    const { platformActionReason, ...teamUpdates } = data;
+    Object.assign(team, teamUpdates);
     if (data.verified !== undefined || data.verificationStatus !== undefined || data.plan !== undefined) {
       audit({
         actorUserId: MOCK_PROFILES.platform_admin.uid,
         action: data.verificationStatus === 'rejected' ? 'blocked' : data.verificationStatus === 'verified' ? 'verified' : 'updated',
         targetCollection: 'teams',
         targetId: teamId,
-        note: 'Demo team record updated from Platform Admin console.',
+        note: platformActionReason || 'Demo team record updated from Platform Admin console.',
       });
     }
     return result(teamId, 'Team profile updated.');
@@ -1211,13 +1213,15 @@ export const mockProvider: GoalPlaceDataProvider = {
     const league = readStoredItems<League>(storedLeaguesKey).find((item) => item.id === leagueId)
       ?? leagues.find((item) => item.id === leagueId);
     if (!league) throw new Error('League not found.');
-    Object.assign(league, data);
+    const { platformActionReason, ...leagueUpdates } = data;
+    Object.assign(league, leagueUpdates);
     persistDemoLeague(league);
     audit({
       actorUserId: league.adminUserIds[0] ?? 'platform_demo',
       action: 'updated',
       targetCollection: 'leagues',
       targetId: leagueId,
+      note: platformActionReason || 'Demo league profile updated from Platform Admin console.',
     });
     return result(leagueId, 'League profile updated.');
   },

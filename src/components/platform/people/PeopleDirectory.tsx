@@ -39,6 +39,7 @@ export function PeopleDirectory() {
   const [query, setQuery] = useState('');
   const [accountClass, setAccountClass] = useState<'all' | AccountClass>('all');
   const [savingUserId, setSavingUserId] = useState('');
+  const [actionReason, setActionReason] = useState('');
 
   const filtered = useMemo(() => users.filter((user) => {
     const haystack = `${user.displayName} ${user.name ?? ''} ${user.email} ${user.role} ${user.accountClass ?? ''}`.toLowerCase();
@@ -48,13 +49,20 @@ export function PeopleDirectory() {
   }).sort((left, right) => +new Date(right.createdAt ?? 0) - +new Date(left.createdAt ?? 0)), [accountClass, query, users]);
 
   async function setAccountStatus(user: User, accountStatus: NonNullable<User['accountStatus']>) {
+    const reason = actionReason.trim();
+    if (reason.length < 4) {
+      toast.error('Add an audit reason before changing an account lifecycle state.');
+      return;
+    }
     setSavingUserId(user.id);
     try {
       await provider.updateUserProfile(user.id, {
         accountStatus,
         status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended',
+        platformActionReason: reason,
       });
       toast.success(`Account ${accountStatus.replace(/_/g, ' ')}.`);
+      setActionReason('');
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Account status could not be updated.');
@@ -91,6 +99,15 @@ export function PeopleDirectory() {
             <option value="platform_operator">Platform operator</option>
           </select>
         </div>
+        <label className="mb-4 block">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Audit reason for account actions</span>
+          <textarea
+            value={actionReason}
+            onChange={(event) => setActionReason(event.target.value)}
+            className="mt-2 min-h-20 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-3 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand"
+            placeholder="Example: Repeated failed identity checks; suspend pending owner review."
+          />
+        </label>
 
         <div className="space-y-2.5">
           {filtered.length ? filtered.slice(0, 80).map((user) => {

@@ -6,6 +6,8 @@ import { POST } from './route';
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
     verifyIdToken: vi.fn(),
+    revokeRefreshTokens: vi.fn(),
+    updateUser: vi.fn(),
   },
   adminDb: {
     collection: vi.fn(),
@@ -34,11 +36,22 @@ function snapshot(id: string, data: Record<string, unknown> | undefined) {
 }
 
 function installFirestoreMock(records: Record<string, Record<string, unknown>>) {
+  const allRecords: Record<string, Record<string, unknown>> = {
+    'users/platform_1': {
+      id: 'platform_1',
+      uid: 'platform_1',
+      role: 'platform_admin',
+      accountClass: 'platform_operator',
+      accountStatus: 'active',
+      status: 'active',
+    },
+    ...records,
+  };
   vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
     doc: (id = `${collectionName}_generated`) => ({
       collectionName,
       id,
-      get: vi.fn(async () => snapshot(id, records[`${collectionName}/${id}`])),
+      get: vi.fn(async () => snapshot(id, allRecords[`${collectionName}/${id}`])),
       set: vi.fn(async () => undefined),
     }),
   }) as never);
@@ -251,10 +264,11 @@ describe('trusted admin actions route hardening', () => {
       verificationStatus: 'rejected',
       verified: false,
       plan: 'free',
+      note: 'Fraudulent team evidence.',
     })));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, id: 'team_1' });
+    expect(await response.json()).toMatchObject({ ok: true, id: 'team_1', requestId: expect.any(String) });
     expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'teams', id: 'team_1' }), expect.objectContaining({
       verificationStatus: 'rejected',
       verified: false,
@@ -299,20 +313,63 @@ describe('trusted admin actions route hardening', () => {
       action: 'update_user_account',
       userId: 'user_1',
       accountStatus: 'suspended',
+      note: 'Reported shared login risk.',
     })));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, id: 'user_1' });
+    expect(await response.json()).toMatchObject({ ok: true, id: 'user_1', requestId: expect.any(String) });
     expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'users', id: 'user_1' }), expect.objectContaining({
       accountStatus: 'suspended',
       status: 'suspended',
+      accessVersion: expect.anything(),
     }));
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'adminAuditEvents' }), expect.objectContaining({
       actorUserId: 'platform_1',
       action: 'suspended',
       targetCollection: 'users',
       targetId: 'user_1',
+      note: 'Reported shared login risk.',
     }));
+    expect(adminAuth.revokeRefreshTokens).toHaveBeenCalledWith('user_1');
+    expect(adminAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('requires a reason before account lifecycle changes', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    installFirestoreMock({});
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_user_account',
+      userId: 'user_1',
+      accountStatus: 'suspended',
+    })));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'A clear audit reason is required for this Platform Admin command.' });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+  });
+
+  it('requires a dedicated Platform Operator account for platform commands', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    installFirestoreMock({
+      'users/platform_1': {
+        id: 'platform_1',
+        role: 'platform_admin',
+        accountClass: 'fan',
+        accountStatus: 'active',
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_user_account',
+      userId: 'user_1',
+      accountStatus: 'suspended',
+      note: 'Reported shared login risk.',
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'A dedicated Platform Operator account is required.' });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
   });
 
   it('rejects access assignment lifecycle changes from non-platform admins', async () => {
@@ -354,7 +411,17 @@ describe('trusted admin actions route hardening', () => {
       doc: vi.fn((id = `${collectionName}_generated`) => ({
         collectionName,
         id,
-        get: vi.fn(async () => snapshot(id, undefined)),
+        get: vi.fn(async () => snapshot(
+          id,
+          collectionName === 'users' && id === 'platform_1'
+            ? {
+                id: 'platform_1',
+                role: 'platform_admin',
+                accountClass: 'platform_operator',
+                accountStatus: 'active',
+              }
+            : undefined,
+        )),
       })),
       where: vi.fn(() => ({
         where: vi.fn(() => ({
@@ -390,10 +457,11 @@ describe('trusted admin actions route hardening', () => {
     })));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    expect(await response.json()).toMatchObject({
       ok: true,
       id: 'assignment_a',
       status: 'suspended',
+      requestId: expect.any(String),
     });
     expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessAssignments',

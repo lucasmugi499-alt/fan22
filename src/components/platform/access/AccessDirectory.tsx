@@ -36,6 +36,7 @@ export function AccessDirectory() {
   });
   const [query, setQuery] = useState('');
   const [revokingId, setRevokingId] = useState('');
+  const [actionReason, setActionReason] = useState('');
 
   const filtered = useMemo(() => teamAssignments.filter((assignment) => {
     const team = teams.find((item) => item.id === assignment.teamId);
@@ -50,10 +51,16 @@ export function AccessDirectory() {
       toast.error('Your Platform Operator session is not ready.');
       return;
     }
+    const reason = actionReason.trim();
+    if (reason.length < 4) {
+      toast.error('Add an audit reason before revoking an assignment.');
+      return;
+    }
     setRevokingId(assignment.id);
     try {
-      await provider.revokeTeamAssignment(assignment.id, actorUserId, 'Revoked from Platform Admin access directory.');
+      await provider.revokeTeamAssignment(assignment.id, actorUserId, reason);
       toast.success('Assignment revoked and audit event recorded.');
+      setActionReason('');
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Assignment could not be revoked.');
@@ -83,6 +90,15 @@ export function AccessDirectory() {
         <div className="mb-4">
           <PlatformSearch value={query} onChange={setQuery} placeholder="Search by email, team, league or assignment status" />
         </div>
+        <label className="mb-4 block">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Audit reason for access actions</span>
+          <textarea
+            value={actionReason}
+            onChange={(event) => setActionReason(event.target.value)}
+            className="mt-2 min-h-20 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-3 text-sm text-text-strong outline-none placeholder:text-subtle focus:border-brand"
+            placeholder="Example: Staff member no longer works with this team; revoke active assignment."
+          />
+        </label>
         <div className="space-y-2.5">
           {filtered.length ? filtered.slice(0, 90).map((assignment) => {
             const team = teams.find((item) => item.id === assignment.teamId);

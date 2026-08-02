@@ -79,13 +79,18 @@ export function PlatformTrust() {
       toast.error('Your Platform Admin account is not ready.');
       return;
     }
+    const decisionNote = note.trim();
+    if (decisionNote.length < 4) {
+      toast.error('Add a decision note before closing this case.');
+      return;
+    }
     setSaving(true);
     try {
       await provider.resolveReport({
         reportId: active.id,
         actorUserId,
         decision,
-        note: note.trim() || undefined,
+        note: decisionNote,
       });
       toast.success(decision === 'resolved' ? 'Case resolved.' : 'Case dismissed.');
       setActive(null);

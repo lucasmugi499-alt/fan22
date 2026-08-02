@@ -666,12 +666,15 @@ export const firebaseProvider: GoalPlaceDataProvider = {
         action: 'update_user_account',
         userId,
         accountStatus: data.accountStatus,
+        note: data.platformActionReason,
       });
       return writeResult(userId, 'Account status updated.');
     }
     const { db } = requireFirebaseClient();
+    const profileUpdates = { ...data };
+    delete profileUpdates.platformActionReason;
     await updateDoc(doc(db, 'users', userId), {
-      ...data,
+      ...profileUpdates,
       updatedAt: serverTimestamp(),
     });
     if (actorUserId === userId && data.onboardingCompletedAt) {
@@ -752,6 +755,7 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async updateTeamProfile(teamId, data) {
     requireActor();
+    const { platformActionReason, ...teamUpdates } = data;
     if (
       data.verified !== undefined ||
       data.verificationStatus !== undefined ||
@@ -760,13 +764,14 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       await requestTrustedAdminAction({
         action: 'update_team_profile',
         teamId,
-        ...data,
+        note: platformActionReason,
+        ...teamUpdates,
       });
       return writeResult(teamId, 'Team record updated.');
     }
     const { db } = requireFirebaseClient();
     await updateDoc(doc(db, 'teams', teamId), {
-      ...data,
+      ...teamUpdates,
       updatedAt: serverTimestamp(),
     });
     return writeResult(teamId, 'Team profile updated.');
@@ -840,10 +845,12 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async updateLeagueProfile(leagueId, data) {
     requireActor();
+    const { platformActionReason, ...leagueUpdates } = data;
     await requestTrustedAdminAction({
       action: 'update_league_profile',
       leagueId,
-      ...data,
+      note: platformActionReason,
+      ...leagueUpdates,
     });
     return writeResult(leagueId, 'League profile updated.');
   },

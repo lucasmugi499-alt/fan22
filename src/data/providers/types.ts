@@ -184,6 +184,7 @@ export type EditableUserProfile = {
   notificationPreferences?: NotificationPreferences;
   lowDataMode?: boolean;
   onboardingCompletedAt?: string;
+  platformActionReason?: string;
 };
 
 export type EditableAthleteProfile = Pick<
@@ -194,12 +195,12 @@ export type EditableAthleteProfile = Pick<
 export type EditableTeamProfile = Pick<
   Team,
   'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail' | 'verified' | 'verificationStatus' | 'plan'
->;
+> & { platformActionReason?: string };
 
 export type EditableLeagueProfile = Pick<
   League,
   'name' | 'city' | 'description' | 'status' | 'plan' | 'verified'
->;
+> & { platformActionReason?: string };
 
 export type CreateLeagueNoticeInput = Omit<LeagueNotice, 'id' | 'createdAt'> & {
   id?: string;
