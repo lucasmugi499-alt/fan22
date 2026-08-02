@@ -466,8 +466,22 @@ describe('the trust boundary: nobody can author an official result', () => {
     );
   });
 
-  it('still lets the league admin maintain fixture details', async () => {
-    await assertSucceeds(
+  it('refuses browser fixture creation even from a league admin', async () => {
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'matches/match_new'), {
+        leagueId: 'league_001',
+        seasonId: 'season_001',
+        homeTeamId: 'team_a',
+        awayTeamId: 'team_b',
+        status: 'scheduled',
+        verificationStatus: 'pending',
+        score: { home: null, away: null },
+      })
+    );
+  });
+
+  it('refuses browser fixture edits even from a league admin', async () => {
+    await assertFails(
       updateDoc(doc(asUser(LEAGUE_ADMIN), 'matches/match_001'), {
         venue: 'Nakivubo Stadium',
         scheduledAt: '2026-03-08T15:00:00.000Z',
@@ -750,8 +764,8 @@ describe('seasons', () => {
     await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'seasons/season_001')));
   });
 
-  it('are writable only by the owning league', async () => {
-    await assertSucceeds(
+  it('are command-owned and not directly writable by browser roles', async () => {
+    await assertFails(
       setDoc(doc(asUser(LEAGUE_ADMIN), 'seasons/season_new'), {
         leagueId: 'league_001',
         name: '2027 Season',

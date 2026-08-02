@@ -113,6 +113,7 @@ async function requestTrustedAdminAction(payload: Record<string, unknown>) {
   const body = await response.json().catch(() => ({})) as {
     error?: string;
     id?: string;
+    count?: number;
     actionUrl?: string;
     emailDelivery?: DataWriteResult['emailDelivery'];
     emailMessageId?: string;
@@ -856,19 +857,22 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async createSeason(data) {
     requireActor();
-    const { db } = requireFirebaseClient();
-    const ref = data.id ? doc(db, 'seasons', data.id) : doc(collection(db, 'seasons'));
-    await setDoc(ref, {
+    const response = await requestTrustedAdminAction({
+      action: 'create_season',
       ...data,
-      id: ref.id,
-      createdAt: serverTimestamp(),
     });
-    return writeResult(ref.id, 'Season created.');
+    return writeResult(response.id ?? data.id ?? data.name, 'Season created.');
   },
   async transitionSeason(seasonId, status) {
     requireActor();
     const { db } = requireFirebaseClient();
-    await updateDoc(doc(db, 'seasons', seasonId), { status, updatedAt: serverTimestamp() });
+    const season = await getDoc(doc(db, 'seasons', seasonId));
+    if (!season.exists()) throw new Error('Season not found.');
+    await requestTrustedAdminAction({
+      action: 'transition_season',
+      seasonId,
+      status,
+    });
     return writeResult(seasonId, `Season moved to ${status}.`);
   },
   async createTeams(teams) {
@@ -883,13 +887,11 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async createFixtures(fixtures) {
     requireActor();
     if (!fixtures.length) throw new Error('Add at least one fixture.');
-    const { db } = requireFirebaseClient();
-    const batch = writeBatch(db);
-    for (const fixture of fixtures) {
-      batch.set(doc(db, 'matches', fixture.id), fixture);
-    }
-    await batch.commit();
-    return writeResult(fixtures[0].id, `${fixtures.length} fixtures created.`);
+    const response = await requestTrustedAdminAction({
+      action: 'create_fixtures',
+      fixtures,
+    });
+    return writeResult(response.id ?? fixtures[0].id, `${response.count ?? fixtures.length} fixtures created.`);
   },
   async createTeamAdminInvitation(data) {
     requireActor(data.invitedByUserId);

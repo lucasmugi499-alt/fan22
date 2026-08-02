@@ -18,6 +18,23 @@ type PlatformCommandInput<TResult> = {
   }) => Promise<TResult>;
 };
 
+type LeagueCommandInput<TResult> = {
+  actor: AuthenticatedActor;
+  command: string;
+  leagueId: string;
+  requiredCapability: PermissionCapability;
+  requireReason?: boolean;
+  reason?: string;
+  handler: (context: {
+    actor: AuthenticatedActor;
+    requestId: string;
+    reason: string;
+    profile: FirebaseFirestore.DocumentData;
+    league: FirebaseFirestore.DocumentSnapshot;
+    isPlatformActor: boolean;
+  }) => Promise<TResult>;
+};
+
 function isRestrictedStatus(status: unknown) {
   return status === 'suspended' || status === 'disabled' || status === 'deletion_pending';
 }
@@ -97,6 +114,80 @@ export async function securePlatformCommand<TResult>({
       requestId,
       reason: normalizedReason,
       profile,
+    }),
+  };
+}
+
+export async function secureLeagueCommand<TResult>({
+  actor,
+  command,
+  leagueId,
+  requiredCapability,
+  requireReason = false,
+  reason,
+  handler,
+}: LeagueCommandInput<TResult>): Promise<{ result: TResult } | { response: Response }> {
+  const forbidden = requireRole(
+    actor,
+    ['league_admin', 'platform_admin', 'super_admin'],
+    'League Admin access required.',
+  );
+  if (forbidden) return { response: forbidden };
+
+  const normalizedReason = reason?.trim() ?? '';
+  if (requireReason && normalizedReason.length < 4) {
+    return { response: jsonError('A clear audit reason is required for this League Admin command.', 400) };
+  }
+
+  const [profileSnapshot, leagueSnapshot] = await Promise.all([
+    adminDb.collection('users').doc(actor.uid).get(),
+    adminDb.collection('leagues').doc(leagueId).get(),
+  ]);
+  if (!leagueSnapshot.exists) {
+    return { response: jsonError('League not found.', 404) };
+  }
+  const profile = profileSnapshot.data() ?? {};
+  const role = String(actor.role);
+  const isPlatformActor = role === 'platform_admin' || role === 'super_admin';
+  const accountClass = typeof actor.accountClass === 'string'
+    ? actor.accountClass
+    : profile.accountClass;
+  const requiredAccountClass = isPlatformActor ? 'platform_operator' : 'organization_operator';
+  if (accountClass !== requiredAccountClass) {
+    return {
+      response: jsonError(
+        isPlatformActor
+          ? 'A dedicated Platform Operator account is required.'
+          : 'A dedicated Organization Operator account is required.',
+        403,
+      ),
+    };
+  }
+  if (isRestrictedStatus(profile.accountStatus) || isRestrictedStatus(profile.status)) {
+    return { response: jsonError('This operator account is not active.', 403) };
+  }
+
+  if (!isPlatformActor) {
+    const leagueData = leagueSnapshot.data();
+    const isLegacyAdmin = Array.isArray(leagueData?.adminUserIds) && leagueData.adminUserIds.includes(actor.uid);
+    const leagueAccess = await adminDb
+      .collection('accessIndex')
+      .doc(accessIndexId('league', leagueId, actor.uid))
+      .get();
+    if (!isLegacyAdmin && !hasCapability(leagueAccess, requiredCapability)) {
+      return { response: jsonError('You do not manage this league.', 403) };
+    }
+  }
+
+  const requestId = `${command}_${randomUUID()}`;
+  return {
+    result: await handler({
+      actor,
+      requestId,
+      reason: normalizedReason,
+      profile,
+      league: leagueSnapshot,
+      isPlatformActor,
     }),
   };
 }

@@ -108,7 +108,7 @@ describe('trusted admin actions route hardening', () => {
       teamId: 'team_1',
       leagueId: 'league_1',
       seasonId: 'season_1',
-      invitedEmail: `${'a'.repeat(65 * 1024)}@example.com`,
+      invitedEmail: `${'a'.repeat(513 * 1024)}@example.com`,
     })));
 
     expect(response.status).toBe(413);
@@ -370,6 +370,157 @@ describe('trusted admin actions route hardening', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'A dedicated Platform Operator account is required.' });
     expect(adminDb.runTransaction).not.toHaveBeenCalled();
+  });
+
+  it('lets a scoped Organization Operator create a season through the trusted command', async () => {
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => snapshot(ref.id, undefined)),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({
+      'users/league_admin_1': {
+        id: 'league_admin_1',
+        role: 'league_admin',
+        accountClass: 'organization_operator',
+        accountStatus: 'active',
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/league_league_1_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.season.manage'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_season',
+      id: 'season_2027',
+      leagueId: 'league_1',
+      name: '2027 Regular Season',
+      sport: 'football',
+      status: 'registration',
+      startDate: '2027-01-16T00:00:00.000Z',
+      competitionFormat: 'league',
+      scoring: { win: 3, draw: 1, loss: 0 },
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, id: 'season_2027', requestId: expect.any(String) });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'seasons',
+      id: 'season_2027',
+    }), expect.objectContaining({
+      leagueId: 'league_1',
+      name: '2027 Regular Season',
+      status: 'registration',
+    }));
+    expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'leagues',
+      id: 'league_1',
+    }), expect.objectContaining({
+      currentSeasonId: 'season_2027',
+      season: '2027 Regular Season',
+    }));
+  });
+
+  it('rejects season creation when the Organization Operator lacks the league scope', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    installFirestoreMock({
+      'users/league_admin_1': {
+        id: 'league_admin_1',
+        role: 'league_admin',
+        accountClass: 'organization_operator',
+        accountStatus: 'active',
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_season',
+      id: 'season_2027',
+      leagueId: 'league_1',
+      name: '2027 Regular Season',
+      sport: 'football',
+      status: 'registration',
+      startDate: '2027-01-16T00:00:00.000Z',
+      competitionFormat: 'league',
+      scoring: { win: 3, draw: 1, loss: 0 },
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'You do not manage this league.' });
+    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+  });
+
+  it('creates fixtures through a scoped trusted command with pending result state', async () => {
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => {
+        if (ref.collectionName === 'seasons') return snapshot(ref.id, { id: ref.id, leagueId: 'league_1', status: 'active' });
+        if (ref.collectionName === 'teams') return snapshot(ref.id, { id: ref.id, leagueId: 'league_1' });
+        return snapshot(ref.id, undefined);
+      }),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({
+      'users/league_admin_1': {
+        id: 'league_admin_1',
+        role: 'league_admin',
+        accountClass: 'organization_operator',
+        accountStatus: 'active',
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      'accessIndex/league_league_1_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.season.manage'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_fixtures',
+      fixtures: [{
+        id: 'match_1',
+        sport: 'football',
+        leagueId: 'league_1',
+        seasonId: 'season_1',
+        homeTeamId: 'team_home',
+        awayTeamId: 'team_away',
+        venue: 'Kampala Ground',
+        city: 'Kampala',
+        scheduledAt: '2027-01-16T15:00:00.000Z',
+        status: 'scheduled',
+        score: { home: null, away: null },
+        verificationStatus: 'pending',
+      }],
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, id: 'match_1', count: 1, requestId: expect.any(String) });
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'matches',
+      id: 'match_1',
+    }), expect.objectContaining({
+      leagueId: 'league_1',
+      seasonId: 'season_1',
+      score: { home: null, away: null },
+      verificationStatus: 'pending',
+    }));
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'adminAuditEvents',
+    }), expect.objectContaining({
+      actorUserId: 'league_admin_1',
+      action: 'created',
+      targetCollection: 'matches',
+      targetId: 'match_1',
+    }));
   });
 
   it('rejects access assignment lifecycle changes from non-platform admins', async () => {

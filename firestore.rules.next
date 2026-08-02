@@ -234,42 +234,17 @@ service cloud.firestore {
     }
 
     // Seasons are league-owned competition containers. Publicly readable so fans can browse
-    // historical tables; only the owning league's admins (or platform admins) may create or
-    // change one. Deletion is never allowed below super admin: removing a season would
-    // orphan every match, challenge and standing that references it.
+    // historical tables; writes are command-owned. League and Platform Operators use the
+    // trusted server command layer so the mutation can validate scope and write immutable
+    // audit, while the Admin SDK bypasses these browser rules.
     match /seasons/{seasonId} {
       allow read: if true;
-      allow create: if canManageLeagueById(request.resource.data.leagueId);
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
-        request.resource.data.leagueId == resource.data.leagueId &&
-        (
-          request.resource.data.status == resource.data.status ||
-          (resource.data.status == 'draft' && request.resource.data.status == 'registration') ||
-          (resource.data.status == 'registration' && request.resource.data.status == 'active') ||
-          (resource.data.status == 'active' && request.resource.data.status == 'completed') ||
-          (resource.data.status == 'completed' && request.resource.data.status == 'archived')
-        ) &&
-        (
-          resource.data.status in ['draft', 'planned'] ||
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'leagueId', 'sport', 'scoring', 'competitionFormat'
-          ])
-        );
-      allow delete: if isSuperAdmin();
+      allow create, update, delete: if false;
     }
 
     match /matches/{matchId} {
       allow read: if true;
-      allow create: if canManageLeagueById(request.resource.data.leagueId) &&
-        request.resource.data.verificationStatus == 'pending' &&
-        request.resource.data.score.home == null &&
-        request.resource.data.score.away == null &&
-        !('officialResultVersion' in request.resource.data);
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
-        changedKeysWithin([
-          'scheduledAt', 'date', 'venue', 'city', 'publicNotes', 'status', 'updatedAt'
-        ]);
-      allow delete: if isSuperAdmin();
+      allow create, update, delete: if false;
     }
 
     // Result submissions: a team's CLAIM about a match, not the official record.

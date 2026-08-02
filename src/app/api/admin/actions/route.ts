@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
-import { platformAuditEvent, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
+import { platformAuditEvent, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import {
   accessIndexId,
   buildAccessIndexDocuments,
@@ -144,6 +144,14 @@ function slugPart(value: string) {
     .slice(0, 48) || 'league';
 }
 
+function seasonIdPart(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64) || 'season';
+}
+
 const adminActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('create_league'),
@@ -160,6 +168,59 @@ const adminActionSchema = z.discriminatedUnion('action', [
     leagueId: z.string().trim().min(1).max(160),
     seasonId: z.string().trim().min(1).max(160),
     invitedEmail: z.string().trim().email().max(200).transform((value) => value.toLowerCase()),
+  }),
+  z.object({
+    action: z.literal('create_season'),
+    id: z.string().trim().min(1).max(180).optional(),
+    leagueId: z.string().trim().min(1).max(160),
+    name: z.string().trim().min(3).max(120),
+    sport: z.enum(['football', 'basketball', 'rugby']),
+    status: z.enum(['draft', 'registration', 'active', 'completed', 'archived']).optional().default('registration'),
+    startDate: z.string().trim().min(4).max(40),
+    endDate: z.string().trim().min(4).max(40).optional(),
+    competitionFormat: z.enum(['league', 'knockout', 'group_knockout']),
+    scoring: z.object({
+      win: z.number().finite().min(0).max(20),
+      draw: z.number().finite().min(0).max(20).nullable(),
+      loss: z.number().finite().min(0).max(20),
+    }),
+  }),
+  z.object({
+    action: z.literal('transition_season'),
+    seasonId: z.string().trim().min(1).max(180),
+    status: z.enum(['draft', 'registration', 'active', 'completed', 'archived']),
+    note: z.string().trim().max(1200).optional().default(''),
+  }),
+  z.object({
+    action: z.literal('create_fixtures'),
+    fixtures: z.array(z.object({
+      id: z.string().trim().min(1).max(180),
+      sport: z.union([z.enum(['football', 'basketball', 'rugby']), z.enum(['Football', 'Basketball', 'Rugby'])]),
+      leagueId: z.string().trim().min(1).max(160),
+      seasonId: z.string().trim().min(1).max(180),
+      homeTeamId: z.string().trim().min(1).max(180),
+      teamAId: z.string().trim().min(1).max(180).optional(),
+      awayTeamId: z.string().trim().min(1).max(180),
+      teamBId: z.string().trim().min(1).max(180).optional(),
+      venue: z.string().trim().min(2).max(180),
+      city: z.string().trim().min(2).max(100),
+      scheduledAt: z.string().trim().min(4).max(40),
+      date: z.string().trim().min(4).max(40).optional(),
+      status: z.literal('scheduled'),
+      score: z.object({ home: z.null(), away: z.null() }),
+      verificationStatus: z.literal('pending'),
+      supportersCount: z.number().nonnegative().optional().default(0),
+      totalSupport: z.number().nonnegative().optional().default(0),
+      events: z.array(z.object({
+        minute: z.number().int().nonnegative().optional(),
+        period: z.string().trim().max(40).optional(),
+        type: z.string().trim().min(1).max(80),
+        athleteId: z.string().trim().max(180).optional(),
+        teamId: z.string().trim().min(1).max(180),
+        description: z.string().trim().min(1).max(240),
+      })).optional().default([]),
+      createdAt: z.string().optional(),
+    })).min(1).max(250),
   }),
   z.object({
     action: z.literal('create_teams'),
@@ -247,7 +308,7 @@ export async function POST(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
 
-  const parsed = await parseJsonBody(request, adminActionSchema, { maxBytes: 64 * 1024 });
+  const parsed = await parseJsonBody(request, adminActionSchema, { maxBytes: 512 * 1024 });
   if ('response' in parsed) return parsed.response;
 
   const actor = auth.actor;
@@ -462,6 +523,170 @@ export async function POST(request: Request) {
             await adminAuth.updateUser(userId, { disabled: false }).catch(() => undefined);
           }
           return Response.json({ ok: true, id: userId, requestId });
+        },
+      });
+      return 'response' in guarded ? guarded.response : guarded.result;
+    }
+
+    if (body.action === 'create_season') {
+      const guarded = await secureLeagueCommand({
+        actor,
+        command: 'league.create_season',
+        leagueId: body.leagueId,
+        requiredCapability: 'league.season.manage',
+        handler: async ({ requestId, reason, league }) => {
+          const seasonId = body.id ?? `season_${seasonIdPart(body.leagueId)}_${seasonIdPart(body.name)}_${Date.now().toString(36)}`;
+          const seasonRef = adminDb.collection('seasons').doc(seasonId);
+          const leagueRef = adminDb.collection('leagues').doc(body.leagueId);
+          await adminDb.runTransaction(async (transaction) => {
+            const existingSeason = await transaction.get(seasonRef);
+            if (existingSeason.exists) throw new Error('Season already exists.');
+            const seasonRecord = {
+              id: seasonId,
+              leagueId: body.leagueId,
+              name: body.name,
+              sport: body.sport,
+              status: body.status,
+              startDate: body.startDate,
+              ...(body.endDate ? { endDate: body.endDate } : {}),
+              competitionFormat: body.competitionFormat,
+              scoring: body.scoring,
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            };
+            transaction.set(seasonRef, seasonRecord);
+            transaction.update(leagueRef, {
+              currentSeasonId: seasonId,
+              season: body.name,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: 'created',
+              targetCollection: 'seasons',
+              targetId: seasonId,
+              note: reason || `Created season ${body.name}.`,
+              beforeSummary: { leagueId: body.leagueId, previousCurrentSeasonId: league.data()?.currentSeasonId },
+              afterSummary: { leagueId: body.leagueId, status: body.status, competitionFormat: body.competitionFormat },
+            }));
+          });
+          return Response.json({ ok: true, id: seasonId, requestId });
+        },
+      });
+      return 'response' in guarded ? guarded.response : guarded.result;
+    }
+
+    if (body.action === 'transition_season') {
+      const seasonSnapshot = await adminDb.collection('seasons').doc(body.seasonId).get();
+      if (!seasonSnapshot.exists) return Response.json({ error: 'Season not found.' }, { status: 404 });
+      const leagueId = String(seasonSnapshot.data()?.leagueId ?? '');
+      if (!leagueId) return Response.json({ error: 'Season is missing its league relationship.' }, { status: 409 });
+      const guarded = await secureLeagueCommand({
+        actor,
+        command: 'league.transition_season',
+        leagueId,
+        requiredCapability: 'league.season.manage',
+        reason: body.note,
+        handler: async ({ requestId, reason }) => {
+          const seasonRef = adminDb.collection('seasons').doc(body.seasonId);
+          await adminDb.runTransaction(async (transaction) => {
+            const season = await transaction.get(seasonRef);
+            if (!season.exists) throw new Error('Season not found.');
+            transaction.update(seasonRef, {
+              status: body.status,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: body.status,
+              targetCollection: 'seasons',
+              targetId: body.seasonId,
+              note: reason || `Season moved to ${body.status}.`,
+              beforeSummary: { status: season.data()?.status, leagueId },
+              afterSummary: { status: body.status },
+            }));
+          });
+          return Response.json({ ok: true, id: body.seasonId, status: body.status, requestId });
+        },
+      });
+      return 'response' in guarded ? guarded.response : guarded.result;
+    }
+
+    if (body.action === 'create_fixtures') {
+      const [firstFixture] = body.fixtures;
+      if (!firstFixture) return Response.json({ error: 'Add at least one fixture.' }, { status: 400 });
+      const leagueId = firstFixture.leagueId;
+      const seasonId = firstFixture.seasonId;
+      if (!body.fixtures.every((fixture) => fixture.leagueId === leagueId && fixture.seasonId === seasonId)) {
+        return Response.json({ error: 'All fixtures must belong to one league and season.' }, { status: 400 });
+      }
+      const duplicateIds = new Set<string>();
+      for (const fixture of body.fixtures) {
+        if (duplicateIds.has(fixture.id)) return Response.json({ error: `Duplicate fixture id ${fixture.id}.` }, { status: 400 });
+        duplicateIds.add(fixture.id);
+      }
+      const guarded = await secureLeagueCommand({
+        actor,
+        command: 'league.create_fixtures',
+        leagueId,
+        requiredCapability: 'league.season.manage',
+        handler: async ({ requestId, reason }) => {
+          const seasonRef = adminDb.collection('seasons').doc(seasonId);
+          await adminDb.runTransaction(async (transaction) => {
+            const season = await transaction.get(seasonRef);
+            if (!season.exists || season.data()?.leagueId !== leagueId) {
+              throw new Error('The selected season does not belong to this league.');
+            }
+            if (season.data()?.status === 'archived') {
+              throw new Error('Archived seasons cannot receive new fixtures.');
+            }
+
+            const fixtureRefs = body.fixtures.map((fixture) => adminDb.collection('matches').doc(fixture.id));
+            const existingFixtures = await Promise.all(fixtureRefs.map((fixtureRef) => transaction.get(fixtureRef)));
+            existingFixtures.forEach((existing, index) => {
+              if (existing.exists) throw new Error(`Fixture ${body.fixtures[index].id} already exists.`);
+            });
+
+            const teamIds = [...new Set(body.fixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]))];
+            const teamSnapshots = await Promise.all(
+              teamIds.map((teamId) => transaction.get(adminDb.collection('teams').doc(teamId))),
+            );
+            teamSnapshots.forEach((team, index) => {
+              if (!team.exists || team.data()?.leagueId !== leagueId) {
+                throw new Error(`Team ${teamIds[index]} does not belong to this league.`);
+              }
+            });
+
+            body.fixtures.forEach((fixture, index) => {
+              transaction.set(fixtureRefs[index], {
+                ...fixture,
+                score: { home: null, away: null },
+                verificationStatus: 'pending',
+                supportersCount: fixture.supportersCount ?? 0,
+                totalSupport: fixture.totalSupport ?? 0,
+                events: fixture.events ?? [],
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+            });
+            transaction.update(adminDb.collection('leagues').doc(leagueId), {
+              matchesCount: FieldValue.increment(body.fixtures.length),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: 'created',
+              targetCollection: 'matches',
+              targetId: firstFixture.id,
+              note: reason || `Created ${body.fixtures.length} fixture(s) for ${seasonId}.`,
+              beforeSummary: { leagueId, seasonId, existingFixtureCount: 0 },
+              afterSummary: { leagueId, seasonId, fixtureCount: body.fixtures.length },
+            }));
+          });
+          return Response.json({ ok: true, id: firstFixture.id, count: body.fixtures.length, requestId });
         },
       });
       return 'response' in guarded ? guarded.response : guarded.result;
