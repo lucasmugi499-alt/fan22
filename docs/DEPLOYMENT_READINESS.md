@@ -22,6 +22,17 @@ This performs:
 - dependency advisory gate
 - Next production build
 
+Fantasy staging candidates also require the hosted Auth/Firestore smoke before rules or
+indexes are promoted:
+
+```bash
+npm run staging:fantasy-smoke
+```
+
+That command exercises the deployed API with a real Fan Firebase ID token, scheduler
+authorization, lineup locking, transfer validation, official scoring, and correction
+re-scoring. See `docs/FANTASY_STAGING_SMOKE.md` for required credentials and evidence.
+
 ## Environment Topology
 
 The current investor demo uses Firebase App Hosting in `us-east4`. The default Firebase

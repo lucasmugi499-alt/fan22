@@ -149,6 +149,7 @@ Synthetic data must always remain visibly labelled as demonstration data.
 - [x] Complete match-squad and athlete-event capture for non-scoring appearances
 - [x] Trusted fantasy pipeline integration tests for lineup locking, transfers, scoring, and corrections
 - [ ] Staging Auth/Firestore integration tests for lineup locking, transfers, scoring, and corrections
+  - Runner added: `npm run staging:fantasy-smoke`. Keep unchecked until it passes against the hosted staging app and the evidence report is attached.
 - [x] League and Platform Admin activation workflow browser QA
 - [ ] Candidate fantasy rules and indexes promoted only after staging validation
 
