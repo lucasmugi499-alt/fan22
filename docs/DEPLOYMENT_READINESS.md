@@ -22,6 +22,26 @@ This performs:
 - dependency advisory gate
 - Next production build
 
+## Environment Topology
+
+The current investor demo uses Firebase App Hosting in `us-east4`. The default Firebase
+framework backend region in `firebase.json` is pinned to `us-east4` to avoid accidental
+cross-region server runtime placement for App Router API routes and server rendering.
+
+The demo hosting/control project and the backing Auth/Firestore/Storage project may be
+different during the investor showroom phase. When that is intentional, the App Hosting
+config must make both identities explicit:
+
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`: browser Auth/Firestore/Storage project.
+- `GOALPLACE_ADMIN_PROJECT_ID`: Admin SDK data project.
+- `NEXT_PUBLIC_FIREBASE_DATABASE_ID` and `GOALPLACE_FIRESTORE_DATABASE_ID`: named database,
+  currently `fg256`.
+- `GOALPLACE_APP_BASE_URL`: exact public origin used for invitations, email links,
+  callbacks, and share metadata.
+
+Beta and production should prefer one Firebase project per environment unless there is a
+documented operational reason to split hosting from data.
+
 The Firebase rules emulators require a local Java runtime on `PATH`. If Java is missing,
 `npm run test:rules` fails before executing rule assertions.
 
