@@ -878,6 +878,15 @@ export const mockProvider: GoalPlaceDataProvider = {
     if (!user && !demoProfile) throw new Error('User profile not found.');
     if (user) Object.assign(user, data);
     if (demoProfile) Object.assign(demoProfile, data);
+    if (data.accountStatus) {
+      audit({
+        actorUserId: MOCK_PROFILES.platform_admin.uid,
+        action: data.accountStatus === 'active' ? 'activated' : data.accountStatus === 'suspended' ? 'suspended' : 'disabled',
+        targetCollection: 'users',
+        targetId: userId,
+        note: `Demo account lifecycle set to ${data.accountStatus}.`,
+      });
+    }
     if (data.onboardingCompletedAt) {
       await mockProvider.recordPointsAction({
         userId,
@@ -994,6 +1003,15 @@ export const mockProvider: GoalPlaceDataProvider = {
     const team = teams.find((item) => item.id === teamId);
     if (!team) throw new Error('Team profile not found.');
     Object.assign(team, data);
+    if (data.verified !== undefined || data.verificationStatus !== undefined || data.plan !== undefined) {
+      audit({
+        actorUserId: MOCK_PROFILES.platform_admin.uid,
+        action: data.verificationStatus === 'rejected' ? 'blocked' : data.verificationStatus === 'verified' ? 'verified' : 'updated',
+        targetCollection: 'teams',
+        targetId: teamId,
+        note: 'Demo team record updated from Platform Admin console.',
+      });
+    }
     return result(teamId, 'Team profile updated.');
   },
   async saveRoster(roster) {

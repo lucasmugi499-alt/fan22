@@ -986,7 +986,12 @@ export interface AdminAuditEvent {
     | "accepted"
     | "created"
     | "updated"
-    | "revoked";
+    | "revoked"
+    | "blocked"
+    | "verified"
+    | "activated"
+    | "suspended"
+    | "disabled";
   targetCollection: string;
   targetId: string;
   note?: string;

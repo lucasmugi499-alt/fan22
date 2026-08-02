@@ -111,6 +111,22 @@ const adminActionSchema = z.discriminatedUnion('action', [
     verified: z.boolean().optional(),
   }),
   z.object({
+    action: z.literal('update_team_profile'),
+    teamId: z.string().trim().min(1).max(160),
+    name: z.string().trim().min(2).max(120).optional(),
+    city: z.string().trim().min(2).max(100).optional(),
+    location: z.string().trim().max(160).optional(),
+    description: z.string().trim().max(1000).optional(),
+    plan: z.enum(['free', 'pro']).optional(),
+    verified: z.boolean().optional(),
+    verificationStatus: z.enum(['pending', 'verified', 'rejected', 'disputed']).optional(),
+  }),
+  z.object({
+    action: z.literal('update_user_account'),
+    userId: z.string().trim().min(1).max(160),
+    accountStatus: z.enum(['invited', 'active', 'suspended', 'disabled', 'deletion_pending']),
+  }),
+  z.object({
     action: z.literal('review_approval'),
     targetCollection: z.enum(['athletes', 'leagues', 'leagueAdminApplications']),
     targetId: z.string().trim().min(1).max(160),
@@ -244,6 +260,68 @@ export async function POST(request: Request) {
         ));
       });
       return Response.json({ ok: true, id: leagueId });
+    }
+
+    if (body.action === 'update_team_profile') {
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { teamId } = body;
+      const updates = {
+        name: body.name,
+        city: body.city,
+        location: body.location,
+        description: body.description,
+        plan: body.plan,
+        verified: body.verified,
+        verificationStatus: body.verificationStatus,
+      };
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([, value]) => value !== undefined),
+      );
+      if (!Object.keys(cleanUpdates).length) {
+        return Response.json({ error: 'Provide at least one team field to update.' }, { status: 400 });
+      }
+      const teamRef = adminDb.collection('teams').doc(teamId);
+      await adminDb.runTransaction(async (transaction) => {
+        const team = await transaction.get(teamRef);
+        if (!team.exists) throw new Error('Team not found.');
+        transaction.update(teamRef, {
+          ...cleanUpdates,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          body.verificationStatus === 'rejected' ? 'blocked' : body.verificationStatus === 'verified' ? 'verified' : 'updated',
+          'teams',
+          teamId,
+          'Updated team record from Platform Admin console.',
+        ));
+      });
+      return Response.json({ ok: true, id: teamId });
+    }
+
+    if (body.action === 'update_user_account') {
+      const forbidden = requireRole(actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
+      if (forbidden) return forbidden;
+      const { userId, accountStatus } = body;
+      const userRef = adminDb.collection('users').doc(userId);
+      await adminDb.runTransaction(async (transaction) => {
+        const user = await transaction.get(userRef);
+        if (!user.exists) throw new Error('User account not found.');
+        transaction.update(userRef, {
+          accountStatus,
+          status: accountStatus === 'active' ? 'active' : accountStatus === 'invited' ? 'pending' : 'suspended',
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
+          actor.uid,
+          accountStatus === 'active' ? 'activated' : accountStatus === 'suspended' ? 'suspended' : 'disabled',
+          'users',
+          userId,
+          `Account lifecycle set to ${accountStatus}.`,
+        ));
+      });
+      return Response.json({ ok: true, id: userId });
     }
 
     if (body.action === 'create_team_invitation') {

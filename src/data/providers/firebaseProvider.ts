@@ -657,6 +657,14 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async updateUserProfile(userId, data) {
     const actorUserId = requireActor();
+    if (data.accountStatus) {
+      await requestTrustedAdminAction({
+        action: 'update_user_account',
+        userId,
+        accountStatus: data.accountStatus,
+      });
+      return writeResult(userId, 'Account status updated.');
+    }
     const { db } = requireFirebaseClient();
     await updateDoc(doc(db, 'users', userId), {
       ...data,
@@ -740,6 +748,18 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async updateTeamProfile(teamId, data) {
     requireActor();
+    if (
+      data.verified !== undefined ||
+      data.verificationStatus !== undefined ||
+      data.plan !== undefined
+    ) {
+      await requestTrustedAdminAction({
+        action: 'update_team_profile',
+        teamId,
+        ...data,
+      });
+      return writeResult(teamId, 'Team record updated.');
+    }
     const { db } = requireFirebaseClient();
     await updateDoc(doc(db, 'teams', teamId), {
       ...data,

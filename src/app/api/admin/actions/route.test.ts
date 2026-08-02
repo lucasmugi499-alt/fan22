@@ -231,4 +231,87 @@ describe('trusted admin actions route hardening', () => {
       seasonName: '2027 Season',
     }));
   });
+
+  it('records audited team moderation through the trusted admin route', async () => {
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => snapshot(ref.id, {
+        id: 'team_1',
+        name: 'Kampala Testers',
+      })),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({});
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_team_profile',
+      teamId: 'team_1',
+      verificationStatus: 'rejected',
+      verified: false,
+      plan: 'free',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, id: 'team_1' });
+    expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'teams', id: 'team_1' }), expect.objectContaining({
+      verificationStatus: 'rejected',
+      verified: false,
+      plan: 'free',
+    }));
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'adminAuditEvents' }), expect.objectContaining({
+      actorUserId: 'platform_1',
+      action: 'blocked',
+      targetCollection: 'teams',
+      targetId: 'team_1',
+    }));
+  });
+
+  it('rejects team moderation from non-platform admins', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_team_profile',
+      teamId: 'team_1',
+      verificationStatus: 'verified',
+    })));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
+    expect(adminDb.collection).not.toHaveBeenCalled();
+  });
+
+  it('records audited account lifecycle changes through the trusted admin route', async () => {
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => snapshot(ref.id, {
+        id: 'user_1',
+        role: 'fan',
+      })),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({});
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_user_account',
+      userId: 'user_1',
+      accountStatus: 'suspended',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, id: 'user_1' });
+    expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'users', id: 'user_1' }), expect.objectContaining({
+      accountStatus: 'suspended',
+      status: 'suspended',
+    }));
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ collectionName: 'adminAuditEvents' }), expect.objectContaining({
+      actorUserId: 'platform_1',
+      action: 'suspended',
+      targetCollection: 'users',
+      targetId: 'user_1',
+    }));
+  });
 });
