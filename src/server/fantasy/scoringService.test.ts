@@ -34,6 +34,9 @@ class MemoryDocRef {
   }
 
   async update(data: RecordData) {
+    if (!this.store.has(this.path)) {
+      throw new Error(`No document to update: ${this.path}`);
+    }
     this.store.set(this.path, { ...(this.store.get(this.path) ?? {}), ...data });
   }
 }
@@ -97,6 +100,9 @@ class MemoryBatch {
 
   update(ref: MemoryDocRef, data: RecordData) {
     this.operations.push(() => {
+      if (!this.store.has(ref.path)) {
+        throw new Error(`No document to update: ${ref.path}`);
+      }
       this.store.set(ref.path, { ...(this.store.get(ref.path) ?? {}), ...data });
     });
   }

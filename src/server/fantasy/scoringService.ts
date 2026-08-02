@@ -210,7 +210,7 @@ export async function scoreFinalizedFantasyMatch(
     const writeOperations: BatchOperation[] = [];
     for (const previous of previousEvents) {
       writeOperations.push((batch) =>
-        batch.update(db.collection('fantasyPointEvents').doc(previous.id), {
+        batch.update(db.collection('fantasyPointEvents').doc(documentId(previous.idempotencyKey)), {
           status: 'superseded',
           supersededAt: now,
         }),
