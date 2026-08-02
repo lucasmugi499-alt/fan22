@@ -37,6 +37,12 @@ Supporter chooses a support amount
 -> payout remains pending until destination and KYC controls pass
 ```
 
+If a provider-confirmed settlement arrives after a reservation expires, would overfund a
+need, or references a support need that is no longer available, the platform still
+recognizes the collected money. It writes a held settlement journal that debits PSP
+clearing and credits `refund_payable` for the full charged amount. It does not credit
+`recipient_payable` or `platform_fee_revenue` until compliance resolves the case.
+
 Money is stored as positive integer UGX units. The checkout displays:
 
 - Full recipient support amount

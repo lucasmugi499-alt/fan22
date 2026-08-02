@@ -1,6 +1,11 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
-import { buildContributionSettlement, cappedPointsAward, kampalaPeriod } from '@/lib/money';
+import {
+  buildContributionSettlement,
+  buildHeldContributionSettlement,
+  cappedPointsAward,
+  kampalaPeriod,
+} from '@/lib/money';
 import type { PaymentIntentStatus, PaymentWebhookEvent } from '@/types/money';
 import { paymentTransition } from './paymentState';
 
@@ -65,28 +70,29 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
       return { outcome: 'applied', status: nextStatus };
     }
 
-    const journal = buildContributionSettlement({
-      transactionId: `ledger_${event.paymentIntentId}`,
-      contributionId: event.paymentIntentId,
-      supportAmountMinor: intent.supportAmountMinor,
-      platformFeeMinor: intent.platformFeeMinor,
-      createdAt: event.occurredAt,
-    });
     let need: FirebaseFirestore.DocumentData | undefined;
     let needRef: FirebaseFirestore.DocumentReference | undefined;
     let raisedAmount: number | undefined;
     let excessSupport = false;
+    let holdReason = 'Provider settlement arrived after the support reservation expired or capacity was no longer available.';
     let points = 0;
     if (contribution.supportNeedId) {
       needRef = adminDb.collection('supportNeeds').doc(contribution.supportNeedId);
       const needSnapshot = await transaction.get(needRef);
       need = needSnapshot.data();
-      if (!needSnapshot.exists || !need) throw new Error('Support need is no longer available.');
-      const nextRaisedAmount = (need.raisedAmount ?? 0) + intent.supportAmountMinor;
-      excessSupport =
-        nextRaisedAmount > need.targetAmount ||
-        !reservationSnapshot.exists ||
-        reservationSnapshot.data()?.status !== 'active';
+      if (!needSnapshot.exists || !need) {
+        excessSupport = true;
+        holdReason = 'Provider settlement arrived after the support need was removed or became unavailable.';
+      }
+      const nextRaisedAmount = need ? (need.raisedAmount ?? 0) + intent.supportAmountMinor : 0;
+      if (need && nextRaisedAmount > need.targetAmount) {
+        excessSupport = true;
+        holdReason = 'Provider settlement would overfund the verified support need.';
+      }
+      if (need && (!reservationSnapshot.exists || reservationSnapshot.data()?.status !== 'active')) {
+        excessSupport = true;
+        holdReason = 'Provider settlement arrived after the support reservation expired or capacity was no longer available.';
+      }
       if (!excessSupport) {
         raisedAmount = nextRaisedAmount;
         const pointEvents = await transaction.get(
@@ -106,6 +112,21 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
         points = cappedPointsAward('verified_need_supported', dailyTotal, weeklyTotal);
       }
     }
+    const journal = excessSupport
+      ? buildHeldContributionSettlement({
+          transactionId: `ledger_${event.paymentIntentId}`,
+          contributionId: event.paymentIntentId,
+          supportAmountMinor: intent.supportAmountMinor,
+          platformFeeMinor: intent.platformFeeMinor,
+          createdAt: event.occurredAt,
+        })
+      : buildContributionSettlement({
+          transactionId: `ledger_${event.paymentIntentId}`,
+          contributionId: event.paymentIntentId,
+          supportAmountMinor: intent.supportAmountMinor,
+          platformFeeMinor: intent.platformFeeMinor,
+          createdAt: event.occurredAt,
+        });
     transaction.create(adminDb.collection('ledgerTransactions').doc(journal.transaction.id), {
       ...journal.transaction,
       createdAt: Timestamp.fromDate(occurredAt),
@@ -187,7 +208,7 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
         relatedEntityType: 'contribution',
         relatedEntityId: event.paymentIntentId,
         riskTier: 'enhanced',
-        reason: 'Provider settlement arrived after the support reservation expired or capacity was no longer available.',
+        reason: holdReason,
         status: 'open',
         resolutionOptions: ['refund', 'supporter_redirection'],
         createdAt: FieldValue.serverTimestamp(),
@@ -196,7 +217,7 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
       transaction.create(refundRef, {
         id: refundRef.id,
         contributionId: event.paymentIntentId,
-        amountMinor: intent.supportAmountMinor,
+        amountMinor: intent.totalAmountMinor,
         currency: intent.currency,
         reason: 'invalid_campaign',
         status: 'requested',

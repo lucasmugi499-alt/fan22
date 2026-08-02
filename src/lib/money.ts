@@ -110,6 +110,58 @@ export function buildContributionSettlement({
   return { transaction, entries };
 }
 
+export function buildHeldContributionSettlement({
+  transactionId,
+  contributionId,
+  supportAmountMinor,
+  platformFeeMinor,
+  currency = 'UGX',
+  createdAt,
+}: {
+  transactionId: string;
+  contributionId: string;
+  supportAmountMinor: number;
+  platformFeeMinor: number;
+  currency?: MoneyCurrency;
+  createdAt: string;
+}): { transaction: LedgerTransaction; entries: LedgerEntry[] } {
+  assertMoney(supportAmountMinor);
+  assertMoney(platformFeeMinor);
+  const total = supportAmountMinor + platformFeeMinor;
+  const transaction: LedgerTransaction = {
+    id: transactionId,
+    type: 'contribution_settlement',
+    relatedEntityId: contributionId,
+    currency,
+    idempotencyKey: `contribution_settlement:${contributionId}`,
+    createdAt,
+  };
+  const entries: LedgerEntry[] = [
+    {
+      id: `${transactionId}:psp`,
+      transactionId,
+      accountCode: 'psp_clearing',
+      direction: 'debit',
+      amountMinor: total,
+      currency,
+      relatedEntityId: contributionId,
+      createdAt,
+    },
+    {
+      id: `${transactionId}:refund_payable`,
+      transactionId,
+      accountCode: 'refund_payable',
+      direction: 'credit',
+      amountMinor: total,
+      currency,
+      relatedEntityId: contributionId,
+      createdAt,
+    },
+  ];
+  assertBalancedEntries(entries);
+  return { transaction, entries };
+}
+
 export function buildRecipientPayout({
   transactionId,
   allocationId,

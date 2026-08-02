@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertBalancedEntries,
   buildContributionSettlement,
+  buildHeldContributionSettlement,
   buildChargebackJournal,
   buildRecipientPayout,
   buildRefundJournal,
@@ -33,6 +34,25 @@ describe('money engine', () => {
       createdAt: '2026-07-26T00:00:00.000Z',
     });
     expect(() => assertBalancedEntries(entries)).not.toThrow();
+  });
+
+  it('parks held settlements in refund payable instead of recipient revenue accounts', () => {
+    const { entries } = buildHeldContributionSettlement({
+      transactionId: 'ledger_held_1',
+      contributionId: 'contribution_1',
+      supportAmountMinor: 100_000,
+      platformFeeMinor: 5_000,
+      createdAt: '2026-07-26T00:00:00.000Z',
+    });
+
+    expect(() => assertBalancedEntries(entries)).not.toThrow();
+    expect(entries).toContainEqual(expect.objectContaining({
+      accountCode: 'refund_payable',
+      direction: 'credit',
+      amountMinor: 105_000,
+    }));
+    expect(entries.some((entry) => entry.accountCode === 'recipient_payable')).toBe(false);
+    expect(entries.some((entry) => entry.accountCode === 'platform_fee_revenue')).toBe(false);
   });
 
   it('rejects an unbalanced journal', () => {
