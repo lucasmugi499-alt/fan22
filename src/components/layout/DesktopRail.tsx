@@ -14,6 +14,7 @@ export function DesktopRail({ nav }: { nav: RoleNav }) {
   const pathname = usePathname();
   const all = [...nav.primary, ...nav.more];
   const active = activeHref(pathname, all);
+  const grouped = all.some((destination) => destination.group);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface-1 md:flex">
@@ -25,11 +26,45 @@ export function DesktopRail({ nav }: { nav: RoleNav }) {
       </div>
 
       <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-2">
-        <RailGroup destinations={nav.primary} active={active} />
-        <div className="my-3 h-px bg-border" />
-        <RailGroup destinations={nav.more} active={active} muted />
+        {grouped ? (
+          <GroupedRail destinations={all} active={active} />
+        ) : (
+          <>
+            <RailGroup destinations={nav.primary} active={active} />
+            <div className="my-3 h-px bg-border" />
+            <RailGroup destinations={nav.more} active={active} muted />
+          </>
+        )}
       </nav>
     </aside>
+  );
+}
+
+function GroupedRail({
+  destinations,
+  active,
+}: {
+  destinations: RoleNav['primary'];
+  active: string | null;
+}) {
+  const groups = ['COMMAND', 'NETWORK', 'INTEGRITY', 'GROWTH', 'SYSTEM'] as const;
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => {
+        const items = destinations.filter((destination) => destination.group === group);
+        if (!items.length) return null;
+        return (
+          <div key={group}>
+            <p className="px-3 pb-1.5 text-[10px] font-semibold tracking-[0.18em] text-subtle">{group}</p>
+            <RailGroup destinations={items} active={active} muted={group !== 'COMMAND'} />
+          </div>
+        );
+      })}
+      <div>
+        <p className="px-3 pb-1.5 text-[10px] font-semibold tracking-[0.18em] text-subtle">ACCOUNT</p>
+        <RailGroup destinations={destinations.filter((destination) => !destination.group)} active={active} muted />
+      </div>
+    </div>
   );
 }
 

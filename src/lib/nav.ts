@@ -21,6 +21,10 @@ import {
   MapPin,
   HandHeart,
   DeviceMobile,
+  Key,
+  Pulse,
+  Scroll,
+  UserList,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -38,6 +42,7 @@ export interface NavDestination {
   name: string;
   href: string;
   icon: IconComponent;
+  group?: 'COMMAND' | 'NETWORK' | 'INTEGRITY' | 'GROWTH' | 'SYSTEM';
 }
 
 export interface RoleNav {
@@ -135,16 +140,23 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
   },
   platform_admin: {
-    workspace: 'Governance',
+    workspace: 'Platform Command',
     primary: [
-      { name: 'Control', href: '/admin', icon: SlidersHorizontal },
-      { name: 'Approvals', href: '/admin/approvals', icon: ShieldCheck },
-      { name: 'Trust', href: '/admin/trust', icon: Gavel },
-      { name: 'Reports', href: '/admin/reports', icon: ChartLine },
+      { name: 'Command', href: '/admin', icon: SlidersHorizontal, group: 'COMMAND' },
+      { name: 'Work', href: '/admin/work', icon: ListBullets, group: 'COMMAND' },
+      { name: 'Organizations', href: '/admin/organizations', icon: Buildings, group: 'NETWORK' },
+      { name: 'Trust', href: '/admin/trust', icon: Gavel, group: 'INTEGRITY' },
     ],
     more: [
-      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins },
-      { name: 'Financial operations', href: '/admin/finance', icon: Wallet },
+      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'NETWORK' },
+      { name: 'People', href: '/admin/people', icon: UserList, group: 'NETWORK' },
+      { name: 'Access', href: '/admin/access', icon: Key, group: 'NETWORK' },
+      { name: 'Competition', href: '/admin/competition', icon: Trophy, group: 'INTEGRITY' },
+      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'GROWTH' },
+      { name: 'Finance', href: '/admin/finance', icon: Wallet, group: 'INTEGRITY' },
+      { name: 'Reports', href: '/admin/reports', icon: ChartLine, group: 'GROWTH' },
+      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'SYSTEM' },
+      { name: 'Audit', href: '/admin/audit', icon: Scroll, group: 'SYSTEM' },
       ...COMMON_MORE,
     ],
   },

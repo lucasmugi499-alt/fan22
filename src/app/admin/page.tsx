@@ -1,5 +1,5 @@
-import { PlatformControl } from "@/components/platform/PlatformControl";
+import { CommandCentre } from '@/components/platform/command-centre/CommandCentre';
 
 export default function Page() {
-  return <PlatformControl />;
+  return <CommandCentre />;
 }
