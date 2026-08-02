@@ -30,6 +30,9 @@ env:
   - variable: GOALPLACE_SCHEDULER_AUTH_MODE
     value: shared_secret
     availability: [RUNTIME]
+  - variable: GOALPLACE_FANTASY_SCORING_SECRET
+    secret: goalplaceFantasyScoringSecret
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
     availability: [BUILD]
