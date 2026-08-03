@@ -46,7 +46,7 @@ This is the honest state of the system as of the Build 31 audit.
 | `GOALPLACE_ACCESS_ENGINE_MODE` set explicitly | `tested` | All four App Hosting configs pin it. Production preparation fails on missing/`legacy`/`compare`. |
 | Divergence reporting | `tested` | Durable `securityEvents` records, deduplicated per (user, scope, capability, kind) with an occurrence count. |
 | Firestore Rules use canonical access | `tested` | `firestore.rules.next` authorizes from `accessIndex` only. No legacy `OR`. 103 rules tests. |
-| Platform Admin access desk on canonical data | `designed` | **Still outstanding.** `/admin/access` reads and revokes legacy `teamAssignments`. |
+| Platform Admin access desk on canonical data | `tested` | `/admin/access` reads canonical assignments through a server-paginated endpoint; legacy is a labelled read-only panel. |
 | Capability checks share one implementation | `tested` | `src/server/access/capabilities.ts`. The three duplicates are deleted. |
 | Platform command capability gate | `connected` | `securePlatformCommand` does read canonical `accessIndex` capabilities. |
 | Upload authorization capability gate | `connected` | `uploads/session` does read canonical `accessIndex` capabilities. |
@@ -173,11 +173,9 @@ These were reported against an earlier commit. Treat as stale until re-run.
 | **50 uncovered legacy grants closed** | `designed` | **Stage C blocker.** Each is a live lockout. |
 | **200 users given an explicit `accountClass`** | `designed` | **Stage C blocker.** Account class is currently inferred from the legacy role being retired. |
 | Break-glass path proven working | `designed` | **Stage C prerequisite.** After cutover there is no legacy fallback. |
-| Canonical Platform Admin access desk | `designed` | Stage C |
 | Rules authorize via `accessIndex` | `designed` | Stage C |
 | Emulator denial matrix (revoked / suspended / expired / missing index / wrong scope / fan-as-operator) | `designed` | Stage C |
 | `secureLeagueCommand` legacy arm removed | `designed` | Stage D — kept deliberately as the last legacy fallback until the deployed soak is clean. |
-| Canonical Platform Admin access desk | `designed` | Stage D |
 
 ## Remaining Phase 1 Work
 
