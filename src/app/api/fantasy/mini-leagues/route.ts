@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -26,7 +26,39 @@ const requestSchema = z.discriminatedUnion('action', [
     memberUserId: z.string().trim().min(1).max(180),
     status: z.enum(['active', 'removed']),
   }),
+  z.object({
+    action: z.literal('rotate_invite_code'),
+    miniLeagueId: z.string().trim().min(1).max(180),
+  }),
 ]);
+
+/** Codes are valid for 30 days unless rotated sooner. */
+const INVITE_CODE_TTL_DAYS = 30;
+
+/**
+ * Invite codes are stored as a hash, never in plaintext.
+ *
+ * A stored plaintext code is a bearer credential sitting in a document that platform
+ * operators and any future export can read, and it was queried by equality on the
+ * plaintext value. Hashing means a database read cannot hand anyone a working code; the
+ * only copy is the one shown once to the creator.
+ *
+ * Not salted per record, deliberately: the join path has to find a league from the code
+ * alone, which requires a deterministic lookup. Guessing is bounded by the code's
+ * entropy, the abuse limit on the join action, and expiry.
+ */
+function inviteCodeHash(code: string) {
+  return createHash('sha256').update(code.trim().toUpperCase()).digest('hex');
+}
+
+function issueInviteCode(now = new Date()) {
+  const code = randomBytes(5).toString('hex').toUpperCase();
+  return {
+    code,
+    hash: inviteCodeHash(code),
+    expiresAt: new Date(now.getTime() + INVITE_CODE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
 
 function tokenFrom(request: Request) {
   const header = request.headers.get('authorization');
@@ -122,7 +154,7 @@ export async function POST(request: Request) {
     const leagueRef = adminDb.collection('fantasyMiniLeagues').doc();
     const memberRef = adminDb.collection('fantasyMiniLeagueMembers')
       .doc(`${leagueRef.id}_${actor.uid}`);
-    const inviteCode = randomBytes(5).toString('hex').toUpperCase();
+    const invite = issueInviteCode();
     const batch = adminDb.batch();
     batch.create(leagueRef, {
       id: leagueRef.id,
@@ -130,7 +162,9 @@ export async function POST(request: Request) {
       ownerUserId: actor.uid,
       name: input.name,
       description: input.description,
-      inviteCode,
+      // The plaintext code is returned to the creator once and never stored.
+      inviteCodeHash: invite.hash,
+      inviteCodeExpiresAt: invite.expiresAt,
       visibility: input.visibility,
       approvalRequired: input.approvalRequired,
       memberLimit: input.memberLimit,
@@ -148,7 +182,31 @@ export async function POST(request: Request) {
       joinedAt: FieldValue.serverTimestamp(),
     });
     await batch.commit();
-    return Response.json({ id: leagueRef.id, inviteCode }, { status: 201 });
+    return Response.json({
+      id: leagueRef.id,
+      inviteCode: invite.code,
+      inviteCodeExpiresAt: invite.expiresAt,
+    }, { status: 201 });
+  }
+
+  if (input.action === 'rotate_invite_code') {
+    const leagueRef = adminDb.collection('fantasyMiniLeagues').doc(input.miniLeagueId);
+    const league = await leagueRef.get();
+    if (!league.exists || league.data()?.ownerUserId !== actor.uid) {
+      return Response.json({ error: 'Only the mini-league owner may rotate the invite code.' }, { status: 403 });
+    }
+    // Rotation is how a leaked code is revoked: the old hash stops matching immediately.
+    const invite = issueInviteCode();
+    await leagueRef.set({
+      inviteCodeHash: invite.hash,
+      inviteCodeExpiresAt: invite.expiresAt,
+      inviteCodeRotatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return Response.json({
+      id: input.miniLeagueId,
+      inviteCode: invite.code,
+      inviteCodeExpiresAt: invite.expiresAt,
+    });
   }
 
   if (input.action === 'moderate') {
@@ -174,12 +232,17 @@ export async function POST(request: Request) {
   }
 
   const leagueQuery = await adminDb.collection('fantasyMiniLeagues')
-    .where('inviteCode', '==', input.inviteCode.toUpperCase())
+    .where('inviteCodeHash', '==', inviteCodeHash(input.inviteCode))
     .where('status', '==', 'active')
     .limit(1)
     .get();
   if (leagueQuery.empty) return Response.json({ error: 'Invite code was not found.' }, { status: 404 });
   const league = leagueQuery.docs[0];
+  const inviteExpiresAt = league.data().inviteCodeExpiresAt;
+  if (typeof inviteExpiresAt === 'string' && Date.parse(inviteExpiresAt) <= Date.now()) {
+    // Same message as an unknown code: a distinct one would confirm the code is real.
+    return Response.json({ error: 'Invite code was not found.' }, { status: 404 });
+  }
   const fantasyTeam = await adminDb.collection('fantasyTeams')
     .doc(`${league.data().competitionId}_${actor.uid}`)
     .get();
