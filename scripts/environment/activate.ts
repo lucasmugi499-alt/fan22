@@ -4,6 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertSafeProductionEnvironment, type GoalPlaceEnvironment } from '../../src/lib/environment';
 
+/**
+ * PREPARES an environment; it does not switch public traffic.
+ *
+ * This script validates configuration, records the intended target in local activation
+ * state and writes an audit report. It does NOT change Cloudflare or DNS routing, does
+ * NOT change App Hosting routing, does NOT purge caches and does NOT mutate any
+ * database. Until a real gateway exists, `goalplace256.com` continues to serve whatever
+ * it served before this ran.
+ *
+ * The npm scripts are named `environment:prepare:*` for that reason. Do not rename them
+ * back to `activate` without implementing actual traffic switching.
+ */
+
 export type SwitchableEnvironment = 'demo' | 'beta' | 'production';
 export type ActiveEnvironment = SwitchableEnvironment | 'maintenance';
 export type EnvironmentAction = 'status' | 'activate' | 'maintenance' | 'rollback';
@@ -300,11 +313,12 @@ export function activateEnvironment(
     state: next,
     reportPath: next.lastActivationReport,
     lines: [
-      `Active environment: ${next.activeEnvironment}`,
+      `Prepared environment: ${next.activeEnvironment}`,
       `Previous environment: ${next.previousEnvironment ?? 'none'}`,
       `Environment version: ${next.environmentVersion}`,
       `Audit report: ${next.lastActivationReport}`,
       'Database mutation: none',
+      'Public traffic switched: no — this records intent only; DNS, gateway and App Hosting routing are unchanged.',
     ],
   };
 }

@@ -48,15 +48,30 @@ async function getLimited(collectionName: string, max = 120, orderField?: string
   }
 }
 
-async function getCount(collectionName: string) {
-  const collection = adminDb.collection(collectionName) as FirebaseFirestore.CollectionReference & {
-    count?: () => { get: () => Promise<{ data: () => { count?: number } }> };
-  };
-  if (typeof collection.count === 'function') {
-    const snapshot = await collection.count().get();
+type CountableQuery = {
+  count?: () => { get: () => Promise<{ data: () => { count?: number } }> };
+  limit: (value: number) => { get: () => Promise<{ size: number }> };
+};
+
+/**
+ * Counts across the whole collection rather than the display window. The panels below
+ * read a bounded slice of each collection for listing; deriving totals from that slice
+ * would report a fraction of reality (the demo carries 540 matches behind a 260-record
+ * window). Equality-only filters are served by automatic single-field indexes, so these
+ * need no composite index.
+ */
+async function getCount(collectionName: string, equalityFilters: Record<string, string> = {}) {
+  const collection = adminDb.collection(collectionName);
+  const query = Object.entries(equalityFilters).reduce<FirebaseFirestore.Query>(
+    (current, [field, value]) => current.where(field, '==', value),
+    collection,
+  ) as FirebaseFirestore.Query & CountableQuery;
+
+  if (typeof query.count === 'function') {
+    const snapshot = await query.count().get();
     return Number(snapshot.data().count ?? 0);
   }
-  const snapshot = await collection.limit(250).get();
+  const snapshot = await query.limit(250).get();
   return snapshot.size;
 }
 
@@ -182,6 +197,8 @@ export async function GET(request: Request) {
     teamCount,
     athleteCount,
     matchCount,
+    officialMatches,
+    disputedResults,
   ] = await Promise.all([
     getLimited('leagues', 180),
     getLimited('teams', 220),
@@ -196,6 +213,9 @@ export async function GET(request: Request) {
     getCount('teams'),
     getCount('athletes'),
     getCount('matches'),
+    // A match is official only when it was played AND its result was verified.
+    getCount('matches', { status: 'completed', verificationStatus: 'verified' }),
+    getCount('matches', { verificationStatus: 'disputed' }),
   ]);
 
   const failedFinalizations = finalizations.filter((record) => stringValue(record.status) === 'failed').length;
@@ -204,12 +224,6 @@ export async function GET(request: Request) {
   )).length;
   const suspendedLeagues = leagues.filter((record) => stringValue(record.status) === 'suspended' || stringValue(record.lifecycleStatus) === 'suspended').length;
   const blockedTeams = teams.filter((record) => stringValue(record.verificationStatus) === 'rejected').length;
-  const officialMatches = matches.filter((record) => (
-    stringValue(record.verificationStatus) === 'verified'
-    || stringValue(record.status) === 'official'
-    || record.official === true
-  )).length;
-  const disputedResults = matches.filter((record) => stringValue(record.verificationStatus) === 'disputed').length;
   const suspendedAccounts = users.filter((record) => ['suspended', 'disabled', 'deletion_pending'].includes(stringValue(record.accountStatus))).length;
   const pendingApplications = applications.filter((record) => {
     const status = stringValue(record.status);
@@ -245,10 +259,12 @@ export async function GET(request: Request) {
       { label: 'Active leagues', value: leagueCount - suspendedLeagues },
       { label: 'Active teams', value: teamCount - blockedTeams },
       { label: 'Registered athletes', value: athleteCount },
-      { label: 'Official matches', value: officialMatches || matchCount },
-      { label: 'Verified-result rate', value: `${Math.round((officialMatches / Math.max(1, matches.length)) * 100)}%` },
+      { label: 'Official matches', value: officialMatches },
+      { label: 'Verified-result rate', value: `${Math.round((officialMatches / Math.max(1, matchCount)) * 100)}%` },
       { label: 'Results disputed', value: disputedResults },
-      { label: 'Data-completeness rate', value: `${Math.round((athletes.filter((record) => stringValue(record.teamId)).length / Math.max(1, athletes.length)) * 100)}%` },
+      // Roster linkage only — the share of athletes attached to a team. This is not sport-data
+      // completeness, which requires official event coverage the finalizer does not yet produce.
+      { label: 'Roster-linkage rate', value: `${Math.round((athletes.filter((record) => stringValue(record.teamId)).length / Math.max(1, athletes.length)) * 100)}%` },
       { label: 'Suspended accounts', value: suspendedAccounts },
     ],
     recentActivity: auditEvents.map((record) => ({

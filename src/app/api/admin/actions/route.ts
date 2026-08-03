@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -1062,9 +1062,14 @@ export async function POST(request: Request) {
 
     return Response.json({ error: 'Unsupported admin action.' }, { status: 400 });
   } catch (error) {
-    console.error('Trusted admin action failed', error);
+    // Internal failure text can carry collection names, document IDs and provider
+    // details. Log it server-side and hand the caller only a correlation ID so an
+    // operator can quote it to support without the response leaking internals.
+    const errorId = randomUUID();
+    console.error('Trusted admin action failed', { errorId, error });
     return Response.json({
-      error: error instanceof Error ? error.message : 'The trusted action failed.',
+      error: 'The trusted action failed. Quote this reference when reporting it.',
+      errorId,
     }, { status: 500 });
   }
 }

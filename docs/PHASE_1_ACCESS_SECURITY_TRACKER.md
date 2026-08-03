@@ -1,8 +1,25 @@
 # Phase 1 Access Security Tracker
 
+## Status Vocabulary
+
+Every row below uses one of these levels. Nothing may be described as "complete".
+A claim may only carry a level it has actually reached.
+
+| Level | Meaning |
+| --- | --- |
+| `designed` | The approach is agreed and written down. No code. |
+| `implemented` | Code exists. Nothing depends on it in a running path yet. |
+| `connected` | Production code paths actually call it. |
+| `tested` | Automated tests cover it locally (unit and/or emulator). |
+| `deployed` | It is running in a deployed environment. |
+| `verified` | Proven in the deployed environment by authenticated end-to-end evidence. |
+
+A component can be `implemented` and still be authoritative over nothing. That is
+precisely the condition Phase 1 exists to end, so the distinction is load-bearing.
+
 ## Approved Identity Decision
 
-GoalPlace256 now targets the fixed account-class model approved for Phase 1:
+GoalPlace256 targets the fixed account-class model approved for Phase 1:
 
 - `fan`: public registration, fantasy, support, feed activity, follows, discovery, and fan notifications.
 - `athlete`: invitation or profile claim only, Career Passport, performance records, support needs, challenges, and athlete notifications.
@@ -13,65 +30,134 @@ Fan accounts cannot become Team Admin or League Admin accounts. Athlete accounts
 
 Within an Organization Operator account, scoped assignment switching is allowed. For example, one operator account may be League Admin for one league, Team Admin for one team, and Results Reporter for another team.
 
-## Phase 1 Rollout Modes
+**Phase 1 does not change this model.** It is an authorization convergence project
+*inside* the existing account classes. Fan and operator identities are never merged.
 
-`GOALPLACE_ACCESS_ENGINE_MODE` controls the migration:
+## Current Authority Reality
 
-- `legacy`: return the existing `accessIndex` projection.
-- `compare`: compute assignment-derived access and legacy projection, log divergences, but return legacy projection.
-- `assignments`: return assignment-derived access.
+This is the honest state of the system as of the Build 31 audit.
 
-Default mode is `compare`. In compare mode, the system deliberately avoids granting additional access from assignment disagreements until projections are validated.
+| Concern | Level | Reality |
+| --- | --- | --- |
+| Canonical `accessAssignments` model | `implemented` | The model, capabilities and permission bundles exist and are correct. |
+| Deterministic `accessIndex` projection | `implemented` | `buildAccessIndexDocuments` is deterministic and tested — but it is not the only writer. |
+| Single projector owning every index write | `designed` | **Does not exist.** Index documents are written ad hoc in at least three routes. |
+| Server resolver returns canonical access | `implemented` | Returns **legacy** in both `legacy` and `compare` modes. `compare` is the code default. |
+| `GOALPLACE_ACCESS_ENGINE_MODE` set explicitly | `designed` | No `apphosting.*.yaml` sets it. Every environment falls through to the `compare` default. |
+| Divergence reporting | `implemented` | `console.warn` only. Not durable, not reviewable, not alertable. |
+| Firestore Rules use canonical access | `designed` | Rules authorize via `leagues/teams.adminUserIds`. `accessIndex` appears only as its own read rule. |
+| Platform Admin access desk on canonical data | `designed` | `/admin/access` reads and revokes legacy `teamAssignments`. |
+| Capability checks share one implementation | `designed` | Two separate `hasCapability` implementations exist in unrelated files. |
+| Platform command capability gate | `connected` | `securePlatformCommand` does read canonical `accessIndex` capabilities. |
+| Upload authorization capability gate | `connected` | `uploads/session` does read canonical `accessIndex` capabilities. |
 
-## Phase 1A Scope
+**Consequence:** the platform presents a modern scoped-assignment architecture while
+still authorizing most operations from legacy arrays. Revoking a canonical assignment
+does not reliably remove access, and updating a legacy array does not reliably grant it.
 
-This slice implements the first migration footing:
+## Approved Transition — Do Not Shortcut
 
-- Server-side trusted access resolver.
-- `GET /api/access/context` for authenticated users.
-- Real client sessions load scoped access from the trusted endpoint.
-- Demo sessions continue using local mock access indexes.
-- Deterministic assignment projection with sorted indexes, roles, capabilities, and assignment IDs.
-- Divergence logging between legacy and assignment projections in compare mode.
-- Trusted context includes the resolved account class so clients can separate fan, athlete, organization operator, and platform operator experiences.
+A live `legacy OR canonical` rule was considered and **rejected**. It would prevent
+lockouts but preserve stale privilege: a user whose canonical assignment was revoked
+would stay authorized through an unsynchronized `adminUserIds` entry. Failing open on
+revocation is worse than a visible migration error.
+
+### Stage A — Legacy live, canonical shadow
+
+- Firestore Rules keep the current authority.
+- The server computes both legacy and canonical decisions.
+- Every divergence is written to a durable server-owned `securityEvents` record.
+- No canonical rule authorization yet.
+
+### Stage B — Repair and verify
+
+- One deterministic projector owns every `accessIndex` write.
+- Every assignment mutation routes through it.
+- Backfill canonical assignments and indexes; run drift detection; repair.
+- Verify all demo users and organization scopes.
+- Reach zero blocking divergence.
+- Break-glass and repair paths must be operational **before** Stage C, because after
+  cutover there is no legacy fallback.
+
+### Stage C — Canonical cutover
+
+- Server flips to `assignments` first (fastest rollback), then Rules flip to
+  deterministic `accessIndex` lookups. Rollback runs in reverse.
+- `adminUserIds` and `teamAssignments` become display/migration fields only.
+- No authorization `OR` is retained.
+
+### Stage D — Soak, then remove legacy
+
+- Monitor denials, projection drift, invitation failures, cross-scope denials.
+- Remove legacy authorization code only after the approved soak period.
+
+### Required mode configuration
+
+| Environment | Mode |
+| --- | --- |
+| Demo during migration | `compare` |
+| Demo after approved cutover | `assignments` |
+| Beta | `assignments` |
+| Production | `assignments` |
+
+Production deployment must **fail** if the mode is missing, `legacy` or `compare`.
 
 ## Rollback
 
-If Phase 1A causes an access-context issue:
-
 1. Set `GOALPLACE_ACCESS_ENGINE_MODE=legacy`.
 2. Redeploy the app.
-3. The trusted endpoint will return existing `accessIndex` documents only.
+3. The trusted endpoint returns existing `accessIndex` documents only.
 4. Demo mode is unaffected because it does not call the trusted endpoint.
 
 No destructive data migration is included in Phase 1A.
 
 ## Evidence
 
-| Check | Status | Evidence |
+Evidence is only valid for the commit that produced it. Re-run before relying on a row.
+
+### Re-verified in the current pass
+
+| Check | Level | Evidence |
 | --- | --- | --- |
-| Deterministic projection tests | Pass | `npm test -- src/lib/auth/access.test.ts src/server/access/resolver.test.ts src/app/api/access/context/route.test.ts` passed 9 tests. |
-| Trusted context route tests | Pass | `npm test -- src/lib/auth/access.test.ts src/server/access/resolver.test.ts src/app/api/access/context/route.test.ts` passed 9 tests. |
-| Full unit suite | Pass | `npm test` passed 61 files and 704 tests. |
-| Lint | Pass | `npm run lint` passed. |
-| Firestore/storage rules | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run test:rules` passed 2 files and 81 tests. |
-| Functions typecheck | Pass | `npm run functions:typecheck` passed. |
-| Functions build | Pass | `npm run functions:build` passed. |
-| App build | Pass | `npm run build` passed, including `/api/access/context` in the production route map. |
-| Demo validation | Pass | `npm run demo:validate` passed. |
-| Security audit gate | Pass | `npm run security:audit` passed with registered temporary exceptions. |
-| Combined release gate | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run deploy:ready` passed. |
-| Corrected account-class decision | Pass | Current slice updates docs/code/tests to fixed account classes. |
-| Safe invitation preview | Pass | Current slice adds `/api/access/invitations/[invitationId]`, verified in `npm test` and production route map. |
-| Super Admin direct write removal | Pass | Firestore and Storage catch-all writes now fail for Super Admin browser clients; `npm run test:rules` passed 83 tests with Java 21. |
-| Immutable audit hardening | Pass | `adminAuditEvents` and legacy `adminLogs` are server-write-only; Super Admin browser update/delete attempts are covered by rules tests. |
-| Assignment lifecycle API | Pass | `transition_access_assignment` supports platform-admin suspension, revocation, expiry, and reactivation while rebuilding the exact scoped `accessIndex`. |
-| Invitation acceptance projection rebuild | Pass | `accept_invitation` now rebuilds the scoped `accessIndex` from active assignments instead of merging roles/capabilities with `arrayUnion`. |
-| Demo/Firebase compatibility report | Pass | `npm run access:compat` audits users, account classes, scoped assignments, and deterministic access-index projections; bundled demo reports 1,068 assignments, 1,068 indexes, 0 blockers, and 0 warnings. |
-| Live manifest compatibility report | Pass | `npx tsx --env-file=.env.local scripts/access/compatibility-report.ts --firebase --project manifest-quasar-479416-s7 --database fg256` returned 0 blockers after the investor demo merge. Warnings are limited to pre-existing partial demo records left in place by the non-destructive seed. |
-| Live role smoke | Pass | `npm run staging:role-smoke -- --project manifest-quasar-479416-s7 --allow-production` passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app`; evidence is `reports/staging/role-auth-firestore-smoke-role_20260802224456_6ad0e51d.json`. |
-| Live fantasy smoke | Pass | `npm run staging:fantasy-smoke -- --project manifest-quasar-479416-s7 --allow-production` passed against `https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app`; evidence is `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`. |
+| Full unit suite | `tested` | `npx vitest run` — 76 files, 772 tests passed. |
+
+### Recorded previously, NOT re-verified in the current pass
+
+These were reported against an earlier commit. Treat as stale until re-run.
+
+| Check | Level | Evidence |
+| --- | --- | --- |
+| Deterministic projection tests | `tested` | Access, resolver and context route tests passed (9 tests). |
+| Lint | `tested` | `npm run lint` passed. |
+| Firestore/storage rules | `tested` | `npm run test:rules` passed 2 files, 83 tests, under Java 21. |
+| Functions typecheck / build | `tested` | `npm run functions:typecheck` and `functions:build` passed. |
+| App build | `tested` | `npm run build` passed, including `/api/access/context`. |
+| Demo validation | `tested` | `npm run demo:validate` passed. |
+| Security audit gate | `tested` | `npm run security:audit` passed with registered temporary exceptions. |
+| Combined release gate | `tested` | `npm run deploy:ready` passed. |
+| Demo compatibility report | `tested` | `npm run access:compat` — 1,068 assignments, 1,068 indexes, 0 blockers, 0 warnings. |
+| Live manifest compatibility report | `verified` | Live report returned 0 blockers after the investor demo merge. Warnings limited to pre-existing partial demo records. |
+| Live role smoke | `verified` | `reports/staging/role-auth-firestore-smoke-role_20260802224456_6ad0e51d.json`. |
+| Live fantasy smoke | `verified` | `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`. |
+
+### Not yet evidenced
+
+| Check | Level | Blocking |
+| --- | --- | --- |
+| Single projector owns all index writes | `designed` | Stage B |
+| Durable divergence records | `designed` | Stage A |
+| Explicit access mode per environment | `designed` | Stage A |
+| Canonical Platform Admin access desk | `designed` | Stage C |
+| Rules authorize via `accessIndex` | `designed` | Stage C |
+| Emulator denial matrix (revoked / suspended / expired / missing index / wrong scope / fan-as-operator) | `designed` | Stage C |
+| Production startup guard on access mode | `designed` | Stage C |
 
 ## Remaining Phase 1 Work
 
-Phase 1 audit blockers are complete. Keep `GOALPLACE_ACCESS_ENGINE_MODE=compare` for the investor demo while legacy partial demo records still exist in the live database. Move to `assignments` after a deliberate production data cleanup or migration pass reduces the live compatibility report to 0 blockers and 0 warnings.
+**Phase 1 is not complete.** The previous revision of this document stated that the
+Phase 1 audit blockers were complete while the resolver still returned legacy access,
+Firestore Rules still authorized through `adminUserIds`, and the Platform Admin access
+desk still managed legacy `teamAssignments`. That claim was wrong and has been removed.
+
+Outstanding, in order: build the projector, route every mutation through it, persist
+divergence, backfill and verify, then cut over Rules and server together per Stage C.

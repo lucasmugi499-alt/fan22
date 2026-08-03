@@ -32,7 +32,17 @@ export async function processVerifiedPaymentEvent(event: PaymentWebhookEvent): P
   const period = kampalaPeriod(occurredAt);
 
   return adminDb.runTransaction(async (transaction) => {
-    if ((await transaction.get(eventRef)).exists) return { outcome: 'duplicate', status: 'payment_pending' };
+    if ((await transaction.get(eventRef)).exists) {
+      // A replayed webhook must report the payment's real current state. Reporting a fixed
+      // 'payment_pending' told callers a settled, failed or cancelled payment was still in
+      // flight, which is the one answer that is never true for an already-processed event.
+      const settledIntent = await transaction.get(intentRef);
+      const storedStatus = settledIntent.data()?.status;
+      return {
+        outcome: 'duplicate',
+        status: (typeof storedStatus === 'string' ? storedStatus : paymentStatus(event)) as PaymentIntentStatus,
+      };
+    }
     const [intentSnapshot, contributionSnapshot, reservationSnapshot] = await Promise.all([
       transaction.get(intentRef),
       transaction.get(contributionRef),

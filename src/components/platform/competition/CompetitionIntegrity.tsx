@@ -1,6 +1,7 @@
 'use client';
 
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { isOfficialMatch } from '@/lib/status';
 import { disputedMatches } from '@/lib/platform/platformContext';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -14,7 +15,7 @@ export function CompetitionIntegrity() {
   const disputes = disputedMatches(data.matches);
   const failedFinalizations = data.finalizations.filter((item) => item.status === 'failed');
   const overdue = data.matches.filter((item) => item.verificationStatus === 'pending' && item.status === 'completed');
-  const official = data.matches.filter((item) => item.verificationStatus === 'verified' || item.status === 'completed');
+  const official = data.matches.filter(isOfficialMatch);
 
   if (data.loading) return <Skeleton className="h-[560px] rounded-[var(--radius-lg)]" />;
 

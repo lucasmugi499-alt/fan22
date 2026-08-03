@@ -12,6 +12,7 @@ import {
 } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { isOfficialMatch } from '@/lib/status';
 import { pendingApprovals, openReports, disputedMatches } from '@/lib/platform/platformContext';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -73,7 +74,7 @@ function buildDemoPayload(data: ReturnType<typeof useGoalPlaceData>): CommandCen
   const suspendedLeagues = data.leagues.filter((item) => item.status === 'suspended').length;
   const suspendedTeams = data.teams.filter((item) => item.verificationStatus === 'rejected').length;
   const suspendedAccounts = data.users.filter((item) => ['suspended', 'disabled', 'deletion_pending'].includes(item.accountStatus ?? '')).length;
-  const officialMatches = data.matches.filter((item) => item.verificationStatus === 'verified' || item.status === 'completed').length;
+  const officialMatches = data.matches.filter(isOfficialMatch).length;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -127,7 +128,7 @@ function buildDemoPayload(data: ReturnType<typeof useGoalPlaceData>): CommandCen
       { label: 'Official matches', value: officialMatches },
       { label: 'Verified-result rate', value: `${Math.round((officialMatches / Math.max(1, data.matches.length)) * 100)}%` },
       { label: 'Results disputed', value: disputes.length },
-      { label: 'Data-completeness rate', value: `${Math.round((data.athletes.filter((item) => item.teamId).length / Math.max(1, data.athletes.length)) * 100)}%` },
+      { label: 'Roster-linkage rate', value: `${Math.round((data.athletes.filter((item) => item.teamId).length / Math.max(1, data.athletes.length)) * 100)}%` },
       { label: 'Suspended accounts', value: suspendedAccounts },
     ],
     recentActivity: data.adminAuditEvents.slice(0, 8).map((item) => ({

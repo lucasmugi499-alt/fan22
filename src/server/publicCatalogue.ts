@@ -2,7 +2,34 @@ import 'server-only';
 
 import { investorDemo } from '@/data/investorDemo';
 import { adminDb } from '@/lib/firebase/admin';
+import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
 import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
+
+export type PublicCatalogueSource = 'live' | 'curated_preview' | 'configured_preview';
+
+/**
+ * Every public loader reports which dataset answered it, so a page can disclose that it
+ * is showing preview records rather than live ones.
+ *
+ * The source is returned explicitly rather than held in request-scoped state. A
+ * `React.cache` store only memoizes inside a render pass — called from a route handler
+ * or any non-render context it silently hands back a fresh value, which would report
+ * "live" during an actual outage. An explicit return cannot drift from the read.
+ */
+export type CatalogueResult<T> = { data: T; source: PublicCatalogueSource };
+
+function live<T>(data: T): CatalogueResult<T> {
+  return { data, source: 'live' };
+}
+
+/**
+ * Mock mode is a deliberate configuration, not an outage, so it is reported separately
+ * from a fallback. Only a fallback warrants telling the reader that live services are
+ * unavailable.
+ */
+function configured<T>(data: T): CatalogueResult<T> {
+  return { data, source: 'configured_preview' };
+}
 
 function usesFirebaseData() {
   return (
@@ -11,15 +38,27 @@ function usesFirebaseData() {
   );
 }
 
+/**
+ * Only the demo and local environments may substitute the curated dataset for a failed
+ * live read. Beta and production must surface the outage instead: silently serving
+ * synthetic records to real league operators would misrepresent their own competitions.
+ */
+function syntheticFallbackAllowed(env: NodeJS.ProcessEnv = process.env) {
+  const environment = goalPlaceEnvironment(env);
+  if (environment !== 'demo' && environment !== 'local') return false;
+  return environmentFlags(env).allowDemoLogin;
+}
+
 async function withSyntheticDemoFallback<T>(
   load: () => Promise<T>,
   fallback: () => T,
-): Promise<T> {
+): Promise<CatalogueResult<T>> {
   try {
-    return await load();
+    return live(await load());
   } catch (cause) {
-    if (process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN !== 'true') throw cause;
-    return fallback();
+    if (!syntheticFallbackAllowed()) throw cause;
+    console.error('GoalPlace256 public catalogue fell back to the curated preview dataset', cause);
+    return { data: fallback(), source: 'curated_preview' };
   }
 }
 
@@ -38,13 +77,19 @@ function record<T>(id: string, data: FirebaseFirestore.DocumentData) {
   return normalize({ id, ...data }) as T;
 }
 
+/**
+ * Returns the newest records, not an arbitrary page of them. A bare `.limit()` returns
+ * documents in key order, so "recent" surfaces were showing whichever records happened to
+ * sort first by ID. Every collection read here carries a required `createdAt`, so ordering
+ * cannot silently drop documents.
+ */
 async function recentCollection<T>(name: string, limit: number) {
-  const snapshot = await adminDb.collection(name).limit(limit).get();
+  const snapshot = await adminDb.collection(name).orderBy('createdAt', 'desc').limit(limit).get();
   return snapshot.docs.map((item) => record<T>(item.id, item.data()));
 }
 
 export async function getPublicLeagues() {
-  if (!usesFirebaseData()) return investorDemo.leagues;
+  if (!usesFirebaseData()) return configured(investorDemo.leagues);
   return withSyntheticDemoFallback(
     () => recentCollection<League>('leagues', 24),
     () => investorDemo.leagues,
@@ -52,7 +97,7 @@ export async function getPublicLeagues() {
 }
 
 export async function getPublicTeams() {
-  if (!usesFirebaseData()) return investorDemo.teams;
+  if (!usesFirebaseData()) return configured(investorDemo.teams);
   return withSyntheticDemoFallback(
     () => recentCollection<Team>('teams', 80),
     () => investorDemo.teams,
@@ -66,7 +111,7 @@ export async function getPublicLeagueDiscoveryData() {
     matches: investorDemo.matches,
     seasons: investorDemo.seasons,
   });
-  if (!usesFirebaseData()) return fallback();
+  if (!usesFirebaseData()) return configured(fallback());
   return withSyntheticDemoFallback(
     async () => {
       const [leagues, teams, matches, seasons] = await Promise.all([
@@ -92,7 +137,7 @@ export async function getPublicLeagueProfileData(leagueId: string) {
     feedPosts: investorDemo.feedPosts.filter((post) => post.relatedLeagueId === leagueId).slice(0, 12),
     leagueNotices: investorDemo.leagueNotices.filter((notice) => notice.leagueId === leagueId).slice(0, 12),
   });
-  if (!usesFirebaseData()) return fallback();
+  if (!usesFirebaseData()) return configured(fallback());
   return withSyntheticDemoFallback(
     async () => {
       const [league, teams, matches, seasons, athletes, feedPosts, leagueNotices] = await Promise.all([
@@ -118,7 +163,7 @@ export async function getPublicLeagueProfileData(leagueId: string) {
 }
 
 export async function getPublicAthletes() {
-  if (!usesFirebaseData()) return investorDemo.athletes.slice(0, 48);
+  if (!usesFirebaseData()) return configured(investorDemo.athletes.slice(0, 48));
   return withSyntheticDemoFallback(
     () => recentCollection<Athlete>('athletes', 48),
     () => investorDemo.athletes.slice(0, 48),
@@ -126,7 +171,7 @@ export async function getPublicAthletes() {
 }
 
 export async function getPublicMatches() {
-  if (!usesFirebaseData()) return investorDemo.matches;
+  if (!usesFirebaseData()) return configured(investorDemo.matches);
   return withSyntheticDemoFallback(
     async () => {
       const snapshot = await adminDb.collection('matches')
@@ -151,7 +196,7 @@ export async function getPublicLandingData() {
     ],
     challenges: investorDemo.challenges.slice(0, 12),
   });
-  if (!usesFirebaseData()) return fallback();
+  if (!usesFirebaseData()) return configured(fallback());
   return withSyntheticDemoFallback(
     async () => {
       const [leagues, teams, athletes, matches, challenges] = await Promise.all([

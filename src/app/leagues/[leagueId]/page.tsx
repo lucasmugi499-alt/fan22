@@ -1,4 +1,5 @@
 import { LeaguePublic } from "@/components/core/LeaguePublic";
+import { PreviewDataNotice } from "@/components/ui/PreviewDataNotice";
 import { leagues } from "@/data/mockDatabase";
 import { getPublicLeagueProfileData } from "@/server/publicCatalogue";
 
@@ -15,5 +16,11 @@ export default async function Page({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  return <LeaguePublic leagueId={leagueId} initialData={await getPublicLeagueProfileData(leagueId)} />;
+  const { data: initialData, source } = await getPublicLeagueProfileData(leagueId);
+  return (
+    <>
+      <PreviewDataNotice source={source} className="mx-auto mt-3 w-[min(100%-2rem,72rem)]" />
+      <LeaguePublic leagueId={leagueId} initialData={initialData} />
+    </>
+  );
 }

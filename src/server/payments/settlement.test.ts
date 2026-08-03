@@ -113,4 +113,46 @@ describe('payment settlement accounting', () => {
       data: expect.objectContaining({ amountMinor: 105_000 }),
     }));
   });
+
+  it.each([
+    ['settled', 'settled'],
+    ['failed', 'failed'],
+    ['cancelled', 'cancelled'],
+  ])('reports the stored intent status %s when a webhook is replayed', async (storedStatus, expected) => {
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: vi.fn((id = `${collectionName}_generated`) => ref(collectionName, id)),
+    }) as never);
+    const transaction = {
+      get: vi.fn(async (documentRef: { collectionName: string; id: string }) => {
+        // The webhook event already exists, so this delivery is a replay.
+        if (documentRef.collectionName === 'paymentWebhookEvents') return snapshot({ id: 'sandbox:event_1' });
+        if (documentRef.collectionName === 'paymentIntents') {
+          return snapshot({ id: 'payment_1', status: storedStatus });
+        }
+        return snapshot(undefined);
+      }),
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+
+    const result = await processVerifiedPaymentEvent({
+      provider: 'sandbox',
+      eventId: 'event_1',
+      paymentIntentId: 'payment_1',
+      status: 'settled',
+      amountMinor: 105_000,
+      currency: 'UGX',
+      occurredAt: '2026-07-30T12:00:00.000Z',
+      providerRequestReference: 'provider_request_1',
+      providerFinancialReference: 'provider_financial_1',
+      verifiedByStatusQuery: true,
+    });
+
+    // A replay previously always answered 'payment_pending', which is the one state an
+    // already-processed payment can never be in.
+    expect(result).toEqual({ outcome: 'duplicate', status: expected });
+    expect(transaction.create).not.toHaveBeenCalled();
+    expect(transaction.update).not.toHaveBeenCalled();
+  });
 });

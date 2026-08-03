@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { Landing } from '@/components/marketing/Landing';
+import { PreviewDataNotice } from '@/components/ui/PreviewDataNotice';
 import { getPublicLandingData } from '@/server/publicCatalogue';
 
 export const metadata: Metadata = {
@@ -12,8 +13,11 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
-  const initialData = await getPublicLandingData();
+  const { data: initialData, source } = await getPublicLandingData();
   return (
-    <Landing initialData={initialData} />
+    <>
+      <PreviewDataNotice source={source} className="mx-auto mt-3 w-[min(100%-2rem,72rem)]" />
+      <Landing initialData={initialData} />
+    </>
   );
 }

@@ -1,5 +1,13 @@
 # GoalPlace256 Environment Activation
 
+> **Status: designed, not implemented.** The `environment:prepare:*` commands validate
+> configuration, record the intended target and write an audit report. **They do not switch
+> public traffic.** No edge gateway, DNS change, App Hosting routing change or cache purge
+> is performed, and no database is mutated. The routing model described below is the target
+> design; until it exists, `goalplace256.com` keeps serving whatever it served before.
+>
+> The commands are named `prepare`, not `activate`, for exactly this reason.
+
 GoalPlace256 uses one public URL and isolated backing environments. Switching the public experience changes traffic routing only. It must not copy, delete, or migrate an entire dataset.
 
 ## Public Model
@@ -83,7 +91,7 @@ Read current state:
 npm run environment:status
 ```
 
-Activate demo:
+Prepare demo:
 
 ```bash
 GOALPLACE_ACTIVATION_IDENTITY="name@example.com" \
@@ -91,10 +99,10 @@ GOALPLACE_BACKUP_CONFIRMED=true \
 GOALPLACE_HEALTHCHECK_PASSED=true \
 GOALPLACE_CACHE_PURGED=true \
 GOALPLACE_POST_SWITCH_SMOKE_PASSED=true \
-npm run environment:activate:demo
+npm run environment:prepare:demo
 ```
 
-Activate production:
+Prepare production:
 
 ```bash
 GOALPLACE_ACTIVATION_IDENTITY="name@example.com" \
@@ -103,7 +111,7 @@ GOALPLACE_HEALTHCHECK_PASSED=true \
 GOALPLACE_CACHE_PURGED=true \
 GOALPLACE_POST_SWITCH_SMOKE_PASSED=true \
 GOALPLACE_PRODUCTION_CONFIRM="ACTIVATE GOALPLACE256 PRODUCTION" \
-npm run environment:activate:production
+npm run environment:prepare:production
 ```
 
 Enter maintenance:

@@ -112,6 +112,7 @@ async function requestTrustedAdminAction(payload: Record<string, unknown>) {
   });
   const body = await response.json().catch(() => ({})) as {
     error?: string;
+    errorId?: string;
     id?: string;
     count?: number;
     actionUrl?: string;
@@ -119,7 +120,12 @@ async function requestTrustedAdminAction(payload: Record<string, unknown>) {
     emailMessageId?: string;
     emailError?: string;
   };
-  if (!response.ok) throw new Error(body.error ?? 'GoalPlace256 could not complete this action.');
+  if (!response.ok) {
+    const message = body.error ?? 'GoalPlace256 could not complete this action.';
+    // Unexpected failures return a correlation ID instead of internal detail; keep it
+    // visible so an operator can quote it when reporting the problem.
+    throw new Error(body.errorId ? `${message} (reference ${body.errorId})` : message);
+  }
   return body;
 }
 
