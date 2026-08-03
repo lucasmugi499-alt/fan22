@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import { MarketingMobileMenu } from '@/components/marketing/MarketingMobileMenu';
+import { GoalPlaceLockup } from '@/components/brand/GoalPlaceBrand';
 
 const FOOTER_LINKS = [
   {
@@ -45,13 +46,8 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       </a>
       <header className="glass fixed inset-x-0 top-0 z-30 border-b border-border">
         <div className="mx-auto flex h-[4.25rem] max-w-7xl items-center justify-between px-[var(--gutter)]">
-          <Link href="/" className="group flex items-center gap-2.5" aria-label="GoalPlace256 home">
-            <span className="grid h-8 w-8 place-items-center rounded-sm bg-brand text-sm font-black text-on-brand shadow-[var(--glow-brand)] transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-105">
-              G
-            </span>
-            <span className="font-display text-[15px] font-semibold text-text-strong">
-              GoalPlace256
-            </span>
+          <Link href="/" className="group flex items-center" aria-label="GoalPlace256 home">
+            <GoalPlaceLockup className="transition-transform duration-200 group-hover:-rotate-1 group-hover:scale-[1.015]" />
           </Link>
           <nav className="flex items-center gap-1 text-sm" aria-label="Primary navigation">
             <Link
@@ -119,13 +115,8 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto max-w-7xl px-[var(--gutter)] py-12 sm:py-16">
           <div className="grid gap-12 sm:grid-cols-[1.4fr_2fr]">
             <div>
-              <Link href="/" className="inline-flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-sm bg-brand text-sm font-black text-on-brand">
-                  G
-                </span>
-                <span className="font-display text-base font-semibold text-text-strong">
-                  GoalPlace256
-                </span>
+              <Link href="/" className="inline-flex items-center" aria-label="GoalPlace256 home">
+                <GoalPlaceLockup size="lg" />
               </Link>
               <p className="mt-5 max-w-sm text-sm leading-6 text-muted">
                 The verified operating platform for grassroots sport. Starting in Uganda. Built for

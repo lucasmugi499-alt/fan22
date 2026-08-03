@@ -11,6 +11,7 @@ import { useUserNotifications } from '@/lib/firebase/useGoalPlaceData';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { storeSelectedAssignmentId } from '@/lib/auth/assignmentSelection';
 import { scopedIdsForAccess } from '@/lib/auth/clientAccess';
+import { GoalPlaceMark } from '@/components/brand/GoalPlaceBrand';
 
 const ROLE_LABEL: Record<string, string> = {
   fan: 'Fan',
@@ -63,11 +64,7 @@ export function TopBar({ nav, role }: { nav: RoleNav; role: AppRole | null }) {
     <>
     <header className="glass sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between gap-3 border-b border-border px-[var(--gutter)]">
       <div className="flex min-w-0 items-center gap-2.5">
-        <span
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-brand text-on-brand text-sm font-bold shadow-[var(--glow-brand)] md:hidden"
-        >
-          G
-        </span>
+        <GoalPlaceMark size="sm" className="md:hidden" />
         <span className="truncate font-display text-[17px] font-semibold tracking-tight text-text-strong">
           {nav.workspace}
         </span>

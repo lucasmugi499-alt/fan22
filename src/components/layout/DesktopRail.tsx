@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import type { RoleNav } from '@/lib/nav';
 import { activeHref } from './navActive';
+import { GoalPlaceLockup } from '@/components/brand/GoalPlaceBrand';
 
 /**
  * Desktop global nav: a vertical rail replacing the mobile bottom nav. Same destinations,
@@ -18,11 +19,8 @@ export function DesktopRail({ nav }: { nav: RoleNav }) {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface-1 md:flex">
-      <div className="flex h-14 items-center gap-2 px-5">
-        <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] bg-brand text-on-brand text-sm font-bold">
-          G
-        </span>
-        <span className="font-display text-[15px] font-semibold text-text-strong">GoalPlace256</span>
+      <div className="flex h-14 items-center px-5">
+        <GoalPlaceLockup size="sm" />
       </div>
 
       <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-2">
