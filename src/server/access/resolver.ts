@@ -10,7 +10,7 @@ import {
   AccessScopeType,
   buildAccessIndexDocuments,
 } from '@/lib/auth/access';
-import { AccessEngineMode, accessEngineMode, returnsLegacyProjection } from '@/lib/auth/accessMode';
+import { AccessEngineMode, accessEngineMode } from '@/lib/auth/accessMode';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
 import { recordAccessDivergence } from './securityEvents';
 import type { AccountClass, AppRole } from '@/types';
@@ -186,7 +186,10 @@ export async function resolveTrustedAccessContext(
   const [profile, assignments, legacyIndexes] = await Promise.all([
     loadUserProfile(userId),
     mode === 'legacy' ? Promise.resolve([]) : loadAssignments(userId, nowIso),
-    returnsLegacyProjection(mode) ? loadLegacyIndexes(userId) : Promise.resolve([]),
+    // Legacy indexes are still loaded in `assignments` mode so the Stage D soak can keep
+    // observing disagreement after the cutover. Monitoring that stops the moment the
+    // cutover happens cannot tell you the cutover was safe.
+    mode === 'legacy' ? Promise.resolve([]) : loadLegacyIndexes(userId),
   ]);
 
   const assignmentContext = contextFromIndexes(
@@ -201,7 +204,7 @@ export async function resolveTrustedAccessContext(
   );
   const legacyContext = contextFromIndexes(userId, legacyIndexes, profile.accessVersion);
 
-  if (mode === 'compare' && accessContextsDiverge(legacyContext, assignmentContext)) {
+  if (mode !== 'legacy' && accessContextsDiverge(legacyContext, assignmentContext)) {
     // Recorded per scope rather than as one blob so each disagreement is independently
     // reviewable and closes independently. A console warning could not be reviewed at
     // all, and the cutover gate is "divergence has reached zero" — which needs evidence

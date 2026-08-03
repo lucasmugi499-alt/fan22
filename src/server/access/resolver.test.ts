@@ -127,6 +127,40 @@ describe('trusted access resolver', () => {
     }));
   });
 
+  it('keeps recording divergence after the cutover to assignments mode', async () => {
+    mockCollections({
+      user: { role: 'team_admin', accountClass: 'organization_operator', accessVersion: 2 },
+      assignments: [],
+      indexes: [{
+        id: 'team_team_9_user_1',
+        data: {
+          userId: 'user_1',
+          scopeType: 'team',
+          scopeId: 'team_9',
+          activeRoles: ['team_admin'],
+          capabilities: ['team.profile.manage'],
+          assignmentIds: ['stale_assignment'],
+          accessVersion: 1,
+          updatedAt: '2026-07-30T01:00:00.000Z',
+        },
+      }],
+    });
+
+    const context = await resolveTrustedAccessContext('user_1', { mode: 'assignments', now });
+
+    // Canonical wins: the stale legacy projection grants nothing.
+    expect(context.indexes).toHaveLength(0);
+    // But the disagreement is still observed. Monitoring that stopped at the cutover
+    // could not tell anyone whether the cutover was safe.
+    expect(recordAccessDivergence).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user_1',
+      scopeType: 'team',
+      scopeId: 'team_9',
+      legacyDecision: true,
+      assignmentDecision: false,
+    }));
+  });
+
   it('uses assignment projections in assignments mode and excludes inactive assignments', async () => {
     mockCollections({
       user: {

@@ -42,18 +42,17 @@ This is the honest state of the system as of the Build 31 audit.
 | Canonical `accessAssignments` model | `implemented` | The model, capabilities and permission bundles exist and are correct. |
 | Deterministic `accessIndex` projection | `implemented` | `buildAccessIndexDocuments` is deterministic and tested — but it is not the only writer. |
 | Single projector owning every index write | `tested` | `src/server/access/projector.ts` is the sole writer. The three ad hoc write sites are gone. |
-| Server resolver returns canonical access | `implemented` | Returns **legacy** in both `legacy` and `compare` modes. `compare` is the code default. |
+| Server resolver returns canonical access | `tested` | Demo pinned to `assignments`. Legacy is still read so divergence recording survives the soak. |
 | `GOALPLACE_ACCESS_ENGINE_MODE` set explicitly | `tested` | All four App Hosting configs pin it. Production preparation fails on missing/`legacy`/`compare`. |
 | Divergence reporting | `tested` | Durable `securityEvents` records, deduplicated per (user, scope, capability, kind) with an occurrence count. |
-| Firestore Rules use canonical access | `designed` | Rules authorize via `leagues/teams.adminUserIds`. `accessIndex` appears only as its own read rule. |
-| Platform Admin access desk on canonical data | `designed` | `/admin/access` reads and revokes legacy `teamAssignments`. |
+| Firestore Rules use canonical access | `tested` | `firestore.rules.next` authorizes from `accessIndex` only. No legacy `OR`. 103 rules tests. |
+| Platform Admin access desk on canonical data | `designed` | **Still outstanding.** `/admin/access` reads and revokes legacy `teamAssignments`. |
 | Capability checks share one implementation | `tested` | `src/server/access/capabilities.ts`. The three duplicates are deleted. |
 | Platform command capability gate | `connected` | `securePlatformCommand` does read canonical `accessIndex` capabilities. |
 | Upload authorization capability gate | `connected` | `uploads/session` does read canonical `accessIndex` capabilities. |
 
-**Consequence:** the platform presents a modern scoped-assignment architecture while
-still authorizing most operations from legacy arrays. Revoking a canonical assignment
-does not reliably remove access, and updating a legacy array does not reliably grant it.
+**Stage C is done in code.** Firestore Rules and the server resolver both authorize from
+canonical assignments; `adminUserIds` grants nothing. Not yet deployed.
 
 ## Approved Transition — Do Not Shortcut
 
@@ -79,12 +78,22 @@ revocation is worse than a visible migration error.
 - Break-glass and repair paths must be operational **before** Stage C, because after
   cutover there is no legacy fallback.
 
-### Stage C — Canonical cutover
+### Stage C — Canonical cutover — BUILT, NOT DEPLOYED
 
-- Server flips to `assignments` first (fastest rollback), then Rules flip to
-  deterministic `accessIndex` lookups. Rollback runs in reverse.
-- `adminUserIds` and `teamAssignments` become display/migration fields only.
-- No authorization `OR` is retained.
+- Rules authorize from `accessIndex` only; `adminUserIds` is no longer an authority
+  anywhere in `firestore.rules.next`.
+- Demo pinned to `GOALPLACE_ACCESS_ENGINE_MODE=assignments`.
+- 16 denial-matrix tests pin the property, including the case a `legacy OR canonical`
+  rule would have kept authorizing.
+
+**Deploy order** (both are independently reversible, which is what makes this safe):
+
+1. Deploy the app with `assignments`. Verify. Rollback = redeploy with `legacy`.
+2. Deploy `firestore.rules.next`. Rollback = redeploy the previous ruleset.
+
+Reverse that order to roll back. Do not deploy the Rules first: Rules govern browser
+writes, and the Admin SDK bypasses them, so a Rules-first deploy would leave client
+writes on canonical authority while the server still answered from legacy.
 
 ### Stage D — Soak, then remove legacy
 
@@ -167,7 +176,8 @@ These were reported against an earlier commit. Treat as stale until re-run.
 | Canonical Platform Admin access desk | `designed` | Stage C |
 | Rules authorize via `accessIndex` | `designed` | Stage C |
 | Emulator denial matrix (revoked / suspended / expired / missing index / wrong scope / fan-as-operator) | `designed` | Stage C |
-| `secureLeagueCommand` legacy arm removed | `designed` | Stage C |
+| `secureLeagueCommand` legacy arm removed | `designed` | Stage D — kept deliberately as the last legacy fallback until the deployed soak is clean. |
+| Canonical Platform Admin access desk | `designed` | Stage D |
 
 ## Remaining Phase 1 Work
 

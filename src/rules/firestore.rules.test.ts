@@ -48,6 +48,56 @@ const TEAM_B_ADMIN = 'user_team_b';
 const LEAGUE_ADMIN = 'user_league';
 const OUTSIDER = 'user_outsider';
 
+// Principals used only by the canonical-authority matrix below.
+const REVOKED_ADMIN = 'user_revoked';
+const SUSPENDED_ADMIN = 'user_suspended';
+const EXPIRED_ADMIN = 'user_expired';
+const LEGACY_ONLY_ADMIN = 'user_legacy_only';
+const RESULTS_ONLY = 'user_results_only';
+
+const TEAM_CAPABILITIES = [
+  'team.profile.manage',
+  'team.staff.invite',
+  'team.roster.manage',
+  'team.athlete.create',
+  'team.athlete.invite',
+  'team.result.submit',
+  'team.result.confirm',
+  'team.update.publish',
+];
+
+const LEAGUE_CAPABILITIES = [
+  'league.profile.manage',
+  'league.season.manage',
+  'league.team.create',
+  'league.team_admin.invite',
+  'league.roster.verify',
+  'league.result.resolve',
+  'league.notice.publish',
+];
+
+/**
+ * Mirrors what the server-side projector writes. Rules authorize from this document and
+ * nothing else, so a scope with no document here is denied outright.
+ */
+function accessIndexDoc(
+  userId: string,
+  scopeType: 'league' | 'team',
+  scopeId: string,
+  capabilities: string[],
+) {
+  return {
+    userId,
+    scopeType,
+    scopeId,
+    activeRoles: ['team_admin'],
+    capabilities,
+    assignmentIds: [`assignment_${scopeType}_${scopeId}_${userId}`],
+    accessVersion: 1,
+    updatedAt: '2026-03-01T00:00:00.000Z',
+  };
+}
+
 function submissionDoc(overrides: Record<string, unknown> = {}) {
   return {
     matchId: 'match_001',
@@ -97,6 +147,31 @@ beforeEach(async () => {
     await setDoc(doc(db, 'teams/team_a'), { name: 'Team A', adminUserIds: [TEAM_A_ADMIN] });
     await setDoc(doc(db, 'teams/team_b'), { name: 'Team B', adminUserIds: [TEAM_B_ADMIN] });
     await setDoc(doc(db, 'leagues/league_001'), { name: 'League', adminUserIds: [LEAGUE_ADMIN] });
+
+    // Canonical grants. LEGACY_ONLY_ADMIN is deliberately present in the adminUserIds
+    // array above but has no accessIndex document: after the cutover the array grants
+    // nothing.
+    await setDoc(doc(db, 'teams/team_a'), {
+      name: 'Team A',
+      adminUserIds: [TEAM_A_ADMIN, LEGACY_ONLY_ADMIN, REVOKED_ADMIN, SUSPENDED_ADMIN, EXPIRED_ADMIN],
+    });
+    await setDoc(
+      doc(db, `accessIndex/team_team_a_${TEAM_A_ADMIN}`),
+      accessIndexDoc(TEAM_A_ADMIN, 'team', 'team_a', TEAM_CAPABILITIES),
+    );
+    await setDoc(
+      doc(db, `accessIndex/team_team_b_${TEAM_B_ADMIN}`),
+      accessIndexDoc(TEAM_B_ADMIN, 'team', 'team_b', TEAM_CAPABILITIES),
+    );
+    await setDoc(
+      doc(db, `accessIndex/league_league_001_${LEAGUE_ADMIN}`),
+      accessIndexDoc(LEAGUE_ADMIN, 'league', 'league_001', LEAGUE_CAPABILITIES),
+    );
+    // A narrower bundle: may report results, may not edit the team profile.
+    await setDoc(
+      doc(db, `accessIndex/team_team_a_${RESULTS_ONLY}`),
+      accessIndexDoc(RESULTS_ONLY, 'team', 'team_a', ['team.result.submit', 'team.result.confirm']),
+    );
     await setDoc(doc(db, `users/${OUTSIDER}`), {
       uid: OUTSIDER,
       email: 'fan@example.com',
@@ -1386,6 +1461,130 @@ describe('GoalPlace Fantasy trust boundary', () => {
       miniLeagueId: 'private_league',
       userId: OUTSIDER,
       status: 'active',
+    }));
+  });
+});
+
+/**
+ * The canonical-authority denial matrix.
+ *
+ * These pin the property the migration exists to establish: authority comes from the
+ * accessIndex projection and from nothing else. A revoked, suspended or expired
+ * assignment leaves no projection, and a legacy adminUserIds entry is not a grant.
+ */
+describe('canonical access authority', () => {
+  it('allows a team admin holding a canonical grant', async () => {
+    await assertSucceeds(setDoc(
+      doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'),
+      submissionDoc(),
+    ));
+  });
+
+  it('denies a team admin acting on a team they do not hold', async () => {
+    await assertFails(setDoc(
+      doc(asUser(TEAM_B_ADMIN), 'resultSubmissions/match_001'),
+      submissionDoc(),
+    ));
+  });
+
+  it.each([
+    ['revoked', REVOKED_ADMIN],
+    ['suspended', SUSPENDED_ADMIN],
+    ['expired', EXPIRED_ADMIN],
+  ])('denies a %s assignment even though the legacy array still lists the user', async (_label, uid) => {
+    // The projector deletes the index when no active assignment remains. This is the
+    // exact case a `legacy OR canonical` rule would have kept authorizing.
+    await assertFails(setDoc(
+      doc(asUser(uid), 'resultSubmissions/match_001'),
+      submissionDoc({ submittedByUserId: uid }),
+    ));
+  });
+
+  it('denies a user present only in the legacy adminUserIds array', async () => {
+    await assertFails(setDoc(
+      doc(asUser(LEGACY_ONLY_ADMIN), 'resultSubmissions/match_001'),
+      submissionDoc({ submittedByUserId: LEGACY_ONLY_ADMIN }),
+    ));
+  });
+
+  it('denies a fan with no assignment anywhere', async () => {
+    await assertFails(setDoc(
+      doc(asUser(OUTSIDER), 'resultSubmissions/match_001'),
+      submissionDoc({ submittedByUserId: OUTSIDER }),
+    ));
+  });
+
+  it('denies an unauthenticated caller', async () => {
+    await assertFails(setDoc(
+      doc(testEnv.unauthenticatedContext().firestore(), 'resultSubmissions/match_001'),
+      submissionDoc(),
+    ));
+  });
+
+  it('enforces capability granularity on team profile edits', async () => {
+    // Results-only holds a team grant, so it may report results...
+    await assertSucceeds(setDoc(
+      doc(asUser(RESULTS_ONLY), 'resultSubmissions/match_001'),
+      submissionDoc({ submittedByUserId: RESULTS_ONLY }),
+    ));
+    // ...but profile editing requires team.profile.manage specifically.
+    await assertFails(updateDoc(doc(asUser(RESULTS_ONLY), 'teams/team_a'), {
+      name: 'Renamed by a results reporter',
+    }));
+  });
+
+  it('allows a team profile edit for a holder of team.profile.manage', async () => {
+    await assertSucceeds(updateDoc(doc(asUser(TEAM_A_ADMIN), 'teams/team_a'), {
+      name: 'Team A Renamed',
+    }));
+  });
+
+  it('denies a league profile edit from a team admin of that league', async () => {
+    await assertFails(updateDoc(doc(asUser(TEAM_A_ADMIN), 'leagues/league_001'), {
+      name: 'Renamed by a team admin',
+    }));
+  });
+
+  it('allows a league profile edit for the assigned league admin', async () => {
+    await assertSucceeds(updateDoc(doc(asUser(LEAGUE_ADMIN), 'leagues/league_001'), {
+      name: 'League Renamed',
+    }));
+  });
+
+  it('denies a league admin of another league', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'leagues/league_002'), { name: 'Other', adminUserIds: [] });
+    });
+    await assertFails(updateDoc(doc(asUser(LEAGUE_ADMIN), 'leagues/league_002'), {
+      name: 'Cross-league edit',
+    }));
+  });
+
+  it('nobody with a client credential may write the access index itself', async () => {
+    // If a client could author this document it could grant itself any capability.
+    for (const uid of [TEAM_A_ADMIN, LEAGUE_ADMIN, OUTSIDER]) {
+      await assertFails(setDoc(
+        doc(asUser(uid), `accessIndex/team_team_a_${uid}`),
+        accessIndexDoc(uid, 'team', 'team_a', TEAM_CAPABILITIES),
+      ));
+    }
+  });
+
+  it('nobody with a client credential may write an access assignment', async () => {
+    for (const uid of [TEAM_A_ADMIN, LEAGUE_ADMIN, OUTSIDER]) {
+      await assertFails(setDoc(doc(asUser(uid), `accessAssignments/forged_${uid}`), {
+        userId: uid,
+        roleKey: 'team_admin',
+        scopeType: 'team',
+        scopeId: 'team_a',
+        status: 'active',
+      }));
+    }
+  });
+
+  it('denies escalation by adding yourself to a legacy admin array', async () => {
+    await assertFails(updateDoc(doc(asUser(OUTSIDER), 'teams/team_a'), {
+      adminUserIds: [OUTSIDER],
     }));
   });
 });

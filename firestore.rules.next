@@ -22,36 +22,70 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    function hasAdminList(data) {
-      return data.adminUserIds is list;
-    }
-
-    function uidInAdminList(data) {
-      return signedIn() && hasAdminList(data) && request.auth.uid in data.adminUserIds;
-    }
-
     function leaguePath(leagueId) {
       return /databases/$(database)/documents/leagues/$(leagueId);
-    }
-
-    function canManageLeagueById(leagueId) {
-      return isPlatformAdmin() ||
-        (signedIn() &&
-          exists(leaguePath(leagueId)) &&
-          hasAdminList(get(leaguePath(leagueId)).data) &&
-          request.auth.uid in get(leaguePath(leagueId)).data.adminUserIds);
     }
 
     function teamPath(teamId) {
       return /databases/$(database)/documents/teams/$(teamId);
     }
 
+    /**
+     * Canonical authority.
+     *
+     * `accessIndex` document ids are deterministic — `{scopeType}_{scopeId}_{uid}` — so a
+     * scope check is a direct lookup rather than a scan, and it costs fewer document
+     * accesses than the exists()+get() pair on the league/team document it replaces.
+     *
+     * The index is written only by the server-side projector, and only as a deterministic
+     * projection of active accessAssignments. Revoked, suspended and expired assignments
+     * are excluded, and the document is DELETED when no active assignment remains — so
+     * absence is a real denial, not an empty allow.
+     *
+     * Deliberately NOT `legacy OR canonical`: a stale adminUserIds entry would keep
+     * authorizing a user whose assignment had been revoked, which is the one failure this
+     * migration exists to remove. Availability is protected instead by backfilling every
+     * legacy grant before cutover (npm run access:migrate:gate).
+     */
+    function accessIndexPath(scopeType, scopeId) {
+      return /databases/$(database)/documents/accessIndex/$(scopeType + '_' + scopeId + '_' + request.auth.uid);
+    }
+
+    function scopeCapabilities(scopeType, scopeId) {
+      return get(accessIndexPath(scopeType, scopeId)).data.capabilities;
+    }
+
+    function hasScopeCapability(scopeType, scopeId, capabilities) {
+      return signedIn() &&
+        exists(accessIndexPath(scopeType, scopeId)) &&
+        scopeCapabilities(scopeType, scopeId).hasAny(capabilities);
+    }
+
+    function canManageLeagueById(leagueId) {
+      return isPlatformAdmin() ||
+        hasScopeCapability('league', leagueId, [
+          'league.profile.manage',
+          'league.season.manage',
+          'league.team.create',
+          'league.team_admin.invite',
+          'league.roster.verify',
+          'league.result.resolve',
+          'league.notice.publish',
+        ]);
+    }
+
     function canManageTeamById(teamId) {
       return isPlatformAdmin() ||
-        (signedIn() &&
-          exists(teamPath(teamId)) &&
-          hasAdminList(get(teamPath(teamId)).data) &&
-          request.auth.uid in get(teamPath(teamId)).data.adminUserIds);
+        hasScopeCapability('team', teamId, [
+          'team.profile.manage',
+          'team.staff.invite',
+          'team.roster.manage',
+          'team.athlete.create',
+          'team.athlete.invite',
+          'team.result.submit',
+          'team.result.confirm',
+          'team.update.publish',
+        ]);
     }
 
     function athletePath(athleteId) {
@@ -215,7 +249,7 @@ service cloud.firestore {
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
       allow update: if isPlatformAdmin() ||
-        (uidInAdminList(resource.data) && changedKeysWithin([
+        (hasScopeCapability('team', teamId, ['team.profile.manage']) && changedKeysWithin([
           'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
           'teamAdminName', 'teamAdminEmail', 'lastUpdated', 'updatedAt'
         ]));
@@ -226,7 +260,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isPlatformAdmin();
       allow update: if isPlatformAdmin() ||
-        (uidInAdminList(resource.data) && changedKeysWithin([
+        (hasScopeCapability('league', leagueId, ['league.profile.manage']) && changedKeysWithin([
           'name', 'city', 'description', 'logoUrl', 'logoURL',
           'currentSeasonId', 'verificationRules', 'updatedAt'
         ]));
@@ -897,7 +931,10 @@ service cloud.firestore {
     match /sponsors/{sponsorId} {
       allow read: if true;
       allow create: if isPlatformAdmin();
-      allow update: if isPlatformAdmin() || (signedIn() && resource.data.adminUserIds is list && request.auth.uid in resource.data.adminUserIds);
+      // Sponsor records carry no scoped assignment model of their own, so the legacy
+      // array here is retired outright rather than migrated: platform operators manage
+      // sponsors through trusted commands.
+      allow update: if isPlatformAdmin();
       allow delete: if isSuperAdmin();
     }
 

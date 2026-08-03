@@ -27,10 +27,11 @@ env:
   - variable: GOALPLACE_REQUIRE_APP_CHECK
     value: "false"
     availability: [RUNTIME]
-  # Demo runs Stage A of the access migration: legacy stays enforced while the
-    # canonical decision is computed alongside it and divergence is recorded.
+  # Stage C: canonical assignments are authoritative, matching firestore.rules.next.
+    # Legacy indexes are still read so the soak keeps recording divergence.
+    # Both cutover gates read zero (npm run access:migrate:gate).
   - variable: GOALPLACE_ACCESS_ENGINE_MODE
-    value: compare
+    value: assignments
     availability: [RUNTIME]
   - variable: GOALPLACE_SCHEDULER_AUTH_MODE
     value: shared_secret
