@@ -27,6 +27,10 @@ env:
   - variable: GOALPLACE_REQUIRE_APP_CHECK
     value: "true"
     availability: [RUNTIME]
+  # Production authorizes from canonical assignments only. Startup asserts this.
+  - variable: GOALPLACE_ACCESS_ENGINE_MODE
+    value: assignments
+    availability: [RUNTIME]
   - variable: GOALPLACE_SCHEDULER_AUTH_MODE
     value: oidc
     availability: [RUNTIME]

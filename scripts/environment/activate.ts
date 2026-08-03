@@ -202,6 +202,9 @@ function validateTarget(
       GOALPLACE_ALLOW_REAL_PAYMENTS: 'false',
       GOALPLACE_ENABLE_INVESTOR_TOOLS: 'false',
       NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS: 'false',
+      // Read from the config being prepared rather than assumed, so a production file
+      // that omits the access mode — or pins it to a legacy-returning mode — fails here.
+      GOALPLACE_ACCESS_ENGINE_MODE: values.get('GOALPLACE_ACCESS_ENGINE_MODE'),
     } as NodeJS.ProcessEnv);
   }
 

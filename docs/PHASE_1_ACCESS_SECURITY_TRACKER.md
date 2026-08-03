@@ -41,13 +41,13 @@ This is the honest state of the system as of the Build 31 audit.
 | --- | --- | --- |
 | Canonical `accessAssignments` model | `implemented` | The model, capabilities and permission bundles exist and are correct. |
 | Deterministic `accessIndex` projection | `implemented` | `buildAccessIndexDocuments` is deterministic and tested — but it is not the only writer. |
-| Single projector owning every index write | `designed` | **Does not exist.** Index documents are written ad hoc in at least three routes. |
+| Single projector owning every index write | `tested` | `src/server/access/projector.ts` is the sole writer. The three ad hoc write sites are gone. |
 | Server resolver returns canonical access | `implemented` | Returns **legacy** in both `legacy` and `compare` modes. `compare` is the code default. |
-| `GOALPLACE_ACCESS_ENGINE_MODE` set explicitly | `designed` | No `apphosting.*.yaml` sets it. Every environment falls through to the `compare` default. |
-| Divergence reporting | `implemented` | `console.warn` only. Not durable, not reviewable, not alertable. |
+| `GOALPLACE_ACCESS_ENGINE_MODE` set explicitly | `tested` | All four App Hosting configs pin it. Production preparation fails on missing/`legacy`/`compare`. |
+| Divergence reporting | `tested` | Durable `securityEvents` records, deduplicated per (user, scope, capability, kind) with an occurrence count. |
 | Firestore Rules use canonical access | `designed` | Rules authorize via `leagues/teams.adminUserIds`. `accessIndex` appears only as its own read rule. |
 | Platform Admin access desk on canonical data | `designed` | `/admin/access` reads and revokes legacy `teamAssignments`. |
-| Capability checks share one implementation | `designed` | Two separate `hasCapability` implementations exist in unrelated files. |
+| Capability checks share one implementation | `tested` | `src/server/access/capabilities.ts`. The three duplicates are deleted. |
 | Platform command capability gate | `connected` | `securePlatformCommand` does read canonical `accessIndex` capabilities. |
 | Upload authorization capability gate | `connected` | `uploads/session` does read canonical `accessIndex` capabilities. |
 
@@ -117,9 +117,20 @@ Evidence is only valid for the commit that produced it. Re-run before relying on
 
 ### Re-verified in the current pass
 
+Each command was run separately; results are its own, not inferred from another.
+
 | Check | Level | Evidence |
 | --- | --- | --- |
-| Full unit suite | `tested` | `npx vitest run` — 76 files, 772 tests passed. |
+| Lint | `tested` | `npm run lint` — clean, 0 warnings. |
+| Typecheck | `tested` | `npx tsc --noEmit` — 246 errors, all in `.test.ts`, identical to the pre-change baseline. 0 in production source. |
+| Full unit suite | `tested` | `npx vitest run` — 80 files, 826 tests passed. |
+| Firestore/storage rules | `tested` | `npm run test:rules` — 2 files, 87 tests, Java 21. |
+| Functions typecheck / build | `tested` | Both exit 0. |
+| App build | `tested` | `npm run build` — compiled successfully. |
+| Demo validation | `tested` | `npm run demo:validate` passed. |
+| Access compatibility | `tested` | `npm run access:compat` — 1,068 assignments, 1,068 indexes, 0 blockers, 0 warnings. |
+| Projection migration dry-run | `tested` | `npm run access:migrate:dry-run` — 1,068 scopes checked, 0 drift (bundled dataset). |
+| Combined release gate | `tested` | `npm run deploy:ready` — exit 0. |
 
 ### Recorded previously, NOT re-verified in the current pass
 
@@ -127,30 +138,32 @@ These were reported against an earlier commit. Treat as stale until re-run.
 
 | Check | Level | Evidence |
 | --- | --- | --- |
-| Deterministic projection tests | `tested` | Access, resolver and context route tests passed (9 tests). |
-| Lint | `tested` | `npm run lint` passed. |
-| Firestore/storage rules | `tested` | `npm run test:rules` passed 2 files, 83 tests, under Java 21. |
-| Functions typecheck / build | `tested` | `npm run functions:typecheck` and `functions:build` passed. |
-| App build | `tested` | `npm run build` passed, including `/api/access/context`. |
-| Demo validation | `tested` | `npm run demo:validate` passed. |
-| Security audit gate | `tested` | `npm run security:audit` passed with registered temporary exceptions. |
-| Combined release gate | `tested` | `npm run deploy:ready` passed. |
-| Demo compatibility report | `tested` | `npm run access:compat` — 1,068 assignments, 1,068 indexes, 0 blockers, 0 warnings. |
 | Live manifest compatibility report | `verified` | Live report returned 0 blockers after the investor demo merge. Warnings limited to pre-existing partial demo records. |
 | Live role smoke | `verified` | `reports/staging/role-auth-firestore-smoke-role_20260802224456_6ad0e51d.json`. |
 | Live fantasy smoke | `verified` | `reports/staging/fantasy-auth-firestore-smoke-fantasy_20260802225113_a1b4f2fd.json`. |
+
+### Stage A and Stage B — delivered
+
+| Check | Level | Evidence |
+| --- | --- | --- |
+| Single projector owns all index writes | `tested` | 18 projector tests. No `accessIndex` write outside `projector.ts` remains. |
+| Projection deletes rather than empties | `tested` | An empty document would still satisfy `exists()` in Rules. |
+| Durable divergence records | `tested` | `securityEvents`, per scope and per capability, with `legacy_broader` called out. |
+| One shared capability resolver | `tested` | 11 capability tests. |
+| Explicit access mode per environment | `tested` | 8 environment tests; demo `compare`, beta/production `assignments`. |
+| Production guard on access mode | `tested` | `assert-clean` and `environment:prepare:production` both reject non-`assignments`. |
+| Migration dry-run / repair / drift tooling | `tested` | `npm run access:migrate:dry-run`; demo run reports 1,068 scopes, 0 drift. |
 
 ### Not yet evidenced
 
 | Check | Level | Blocking |
 | --- | --- | --- |
-| Single projector owns all index writes | `designed` | Stage B |
-| Durable divergence records | `designed` | Stage A |
-| Explicit access mode per environment | `designed` | Stage A |
+| Live migration dry-run against the demo database | `implemented` | Stage B — needs credentials; the bundled-dataset run is self-consistent by construction and proves only that the tool and runtime agree. |
+| Break-glass path proven working | `designed` | **Stage C prerequisite.** After cutover there is no legacy fallback. |
 | Canonical Platform Admin access desk | `designed` | Stage C |
 | Rules authorize via `accessIndex` | `designed` | Stage C |
 | Emulator denial matrix (revoked / suspended / expired / missing index / wrong scope / fan-as-operator) | `designed` | Stage C |
-| Production startup guard on access mode | `designed` | Stage C |
+| `secureLeagueCommand` legacy arm removed | `designed` | Stage C |
 
 ## Remaining Phase 1 Work
 
@@ -159,5 +172,21 @@ Phase 1 audit blockers were complete while the resolver still returned legacy ac
 Firestore Rules still authorized through `adminUserIds`, and the Platform Admin access
 desk still managed legacy `teamAssignments`. That claim was wrong and has been removed.
 
-Outstanding, in order: build the projector, route every mutation through it, persist
-divergence, backfill and verify, then cut over Rules and server together per Stage C.
+Stage A and Stage B are built and tested locally. Outstanding before Stage C:
+
+1. Run the migration dry-run against the live demo database and drive drift to zero.
+2. Prove the break-glass and repair paths against live data — after cutover there is no
+   legacy fallback, so these cannot be left until the soak.
+3. Rebuild `/admin/access` on canonical assignments.
+4. Add the emulator denial matrix, then switch Rules to deterministic `accessIndex`
+   lookups.
+5. Remove the legacy arm from `secureLeagueCommand`.
+
+### A live `legacy OR canonical` check already exists
+
+`secureLeagueCommand` authorizes a league operator when **either** a legacy
+`adminUserIds` entry **or** a canonical capability allows it. That is the pattern this
+migration rejects, already running in production — server-side rather than in Rules, but
+with the same failure mode: a revoked canonical assignment still authorizes through a
+stale array. It is retained for Stage A only, and now records every disagreement. Its
+`legacy_broader` events are the cutover gate. It must lose the legacy arm in Stage C.

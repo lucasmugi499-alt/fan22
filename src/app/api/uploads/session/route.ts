@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
-import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
+import { hasCapability } from '@/server/access/capabilities';
 import { jsonError, parseJsonBody, requireAuthenticatedUser, type AuthenticatedActor } from '@/server/api/security';
 
 export const runtime = 'nodejs';
@@ -39,32 +39,28 @@ function encodedDownloadUrl(bucketName: string, objectPath: string) {
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}?alt=media`;
 }
 
+const PLATFORM_SCOPE = { scopeType: 'platform', scopeId: 'global' } as const;
+
 function actorIsPlatform(actor: AuthenticatedActor) {
   return actor.role === 'platform_admin' || actor.role === 'super_admin';
 }
 
-async function hasCapability(userId: string, scopeType: 'platform' | 'league' | 'team' | 'athlete', scopeId: string, capability: PermissionCapability) {
-  const snapshot = await adminDb.collection('accessIndex').doc(accessIndexId(scopeType, scopeId, userId)).get();
-  const capabilities = snapshot.data()?.capabilities;
-  return Array.isArray(capabilities) && capabilities.includes(capability);
-}
-
 async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'user' | 'athlete' | 'team' | 'league', ownerId: string) {
-  if (actorIsPlatform(actor) || await hasCapability(actor.uid, 'platform', 'global', 'platform.admin.manage')) return true;
+  if (actorIsPlatform(actor) || await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   if (ownerType === 'user') return ownerId === actor.uid;
-  if (ownerType === 'athlete') return hasCapability(actor.uid, 'athlete', ownerId, 'athlete.media.manage');
-  if (ownerType === 'team') return hasCapability(actor.uid, 'team', ownerId, 'team.profile.manage');
-  return hasCapability(actor.uid, 'league', ownerId, 'league.profile.manage');
+  if (ownerType === 'athlete') return hasCapability(actor.uid, { scopeType: 'athlete', scopeId: ownerId }, 'athlete.media.manage');
+  if (ownerType === 'team') return hasCapability(actor.uid, { scopeType: 'team', scopeId: ownerId }, 'team.profile.manage');
+  return hasCapability(actor.uid, { scopeType: 'league', scopeId: ownerId }, 'league.profile.manage');
 }
 
 async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string, teamId: string) {
-  if (actorIsPlatform(actor) || await hasCapability(actor.uid, 'platform', 'global', 'platform.admin.manage')) return true;
+  if (actorIsPlatform(actor) || await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   const match = await adminDb.collection('matches').doc(matchId).get();
   if (!match.exists) return false;
   const data = match.data() ?? {};
   if (data.homeTeamId !== teamId && data.awayTeamId !== teamId) return false;
-  return await hasCapability(actor.uid, 'team', teamId, 'team.result.submit')
-    || await hasCapability(actor.uid, 'team', teamId, 'team.result.confirm');
+  return await hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.result.submit')
+    || await hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.result.confirm');
 }
 
 async function signedWriteUrl(path: string, contentType: string) {

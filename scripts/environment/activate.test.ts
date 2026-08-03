@@ -54,6 +54,7 @@ function envValues(environment: 'demo' | 'beta' | 'production', overrides: Recor
     GOALPLACE_FIRESTORE_DATABASE_ID: 'fg256',
     GOALPLACE_APP_BASE_URL: `https://${demo ? 'demo' : environment}.goalplace256.com`,
     GOALPLACE_EMAIL_FROM: 'GoalPlace256 <team@goalplace256.com>',
+    GOALPLACE_ACCESS_ENGINE_MODE: demo ? 'compare' : 'assignments',
     ...(environment === 'beta' ? { GOALPLACE_PAYMENTS_MODE: 'sandbox' } : {}),
     ...overrides,
   };
@@ -199,6 +200,23 @@ describe('environment activation command', () => {
       env: controls,
     })).toThrow(/REPLACE_WITH/);
   });
+
+  it.each(['compare', 'legacy'])(
+    'refuses production preparation when the access engine mode is %s',
+    (mode) => {
+      const root = fixture();
+      writeFileSync(path.join(root, 'apphosting.production.yaml'), `${yaml(envValues('production', {
+        GOALPLACE_ACCESS_ENGINE_MODE: mode,
+      }))}\n`);
+
+      // Both modes return the legacy projection, so production would authorize from
+      // arrays that canonical assignments no longer govern.
+      expect(() => activateEnvironment('production', 'activate', {
+        root,
+        env: { ...controls, GOALPLACE_PRODUCTION_CONFIRM: 'ACTIVATE GOALPLACE256 PRODUCTION' },
+      })).toThrow(/access engine mode/);
+    },
+  );
 
   it('refuses activation when transactional email is not backed by a Secret Manager key', () => {
     const root = fixture();

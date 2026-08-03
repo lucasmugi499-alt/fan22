@@ -511,7 +511,7 @@ export function buildAccessCompatibilityReport(
   };
 }
 
-async function loadDemoDataset(source: string): Promise<AccessCompatibilityDataset> {
+export async function loadDemoDataset(source: string): Promise<AccessCompatibilityDataset> {
   const database = readJson<Record<string, unknown>>(path.join(source, 'database.json'));
   const persistedAssignments = Array.isArray(database.accessAssignments) ? database.accessAssignments as JsonRecord[] : [];
   const assignments = persistedAssignments.length ? persistedAssignments : derivedDemoAssignments(database);
@@ -536,7 +536,7 @@ async function loadDemoDataset(source: string): Promise<AccessCompatibilityDatas
   };
 }
 
-async function loadFirebaseDataset(projectId: string | undefined, databaseId: string | undefined): Promise<AccessCompatibilityDataset> {
+export async function loadFirebaseDataset(projectId: string | undefined, databaseId: string | undefined): Promise<AccessCompatibilityDataset> {
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
   const app = getApps()[0] ?? initializeApp({

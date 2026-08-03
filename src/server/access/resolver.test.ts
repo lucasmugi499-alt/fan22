@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
+import { recordAccessDivergence } from './securityEvents';
 import { resolveTrustedAccessContext } from './resolver';
 
 vi.mock('server-only', () => ({}));
+
+vi.mock('./securityEvents', () => ({
+  recordAccessDivergence: vi.fn(async () => undefined),
+}));
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -69,8 +74,7 @@ describe('trusted access resolver', () => {
     vi.unstubAllEnvs();
   });
 
-  it('returns the legacy projection in compare mode and logs assignment divergences', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('returns the legacy projection in compare mode and records assignment divergences durably', async () => {
     mockCollections({
       assignments: [{
         id: 'assignment_league_1',
@@ -112,10 +116,15 @@ describe('trusted access resolver', () => {
       scopeId: 'team_1',
       activeRoles: ['team_admin'],
     });
-    expect(warn).toHaveBeenCalledWith(
-      'GoalPlace256 access authorization divergence',
-      expect.objectContaining({ userId: 'user_1' }),
-    );
+    // A console warning cannot be reviewed after the fact, and "divergence has reached
+    // zero" is the gate for the canonical cutover, so the record must be durable.
+    expect(recordAccessDivergence).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user_1',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      legacyDecision: false,
+      assignmentDecision: true,
+    }));
   });
 
   it('uses assignment projections in assignments mode and excludes inactive assignments', async () => {

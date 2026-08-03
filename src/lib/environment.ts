@@ -84,8 +84,43 @@ export function assertSafeProductionEnvironment(env: NodeJS.ProcessEnv = process
   if ((env.GOALPLACE_PAYMENT_CALLBACK_BASE_URL ?? '').includes('beta.')) {
     problems.push('beta callback URL is configured');
   }
+  // Production must never fall through to the code default. `legacy` and `compare` both
+  // return the legacy projection, so either would run production on authority that
+  // canonical assignments do not govern — silently, and looking correct.
+  const accessMode = env.GOALPLACE_ACCESS_ENGINE_MODE;
+  if (accessMode !== 'assignments') {
+    problems.push(accessMode
+      ? `access engine mode is '${accessMode}' rather than 'assignments'`
+      : 'access engine mode is not set (GOALPLACE_ACCESS_ENGINE_MODE)');
+  }
 
   if (problems.length) {
     throw new Error(`Unsafe GoalPlace256 production configuration: ${problems.join('; ')}.`);
+  }
+}
+
+/**
+ * Beta and production must pin the access engine explicitly. Demo may run `compare`
+ * during the migration, but never by omission — an unset variable silently selects the
+ * legacy authority.
+ */
+export function assertExplicitAccessEngineMode(env: NodeJS.ProcessEnv = process.env) {
+  const environment = goalPlaceEnvironment(env);
+  if (environment === 'local') return;
+
+  const accessMode = env.GOALPLACE_ACCESS_ENGINE_MODE;
+  if (!accessMode) {
+    throw new Error(
+      `GoalPlace256 ${environment} must set GOALPLACE_ACCESS_ENGINE_MODE explicitly. `
+      + 'Leaving it unset selects the legacy authority through the code default.',
+    );
+  }
+  if (!['legacy', 'compare', 'assignments'].includes(accessMode)) {
+    throw new Error(`GOALPLACE_ACCESS_ENGINE_MODE '${accessMode}' is not a supported access engine mode.`);
+  }
+  if ((environment === 'beta' || environment === 'production') && accessMode !== 'assignments') {
+    throw new Error(
+      `GoalPlace256 ${environment} requires GOALPLACE_ACCESS_ENGINE_MODE=assignments, not '${accessMode}'.`,
+    );
   }
 }

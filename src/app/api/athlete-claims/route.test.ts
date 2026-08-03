@@ -42,17 +42,34 @@ function querySnapshot(empty: boolean) {
   return { empty };
 }
 
+/** A chainable stand-in for the projector's scoped assignment query. */
+function query(collectionName: string, docs: Array<{ id: string; data: Record<string, unknown> }> = []) {
+  const api = {
+    isQuery: true as const,
+    collectionName,
+    where: vi.fn(() => api),
+    docs,
+  };
+  return api;
+}
+
 describe('athlete claim access projection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
       doc: (id?: string) => ref(collectionName, id),
+      where: vi.fn(() => query(collectionName)),
     }) as never);
   });
 
   it('creates an athlete_self access assignment and index when a league verifies a claim', async () => {
     const transaction = {
-      get: vi.fn(async (document: ReturnType<typeof ref>) => {
+      get: vi.fn(async (target: ReturnType<typeof ref> & { isQuery?: boolean; docs?: unknown[] }) => {
+        // The projector reads the scoped assignment query; no assignment exists yet.
+        if (target.isQuery) {
+          return { docs: (target.docs ?? []).map((doc) => doc) };
+        }
+        const document = target;
         if (document.collectionName === 'athleteClaims') {
           return snapshot({
             athleteId: 'athlete_1',
@@ -69,6 +86,7 @@ describe('athlete claim access projection', () => {
       }),
       update: vi.fn(),
       set: vi.fn(),
+      delete: vi.fn(),
     };
     vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
@@ -109,6 +127,8 @@ describe('athlete claim access projection', () => {
       grantedByUserId: 'league_admin_1',
       applicationId: 'claim_1',
     }));
+    // The projection is written whole. A partial merge is what previously allowed
+    // capabilities from a removed assignment to survive in the same scope.
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessIndex',
       id: 'athlete_athlete_1_athlete_user_1',
@@ -119,7 +139,7 @@ describe('athlete claim access projection', () => {
       activeRoles: ['athlete_self'],
       capabilities: expect.arrayContaining(['athlete.profile.manage', 'athlete.challenge.propose']),
       assignmentIds: ['assignment_athlete_athlete_1_athlete_user_1'],
-    }), { merge: true });
+    }), { merge: false });
     expect(adminAuth.setCustomUserClaims).toHaveBeenCalledWith('athlete_user_1', expect.objectContaining({
       role: 'athlete',
     }));

@@ -5,15 +5,13 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { platformAuditEvent, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
-import {
-  accessIndexId,
-  buildAccessIndexDocuments,
-  type AccessAssignment,
-  type AccessAssignmentStatus,
-  type AccessRoleKey,
-  type AccessScopeType,
-  type PermissionCapability,
+import type {
+  AccessAssignment,
+  AccessAssignmentStatus,
+  PermissionCapability,
 } from '@/lib/auth/access';
+import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import { normalizeAccessAssignment, readScopeProjection } from '@/server/access/projector';
 
 export const runtime = 'nodejs';
 
@@ -36,57 +34,6 @@ function audit(
 
 function hasRole(actor: AuthenticatedActor, roles: string[]) {
   return roles.includes(String(actor.role));
-}
-
-function indexHasCapability(snapshot: FirebaseFirestore.DocumentSnapshot, capability: PermissionCapability) {
-  const capabilities = snapshot.data()?.capabilities;
-  return Array.isArray(capabilities) && capabilities.includes(capability);
-}
-
-type FirestoreValue = {
-  toDate?: () => Date;
-};
-
-function isoFromFirestoreValue(value: unknown, fallback: string) {
-  if (typeof value === 'string') return value;
-  const maybeTimestamp = value as FirestoreValue | undefined;
-  const date = maybeTimestamp?.toDate?.();
-  return date instanceof Date ? date.toISOString() : fallback;
-}
-
-function assignmentFromData(id: string, data: FirebaseFirestore.DocumentData, fallbackNow: string): AccessAssignment {
-  return {
-    id: typeof data.id === 'string' ? data.id : id,
-    userId: String(data.userId ?? ''),
-    roleKey: String(data.roleKey ?? '') as AccessRoleKey,
-    scopeType: String(data.scopeType ?? '') as AccessScopeType,
-    scopeId: String(data.scopeId ?? ''),
-    permissionBundleId: String(data.permissionBundleId ?? data.roleKey ?? ''),
-    status: String(data.status ?? 'pending') as AccessAssignmentStatus,
-    grantedByUserId: String(data.grantedByUserId ?? ''),
-    invitationId: typeof data.invitationId === 'string' ? data.invitationId : undefined,
-    applicationId: typeof data.applicationId === 'string' ? data.applicationId : undefined,
-    validFrom: isoFromFirestoreValue(data.validFrom, fallbackNow),
-    validUntil: data.validUntil ? isoFromFirestoreValue(data.validUntil, fallbackNow) : undefined,
-    suspendedAt: data.suspendedAt ? isoFromFirestoreValue(data.suspendedAt, fallbackNow) : undefined,
-    revokedAt: data.revokedAt ? isoFromFirestoreValue(data.revokedAt, fallbackNow) : undefined,
-    revocationReason: typeof data.revocationReason === 'string' ? data.revocationReason : undefined,
-    createdAt: isoFromFirestoreValue(data.createdAt, fallbackNow),
-    updatedAt: isoFromFirestoreValue(data.updatedAt, fallbackNow),
-  };
-}
-
-function accessIndexEmpty(scopeType: AccessScopeType, scopeId: string, userId: string, updatedAt: string) {
-  return {
-    userId,
-    scopeType,
-    scopeId,
-    activeRoles: [],
-    capabilities: [],
-    assignmentIds: [],
-    accessVersion: FieldValue.increment(1),
-    updatedAt,
-  };
 }
 
 function transitionPatch(status: AccessAssignmentStatus, nowIso: string, note?: string) {
@@ -123,11 +70,7 @@ function transitionPatch(status: AccessAssignmentStatus, nowIso: string, note?: 
 }
 
 async function hasScopedLeagueCapability(userId: string, leagueId: string, capability: PermissionCapability) {
-  const [leagueAccess, platformAccess] = await Promise.all([
-    adminDb.collection('accessIndex').doc(accessIndexId('league', leagueId, userId)).get(),
-    adminDb.collection('accessIndex').doc(accessIndexId('platform', 'global', userId)).get(),
-  ]);
-  return indexHasCapability(leagueAccess, capability) || indexHasCapability(platformAccess, capability);
+  return hasCapabilityOrPlatformGrant(userId, { scopeType: 'league', scopeId: leagueId }, capability, capability);
 }
 
 function publicBaseUrl(request: Request) {
@@ -958,7 +901,7 @@ export async function POST(request: Request) {
           await adminDb.runTransaction(async (transaction) => {
             const assignmentSnapshot = await transaction.get(assignmentRef);
             if (!assignmentSnapshot.exists) throw new Error('Access assignment not found.');
-            const current = assignmentFromData(assignmentSnapshot.id, assignmentSnapshot.data()!, nowIso);
+            const current = normalizeAccessAssignment(assignmentSnapshot.id, assignmentSnapshot.data()!, nowIso);
             const nextAssignment: AccessAssignment = {
               ...current,
               status,
@@ -973,42 +916,21 @@ export async function POST(request: Request) {
               ...(status === 'revoked' ? { revokedAt: nowIso, revocationReason: reason || 'Revoked by Platform Admin.' } : {}),
               ...(status === 'expired' ? { validUntil: nowIso } : {}),
             };
-            const scopedAssignmentsQuery = adminDb
-              .collection('accessAssignments')
-              .where('userId', '==', current.userId)
-              .where('scopeType', '==', current.scopeType)
-              .where('scopeId', '==', current.scopeId);
-            const scopedAssignments = await transaction.get(scopedAssignmentsQuery);
-            const assignments = scopedAssignments.docs.map((doc) =>
-              doc.id === assignmentId
-                ? nextAssignment
-                : assignmentFromData(doc.id, doc.data(), nowIso)
-            );
-            if (!assignments.some((assignment) => assignment.id === assignmentId)) {
-              assignments.push(nextAssignment);
-            }
-            const rebuilt = buildAccessIndexDocuments({
-              assignments,
-              accessVersion: 1,
-              updatedAt: nowIso,
+            // Revocation is the operation that must never fail open. The projector
+            // rebuilds the whole scope, so a revoked assignment's capabilities cannot
+            // survive in the projection, and the document is deleted outright when no
+            // active assignment remains.
+            const projection = await readScopeProjection(transaction, {
+              userId: current.userId,
+              scopeType: current.scopeType,
+              scopeId: current.scopeId,
+            }, {
               now,
-            })[0];
-            const indexRef = adminDb.collection('accessIndex').doc(accessIndexId(
-              current.scopeType,
-              current.scopeId,
-              current.userId,
-            ));
+              pending: [{ operation: 'upsert', assignment: nextAssignment }],
+            });
 
             transaction.update(assignmentRef, transitionPatch(status, nowIso, reason));
-            transaction.set(indexRef, {
-              ...(rebuilt ?? accessIndexEmpty(current.scopeType, current.scopeId, current.userId, nowIso)),
-              accessVersion: FieldValue.increment(1),
-              updatedAt: FieldValue.serverTimestamp(),
-            }, { merge: false });
-            transaction.set(adminDb.collection('users').doc(current.userId), {
-              accessVersion: FieldValue.increment(1),
-              updatedAt: FieldValue.serverTimestamp(),
-            }, { merge: true });
+            projection.apply(transaction);
             transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
               actor,
               requestId,

@@ -31,6 +31,8 @@
     "functions:build": "npm --prefix functions run build",
     "functions:typecheck": "npm --prefix functions run typecheck",
     "access:compat": "tsx scripts/access/compatibility-report.ts",
+    "access:migrate:dry-run": "tsx scripts/access/projection-migration.ts",
+    "access:migrate:apply": "tsx scripts/access/projection-migration.ts --firebase --apply",
     "clean:preview": "tsx scripts/clean-preview.ts",
     "clean:execute": "tsx scripts/clean-execute.ts",
     "deploy:staging:candidate": "firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",

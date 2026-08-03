@@ -27,6 +27,11 @@ env:
   - variable: GOALPLACE_REQUIRE_APP_CHECK
     value: "false"
     availability: [RUNTIME]
+  # Demo runs Stage A of the access migration: legacy stays enforced while the
+    # canonical decision is computed alongside it and divergence is recorded.
+  - variable: GOALPLACE_ACCESS_ENGINE_MODE
+    value: compare
+    availability: [RUNTIME]
   - variable: GOALPLACE_SCHEDULER_AUTH_MODE
     value: shared_secret
     availability: [RUNTIME]

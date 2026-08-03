@@ -123,6 +123,9 @@ export function assertCleanProductionConfiguration(root = ROOT) {
   expectValue(values, 'NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS', 'false', problems);
   expectValue(values, 'GOALPLACE_REQUIRE_APP_CHECK', 'true', problems);
   expectValue(values, 'GOALPLACE_SCHEDULER_AUTH_MODE', 'oidc', problems);
+  // Production must authorize from canonical assignments. Both 'legacy' and 'compare'
+  // return the legacy projection, and an unset value falls through to 'compare'.
+  expectValue(values, 'GOALPLACE_ACCESS_ENGINE_MODE', 'assignments', problems);
   assertNoPlaceholder(values.get('GOALPLACE_APP_BASE_URL'), 'production public application URL', problems);
   assertNoPlaceholder(values.get('GOALPLACE_EMAIL_FROM'), 'production email sender', problems);
   assertSecretReference(values, secrets, 'RESEND_API_KEY', 'resendApiKey', problems);

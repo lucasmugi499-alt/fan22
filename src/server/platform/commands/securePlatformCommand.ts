@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
+import { compareLegacyCapability, indexGrantsCapability } from '@/server/access/capabilities';
 import { jsonError, requireRole, type AuthenticatedActor } from '@/server/api/security';
 
 type PlatformCommandInput<TResult> = {
@@ -39,10 +40,6 @@ function isRestrictedStatus(status: unknown) {
   return status === 'suspended' || status === 'disabled' || status === 'deletion_pending';
 }
 
-function hasCapability(snapshot: FirebaseFirestore.DocumentSnapshot, capability: PermissionCapability) {
-  const capabilities = snapshot.data()?.capabilities;
-  return Array.isArray(capabilities) && capabilities.includes(capability);
-}
 
 export function platformAuditEvent(input: {
   actor: AuthenticatedActor;
@@ -102,7 +99,7 @@ export async function securePlatformCommand<TResult>({
       .doc(accessIndexId('platform', 'global', actor.uid))
       .get();
     const hasRoleGrant = String(actor.role) === 'platform_admin';
-    if (!hasRoleGrant && !hasCapability(platformAccess, requiredCapability)) {
+    if (!hasRoleGrant && !indexGrantsCapability(platformAccess.data(), requiredCapability)) {
       return { response: jsonError(`Missing platform capability: ${requiredCapability}.`, 403) };
     }
   }
@@ -167,19 +164,29 @@ export async function secureLeagueCommand<TResult>({
     return { response: jsonError('This operator account is not active.', 403) };
   }
 
+  const requestId = `${command}_${randomUUID()}`;
+
   if (!isPlatformActor) {
     const leagueData = leagueSnapshot.data();
     const isLegacyAdmin = Array.isArray(leagueData?.adminUserIds) && leagueData.adminUserIds.includes(actor.uid);
-    const leagueAccess = await adminDb
-      .collection('accessIndex')
-      .doc(accessIndexId('league', leagueId, actor.uid))
-      .get();
-    if (!isLegacyAdmin && !hasCapability(leagueAccess, requiredCapability)) {
+    // Stage A of the access migration. Legacy stays enforced, the canonical decision is
+    // computed alongside it, and disagreements are recorded durably. `legacy_broader`
+    // events are operators still working from a stale adminUserIds entry after their
+    // assignment was revoked — that population must reach zero before Stage C drops the
+    // legacy arm and leaves canonical standing alone.
+    const decision = await compareLegacyCapability({
+      userId: actor.uid,
+      scope: { scopeType: 'league', scopeId: leagueId },
+      capability: requiredCapability,
+      legacyGranted: isLegacyAdmin,
+      resource: `leagues/${leagueId}`,
+      requestId,
+    });
+    if (!decision.granted) {
       return { response: jsonError('You do not manage this league.', 403) };
     }
   }
 
-  const requestId = `${command}_${randomUUID()}`;
   return {
     result: await handler({
       actor,

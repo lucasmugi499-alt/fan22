@@ -16,6 +16,7 @@ const baseValues = {
   GOALPLACE_ALLOW_REAL_PAYMENTS: 'false',
   GOALPLACE_ENABLE_INVESTOR_TOOLS: 'false',
   GOALPLACE_REQUIRE_APP_CHECK: 'true',
+  GOALPLACE_ACCESS_ENGINE_MODE: 'assignments',
   GOALPLACE_SCHEDULER_AUTH_MODE: 'oidc',
   GOALPLACE_SCHEDULER_AUDIENCE: 'https://goalplace256.com/api/fantasy/lock-lineups',
   GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS: 'scheduler@goalplace256-prod.iam.gserviceaccount.com',

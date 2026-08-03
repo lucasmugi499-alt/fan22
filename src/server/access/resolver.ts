@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/access';
 import { AccessEngineMode, accessEngineMode, returnsLegacyProjection } from '@/lib/auth/accessMode';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
+import { recordAccessDivergence } from './securityEvents';
 import type { AccountClass, AppRole } from '@/types';
 
 export type TrustedAccessContext = AccessContext & {
@@ -95,6 +96,45 @@ export function accessContextsDiverge(left: AccessContext, right: AccessContext)
   return JSON.stringify(canonicalIndexes(left.indexes)) !== JSON.stringify(canonicalIndexes(right.indexes));
 }
 
+function scopeSignature(index: AccessIndexDocument) {
+  return `${index.scopeType}:${index.scopeId}`;
+}
+
+/**
+ * Emits one divergence event per scope the two authorities disagree on, capturing which
+ * side was broader. A scope present only in the legacy projection is the dangerous
+ * direction: access that canonical assignments no longer justify.
+ */
+async function recordContextDivergence(
+  userId: string,
+  legacyContext: AccessContext,
+  assignmentContext: AccessContext,
+  accessVersion: number,
+) {
+  const legacyByScope = new Map(legacyContext.indexes.map((index) => [scopeSignature(index), index]));
+  const assignmentByScope = new Map(assignmentContext.indexes.map((index) => [scopeSignature(index), index]));
+  const scopes = new Set([...legacyByScope.keys(), ...assignmentByScope.keys()]);
+
+  await Promise.all([...scopes].map(async (signature) => {
+    const legacy = legacyByScope.get(signature);
+    const assignment = assignmentByScope.get(signature);
+    const sameAuthority = JSON.stringify(legacy ? canonicalIndexes([legacy]) : null)
+      === JSON.stringify(assignment ? canonicalIndexes([assignment]) : null);
+    if (sameAuthority) return;
+
+    const [scopeType, scopeId] = signature.split(':');
+    await recordAccessDivergence({
+      userId,
+      scopeType: scopeType as AccessScopeType,
+      scopeId,
+      legacyDecision: Boolean(legacy),
+      assignmentDecision: Boolean(assignment),
+      assignmentIds: assignment?.assignmentIds,
+      accessVersion,
+    });
+  }));
+}
+
 async function loadUserProfile(userId: string) {
   const snapshot = await adminDb.collection('users').doc(userId).get();
   const data = snapshot.exists ? snapshot.data() ?? {} : {};
@@ -162,11 +202,11 @@ export async function resolveTrustedAccessContext(
   const legacyContext = contextFromIndexes(userId, legacyIndexes, profile.accessVersion);
 
   if (mode === 'compare' && accessContextsDiverge(legacyContext, assignmentContext)) {
-    console.warn('GoalPlace256 access authorization divergence', {
-      userId,
-      legacyScopes: canonicalIndexes(legacyContext.indexes),
-      assignmentScopes: canonicalIndexes(assignmentContext.indexes),
-    });
+    // Recorded per scope rather than as one blob so each disagreement is independently
+    // reviewable and closes independently. A console warning could not be reviewed at
+    // all, and the cutover gate is "divergence has reached zero" — which needs evidence
+    // that outlives a log rotation.
+    await recordContextDivergence(userId, legacyContext, assignmentContext, profile.accessVersion);
   }
 
   const selectedContext = mode === 'assignments' ? assignmentContext : legacyContext;

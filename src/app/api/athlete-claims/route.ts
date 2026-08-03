@@ -3,7 +3,8 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
-import { accessIndexId, capabilitiesForAssignment } from '@/lib/auth/access';
+import type { AccessAssignment } from '@/lib/auth/access';
+import { readScopeProjection } from '@/server/access/projector';
 
 export const runtime = 'nodejs';
 
@@ -65,6 +66,33 @@ function athleteSelfAssignment(input: {
     validFrom: new Date().toISOString(),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+/**
+ * The same grant expressed with plain ISO timestamps, for the projector's overlay.
+ * The stored document uses server timestamps, which cannot be projected before commit.
+ */
+function athleteSelfProjectionAssignment(input: {
+  athleteId: string;
+  userId: string;
+  grantedByUserId: string;
+  claimId: string;
+}): AccessAssignment {
+  const nowIso = new Date().toISOString();
+  return {
+    id: athleteSelfAssignmentId(input.athleteId, input.userId),
+    userId: input.userId,
+    roleKey: 'athlete_self',
+    scopeType: 'athlete',
+    scopeId: input.athleteId,
+    permissionBundleId: 'athlete_self',
+    status: 'active',
+    grantedByUserId: input.grantedByUserId,
+    applicationId: input.claimId,
+    validFrom: nowIso,
+    createdAt: nowIso,
+    updatedAt: nowIso,
   };
 }
 
@@ -154,22 +182,28 @@ export async function POST(request: Request) {
           claimId: claimRef.id,
         });
         const assignmentId = assignment.id;
-        const capabilities = capabilitiesForAssignment({
-          permissionBundleId: 'athlete_self',
-          roleKey: 'athlete_self',
-        });
-        if (claim.status === 'linked') {
-          transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment, { merge: true });
-          transaction.set(adminDb.collection('accessIndex').doc(accessIndexId('athlete', claim.athleteId, requesterUserId)), {
+        const scope = {
+          userId: requesterUserId,
+          scopeType: 'athlete' as const,
+          scopeId: claim.athleteId as string,
+        };
+        // The projector rebuilds this scope from every active assignment. The previous
+        // hand-built document asserted exactly one role with `merge: true`, so a second
+        // assignment in the same scope could leave capabilities behind after revocation.
+        const pending = [{
+          operation: 'upsert' as const,
+          assignment: athleteSelfProjectionAssignment({
+            athleteId: claim.athleteId as string,
             userId: requesterUserId,
-            scopeType: 'athlete',
-            scopeId: claim.athleteId,
-            activeRoles: ['athlete_self'],
-            capabilities,
-            assignmentIds: [assignmentId],
-            accessVersion: FieldValue.increment(1),
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
+            grantedByUserId: actor.uid,
+            claimId: claimRef.id,
+          }),
+        }];
+
+        if (claim.status === 'linked') {
+          const projection = await readScopeProjection(transaction, scope, { pending });
+          transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment, { merge: true });
+          projection.apply(transaction);
           return {
             id: claimRef.id,
             status: 'linked',
@@ -179,20 +213,15 @@ export async function POST(request: Request) {
         if (claim.status !== 'league_pending') throw new Error('Team confirmation is required first.');
         if (!platform && !manages(leagueSnapshot.data(), actor.uid)) throw new Error('Only an assigned League Admin can verify this claim.');
         const athleteRef = adminDb.collection('athletes').doc(claim.athleteId);
-        const athleteSnapshot = await transaction.get(athleteRef);
+        // Both remaining reads must precede every write in this transaction.
+        const [athleteSnapshot, projection] = await Promise.all([
+          transaction.get(athleteRef),
+          readScopeProjection(transaction, scope, { pending }),
+        ]);
         if (athleteSnapshot.data()?.userId) throw new Error('This athlete profile was linked while the claim was under review.');
         transaction.update(athleteRef, { userId: requesterUserId, updatedAt: FieldValue.serverTimestamp() });
         transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment);
-        transaction.set(adminDb.collection('accessIndex').doc(accessIndexId('athlete', claim.athleteId, requesterUserId)), {
-          userId: requesterUserId,
-          scopeType: 'athlete',
-          scopeId: claim.athleteId,
-          activeRoles: ['athlete_self'],
-          capabilities,
-          assignmentIds: [assignmentId],
-          accessVersion: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        projection.apply(transaction);
         transaction.update(claimRef, {
           status: 'linked',
           leagueReviewedByUserId: actor.uid,
