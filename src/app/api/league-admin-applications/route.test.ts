@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -76,6 +77,6 @@ describe('public league admin applications route', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'Complete every required field.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 });

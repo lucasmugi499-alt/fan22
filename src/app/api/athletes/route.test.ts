@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { sendAthleteInvitationEmail } from '@/server/email/athleteInvitation';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess, expectNoDomainTransaction } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -53,7 +54,7 @@ describe('athlete creation route hardening', () => {
 
     expect(response.status).toBe(401);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('requires Team Admin access before parsing or touching Firestore', async () => {
@@ -63,7 +64,7 @@ describe('athlete creation route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Team Admin access required.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects invalid JSON before touching Firestore', async () => {
@@ -72,7 +73,7 @@ describe('athlete creation route hardening', () => {
     const response = await POST(request('{'));
 
     expect(response.status).toBe(400);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects oversized athlete creation bodies before touching Firestore', async () => {
@@ -86,7 +87,7 @@ describe('athlete creation route hardening', () => {
     })));
 
     expect(response.status).toBe(413);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('allows a Team Admin with scoped athlete creation access even without legacy team arrays', async () => {
@@ -173,6 +174,6 @@ describe('athlete creation route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'You are not assigned to this team.' });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 });

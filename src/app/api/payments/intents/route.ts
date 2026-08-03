@@ -5,7 +5,7 @@ import { contributionQuote, requiresEnhancedReview } from '@/lib/money';
 import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderConfigurationError } from '@/server/payments/providers';
 import { recordProviderAttempt } from '@/server/payments/providerAttempts';
 import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
-import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -37,13 +37,16 @@ export async function POST(request: Request) {
   if (process.env.GOALPLACE_PAYMENTS_MODE !== 'sandbox') {
     return Response.json({ error: 'Payments remain sandbox-only until legal and PSP launch gates are complete.' }, { status: 503 });
   }
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const actor = auth.actor;
+  // Money movement gets the full hardened path: App Check where required, a body limit,
+  // schema validation and an abuse limit per supporter before any provider is contacted.
+  const guarded = await requireAuthenticatedMutation(request, intentSchema, {
+    maxBytes: 12 * 1024,
+    invalidBodyError: 'Invalid contribution request.',
+    rateLimit: { bucket: 'payment_intent_create', limit: 12, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const { actor, data: input, requestId } = guarded;
   if (actor.email_verified !== true) return Response.json({ error: 'Verify your email address before supporting a recipient.' }, { status: 403 });
-  const parsed = await parseJsonBody(request, intentSchema, { maxBytes: 12 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid contribution request.' }, { status: parsed.response.status });
-  const input = parsed.data;
   if (input.supporterUserId !== actor.uid) return Response.json({ error: 'The supporter must be the signed-in account.' }, { status: 403 });
   if (input.purpose !== 'sponsor_grant') {
     const fanAccount = await requireFanAccountPrincipal(actor, 'Support contributions are available to Fan accounts only.');
@@ -251,6 +254,7 @@ export async function POST(request: Request) {
         console.error('Provider request succeeded but attempt audit failed', auditError);
       });
       return Response.json({
+        requestId,
         id: intentId,
         status: operation.status,
         provider: provider.name,
@@ -278,8 +282,11 @@ export async function POST(request: Request) {
       throw error;
     }
   } catch (error) {
-    console.error('Payment intent creation failed', error);
+    console.error('Payment intent creation failed', { requestId, error });
     const message = error instanceof Error ? error.message : 'The payment provider request could not be prepared.';
-    return Response.json({ error: message }, { status: error instanceof PaymentProviderConfigurationError ? 503 : 409 });
+    return Response.json(
+      { error: message, requestId },
+      { status: error instanceof PaymentProviderConfigurationError ? 503 : 409 },
+    );
   }
 }

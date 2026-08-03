@@ -9,7 +9,7 @@ import type {
   FantasyRound,
   FantasySquadRules,
 } from '@/types/fantasy';
-import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -25,19 +25,22 @@ const lineupSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return Response.json({ error: 'Sign in to submit a fantasy squad.' }, { status: auth.response?.status ?? 401 });
-  const actor = auth.actor;
-  const parsed = await parseJsonBody(request, lineupSchema, { maxBytes: 8 * 1024 });
-  if ('response' in parsed) {
-    return Response.json({ error: 'Invalid fantasy squad.' }, { status: parsed.response.status });
-  }
-  if (fantasyRecordHasFinancialFields(parsed.data)) {
+  const guarded = await requireAuthenticatedMutation(request, lineupSchema, {
+    maxBytes: 8 * 1024,
+    invalidBodyError: 'Invalid fantasy squad.',
+    authError: 'Sign in to submit a fantasy squad.',
+    rateLimit: { bucket: 'fantasy_lineup', limit: 40, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const input = guarded.data;
+  // Fantasy is free to play with no cash pool; a lineup carrying money fields is a
+  // malformed or hostile request either way.
+  if (fantasyRecordHasFinancialFields(input)) {
     return Response.json({ error: 'Invalid fantasy squad.' }, { status: 400 });
   }
   const fanAccount = await requireFanAccountPrincipal(actor, 'GoalPlace Fantasy is available to Fan accounts only.');
   if ('response' in fanAccount) return fanAccount.response;
-  const input = parsed.data;
   const [competitionSnapshot, roundSnapshot] = await Promise.all([
     adminDb.collection('fantasyCompetitions').doc(input.competitionId).get(),
     adminDb.collection('fantasyRounds').doc(input.roundId).get(),

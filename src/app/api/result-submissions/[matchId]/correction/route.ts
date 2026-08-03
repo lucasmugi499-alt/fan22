@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { checkCorrectionRequest } from '@/lib/resultSubmission';
 import { finalizeSubmission } from '@/server/resultFinalizer';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import type { AppRole, ResultSubmission } from '@/types';
 
 export const runtime = 'nodejs';
@@ -29,11 +29,15 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'A corrected score and reason are required.' }, { status: parsed.response.status });
-  const actor = auth.actor;
+  // A correction supersedes an official sporting record; repeated attempts are bounded.
+  const guarded = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'A corrected score and reason are required.',
+    rateLimit: { bucket: 'result_correction', limit: 15, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const parsed = { data: guarded.data };
   const input = parsed.data;
   const { matchId } = await params;
   if (input.matchId !== matchId || input.actorUserId !== actor.uid) {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { GET, POST } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: vi.fn() },
@@ -49,7 +50,7 @@ describe('platform access directory route', () => {
     const response = await GET(request(''));
 
     expect(response.status).toBe(401);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('requires a dedicated Platform Operator account', async () => {

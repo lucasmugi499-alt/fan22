@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { allowingRateLimitTransaction } from '@/test/rateLimitMock';
 import { paymentProviderFromEnvironment } from '@/server/payments/providers';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -9,6 +11,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+  runTransaction: vi.fn(),
   },
 }));
 
@@ -47,6 +50,7 @@ describe('payment intent route hardening', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GOALPLACE_PAYMENTS_MODE = 'sandbox';
+    vi.mocked(adminDb.runTransaction).mockImplementation(allowingRateLimitTransaction() as never);
   });
 
   it('keeps payments disabled outside the sandbox gate before auth or body parsing', async () => {
@@ -56,7 +60,7 @@ describe('payment intent route hardening', () => {
 
     expect(response.status).toBe(503);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
     expect(paymentProviderFromEnvironment).not.toHaveBeenCalled();
   });
 
@@ -65,7 +69,7 @@ describe('payment intent route hardening', () => {
 
     expect(response.status).toBe(401);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
     expect(paymentProviderFromEnvironment).not.toHaveBeenCalled();
   });
 
@@ -75,7 +79,7 @@ describe('payment intent route hardening', () => {
     const response = await POST(request('{'));
 
     expect(response.status).toBe(400);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
     expect(paymentProviderFromEnvironment).not.toHaveBeenCalled();
   });
 
@@ -94,7 +98,7 @@ describe('payment intent route hardening', () => {
     })));
 
     expect(response.status).toBe(413);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
     expect(paymentProviderFromEnvironment).not.toHaveBeenCalled();
   });
 

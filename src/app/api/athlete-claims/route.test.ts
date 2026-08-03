@@ -23,11 +23,22 @@ function request(body: unknown, token = 'token') {
   });
 }
 
+/**
+ * Canonical capability grants the route reads outside the transaction.
+ * Keyed by accessIndex document id.
+ */
+let accessIndex: Record<string, { capabilities: string[] }> = {};
+
 function ref(collectionName: string, id?: string) {
+  const documentId = id ?? `${collectionName}_generated`;
   return {
     collectionName,
-    id: id ?? `${collectionName}_generated`,
+    id: documentId,
     set: vi.fn(async () => undefined),
+    get: vi.fn(async () => ({
+      exists: collectionName === 'accessIndex' ? Boolean(accessIndex[documentId]) : false,
+      data: () => (collectionName === 'accessIndex' ? accessIndex[documentId] : undefined),
+    })),
   };
 }
 
@@ -56,6 +67,10 @@ function query(collectionName: string, docs: Array<{ id: string; data: Record<st
 describe('athlete claim access projection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    accessIndex = {
+      // The league admin's canonical grant. Authority no longer comes from adminUserIds.
+      league_league_1_league_admin_1: { capabilities: ['league.roster.verify'] },
+    };
     vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
       doc: (id?: string) => ref(collectionName, id),
       where: vi.fn(() => query(collectionName)),
@@ -70,6 +85,8 @@ describe('athlete claim access projection', () => {
           return { docs: (target.docs ?? []).map((doc) => doc) };
         }
         const document = target;
+        // The shared mutation wrapper's rate limiter runs in the same transaction.
+        if (document.collectionName === 'apiRateLimits') return snapshot(undefined);
         if (document.collectionName === 'athleteClaims') {
           return snapshot({
             athleteId: 'athlete_1',
@@ -151,6 +168,7 @@ describe('athlete claim access projection', () => {
       get: vi.fn(async (target: unknown) => {
         if (typeof target === 'object' && target && 'collectionName' in target) {
           const document = target as ReturnType<typeof ref>;
+          if (document.collectionName === 'apiRateLimits') return snapshot(undefined);
           if (document.collectionName === 'athletes') {
             return snapshot({
               id: 'athlete_1',

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -33,7 +34,7 @@ describe('feed engagement route hardening', () => {
 
     expect(response.status).toBe(401);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects invalid JSON before touching Firestore', async () => {
@@ -42,7 +43,7 @@ describe('feed engagement route hardening', () => {
     const response = await POST(request('{'), context);
 
     expect(response.status).toBe(400);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects oversized engagement bodies before touching Firestore', async () => {
@@ -54,6 +55,6 @@ describe('feed engagement route hardening', () => {
     })), context);
 
     expect(response.status).toBe(413);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 });

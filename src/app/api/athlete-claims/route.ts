@@ -2,7 +2,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'crypto';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
 import type { AccessAssignment } from '@/lib/auth/access';
 import { readScopeProjection } from '@/server/access/projector';
 
@@ -19,8 +20,17 @@ const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('reject'), claimId: z.string().trim().min(1).max(180), reason: z.string().trim().min(4).max(300) }),
 ]);
 
-function manages(data: FirebaseFirestore.DocumentData | undefined, uid: string) {
-  return Array.isArray(data?.adminUserIds) && data.adminUserIds.includes(uid);
+/**
+ * Canonical scope authority. This route previously read `adminUserIds` directly, which
+ * after the Stage C cutover would have authorized from a field Firestore Rules no longer
+ * honour — a server path granting what the client path denies.
+ */
+function managesTeam(uid: string, teamId: string) {
+  return hasCapabilityOrPlatformGrant(uid, { scopeType: 'team', scopeId: teamId }, 'team.roster.manage');
+}
+
+function managesLeague(uid: string, leagueId: string) {
+  return hasCapabilityOrPlatformGrant(uid, { scopeType: 'league', scopeId: leagueId }, 'league.roster.verify');
 }
 
 async function synchronizeAthleteRole(uid: string) {
@@ -101,11 +111,15 @@ function normalizeEmail(value: unknown) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, schema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid athlete claim action.' }, { status: parsed.response.status });
-  const actor = auth.actor;
+  // Claiming an athlete profile binds a real identity to a record, so attempts are bounded.
+  const guarded = await requireAuthenticatedMutation(request, schema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Invalid athlete claim action.',
+    rateLimit: { bucket: 'athlete_claim', limit: 20, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const parsed = { data: guarded.data };
   const input = parsed.data;
 
   try {
@@ -156,15 +170,11 @@ export async function POST(request: Request) {
       const claimSnapshot = await transaction.get(claimRef);
       if (!claimSnapshot.exists) throw new Error('Athlete claim not found.');
       const claim = claimSnapshot.data()!;
-      const [teamSnapshot, leagueSnapshot] = await Promise.all([
-        transaction.get(adminDb.collection('teams').doc(claim.teamId)),
-        transaction.get(adminDb.collection('leagues').doc(claim.leagueId)),
-      ]);
       const platform = ['platform_admin', 'super_admin'].includes(String(actor.role ?? ''));
 
       if (input.action === 'team_confirm') {
         if (claim.status !== 'team_pending') throw new Error('This claim is no longer waiting for Team confirmation.');
-        if (!platform && !manages(teamSnapshot.data(), actor.uid)) throw new Error('Only an assigned Team Admin can confirm this claim.');
+        if (!platform && !await managesTeam(actor.uid, claim.teamId)) throw new Error('Only an assigned Team Admin can confirm this claim.');
         transaction.update(claimRef, {
           status: 'league_pending',
           teamReviewedByUserId: actor.uid,
@@ -211,7 +221,7 @@ export async function POST(request: Request) {
           };
         }
         if (claim.status !== 'league_pending') throw new Error('Team confirmation is required first.');
-        if (!platform && !manages(leagueSnapshot.data(), actor.uid)) throw new Error('Only an assigned League Admin can verify this claim.');
+        if (!platform && !await managesLeague(actor.uid, claim.leagueId)) throw new Error('Only an assigned League Admin can verify this claim.');
         const athleteRef = adminDb.collection('athletes').doc(claim.athleteId);
         // Both remaining reads must precede every write in this transaction.
         const [athleteSnapshot, projection] = await Promise.all([
@@ -249,8 +259,8 @@ export async function POST(request: Request) {
       }
 
       const mayReject = platform ||
-        (claim.status === 'team_pending' && manages(teamSnapshot.data(), actor.uid)) ||
-        (claim.status === 'league_pending' && manages(leagueSnapshot.data(), actor.uid));
+        (claim.status === 'team_pending' && await managesTeam(actor.uid, claim.teamId)) ||
+        (claim.status === 'league_pending' && await managesLeague(actor.uid, claim.leagueId));
       if (!mayReject) throw new Error('You cannot reject this athlete claim.');
       transaction.update(claimRef, {
         status: 'rejected',

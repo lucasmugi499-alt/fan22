@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
 import { hasCapability } from '@/server/access/capabilities';
-import { jsonError, parseJsonBody, requireAuthenticatedUser, type AuthenticatedActor } from '@/server/api/security';
+import { jsonError, requireAuthenticatedMutation, type AuthenticatedActor } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -79,12 +79,15 @@ async function signedWriteUrl(path: string, contentType: string) {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await requireAuthenticatedUser(request);
-  if ('response' in authenticated) return authenticated.response;
-  const parsed = await parseJsonBody(request, uploadSessionSchema, { maxBytes: 8 * 1024 });
-  if ('response' in parsed) return parsed.response;
-  const actor = authenticated.actor;
-  const input = parsed.data;
+  // Signed upload URLs are a capability to write into the storage bucket, so the request
+  // that mints one is rate limited per account as well as App Check verified.
+  const guarded = await requireAuthenticatedMutation(request, uploadSessionSchema, {
+    maxBytes: 8 * 1024,
+    invalidBodyError: 'Invalid upload request.',
+    rateLimit: { bucket: 'upload_session', limit: 30, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const { actor, data: input } = guarded;
   const extension = extensionFrom(input.fileName, input.contentType);
 
   if (input.kind === 'match_evidence') {

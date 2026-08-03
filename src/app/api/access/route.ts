@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireRole } from '@/server/api/security';
 import { PERMISSION_BUNDLES } from '@/lib/auth/access';
 import { normalizeAccessAssignment, readScopeProjection } from '@/server/access/projector';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
@@ -147,14 +147,17 @@ function accountClassViolation(
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
+  // Accepting an invitation grants scoped authority, so the token-guessing surface is
+  // rate limited per account in addition to the token check itself.
+  const guarded = await requireAuthenticatedMutation(request, accessActionSchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Invalid access action.',
+    rateLimit: { bucket: 'access_action', limit: 20, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
 
-  const parsed = await parseJsonBody(request, accessActionSchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return parsed.response;
-
-  const actor = auth.actor;
-  const body = parsed.data;
+  const actor = guarded.actor;
+  const body = guarded.data;
 
   try {
     if (body.action === 'accept_team_invitation') {

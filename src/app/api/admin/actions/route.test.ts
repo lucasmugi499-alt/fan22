@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess, expectNoDomainTransaction } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -88,7 +89,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(401);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects invalid JSON before touching Firestore', async () => {
@@ -97,7 +98,7 @@ describe('trusted admin actions route hardening', () => {
     const response = await POST(request('{'));
 
     expect(response.status).toBe(400);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects oversized JSON before touching Firestore', async () => {
@@ -112,7 +113,7 @@ describe('trusted admin actions route hardening', () => {
     })));
 
     expect(response.status).toBe(413);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('requires League Admin access before creating an invitation', async () => {
@@ -128,7 +129,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'League Admin access required.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('allows scoped League Admins to create teams for their league', async () => {
@@ -182,7 +183,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'You do not manage league league_1.' });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 
   it('allows scoped League Admins to invite a Team Admin for their league', async () => {
@@ -293,7 +294,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('records audited account lifecycle changes through the trusted admin route', async () => {
@@ -346,7 +347,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'A clear audit reason is required for this Platform Admin command.' });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 
   it('requires a dedicated Platform Operator account for platform commands', async () => {
@@ -369,7 +370,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'A dedicated Platform Operator account is required.' });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 
   it('lets a scoped Organization Operator create a season through the trusted command', async () => {
@@ -453,7 +454,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'You do not manage this league.' });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 
   it('creates fixtures through a scoped trusted command with pending result state', async () => {
@@ -534,7 +535,7 @@ describe('trusted admin actions route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rebuilds scoped access projections when an assignment is suspended', async () => {

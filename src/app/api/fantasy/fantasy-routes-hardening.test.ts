@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { allowingRateLimitTransaction } from '@/test/rateLimitMock';
 import { POST as postAdmin } from './admin/route';
 import { POST as postMiniLeague } from './mini-leagues/route';
 import { POST as postTeam } from './teams/route';
 import { POST as postTransfer } from './transfers/route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -11,6 +13,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+  runTransaction: vi.fn(),
   },
 }));
 
@@ -38,6 +41,7 @@ function installUserProfile(profile: Record<string, unknown>) {
 describe('fantasy route hardening', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(adminDb.runTransaction).mockImplementation(allowingRateLimitTransaction() as never);
   });
 
   it.each([
@@ -51,7 +55,7 @@ describe('fantasy route hardening', () => {
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error });
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it.each([
@@ -66,7 +70,7 @@ describe('fantasy route hardening', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it.each([
@@ -85,7 +89,7 @@ describe('fantasy route hardening', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it.each([

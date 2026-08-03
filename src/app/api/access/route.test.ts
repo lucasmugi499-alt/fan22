@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { allowingRateLimitTransaction } from '@/test/rateLimitMock';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess, expectNoDomainTransaction } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -27,6 +29,15 @@ function request(body: string, token = 'token') {
 describe('trusted access route hardening', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(adminDb.runTransaction).mockImplementation(allowingRateLimitTransaction() as never);
+    // The shared mutation wrapper rate-limits before the handler runs, so every case
+    // needs a Firestore stand-in even when the request is rejected on authorization.
+    vi.mocked(adminDb.collection).mockImplementation(() => ({
+      doc: vi.fn((id: string) => ({
+        id,
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => undefined }),
+      })),
+    }) as never);
   });
 
   it('rejects unauthenticated requests before parsing or touching Firestore', async () => {
@@ -34,7 +45,7 @@ describe('trusted access route hardening', () => {
 
     expect(response.status).toBe(401);
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects invalid JSON before touching Firestore', async () => {
@@ -43,7 +54,7 @@ describe('trusted access route hardening', () => {
     const response = await POST(request('{'));
 
     expect(response.status).toBe(400);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects oversized JSON before touching Firestore', async () => {
@@ -56,7 +67,7 @@ describe('trusted access route hardening', () => {
     })));
 
     expect(response.status).toBe(413);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('requires Platform Admin access before approving a League Admin', async () => {
@@ -69,7 +80,7 @@ describe('trusted access route hardening', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('prevents fan accounts from accepting scoped operator invitations', async () => {
@@ -112,7 +123,7 @@ describe('trusted access route hardening', () => {
     expect(await response.json()).toEqual({
       error: 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.',
     });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 
@@ -157,7 +168,7 @@ describe('trusted access route hardening', () => {
     expect(await response.json()).toEqual({
       error: 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.',
     });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 
@@ -198,7 +209,7 @@ describe('trusted access route hardening', () => {
     expect(await response.json()).toEqual({
       error: 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.',
     });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 
@@ -244,7 +255,7 @@ describe('trusted access route hardening', () => {
     expect(await response.json()).toEqual({
       error: 'This invitation requires a GoalPlace256 Organization Operator account. Sign out and create or access your operator account using the invited email.',
     });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 
@@ -565,6 +576,6 @@ describe('trusted access route hardening', () => {
     expect(await response.json()).toEqual({
       error: 'This email already belongs to a non-operator account. Request a separate operational email before approving this league.',
     });
-    expect(adminDb.runTransaction).not.toHaveBeenCalled();
+    expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 });

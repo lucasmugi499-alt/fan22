@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb, adminStorage } from '@/lib/firebase/admin';
+import { allowingRateLimitTransaction } from '@/test/rateLimitMock';
 import { POST } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -8,6 +10,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn(),
+    runTransaction: vi.fn(),
   },
   adminStorage: {
     bucket: vi.fn(),
@@ -30,6 +33,7 @@ function snapshot(data: Record<string, unknown> | undefined) {
 }
 
 function installFirestore(records: Record<string, Record<string, unknown>>) {
+  vi.mocked(adminDb.runTransaction).mockImplementation(allowingRateLimitTransaction() as never);
   vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
     doc: vi.fn((id: string) => ({
       id,
@@ -57,7 +61,7 @@ describe('trusted upload session route', () => {
     const response = await POST(request({ kind: 'published_media' }, ''));
 
     expect(response.status).toBe(401);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it('rejects team media uploads without a scoped team capability', async () => {

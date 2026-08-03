@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { adminAppCheck, adminAuth, adminDb } from '@/lib/firebase/admin';
+import { allowingRateLimitTransaction, denyingRateLimitTransaction } from '@/test/rateLimitMock';
 import {
   clientIpFrom,
   isFanAccountPrincipal,
@@ -15,6 +16,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminAppCheck: { verifyToken: vi.fn() },
   adminDb: {
     collection: vi.fn(),
+    runTransaction: vi.fn(),
   },
 }));
 
@@ -113,5 +115,164 @@ describe('api security primitives', () => {
       legacySecretEnv: 'GOALPLACE_TEST_SECRET',
     })).resolves.toBeNull();
     process.env.GOALPLACE_TEST_SECRET = previous;
+  });
+});
+
+/**
+ * The convergence properties: every sensitive mutation is subject to the same
+ * account-class boundary, scoped capability check and abuse limit, in the same order.
+ */
+describe('hardened mutation wrapper', () => {
+  const schema = z.object({ teamId: z.string() });
+
+  function mutation(body: unknown, headers: Record<string, string> = {}) {
+    return new Request('https://example.test', {
+      method: 'POST',
+      headers: { authorization: 'Bearer token', ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function installFirestore(options: {
+    user?: Record<string, unknown>;
+    capabilities?: Record<string, string[]>;
+  } = {}) {
+    vi.mocked(adminDb.runTransaction).mockImplementation(allowingRateLimitTransaction() as never);
+    vi.mocked(adminDb.collection).mockImplementation((name: string) => ({
+      doc: (id: string) => ({
+        get: vi.fn(async () => {
+          if (name === 'users') return { exists: true, data: () => options.user ?? {} };
+          const capabilities = options.capabilities?.[id];
+          return { exists: Boolean(capabilities), data: () => (capabilities ? { capabilities } : undefined) };
+        }),
+      }),
+    }) as never);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'user_1', role: 'fan' } as never);
+  });
+
+  it('rejects an account class the route does not serve', async () => {
+    installFirestore({ user: { role: 'fan', accountClass: 'fan' } });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      accountClass: 'organization_operator',
+    });
+
+    // The separate-account model is a security boundary: a Fan account must not reach an
+    // operator mutation even if it somehow held a scoped assignment.
+    expect('response' in result ? result.response.status : 0).toBe(403);
+  });
+
+  it('admits an allowed account class', async () => {
+    installFirestore({ user: { role: 'team_admin', accountClass: 'organization_operator' } });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      accountClass: ['organization_operator', 'platform_operator'],
+    });
+
+    expect('response' in result).toBe(false);
+  });
+
+  it('denies a mutation whose scoped capability is missing', async () => {
+    installFirestore({ user: { accountClass: 'organization_operator' }, capabilities: {} });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      capability: {
+        resolve: (data) => ({ capability: 'team.result.submit', scopeType: 'team', scopeId: data.teamId }),
+      },
+    });
+
+    expect('response' in result ? result.response.status : 0).toBe(403);
+  });
+
+  it('allows a mutation whose scoped capability is granted', async () => {
+    installFirestore({
+      user: { accountClass: 'organization_operator' },
+      capabilities: { team_team_1_user_1: ['team.result.submit'] },
+    });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      capability: {
+        resolve: (data) => ({ capability: 'team.result.submit', scopeType: 'team', scopeId: data.teamId }),
+      },
+    });
+
+    expect('response' in result).toBe(false);
+  });
+
+  it('accepts a platform-global grant in place of the scoped one', async () => {
+    installFirestore({
+      user: { accountClass: 'platform_operator' },
+      capabilities: { platform_global_user_1: ['platform.admin.manage'] },
+    });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      capability: {
+        resolve: (data) => ({ capability: 'team.result.submit', scopeType: 'team', scopeId: data.teamId }),
+      },
+    });
+
+    expect('response' in result).toBe(false);
+  });
+
+  it('returns 429 once the abuse limit for the bucket is reached', async () => {
+    installFirestore({ user: {} });
+    vi.mocked(adminDb.runTransaction).mockImplementation(denyingRateLimitTransaction(5) as never);
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      rateLimit: { bucket: 'test_bucket', limit: 5, windowSeconds: 60 },
+    });
+
+    expect('response' in result ? result.response.status : 0).toBe(429);
+  });
+
+  it('issues a correlation id for every accepted mutation', async () => {
+    installFirestore({ user: {} });
+
+    const first = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+    });
+    const second = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+    });
+
+    const firstId = 'requestId' in first ? first.requestId : '';
+    const secondId = 'requestId' in second ? second.requestId : '';
+    expect(firstId).toBeTruthy();
+    expect(firstId).not.toBe(secondId);
+  });
+
+  it('enforces App Check before any capability read when it is required', async () => {
+    const previous = process.env.GOALPLACE_REQUIRE_APP_CHECK;
+    process.env.GOALPLACE_REQUIRE_APP_CHECK = 'true';
+    installFirestore({ user: {} });
+
+    const result = await requireAuthenticatedMutation(mutation({ teamId: 'team_1' }), schema, {
+      maxBytes: 1024,
+      invalidBodyError: 'Invalid.',
+      capability: {
+        resolve: (data) => ({ capability: 'team.result.submit', scopeType: 'team', scopeId: data.teamId }),
+      },
+    });
+
+    expect('response' in result ? result.response.status : 0).toBe(401);
+    process.env.GOALPLACE_REQUIRE_APP_CHECK = previous;
   });
 });

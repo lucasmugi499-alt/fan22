@@ -7,7 +7,7 @@ import {
   roleCanTransitionChallenge,
   type ChallengeAction,
 } from '@/lib/challenge';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import type { AppRole, Challenge } from '@/types';
 
 export const runtime = 'nodejs';
@@ -64,11 +64,14 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ challengeId: string }> },
 ) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid challenge action.' }, { status: parsed.response.status });
-  const actor = auth.actor;
+  const guarded = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Invalid challenge action.',
+    rateLimit: { bucket: 'challenge_transition', limit: 20, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const parsed = { data: guarded.data };
   const input = parsed.data;
   const { challengeId } = await params;
   if (challengeId !== input.challengeId || actor.uid !== input.actorUserId) {

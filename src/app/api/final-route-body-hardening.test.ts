@@ -4,6 +4,7 @@ import { POST as postChallenge } from './challenges/[challengeId]/transition/rou
 import { POST as postAttendance } from './matches/[matchId]/attendance/route';
 import { POST as postPoints } from './points/events/route';
 import { POST as postCorrection } from './result-submissions/[matchId]/correction/route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
@@ -47,7 +48,7 @@ describe('remaining API body hardening', () => {
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error });
     expect(adminAuth.verifyIdToken).not.toHaveBeenCalled();
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it.each([
@@ -62,7 +63,7 @@ describe('remaining API body hardening', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
   it.each([
@@ -83,6 +84,6 @@ describe('remaining API body hardening', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error });
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 });

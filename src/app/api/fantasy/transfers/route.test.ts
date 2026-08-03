@@ -77,6 +77,11 @@ class MemoryTransaction {
     if (this.store.has(ref.path)) throw new Error(`Document already exists: ${ref.path}`);
     this.store.set(ref.path, data);
   }
+
+  // The shared mutation wrapper's rate limiter writes through the same transaction.
+  set(ref: MemoryDocRef, data: RecordData) {
+    this.store.set(ref.path, { ...(this.store.get(ref.path) ?? {}), ...data });
+  }
 }
 
 function snapshot(ref: MemoryDocRef, data: RecordData | undefined) {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
 import { enforceRateLimit } from '@/server/api/security';
 import { GET } from './route';
+import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -109,6 +110,6 @@ describe('public result provenance route', () => {
     });
 
     expect(response.status).toBe(404);
-    expect(adminDb.collection).not.toHaveBeenCalled();
+    expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 });

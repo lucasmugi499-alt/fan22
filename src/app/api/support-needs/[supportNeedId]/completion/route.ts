@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { requireAuthenticatedMutation } from '@/server/api/security';
 import type { AppRole, SupportNeed } from '@/types';
 
 export const runtime = 'nodejs';
@@ -16,11 +16,14 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ supportNeedId: string }> },
 ) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return auth.response;
-  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Completion evidence review is incomplete.' }, { status: parsed.response.status });
-  const actor = auth.actor;
+  const guarded = await requireAuthenticatedMutation(request, bodySchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Completion evidence review is incomplete.',
+    rateLimit: { bucket: 'support_completion', limit: 20, windowSeconds: 300 },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const parsed = { data: guarded.data };
   const input = parsed.data;
   const { supportNeedId } = await params;
   if (input.supportNeedId !== supportNeedId || input.actorUserId !== actor.uid) {

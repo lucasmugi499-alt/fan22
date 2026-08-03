@@ -1,11 +1,12 @@
-import { timingSafeEqual } from 'node:crypto';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { OAuth2Client } from 'google-auth-library';
 import type { z } from 'zod';
 import { adminAppCheck, adminAuth, adminDb } from '@/lib/firebase/admin';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
-import type { AppRole, UserProfile } from '@/types';
+import type { AccessScopeType, PermissionCapability } from '@/lib/auth/access';
+import { hasCapability, hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import type { AccountClass, AppRole, UserProfile } from '@/types';
 
 export type AuthenticatedActor = Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
 
@@ -108,6 +109,20 @@ export async function parseJsonBody<T extends z.ZodTypeAny>(
   return { data: parsed.data };
 }
 
+/**
+ * The one hardened path for an authenticated mutation.
+ *
+ * Every sensitive write goes through here so that authentication, App Check, body
+ * limits, schema validation, rate limiting, account-class separation and scoped
+ * capability authorization are applied in the same order, with the same failure
+ * semantics, every time. Routes that hand-rolled a subset of these each enforced a
+ * slightly different policy, which is how App Check ended up configurable but
+ * unenforced on the routes that mattered most.
+ *
+ * Checks run cheapest-first and fail closed. Capability authorization is last because
+ * it costs a Firestore read, and there is no reason to pay for it on a request that
+ * fails validation.
+ */
 export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
   request: Request,
   schema: T,
@@ -126,8 +141,29 @@ export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
         request: Request;
       }) => string[];
     };
+    /**
+     * Account classes permitted to call this route at all. The separate-account model
+     * is a security boundary, not a UI preference: a Fan account must not reach an
+     * operator mutation even while holding a scoped assignment.
+     */
+    accountClass?: AccountClass | AccountClass[];
+    accountClassError?: string;
+    /**
+     * Scoped capability required for this mutation, derived from the validated body.
+     * Returning `null` skips the check — use that only where the handler performs its
+     * own equivalent authorization.
+     */
+    capability?: {
+      resolve: (data: z.infer<T>) => { capability: PermissionCapability; scopeType: AccessScopeType; scopeId: string } | null;
+      /** Allow a platform-global grant of this capability to satisfy the check. */
+      allowPlatformGrant?: PermissionCapability | false;
+      error?: string;
+    };
   },
-): Promise<{ actor: AuthenticatedActor; data: z.infer<T>; appId: string } | { response: Response }> {
+): Promise<
+  | { actor: AuthenticatedActor; data: z.infer<T>; appId: string; requestId: string }
+  | { response: Response }
+> {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) {
     const authResponse = auth.response ?? jsonError('Authentication required.', 401);
@@ -170,7 +206,58 @@ export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
     if (limited) return { response: limited };
   }
 
-  return { actor: auth.actor, data: parsed.data, appId: appCheck.appId };
+  if (options.accountClass) {
+    const allowed = Array.isArray(options.accountClass) ? options.accountClass : [options.accountClass];
+    const profile = await adminDb.collection('users').doc(auth.actor.uid).get();
+    const data = profile.data();
+    const accountClass = resolveAccountClass({
+      accountClass: auth.actor.accountClass ?? data?.accountClass,
+      role: (typeof auth.actor.role === 'string' ? auth.actor.role : null)
+        ?? (typeof data?.role === 'string' ? data.role : null),
+    });
+    if (!allowed.includes(accountClass)) {
+      return {
+        response: jsonError(
+          options.accountClassError
+            ?? `This action requires a ${allowed.join(' or ')} account.`,
+          403,
+        ),
+      };
+    }
+  }
+
+  if (options.capability) {
+    const required = options.capability.resolve(parsed.data);
+    if (required) {
+      const platformCapability = options.capability.allowPlatformGrant === false
+        ? null
+        : options.capability.allowPlatformGrant ?? 'platform.admin.manage';
+      const granted = platformCapability
+        ? await hasCapabilityOrPlatformGrant(
+            auth.actor.uid,
+            { scopeType: required.scopeType, scopeId: required.scopeId },
+            required.capability,
+            platformCapability,
+          )
+        : await hasCapability(
+            auth.actor.uid,
+            { scopeType: required.scopeType, scopeId: required.scopeId },
+            required.capability,
+          );
+      if (!granted) {
+        return {
+          response: jsonError(
+            options.capability.error ?? 'You do not have permission to perform this action.',
+            403,
+          ),
+        };
+      }
+    }
+  }
+
+  // One correlation id per mutation, so an audit event, a security event and a client
+  // error report can all be tied to the same request.
+  return { actor: auth.actor, data: parsed.data, appId: appCheck.appId, requestId: randomUUID() };
 }
 
 export function safeSecretEquals(supplied: string | null, expected: string | undefined) {

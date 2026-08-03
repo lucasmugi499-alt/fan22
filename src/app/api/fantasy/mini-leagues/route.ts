@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser, requireFanAccountPrincipal } from '@/server/api/security';
+import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -87,23 +87,34 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuthenticatedUser(request);
-  if ('response' in auth) return Response.json({ error: 'Sign in to manage mini-leagues.' }, { status: auth.response?.status ?? 401 });
-  const actor = auth.actor;
-  const parsed = await parseJsonBody(request, requestSchema, { maxBytes: 4 * 1024 });
-  if ('response' in parsed) return Response.json({ error: 'Invalid mini-league request.' }, { status: parsed.response.status });
+  const guarded = await requireAuthenticatedMutation(request, requestSchema, {
+    maxBytes: 4 * 1024,
+    invalidBodyError: 'Invalid mini-league request.',
+    authError: 'Sign in to manage mini-leagues.',
+    // Joining by invite code is a guessing surface: codes are still stored in plaintext
+    // with no expiry, so the abuse limit is the only thing bounding attempts today.
+    rateLimit: {
+      bucket: 'fantasy_mini_league',
+      limit: 20,
+      windowSeconds: 300,
+      identity: ({ data }) => [data.action],
+    },
+  });
+  if ('response' in guarded) return guarded.response;
+  const actor = guarded.actor;
+  const input = guarded.data;
   const fanAccount = await requireFanAccountPrincipal(actor, 'GoalPlace Fantasy is available to Fan accounts only.');
   if ('response' in fanAccount) return fanAccount.response;
 
-  if (parsed.data.action === 'create') {
+  if (input.action === 'create') {
     const competition = await adminDb.collection('fantasyCompetitions')
-      .doc(parsed.data.competitionId)
+      .doc(input.competitionId)
       .get();
     if (!competition.exists || competition.data()?.status !== 'active') {
       return Response.json({ error: 'Choose an active fantasy competition.' }, { status: 409 });
     }
     const fantasyTeam = await adminDb.collection('fantasyTeams')
-      .doc(`${parsed.data.competitionId}_${actor.uid}`)
+      .doc(`${input.competitionId}_${actor.uid}`)
       .get();
     if (!fantasyTeam.exists) {
       return Response.json({ error: 'Submit your fantasy squad before creating a mini-league.' }, { status: 409 });
@@ -115,21 +126,21 @@ export async function POST(request: Request) {
     const batch = adminDb.batch();
     batch.create(leagueRef, {
       id: leagueRef.id,
-      competitionId: parsed.data.competitionId,
+      competitionId: input.competitionId,
       ownerUserId: actor.uid,
-      name: parsed.data.name,
-      description: parsed.data.description,
+      name: input.name,
+      description: input.description,
       inviteCode,
-      visibility: parsed.data.visibility,
-      approvalRequired: parsed.data.approvalRequired,
-      memberLimit: parsed.data.memberLimit,
+      visibility: input.visibility,
+      approvalRequired: input.approvalRequired,
+      memberLimit: input.memberLimit,
       status: 'active',
       createdAt: FieldValue.serverTimestamp(),
     });
     batch.create(memberRef, {
       id: memberRef.id,
       miniLeagueId: leagueRef.id,
-      competitionId: parsed.data.competitionId,
+      competitionId: input.competitionId,
       userId: actor.uid,
       fantasyTeamId: fantasyTeam.id,
       role: 'owner',
@@ -140,30 +151,30 @@ export async function POST(request: Request) {
     return Response.json({ id: leagueRef.id, inviteCode }, { status: 201 });
   }
 
-  if (parsed.data.action === 'moderate') {
+  if (input.action === 'moderate') {
     const league = await adminDb.collection('fantasyMiniLeagues')
-      .doc(parsed.data.miniLeagueId)
+      .doc(input.miniLeagueId)
       .get();
     if (!league.exists || league.data()?.ownerUserId !== actor.uid) {
       return Response.json({ error: 'Only the mini-league owner may moderate members.' }, { status: 403 });
     }
-    if (parsed.data.memberUserId === actor.uid && parsed.data.status === 'removed') {
+    if (input.memberUserId === actor.uid && input.status === 'removed') {
       return Response.json({ error: 'The owner cannot remove their own membership.' }, { status: 409 });
     }
     const memberRef = adminDb.collection('fantasyMiniLeagueMembers')
-      .doc(`${league.id}_${parsed.data.memberUserId}`);
+      .doc(`${league.id}_${input.memberUserId}`);
     const member = await memberRef.get();
     if (!member.exists) return Response.json({ error: 'Mini-league member was not found.' }, { status: 404 });
     await memberRef.update({
-      status: parsed.data.status,
+      status: input.status,
       moderatedByUserId: actor.uid,
       moderatedAt: FieldValue.serverTimestamp(),
     });
-    return Response.json({ id: member.id, status: parsed.data.status });
+    return Response.json({ id: member.id, status: input.status });
   }
 
   const leagueQuery = await adminDb.collection('fantasyMiniLeagues')
-    .where('inviteCode', '==', parsed.data.inviteCode.toUpperCase())
+    .where('inviteCode', '==', input.inviteCode.toUpperCase())
     .where('status', '==', 'active')
     .limit(1)
     .get();
