@@ -407,7 +407,44 @@ async function main() {
     });
   }
 
+  // Canonical access assignments for every legacy grant.
+  //
+  // Writing adminUserIds alone is what produced 50 operators with legacy access and no
+  // canonical assignment in the demo database — each one a lockout the moment Firestore
+  // Rules stop reading those arrays. Any generator that grants access must emit both.
+  const accessAssignments: any[] = [];
+  const grant = (
+    userId: string,
+    scopeType: "league" | "team",
+    scopeId: string,
+    roleKey: string,
+    permissionBundleId: string,
+  ) => {
+    accessAssignments.push({
+      id: `assignment_${scopeType}_${scopeId}_${userId}`,
+      userId,
+      roleKey,
+      scopeType,
+      scopeId,
+      permissionBundleId,
+      status: "active",
+      grantedByUserId: "system_seed",
+      validFrom: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+  leagues.forEach((league) => {
+    (league.adminUserIds ?? []).forEach((userId: string) =>
+      grant(userId, "league", league.id, "league_admin", "league_admin"));
+  });
+  teams.forEach((team) => {
+    (team.adminUserIds ?? []).forEach((userId: string) =>
+      grant(userId, "team", team.id, "team_admin", "full_team_admin"));
+  });
+
   // Write files
+  writeTsFile("mockAccessAssignments.ts", "accessAssignments", accessAssignments, "AccessAssignment");
   writeTsFile("mockSports.ts", "sports", sports, "Sport");
   writeTsFile("mockUsers.ts", "users", users, "User");
   writeTsFile("mockLeagues.ts", "leagues", leagues, "League");

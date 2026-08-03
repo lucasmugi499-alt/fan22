@@ -70,6 +70,8 @@ function parseArgs(argv: string[]) {
     firebase: argv.includes('--firebase'),
     apply: argv.includes('--apply'),
     json: argv.includes('--json'),
+    // Exit non-zero on any drift or coverage gap, so this can gate the cutover.
+    strict: argv.includes('--strict'),
     source: valueAfter(argv, '--source') ?? path.join(process.cwd(), 'data', 'investor-demo'),
     projectId:
       valueAfter(argv, '--project')
@@ -401,6 +403,16 @@ async function main() {
     console.log(`${legacyGaps.length} legacy grant(s) have no canonical assignment.`);
     console.log('Each is an operator who would lose access at the Stage C cutover.');
     console.log('These cannot be repaired by --apply: the assignments must be created first.');
+    console.log('Run scripts/access/backfill-assignments.ts to create them.');
+  }
+
+  if (args.strict && (totalDrift > 0 || legacyGaps.length > 0)) {
+    // Both directions must be clean. Drift preserves privilege that should be gone;
+    // a coverage gap removes privilege that should remain. Either one makes the
+    // canonical cutover unsafe.
+    throw new Error(
+      `Access projection is not cutover-ready: ${totalDrift} drift, ${legacyGaps.length} coverage gap(s).`,
+    );
   }
 }
 

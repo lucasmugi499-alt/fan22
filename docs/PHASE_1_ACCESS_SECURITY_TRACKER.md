@@ -186,7 +186,37 @@ Stage A and Stage B are built and tested locally. Outstanding before Stage C:
    lookups.
 5. Remove the legacy arm from `secureLeagueCommand`.
 
-### Live measurement — Stage C would currently lock out 50 grants
+### Stage B closed — both gates now read zero
+
+Backfilled on 2026-08-03 against `manifest-quasar-479416-s7/fg256`:
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Canonical assignments | 1,068 | 1,123 |
+| Projection drift | 0 | 0 |
+| Legacy grants with no assignment | **50** | **0** |
+| Compatibility warnings | 350 | 92 |
+| — `missing_account_class` | 200 | 0 |
+| — `operator_missing_access_version` | 30 | 0 |
+| — `legacy_principal_without_assignment` | 120 | 92 |
+
+The backfill is additive, idempotent and never revokes: it creates a canonical
+assignment for each legacy grant, mirrors platform roles into platform-scope
+assignments, and sets explicit account classes. Removing access that should not exist
+is a separate, deliberate decision.
+
+The remaining 92 warnings are **not** lockout risks: 90 are athlete accounts with no
+claimed profile (no scoped authority to lose) and 2 are operator accounts holding a
+legacy role with no scope in any array.
+
+`npm run access:migrate:gate` now exits non-zero on any drift or coverage gap, so the
+condition can gate the cutover rather than relying on someone reading a report. The mock
+generator emits canonical assignments alongside `adminUserIds`, which is what let the
+gap open in the first place.
+
+### How the gap arose
+
+
 
 The live demo database (`manifest-quasar-479416-s7/fg256`) holds **17 leagues and 100
 teams**, but only **6 canonical `league_admin` and 60 canonical `team_admin`**
