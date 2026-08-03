@@ -122,17 +122,83 @@ const STANDARD_STAT_KEYS = new Set([
 
 const ADVANCED_STAT_KEYS = new Set(['steal', 'block', 'turnover']);
 
+/**
+ * Squad entries keyed by athlete, plus the athletes claimed by both teams.
+ *
+ * The previous implementation kept the last write for a duplicated athlete, so someone
+ * submitted under both sides silently became a member of whichever team appeared later.
+ * A conflicting attribution is a data-quality fact and is surfaced rather than resolved
+ * by ordering.
+ */
 function sanitizedActiveSquads(submission: ResultSubmission, match: Match) {
   const validTeams = new Set([match.homeTeamId, match.awayTeamId]);
   const result = new Map<string, { athleteId: string; teamId: string }>();
+  const conflicting = new Set<string>();
   for (const [teamId, athleteIds] of Object.entries(submission.activeSquads ?? {})) {
     if (!validTeams.has(teamId) || !Array.isArray(athleteIds)) continue;
     for (const athleteId of athleteIds) {
       if (typeof athleteId !== 'string' || !athleteId.trim()) continue;
+      const existing = result.get(athleteId);
+      if (existing && existing.teamId !== teamId) {
+        conflicting.add(athleteId);
+        continue;
+      }
       result.set(athleteId, { athleteId, teamId });
     }
   }
-  return result;
+  for (const athleteId of conflicting) result.delete(athleteId);
+  return Object.assign(result, { conflictingAthleteIds: conflicting });
+}
+
+export type AthleteEligibilityIssue = {
+  athleteId: string;
+  claimedTeamId: string | null;
+  registeredTeamId: string | null;
+  reason:
+    | 'athlete_not_found'
+    | 'conflicting_team_attribution'
+    | 'team_not_in_match'
+    | 'not_registered_to_claimed_team';
+};
+
+/**
+ * Decides whether a claimed athlete may receive official records for this match.
+ *
+ * The finalizer validated that a submitted team belonged to the fixture, but never that
+ * the athlete belonged to that team — so a result could credit goals to someone from an
+ * unrelated club. It also defaulted an unattributable athlete to the home team, which
+ * silently invented an affiliation.
+ *
+ * Ineligible athletes are excluded from official records and reported, never guessed at.
+ */
+function assessAthleteEligibility({
+  athleteId,
+  claimedTeamId,
+  registeredTeamId,
+  match,
+  conflicting,
+}: {
+  athleteId: string;
+  claimedTeamId: string | null;
+  registeredTeamId: string | null;
+  match: Match;
+  conflicting: boolean;
+}): AthleteEligibilityIssue | null {
+  if (conflicting) {
+    return { athleteId, claimedTeamId, registeredTeamId, reason: 'conflicting_team_attribution' };
+  }
+  if (!claimedTeamId) {
+    return { athleteId, claimedTeamId, registeredTeamId, reason: 'team_not_in_match' };
+  }
+  if (claimedTeamId !== match.homeTeamId && claimedTeamId !== match.awayTeamId) {
+    return { athleteId, claimedTeamId, registeredTeamId, reason: 'team_not_in_match' };
+  }
+  // A blank registration is tolerated: many grassroots athletes are created mid-season
+  // and the roster link follows. A registration to a DIFFERENT club is not.
+  if (registeredTeamId && registeredTeamId !== claimedTeamId) {
+    return { athleteId, claimedTeamId, registeredTeamId, reason: 'not_registered_to_claimed_team' };
+  }
+  return null;
 }
 
 function sanitizedStatLines(
@@ -596,6 +662,9 @@ export async function finalizeSubmission(
         teamId: scorer.teamId,
       });
     }
+    const eligibilityIssues: AthleteEligibilityIssue[] = [];
+    const conflictingSquadAthleteIds = (activeSquads as unknown as { conflictingAthleteIds?: Set<string> })
+      .conflictingAthleteIds ?? new Set<string>();
     const officialPerformances: {
       athlete: Athlete;
       count: number;
@@ -656,17 +725,45 @@ export async function finalizeSubmission(
         ...activeSquads.keys(),
         ...scorerTotals.keys(),
         ...statLines.keys(),
+        // Conflicting athletes are removed from the squad map but must still be
+        // reported; dropping them silently is the behaviour being fixed.
+        ...conflictingSquadAthleteIds,
       ]);
       for (const athleteId of athleteIds) {
         const athleteSnapshot = await tx.get(db.collection('athletes').doc(athleteId));
-        if (!athleteSnapshot.exists) continue;
         const scorer = scorerTotals.get(athleteId);
         const active = activeSquads.get(athleteId);
         const statLine = statLines.get(athleteId);
+        // No home-team fallback: an athlete who cannot be attributed to a side is a data
+        // problem, not a home player.
+        const claimedTeamId = active?.teamId ?? scorer?.teamId ?? statLine?.teamId ?? null;
+        const athleteData = athleteSnapshot.exists ? athleteSnapshot.data() ?? {} : null;
+        const registeredTeamId = typeof athleteData?.teamId === 'string' ? athleteData.teamId : null;
+
+        const issue = !athleteSnapshot.exists
+          ? {
+            athleteId,
+            claimedTeamId,
+            registeredTeamId,
+            reason: 'athlete_not_found' as const,
+          }
+          : assessAthleteEligibility({
+            athleteId,
+            claimedTeamId,
+            registeredTeamId,
+            match,
+            conflicting: conflictingSquadAthleteIds.has(athleteId),
+          });
+
+        if (issue) {
+          eligibilityIssues.push(issue);
+          continue;
+        }
+
         officialPerformances.push({
-          athlete: { id: athleteSnapshot.id, ...athleteSnapshot.data() } as Athlete,
+          athlete: { id: athleteSnapshot.id, ...athleteData } as Athlete,
           count: scorer?.count ?? 0,
-          teamId: active?.teamId ?? scorer?.teamId ?? statLine?.teamId ?? match.homeTeamId,
+          teamId: claimedTeamId as string,
           activeSquadEventId: activeSquadEventByAthlete.get(athleteId),
           scoringSourceEventId: scoringSourceEventByAthlete.get(athleteId),
           statLine,
@@ -751,6 +848,10 @@ export async function finalizeSubmission(
         officialScore: plan.match.score,
         unattributed: reconciliation.unattributed,
         issues: reconciliation.trace.issues,
+        // Athletes excluded from official records, with the reason. Publishing this
+        // alongside the result is what keeps an incomplete record honest instead of
+        // silently short.
+        eligibilityIssues,
         finalizedAt,
       });
 

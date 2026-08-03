@@ -325,4 +325,84 @@ describe('trusted result finalizer', () => {
       expect(data.stats.appearance).toBe(0);
     }
   });
+
+  it('excludes an athlete registered to a club that is not playing', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': { ...submission, homeScore: 15 },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half', teamId: 'team_home' },
+      // Registered to an unrelated club, yet claimed in this fixture's squad.
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock', teamId: 'team_elsewhere' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row', teamId: 'team_away' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1');
+
+    const performances = writes
+      .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))
+      .map((write) => write.path);
+    expect(performances).not.toContain('officialAthleteMatchStats/match_1_v1_athlete_2');
+
+    const reconciliation = writes.find((write) => write.path === 'officialMatchReconciliation/match_1_v1');
+    expect(reconciliation?.data).toMatchObject({
+      eligibilityIssues: expect.arrayContaining([
+        expect.objectContaining({
+          athleteId: 'athlete_2',
+          reason: 'not_registered_to_claimed_team',
+          registeredTeamId: 'team_elsewhere',
+        }),
+      ]),
+    });
+  });
+
+  it('excludes an athlete claimed by both teams rather than picking one', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': {
+        ...submission,
+        homeScore: 15,
+        activeSquads: {
+          team_home: ['athlete_1', 'athlete_2'],
+          // athlete_2 cannot have played for both sides.
+          team_away: ['athlete_2', 'athlete_3'],
+        },
+      },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1');
+
+    const performances = writes
+      .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))
+      .map((write) => write.path);
+    expect(performances).not.toContain('officialAthleteMatchStats/match_1_v1_athlete_2');
+
+    const reconciliation = writes.find((write) => write.path === 'officialMatchReconciliation/match_1_v1');
+    expect(reconciliation?.data).toMatchObject({
+      eligibilityIssues: expect.arrayContaining([
+        expect.objectContaining({ athleteId: 'athlete_2', reason: 'conflicting_team_attribution' }),
+      ]),
+    });
+  });
+
+  it('still accepts an athlete whose roster link has not been recorded yet', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': { ...submission, homeScore: 15 },
+      'matches/match_1': match,
+      // No teamId: common for grassroots athletes created mid-season. Tolerated, because
+      // a missing registration is not the same as a contradictory one.
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1');
+
+    const performances = writes
+      .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))
+      .map((write) => write.path);
+    expect(performances).toContain('officialAthleteMatchStats/match_1_v1_athlete_1');
+  });
 });
