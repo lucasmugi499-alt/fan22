@@ -52,6 +52,11 @@ type MigrationReport = {
   };
   driftCounts: Record<DriftRow['reason'], number>;
   drift: DriftRow[];
+  legacyCoverage: {
+    gaps: number;
+    byGrant: Record<LegacyCoverageRow['grant'], number>;
+    samples: LegacyCoverageRow[];
+  };
   repaired: number;
 };
 
@@ -137,11 +142,17 @@ export function buildMigrationPlan(input: {
  */
 async function loadDemoDataset(source: string) {
   const dataset = await loadCompatibilityDemoDataset(source);
+  const database = JSON.parse(
+    fs.readFileSync(path.join(source, 'database.json'), 'utf8'),
+  ) as Record<string, JsonRecord[] | undefined>;
   return {
     label: dataset.source,
     users: dataset.users,
     assignments: dataset.assignments,
     indexes: dataset.indexes,
+    leagues: dataset.leagues,
+    teams: dataset.teams,
+    teamAssignments: database.teamAssignments ?? [],
   };
 }
 
@@ -167,7 +178,77 @@ async function loadFirebaseDataset(projectId?: string, databaseId?: string) {
     users: await list('users'),
     assignments: await list('accessAssignments'),
     indexes: await list('accessIndex'),
+    leagues: await list('leagues'),
+    teams: await list('teams'),
+    teamAssignments: await list('teamAssignments'),
   };
+}
+
+export type LegacyCoverageRow = {
+  scopeType: 'league' | 'team';
+  scopeId: string;
+  userId: string;
+  grant: 'adminUserIds' | 'teamAssignment';
+};
+
+/**
+ * The availability half of the cutover.
+ *
+ * The drift report above answers "does the projection match the assignments". It does
+ * NOT answer "does a canonical assignment exist for everyone who currently has access".
+ * An operator sitting in a legacy `adminUserIds` array with no active assignment keeps
+ * working today and is locked out the moment Rules stop reading that array.
+ *
+ * Every row here is one such operator. This count must reach zero before Stage C, for
+ * the opposite reason drift must: drift preserves privilege that should be gone, this
+ * removes privilege that should remain.
+ */
+export function findLegacyCoverageGaps(input: {
+  assignments: ReturnType<typeof buildMigrationPlan>['assignments'];
+  leagues: JsonRecord[];
+  teams: JsonRecord[];
+  teamAssignments: JsonRecord[];
+  now?: Date;
+}): LegacyCoverageRow[] {
+  const now = input.now ?? new Date();
+  const nowIso = now.toISOString();
+
+  const covered = (userId: string, scopeType: 'league' | 'team', scopeId: string) => {
+    const projected = projectScopeIndex({
+      scope: { userId, scopeType, scopeId },
+      assignments: input.assignments,
+      updatedAt: nowIso,
+      now,
+    });
+    return Boolean(projected && projected.capabilities.length > 0);
+  };
+
+  const gaps: LegacyCoverageRow[] = [];
+
+  for (const [scopeType, records] of [['league', input.leagues], ['team', input.teams]] as const) {
+    for (const record of records) {
+      const ids = record.adminUserIds;
+      if (!Array.isArray(ids)) continue;
+      for (const userId of ids) {
+        if (typeof userId !== 'string' || !userId) continue;
+        if (!covered(userId, scopeType, record.id)) {
+          gaps.push({ scopeType, scopeId: record.id, userId, grant: 'adminUserIds' });
+        }
+      }
+    }
+  }
+
+  for (const record of input.teamAssignments) {
+    if (record.status !== 'active') continue;
+    const userId = typeof record.userId === 'string' ? record.userId : '';
+    const teamId = typeof record.teamId === 'string' ? record.teamId : '';
+    if (!userId || !teamId) continue;
+    if (!covered(userId, 'team', teamId)) {
+      gaps.push({ scopeType: 'team', scopeId: teamId, userId, grant: 'teamAssignment' });
+    }
+  }
+
+  return gaps;
 }
 
 async function repair(
@@ -244,6 +325,14 @@ async function main() {
     );
   }
 
+  const legacyGaps = findLegacyCoverageGaps({
+    assignments: plan.assignments,
+    leagues: dataset.leagues ?? [],
+    teams: dataset.teams ?? [],
+    teamAssignments: dataset.teamAssignments ?? [],
+    now,
+  });
+
   const driftCounts = plan.drift.reduce((counts, row) => {
     counts[row.reason] = (counts[row.reason] ?? 0) + 1;
     return counts;
@@ -265,6 +354,14 @@ async function main() {
       orphan_index: driftCounts.orphan_index ?? 0,
     },
     drift: plan.drift.slice(0, 200),
+    legacyCoverage: {
+      gaps: legacyGaps.length,
+      byGrant: {
+        adminUserIds: legacyGaps.filter((row) => row.grant === 'adminUserIds').length,
+        teamAssignment: legacyGaps.filter((row) => row.grant === 'teamAssignment').length,
+      },
+      samples: legacyGaps.slice(0, 200),
+    },
     repaired,
   };
 
@@ -286,6 +383,10 @@ async function main() {
     console.log(`Missing index: ${report.driftCounts.missing_index}`);
     console.log(`Stale index: ${report.driftCounts.stale_index}`);
     console.log(`Orphan index: ${report.driftCounts.orphan_index}`);
+    console.log('');
+    console.log(`Legacy grants with no canonical assignment: ${report.legacyCoverage.gaps}`);
+    console.log(`  via adminUserIds: ${report.legacyCoverage.byGrant.adminUserIds}`);
+    console.log(`  via teamAssignments: ${report.legacyCoverage.byGrant.teamAssignment}`);
     console.log(`Repaired: ${report.repaired}`);
     console.log(`Report: ${reportFile}`);
   }
@@ -294,6 +395,12 @@ async function main() {
   if (!args.apply && totalDrift > 0) {
     console.log('');
     console.log(`${totalDrift} scope(s) diverge from canonical assignments. Re-run with --apply to repair.`);
+  }
+  if (legacyGaps.length > 0) {
+    console.log('');
+    console.log(`${legacyGaps.length} legacy grant(s) have no canonical assignment.`);
+    console.log('Each is an operator who would lose access at the Stage C cutover.');
+    console.log('These cannot be repaired by --apply: the assignments must be created first.');
   }
 }
 

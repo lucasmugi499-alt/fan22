@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMigrationPlan } from './projection-migration';
+import { buildMigrationPlan, findLegacyCoverageGaps } from './projection-migration';
 
 const NOW = new Date('2026-08-03T12:00:00.000Z');
 
@@ -119,5 +119,84 @@ describe('access projection migration plan', () => {
 
     const orphan = plan.drift.find((row) => row.userId === 'user_2');
     expect(orphan?.reason).toBe('orphan_index');
+  });
+});
+
+describe('legacy coverage gaps', () => {
+  const assignments = buildMigrationPlan({
+    assignments: [assignment({ id: 'a_1', userId: 'user_1', scopeType: 'team', scopeId: 'team_1' })],
+    indexes: [],
+    now: NOW,
+  }).assignments;
+
+  it('flags an adminUserIds entry with no canonical assignment', () => {
+    const gaps = findLegacyCoverageGaps({
+      assignments,
+      leagues: [{ id: 'league_1', adminUserIds: ['user_9'] }],
+      teams: [],
+      teamAssignments: [],
+      now: NOW,
+    });
+
+    // user_9 works today and is locked out the moment Rules stop reading the array.
+    expect(gaps).toEqual([
+      { scopeType: 'league', scopeId: 'league_1', userId: 'user_9', grant: 'adminUserIds' },
+    ]);
+  });
+
+  it('does not flag an entry that a canonical assignment already covers', () => {
+    const gaps = findLegacyCoverageGaps({
+      assignments,
+      leagues: [],
+      teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
+      teamAssignments: [],
+      now: NOW,
+    });
+
+    expect(gaps).toHaveLength(0);
+  });
+
+  it('flags an active legacy teamAssignment with no canonical equivalent', () => {
+    const gaps = findLegacyCoverageGaps({
+      assignments,
+      leagues: [],
+      teams: [],
+      teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_2', status: 'active' }],
+      now: NOW,
+    });
+
+    expect(gaps[0]).toMatchObject({ grant: 'teamAssignment', userId: 'user_9', scopeId: 'team_2' });
+  });
+
+  it('ignores inactive legacy team assignments', () => {
+    const gaps = findLegacyCoverageGaps({
+      assignments,
+      leagues: [],
+      teams: [],
+      teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_2', status: 'revoked' }],
+      now: NOW,
+    });
+
+    expect(gaps).toHaveLength(0);
+  });
+
+  it('treats a revoked canonical assignment as no coverage', () => {
+    const revoked = buildMigrationPlan({
+      assignments: [assignment({ id: 'a_1', userId: 'user_1', scopeId: 'team_1', status: 'revoked' })],
+      indexes: [],
+      now: NOW,
+    }).assignments;
+
+    const gaps = findLegacyCoverageGaps({
+      assignments: revoked,
+      leagues: [],
+      teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
+      teamAssignments: [],
+      now: NOW,
+    });
+
+    // Revoked canonically but still in the array: this is the operator whose access the
+    // cutover is supposed to remove, so it must surface rather than look covered.
+    expect(gaps).toHaveLength(1);
   });
 });

@@ -129,7 +129,10 @@ Each command was run separately; results are its own, not inferred from another.
 | App build | `tested` | `npm run build` — compiled successfully. |
 | Demo validation | `tested` | `npm run demo:validate` passed. |
 | Access compatibility | `tested` | `npm run access:compat` — 1,068 assignments, 1,068 indexes, 0 blockers, 0 warnings. |
-| Projection migration dry-run | `tested` | `npm run access:migrate:dry-run` — 1,068 scopes checked, 0 drift (bundled dataset). |
+| Projection migration dry-run (bundled) | `tested` | 1,068 scopes, 0 drift. Self-consistent by construction — proves only tool/runtime agreement. |
+| Projection migration dry-run (**live demo**) | `verified` | `manifest-quasar-479416-s7/fg256` — 1,509 users, 1,068 assignments, 1,068 indexes, **0 drift** in all three kinds. |
+| Legacy coverage (**live demo**) | `verified` | **50 legacy grants have no canonical assignment.** See below. |
+| Live compatibility report | `verified` | 0 blockers, **350 warnings**: 120 `legacy_principal_without_assignment`, 200 `missing_account_class`, 30 `operator_missing_access_version`. |
 | Combined release gate | `tested` | `npm run deploy:ready` — exit 0. |
 
 ### Recorded previously, NOT re-verified in the current pass
@@ -158,7 +161,8 @@ These were reported against an earlier commit. Treat as stale until re-run.
 
 | Check | Level | Blocking |
 | --- | --- | --- |
-| Live migration dry-run against the demo database | `implemented` | Stage B — needs credentials; the bundled-dataset run is self-consistent by construction and proves only that the tool and runtime agree. |
+| **50 uncovered legacy grants closed** | `designed` | **Stage C blocker.** Each is a live lockout. |
+| **200 users given an explicit `accountClass`** | `designed` | **Stage C blocker.** Account class is currently inferred from the legacy role being retired. |
 | Break-glass path proven working | `designed` | **Stage C prerequisite.** After cutover there is no legacy fallback. |
 | Canonical Platform Admin access desk | `designed` | Stage C |
 | Rules authorize via `accessIndex` | `designed` | Stage C |
@@ -181,6 +185,38 @@ Stage A and Stage B are built and tested locally. Outstanding before Stage C:
 4. Add the emulator denial matrix, then switch Rules to deterministic `accessIndex`
    lookups.
 5. Remove the legacy arm from `secureLeagueCommand`.
+
+### Live measurement — Stage C would currently lock out 50 grants
+
+The live demo database (`manifest-quasar-479416-s7/fg256`) holds **17 leagues and 100
+teams**, but only **6 canonical `league_admin` and 60 canonical `team_admin`**
+assignments. Measured on 2026-08-03:
+
+| Direction | Result |
+| --- | --- |
+| Projection matches assignments (drift) | **0** — canonical side is internally clean |
+| Legacy grants with no canonical assignment | **50** (10 league, 40 team, 23 distinct users) |
+
+The drift report and the coverage report answer opposite questions, and only both
+together gate the cutover:
+
+- **Drift** finds privilege that should be gone but survives. Currently zero.
+- **Coverage** finds privilege that should remain but has no canonical basis. Currently
+  50 — every one an active operator who works today and stops working the moment Rules
+  stop reading `adminUserIds`.
+
+All 23 accounts exist and are active. None has an explicit `accountClass`; the resolver
+infers it from the legacy `role` field, which is the field this migration retires. The
+live compatibility report shows the same shape at wider scope: 200 users with no
+`accountClass` and 120 operator principals with no assignment at all.
+
+**`--apply` cannot fix this.** Repair rebuilds projections from assignments; where no
+assignment exists there is nothing to project. The assignments must be created first,
+which is a data decision, not a mechanical one.
+
+An earlier revision of this tracker recorded the live compatibility report as "0
+blockers ... warnings limited to pre-existing partial demo records". The blocker count
+was accurate; the characterisation of the warnings was not.
 
 ### A live `legacy OR canonical` check already exists
 
