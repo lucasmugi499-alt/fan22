@@ -19,6 +19,24 @@ export type FantasyActivationSummary = {
   pricedPlayerCount: number;
   roundCount: number;
   positionGroupCounts: Record<string, number>;
+  observedCoverage?: ObservedDataCoverage;
+};
+
+/**
+ * What the competition's recent official results actually contain.
+ *
+ * Activation previously validated `recordedStatKeys`, which is a declaration: a league
+ * could assert it collects appearances without ever having recorded one, and fantasy
+ * would activate appearance scoring against data that does not exist. This is measured
+ * from a recent window of official performances instead.
+ */
+export type ObservedDataCoverage = {
+  matchesSampled: number;
+  performancesSampled: number;
+  /** Share of official performances that carry evidence the athlete actually played. */
+  participationCoveragePercent: number;
+  /** Share of official performances carrying each stat key, keyed by stat code. */
+  statKeyCoveragePercent: Record<string, number>;
 };
 
 export type FantasyActivationReadiness = {
@@ -53,6 +71,7 @@ export function validateFantasyActivation({
   players,
   prices,
   rounds,
+  observedCoverage,
 }: {
   competition: FantasyCompetition;
   scoringProfile: FantasyScoringProfile | null;
@@ -60,6 +79,8 @@ export function validateFantasyActivation({
   players: FantasyPlayer[];
   prices: FantasyPlayerPrice[];
   rounds: FantasyRound[];
+  /** Omit only where no official results exist yet; absence is reported, not assumed. */
+  observedCoverage?: ObservedDataCoverage;
 }): FantasyActivationReadiness {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -87,6 +108,40 @@ export function validateFantasyActivation({
       .filter((statKey) => !competition.recordedStatKeys.includes(statKey));
     if (missingStatKeys.length) {
       blockers.push(`Recorded stat coverage is missing: ${idList(missingStatKeys)}.`);
+    }
+
+    // Declared coverage is not evidence. Check the rules against what recent official
+    // results actually contain.
+    if (!observedCoverage) {
+      warnings.push('No official results have been observed yet, so recorded stat coverage is unverified.');
+    } else {
+      summary.observedCoverage = observedCoverage;
+      if (observedCoverage.matchesSampled === 0) {
+        warnings.push('No official results in the recent window; recorded stat coverage is unverified.');
+      } else {
+        const requiresParticipation = rules.some((rule) =>
+          rule.requiredStatKey === 'appearance' || rule.requiredStatKey === 'win_participation');
+        if (requiresParticipation && observedCoverage.participationCoveragePercent === 0) {
+          // Squad selection is not participation. Awarding appearance points against
+          // results that never distinguished the two invents the points outright.
+          blockers.push(
+            'Appearance-based rules are activated, but no recent official result records who actually played.',
+          );
+        } else if (requiresParticipation && observedCoverage.participationCoveragePercent < 50) {
+          warnings.push(
+            `Only ${observedCoverage.participationCoveragePercent}% of recent official performances record participation.`,
+          );
+        }
+
+        const unobserved = rules
+          .map((rule) => rule.requiredStatKey)
+          .filter((statKey) => (observedCoverage.statKeyCoveragePercent[statKey] ?? 0) === 0);
+        if (unobserved.length) {
+          blockers.push(
+            `Activated rules need stats that no recent official result contains: ${idList(unobserved)}.`,
+          );
+        }
+      }
     }
   }
 
@@ -157,5 +212,49 @@ export function validateFantasyActivation({
     blockers,
     warnings: [...new Set(warnings)],
     summary,
+  };
+}
+
+
+/**
+ * Measures what a recent window of official performances actually contains.
+ *
+ * Pure so it can be exercised without Firestore; callers supply the window.
+ * `didPlay` is the finalizer's participation verdict, which is derived from official
+ * events rather than squad selection.
+ */
+export function measureObservedCoverage(performances: Array<{
+  matchId: string;
+  didPlay?: boolean;
+  stats?: Record<string, number>;
+}>): ObservedDataCoverage {
+  const matchesSampled = new Set(performances.map((entry) => entry.matchId)).size;
+  const performancesSampled = performances.length;
+  const played = performances.filter((entry) => entry.didPlay === true).length;
+
+  const statCounts: Record<string, number> = {};
+  for (const entry of performances) {
+    for (const [statKey, value] of Object.entries(entry.stats ?? {})) {
+      // A stat present but always zero is not evidence the league records it.
+      if (typeof value === 'number' && value > 0) {
+        statCounts[statKey] = (statCounts[statKey] ?? 0) + 1;
+      }
+    }
+  }
+
+  const statKeyCoveragePercent: Record<string, number> = {};
+  for (const [statKey, count] of Object.entries(statCounts)) {
+    statKeyCoveragePercent[statKey] = performancesSampled
+      ? Math.round((count / performancesSampled) * 100)
+      : 0;
+  }
+
+  return {
+    matchesSampled,
+    performancesSampled,
+    participationCoveragePercent: performancesSampled
+      ? Math.round((played / performancesSampled) * 100)
+      : 0,
+    statKeyCoveragePercent,
   };
 }

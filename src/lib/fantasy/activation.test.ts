@@ -7,7 +7,7 @@ import type {
   FantasyScoringProfile,
   FantasySquadRules,
 } from '@/types/fantasy';
-import { validateFantasyActivation } from './activation';
+import { measureObservedCoverage, validateFantasyActivation } from './activation';
 
 const competition: FantasyCompetition = {
   id: 'competition_1',
@@ -203,5 +203,103 @@ describe('fantasy activation readiness', () => {
 
     expect(readiness.ready).toBe(false);
     expect(readiness.blockers).toContain('Round round_1 has no matches.');
+  });
+
+  it('warns rather than approving silently when no official results have been observed', () => {
+    const readiness = validateFantasyActivation({
+      competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: prices(),
+      rounds,
+    });
+
+    expect(readiness.warnings).toContain(
+      'No official results have been observed yet, so recorded stat coverage is unverified.',
+    );
+  });
+
+  it('blocks appearance scoring when recent results never record who actually played', () => {
+    const readiness = validateFantasyActivation({
+      competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: prices(),
+      rounds,
+      observedCoverage: measureObservedCoverage([
+        // Squads were recorded, but nobody was ever marked as having played.
+        { matchId: 'm1', didPlay: false, stats: { active_squad: 1, goal: 1 } },
+        { matchId: 'm1', didPlay: false, stats: { active_squad: 1 } },
+        { matchId: 'm2', didPlay: false, stats: { active_squad: 1, goal: 2 } },
+      ]),
+    });
+
+    // A league can declare it collects appearances; this checks whether it actually has.
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers).toContain(
+      'Appearance-based rules are activated, but no recent official result records who actually played.',
+    );
+  });
+
+  it('blocks rules whose stats appear in no recent official result', () => {
+    const readiness = validateFantasyActivation({
+      competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: prices(),
+      rounds,
+      observedCoverage: measureObservedCoverage([
+        { matchId: 'm1', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 1, win_participation: 1 } },
+      ]),
+    });
+
+    // Cards are activated but never observed.
+    expect(readiness.blockers.some((blocker) => blocker.includes('red_card'))).toBe(true);
+  });
+
+  it('accepts a competition whose recent results carry every activated stat', () => {
+    const readiness = validateFantasyActivation({
+      competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: prices(),
+      rounds,
+      observedCoverage: measureObservedCoverage([
+        { matchId: 'm1', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 1, win_participation: 1, yellow_card: 1, red_card: 1 } },
+        { matchId: 'm2', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 2, win_participation: 1, yellow_card: 1, red_card: 1 } },
+      ]),
+    });
+
+    expect(readiness.ready).toBe(true);
+    expect(readiness.summary.observedCoverage?.participationCoveragePercent).toBe(100);
+  });
+});
+
+describe('measureObservedCoverage', () => {
+  it('ignores a stat that is always zero', () => {
+    const coverage = measureObservedCoverage([
+      { matchId: 'm1', didPlay: true, stats: { goal: 0, appearance: 1 } },
+    ]);
+
+    // A key present but never non-zero is not evidence the league records it.
+    expect(coverage.statKeyCoveragePercent.goal).toBeUndefined();
+    expect(coverage.statKeyCoveragePercent.appearance).toBe(100);
+  });
+
+  it('reports participation as the share of performances with playing evidence', () => {
+    const coverage = measureObservedCoverage([
+      { matchId: 'm1', didPlay: true, stats: {} },
+      { matchId: 'm1', didPlay: false, stats: {} },
+      { matchId: 'm2', didPlay: false, stats: {} },
+      { matchId: 'm2', didPlay: false, stats: {} },
+    ]);
+
+    expect(coverage.matchesSampled).toBe(2);
+    expect(coverage.performancesSampled).toBe(4);
+    expect(coverage.participationCoveragePercent).toBe(25);
   });
 });
