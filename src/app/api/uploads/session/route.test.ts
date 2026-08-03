@@ -39,6 +39,10 @@ function installFirestore(records: Record<string, Record<string, unknown>>) {
       id,
       collectionName,
       get: vi.fn(async () => snapshot(records[`${collectionName}/${id}`])),
+      // The route records the authorization before handing out a signed URL.
+      set: vi.fn(async (value: Record<string, unknown>) => {
+        records[`${collectionName}/${id}`] = value;
+      }),
     })),
   }) as never);
 }
@@ -100,12 +104,16 @@ describe('trusted upload session route', () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       uploadUrl: 'https://storage.example/upload',
       storagePath: expect.stringMatching(/^publishedMedia\/team\/team_1\/operator_1\/.+\.jpg$/),
-      downloadUrl: expect.stringContaining('publishedMedia%2Fteam%2Fteam_1%2Foperator_1%2F'),
       expiresInSeconds: 600,
+      sessionId: expect.any(String),
     });
+    // Authorizing an upload must not publish it. A download address is issued only after
+    // the stored object is verified against this authorization and passes moderation.
+    expect(body).not.toHaveProperty('downloadUrl');
     expect(getSignedUrl).toHaveBeenCalledWith(expect.objectContaining({
       action: 'write',
       contentType: 'image/jpeg',

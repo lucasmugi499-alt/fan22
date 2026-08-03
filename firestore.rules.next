@@ -607,6 +607,31 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The upload lifecycle is entirely server-owned. A client that could write these
+    // could authorize its own upload, mark it confirmed, or approve its own moderation.
+    match /uploadSessions/{sessionId} {
+      allow read: if isPlatformAdmin() || (signedIn() && resource.data.actorUserId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /mediaRecords/{mediaId} {
+      // Published media is public; anything still awaiting moderation is not.
+      allow read: if resource.data.published == true
+        || isPlatformAdmin()
+        || (signedIn() && resource.data.actorUserId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /officialMatchReconciliation/{reconciliationId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /securityEvents/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     match /adminAuditEvents/{eventId} {
       allow read: if isPlatformAdmin();
       allow write: if false;

@@ -1588,3 +1588,62 @@ describe('canonical access authority', () => {
     }));
   });
 });
+
+/**
+ * The upload lifecycle is server-owned end to end. A client that could write any of
+ * these could authorize its own upload, mark it verified, or approve its own moderation.
+ */
+describe('media lifecycle is server-owned', () => {
+  it('denies a client authorizing its own upload session', async () => {
+    await assertFails(setDoc(doc(asUser(TEAM_A_ADMIN), 'uploadSessions/forged'), {
+      actorUserId: TEAM_A_ADMIN,
+      storagePath: 'publishedMedia/team/team_a/forged.jpg',
+      status: 'authorized',
+    }));
+  });
+
+  it('denies a client creating or publishing its own media record', async () => {
+    await assertFails(setDoc(doc(asUser(TEAM_A_ADMIN), 'mediaRecords/forged'), {
+      actorUserId: TEAM_A_ADMIN,
+      storagePath: 'publishedMedia/team/team_a/forged.jpg',
+      moderationStatus: 'approved',
+      published: true,
+    }));
+  });
+
+  it('hides a media record that has not been approved from other accounts', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'mediaRecords/pending_1'), {
+        actorUserId: TEAM_A_ADMIN,
+        storagePath: 'publishedMedia/team/team_a/pending.jpg',
+        moderationStatus: 'pending_review',
+        published: false,
+      });
+    });
+
+    // The uploader may see their own pending upload; nobody else may.
+    await assertSucceeds(getDoc(doc(asUser(TEAM_A_ADMIN), 'mediaRecords/pending_1')));
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'mediaRecords/pending_1')));
+  });
+
+  it('exposes a media record once it is published', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'mediaRecords/published_1'), {
+        actorUserId: TEAM_A_ADMIN,
+        storagePath: 'publishedMedia/team/team_a/published.jpg',
+        moderationStatus: 'approved',
+        published: true,
+      });
+    });
+
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'mediaRecords/published_1')));
+  });
+
+  it('denies a client writing a security event or a reconciliation record', async () => {
+    await assertFails(setDoc(doc(asUser(TEAM_A_ADMIN), 'securityEvents/forged'), { type: 'forged' }));
+    await assertFails(setDoc(doc(asUser(TEAM_A_ADMIN), 'officialMatchReconciliation/forged'), {
+      matchId: 'match_001',
+      status: 'valid',
+    }));
+  });
+});

@@ -35,9 +35,6 @@ function extensionFrom(fileName: string, contentType: string) {
   return 'bin';
 }
 
-function encodedDownloadUrl(bucketName: string, objectPath: string) {
-  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}?alt=media`;
-}
 
 const PLATFORM_SCOPE = { scopeType: 'platform', scopeId: 'global' } as const;
 
@@ -78,6 +75,8 @@ async function signedWriteUrl(path: string, contentType: string) {
   };
 }
 
+const SESSION_TTL_SECONDS = 600;
+
 export async function POST(request: Request) {
   // Signed upload URLs are a capability to write into the storage bucket, so the request
   // that mints one is rate limited per account as well as App Check verified.
@@ -87,31 +86,57 @@ export async function POST(request: Request) {
     rateLimit: { bucket: 'upload_session', limit: 30, windowSeconds: 300 },
   });
   if ('response' in guarded) return guarded.response;
-  const { actor, data: input } = guarded;
+  const { actor, data: input, requestId } = guarded;
   const extension = extensionFrom(input.fileName, input.contentType);
 
-  if (input.kind === 'match_evidence') {
-    if (!await canUploadMatchEvidence(actor, input.matchId, input.teamId)) {
-      return jsonError('You are not authorized to upload evidence for this match and team.', 403);
-    }
-    const storagePath = `matchEvidence/${input.matchId}/${input.teamId}/${actor.uid}/${randomUUID()}.${extension}`;
-    const signed = await signedWriteUrl(storagePath, input.contentType);
-    return Response.json({
-      uploadUrl: signed.uploadUrl,
-      storagePath,
-      expiresInSeconds: 600,
-    }, { headers: { 'cache-control': 'no-store' } });
+  const authorized = input.kind === 'match_evidence'
+    ? await canUploadMatchEvidence(actor, input.matchId, input.teamId)
+    : await canManagePublishedMedia(actor, input.ownerType, input.ownerId);
+  if (!authorized) {
+    return jsonError(
+      input.kind === 'match_evidence'
+        ? 'You are not authorized to upload evidence for this match and team.'
+        : 'You are not authorized to upload media for this profile.',
+      403,
+    );
   }
 
-  if (!await canManagePublishedMedia(actor, input.ownerType, input.ownerId)) {
-    return jsonError('You are not authorized to upload media for this profile.', 403);
-  }
-  const storagePath = `publishedMedia/${input.ownerType}/${input.ownerId}/${actor.uid}/${randomUUID()}.${extension}`;
+  const storagePath = input.kind === 'match_evidence'
+    ? `matchEvidence/${input.matchId}/${input.teamId}/${actor.uid}/${randomUUID()}.${extension}`
+    : `publishedMedia/${input.ownerType}/${input.ownerId}/${actor.uid}/${randomUUID()}.${extension}`;
+
   const signed = await signedWriteUrl(storagePath, input.contentType);
+  const sessionId = randomUUID();
+  const now = new Date();
+
+  // The authorization is recorded before the URL is handed out, so an upload can be
+  // verified against what was actually authorized. Without this record the signed URL
+  // was the only artefact, and nothing afterwards could check the declared size, enforce
+  // single use, or tie the stored object back to a decision.
+  await adminDb.collection('uploadSessions').doc(sessionId).set({
+    id: sessionId,
+    requestId,
+    kind: input.kind,
+    actorUserId: actor.uid,
+    storagePath,
+    declaredContentType: input.contentType,
+    declaredSize: input.size,
+    declaredFileName: input.fileName,
+    ...(input.kind === 'match_evidence'
+      ? { matchId: input.matchId, teamId: input.teamId }
+      : { ownerType: input.ownerType, ownerId: input.ownerId }),
+    status: 'authorized',
+    expiresAt: new Date(now.getTime() + SESSION_TTL_SECONDS * 1000).toISOString(),
+    createdAt: now.toISOString(),
+  });
+
   return Response.json({
+    sessionId,
     uploadUrl: signed.uploadUrl,
     storagePath,
-    downloadUrl: encodedDownloadUrl(signed.bucketName, storagePath),
-    expiresInSeconds: 600,
+    expiresInSeconds: SESSION_TTL_SECONDS,
+    // Deliberately no download URL. A published address is issued only after the upload
+    // is confirmed against its authorization and passes moderation.
+    confirmEndpoint: '/api/uploads/session/confirm',
   }, { headers: { 'cache-control': 'no-store' } });
 }
