@@ -1,6 +1,15 @@
 import { Firestore, Transaction } from 'firebase-admin/firestore';
 import { planFinalization } from '../lib/resultSubmission';
+// Relative, not aliased: the Cloud Functions build compiles this file without the
+// application's path aliases.
+import { SPORT_DEFINITIONS } from '../kernel/definitions/sportCatalogues';
+import { reconstructMatchScore } from '../kernel/formulas/score';
+import { resolveAthleteParticipation } from '../kernel/projections/participation';
+import type { OfficialSportEvent } from '../kernel/types';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
+
+/** Bound to the kernel rather than hardcoded, so a definition change is traceable. */
+const EVENT_SCHEMA_VERSION = '1.0.0';
 
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';
@@ -335,6 +344,132 @@ function officialActiveSquadEvents({
   return events;
 }
 
+/**
+ * Reconciles the official events against the official score using the kernel's sport
+ * definitions, and records the difference explicitly.
+ *
+ * The finalizer previously published events and a score without ever checking that one
+ * produced the other. A rugby result carrying only tries would publish an official
+ * record whose events account for 15 of a 27-point total, with nothing saying so.
+ *
+ * Where credited events fall short of the official score, the remainder is written as an
+ * `unattributed_team_score` event. That keeps the official record internally consistent
+ * and makes the missing attribution a visible data-quality fact rather than a silent gap.
+ * A surplus is never "corrected" by inventing negative scoring — it is reported as an
+ * inconsistency for a human to resolve.
+ */
+function reconcileOfficialScore({
+  sport,
+  events,
+  match,
+  submission,
+  score,
+  resultVersion,
+  finalizedAt,
+}: {
+  sport: 'football' | 'basketball' | 'rugby';
+  events: OfficialSportEventRecord[];
+  match: Match;
+  submission: ResultSubmission;
+  score: { home: number; away: number };
+  resultVersion: number;
+  finalizedAt: string;
+}) {
+  const definition = SPORT_DEFINITIONS.find((entry) => entry.sportId === sport);
+  const teams = { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId };
+
+  const trace = definition
+    ? reconstructMatchScore({
+      sportDefinition: definition,
+      // Basketball scoring events carry their point value in the payload rather than a
+      // fixed per-event weight, so they are expanded before reconstruction.
+      events: expandForScoring(events, sport) as unknown as OfficialSportEvent[],
+      teams,
+      claimedScore: score,
+    })
+    : {
+      formulaVersion: `${sport}@unknown`,
+      home: 0,
+      away: 0,
+      status: 'incomplete' as const,
+      components: [],
+      issues: [`No kernel sport definition for ${sport}.`],
+    };
+
+  const shortfall = {
+    home: Math.max(0, score.home - trace.home),
+    away: Math.max(0, score.away - trace.away),
+  };
+  const surplus = {
+    home: Math.max(0, trace.home - score.home),
+    away: Math.max(0, trace.away - score.away),
+  };
+
+  let sequence = events.length + 1;
+  const adjustmentEvents: OfficialSportEventRecord[] = [];
+  for (const side of ['home', 'away'] as const) {
+    const points = shortfall[side];
+    if (points <= 0) continue;
+    const teamId = side === 'home' ? match.homeTeamId : match.awayTeamId;
+    const eventId = `${match.id}_v${resultVersion}_event_${String(sequence).padStart(4, '0')}`;
+    adjustmentEvents.push({
+      id: eventId,
+      eventType: `${sport}.unattributed_team_score`,
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+      sportDefinitionVersion: definition?.version ?? EVENT_SCHEMA_VERSION,
+      sportId: sport,
+      competitionId: match.leagueId,
+      seasonId: match.seasonId,
+      matchId: match.id,
+      sequence,
+      teamId,
+      // Not attributable to any athlete: that is the entire point of the record.
+      primaryAthleteId: '',
+      payload: {
+        value: points,
+        source: 'score_reconciliation',
+        reason: 'Official score exceeds the points attributable to recorded events.',
+      },
+      sourceClaimId: submission.id,
+      submittedByUserId: submission.submittedByUserId,
+      submittedByTeamId: submission.submittedByTeamId,
+      evidenceRefs: submission.evidenceRefs,
+      officialResultVersion: resultVersion,
+      officialEventVersion: 1,
+      verificationStatus: 'official',
+      idempotencyKey: `${submission.id}:v${resultVersion}:unattributed:${teamId}`,
+      createdAt: finalizedAt,
+      finalizedAt,
+    });
+    sequence += 1;
+  }
+
+  return {
+    trace,
+    adjustmentEvents,
+    unattributed: shortfall,
+    surplus,
+  };
+}
+
+/**
+ * Basketball point events carry a variable value, which `reconstructMatchScore` cannot
+ * express through fixed per-event weights. Expanding one event per point keeps a single
+ * reconstruction path for every sport rather than a second scoring implementation.
+ */
+function expandForScoring(events: OfficialSportEventRecord[], sport: 'football' | 'basketball' | 'rugby') {
+  if (sport !== 'basketball') return events;
+  return events.flatMap((event) => {
+    if (event.eventType !== 'basketball.points') return [event];
+    const value = typeof event.payload.value === 'number' ? event.payload.value : 0;
+    return Array.from({ length: Math.max(0, Math.trunc(value)) }, (_unused, index) => ({
+      ...event,
+      id: `${event.id}_p${index}`,
+      eventType: 'basketball.free_throw_made',
+    }));
+  });
+}
+
 function officialScorerEvents({
   match,
   submission,
@@ -584,15 +719,47 @@ export async function finalizeSubmission(
     });
 
     if (fantasySport) {
-      for (const event of [...activeSquadEvents, ...scorerEvents, ...statLineEvents]) {
+      const officialEvents = [...activeSquadEvents, ...scorerEvents, ...statLineEvents];
+
+      // Reconcile the events against the official score before publishing anything
+      // derived from them. Where they disagree, the difference is recorded as an
+      // explicit unattributed-score event rather than silently producing an official
+      // record whose parts do not add up.
+      const reconciliation = reconcileOfficialScore({
+        sport: fantasySport,
+        events: officialEvents,
+        match,
+        submission,
+        score: plan.match.score,
+        resultVersion: plan.resultVersion,
+        finalizedAt,
+      });
+      officialEvents.push(...reconciliation.adjustmentEvents);
+
+      for (const event of officialEvents) {
         tx.create(db.collection(OFFICIAL_SPORT_EVENTS).doc(event.id), event);
       }
+
+      tx.set(db.collection('officialMatchReconciliation').doc(`${match.id}_v${plan.resultVersion}`), {
+        id: `${match.id}_v${plan.resultVersion}`,
+        matchId: match.id,
+        officialResultVersion: plan.resultVersion,
+        sport: fantasySport,
+        formulaVersion: reconciliation.trace.formulaVersion,
+        status: reconciliation.trace.status,
+        eventScore: { home: reconciliation.trace.home, away: reconciliation.trace.away },
+        officialScore: plan.match.score,
+        unattributed: reconciliation.unattributed,
+        issues: reconciliation.trace.issues,
+        finalizedAt,
+      });
 
       const statKey = fantasySport === 'football'
         ? 'goal'
         : fantasySport === 'rugby'
           ? 'try'
           : 'points_scored';
+      const kernelEvents = officialEvents as unknown as OfficialSportEvent[];
       for (const { athlete, count, teamId, activeSquadEventId, scoringSourceEventId, statLine } of officialPerformances) {
         const positionGroup = officialPositionGroup(fantasySport, athlete.position);
         const teamWon =
@@ -602,7 +769,18 @@ export async function finalizeSubmission(
         const participationSourceEventId = activeSquadEventId ?? scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:participation`;
         const statSources = statSourceEventsByAthlete.get(athlete.id) ?? {};
         const lineStats = statLine?.stats ?? {};
-        const minutesPlayed = statLine?.minutesPlayed ?? lineStats.minutes_played ?? 0;
+        // Participation is derived from the official events, never assumed from squad
+        // selection. An unused substitute must not receive an appearance.
+        const participation = resolveAthleteParticipation({
+          athleteId: athlete.id,
+          teamId,
+          sportId: fantasySport,
+          events: kernelEvents,
+        });
+        const minutesPlayed = participation.minutesPlayed
+          || statLine?.minutesPlayed
+          || lineStats.minutes_played
+          || 0;
         const playerOfMatch = Boolean(statLine?.playerOfMatch || match.topPerformerId === athlete.id);
         const richStats = {
           ...lineStats,
@@ -622,22 +800,30 @@ export async function finalizeSubmission(
           dataLevel: statLineDataLevel(statLine),
           dataCoverage: statLine ? 'verified_stat_line' : activeSquadEventId ? 'match_squad_basic' : 'scorer_only',
           activeSquad: Boolean(activeSquadEventId) || count > 0 || Boolean(statLine),
-          didPlay: true,
+          participationLevel: participation.level,
+          didPlay: participation.didPlay,
           minutesPlayed,
           teamWon,
           playerOfMatch,
           stats: {
             active_squad: activeSquadEventId || count > 0 || statLine ? 1 : 0,
-            appearance: 1,
+            // Appearance and win participation follow evidence of playing. Awarding
+            // them from selection manufactured career records and fantasy points for
+            // athletes who may never have left the bench.
+            appearance: participation.didPlay ? 1 : 0,
             [statKey]: count,
-            win_participation: teamWon ? 1 : 0,
+            win_participation: teamWon && participation.didPlay ? 1 : 0,
             ...richStats,
           },
           sourceEventIds: {
             active_squad: participationSourceEventId,
-            appearance: participationSourceEventId,
+            ...(participation.didPlay
+              ? {
+                appearance: participation.sourceEventIds[0] ?? participationSourceEventId,
+                ...(teamWon ? { win_participation: participation.sourceEventIds[0] ?? participationSourceEventId } : {}),
+              }
+              : {}),
             [statKey]: scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:${statKey}`,
-            win_participation: participationSourceEventId,
             ...statSources,
           },
           finalizedAt: plan.submission.finalizedAt,

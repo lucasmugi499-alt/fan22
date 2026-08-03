@@ -4,6 +4,11 @@
     "target": "es2022",
     "lib": ["es2022"],
     "moduleResolution": "node",
+    // The shared sports kernel uses the application's "@/" alias internally, so the
+    // Functions build resolves it the same way rather than forcing the kernel to carry
+    // two import styles.
+    "baseUrl": "..",
+    "paths": { "@/*": ["src/*"] },
     "outDir": "lib",
     // rootDir is the repo root so the shared, framework-free logic in ../src/lib can be
     // compiled into the deployed bundle rather than duplicated. Output therefore lands at
@@ -21,6 +26,10 @@
     "src/**/*.ts",
     "../src/lib/resultSubmission.ts",
     "../src/server/resultFinalizer.ts",
-    "../src/types/index.ts"
-  ]
+    "../src/types/index.ts",
+    "../src/kernel/**/*.ts"
+  ],
+  // Test files are not deployed, and the kernel suite imports the "@/kernel" barrel at
+  // runtime, which the emitted CommonJS cannot resolve outside the Next build.
+  "exclude": ["../src/kernel/tests/**", "../src/kernel/**/*.test.ts"]
 }

@@ -76,7 +76,8 @@ const submission = {
   submittedByTeamId: 'team_home',
   opponentTeamId: 'team_away',
   submittedByUserId: 'team_admin_1',
-  homeScore: 10,
+  // 2 tries (10) + 1 conversion (2) + 1 penalty goal (3). The events must add up.
+  homeScore: 15,
   awayScore: 0,
   scorers: [
     { athleteId: 'athlete_1', teamId: 'team_home', count: 2, minute: 12 },
@@ -227,15 +228,101 @@ describe('trusted result finalizer', () => {
         }),
       }),
     }));
+    // athlete_2 was named in the squad and did nothing else. Selection is not playing:
+    // no appearance, no win participation, no fantasy-scoring participation.
     expect(writes).toContainEqual(expect.objectContaining({
       op: 'set',
       path: 'officialAthleteMatchStats/match_1_v1_athlete_2',
       data: expect.objectContaining({
         dataCoverage: 'match_squad_basic',
         activeSquad: true,
-        didPlay: true,
-        stats: expect.objectContaining({ active_squad: 1, appearance: 1, try: 0 }),
+        participationLevel: 'selected_in_squad',
+        didPlay: false,
+        stats: expect.objectContaining({ active_squad: 1, appearance: 0, try: 0, win_participation: 0 }),
       }),
     }));
+
+    // athlete_1 scored and has verified minutes, so participation is proven.
+    expect(writes).toContainEqual(expect.objectContaining({
+      op: 'set',
+      path: 'officialAthleteMatchStats/match_1_v1_athlete_1',
+      data: expect.objectContaining({
+        participationLevel: 'minutes_confirmed',
+        didPlay: true,
+      }),
+    }));
+
+    // The events reconcile to the official score, so nothing is left unattributed.
+    expect(writes).toContainEqual(expect.objectContaining({
+      op: 'set',
+      path: 'officialMatchReconciliation/match_1_v1',
+      data: expect.objectContaining({
+        status: 'valid',
+        eventScore: { home: 15, away: 0 },
+        unattributed: { home: 0, away: 0 },
+      }),
+    }));
+  });
+
+  it('records an unattributed score event when the events fall short of the official result', async () => {
+    // The audit's rugby case: a result carrying only tries, where conversions and
+    // penalties went unrecorded. 2 tries account for 10 of a claimed 27.
+    const { db, records, writes } = fakeDb({
+      'resultSubmissions/match_1': {
+        ...submission,
+        homeScore: 27,
+        athleteStatLines: [],
+      },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1');
+
+    const reconciliation = writes.find((write) => write.path === 'officialMatchReconciliation/match_1_v1');
+    expect(reconciliation?.data).toMatchObject({
+      status: 'inconsistent',
+      eventScore: { home: 10, away: 0 },
+      unattributed: { home: 17, away: 0 },
+    });
+
+    // The gap becomes an explicit official record rather than a silent hole, and it is
+    // attributed to the team with no athlete credited.
+    const unattributed = [...records.entries()]
+      .map(([, value]) => value as Record<string, unknown>)
+      .find((value) => value.eventType === 'rugby.unattributed_team_score');
+    expect(unattributed).toMatchObject({
+      teamId: 'team_home',
+      primaryAthleteId: '',
+      payload: expect.objectContaining({ value: 17, source: 'score_reconciliation' }),
+    });
+  });
+
+  it('does not award appearances when only a squad was recorded', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': {
+        ...submission,
+        homeScore: 0,
+        awayScore: 0,
+        scorers: [],
+        athleteStatLines: [],
+      },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1');
+
+    const performances = writes.filter((write) => write.path.startsWith('officialAthleteMatchStats/'));
+    expect(performances.length).toBeGreaterThan(0);
+    for (const performance of performances) {
+      const data = performance.data as { didPlay: boolean; stats: Record<string, number> };
+      expect(data.didPlay).toBe(false);
+      expect(data.stats.appearance).toBe(0);
+    }
   });
 });
