@@ -51,6 +51,8 @@
     "environment:prepare:production": "tsx scripts/environment/activate.ts --action=activate --environment=production",
     "environment:maintenance": "tsx scripts/environment/activate.ts --action=maintenance",
     "environment:rollback": "tsx scripts/environment/activate.ts --action=rollback",
+    "environment:probe": "tsx scripts/environment/probe.ts",
+    "restore:firestore": "tsx scripts/restore-firestore.ts",
     "prod:assert-clean": "tsx scripts/prod/assert-clean.ts",
     "demo:export": "tsx scripts/demo/data-lifecycle.ts --action=export",
     "demo:validate": "tsx scripts/demo/data-lifecycle.ts --action=validate",

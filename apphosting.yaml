@@ -45,6 +45,11 @@ env:
   - variable: GOALPLACE_ACCESS_ENGINE_MODE
     value: assignments
     availability: [RUNTIME]
+  # The demo origin is served directly on the App Hosting default domain. Enabling this
+    # before a gateway sits in front of it would make src/proxy.ts reject every request.
+  - variable: GOALPLACE_REQUIRE_GATEWAY_SECRET
+    value: "false"
+    availability: [RUNTIME]
   - variable: GOALPLACE_SCHEDULER_AUTH_MODE
     value: shared_secret
     availability:

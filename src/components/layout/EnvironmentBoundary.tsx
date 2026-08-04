@@ -7,6 +7,9 @@ import { clearPrivateCaches } from '@/lib/offline';
 import type { PublicEnvironment } from '@/lib/environment';
 
 const STORAGE_KEY = 'goalplace256.environment';
+
+/** Identity as reported by the origin actually serving the request. */
+type ServedIdentity = PublicEnvironment & { servedBy?: string };
 const APP_PREFIXES = ['goalplace256.', 'goalplace256:', 'goalplace:', 'firebase:'];
 
 function currentEnvironment(): PublicEnvironment {
@@ -18,13 +21,33 @@ function currentEnvironment(): PublicEnvironment {
   };
 }
 
-function sameEnvironment(left: PublicEnvironment, right: PublicEnvironment) {
+function sameEnvironment(left: ServedIdentity, right: ServedIdentity) {
   return (
     left.environment === right.environment &&
     left.environmentVersion === right.environmentVersion &&
     left.firebaseProjectId === right.firebaseProjectId &&
-    left.dataMode === right.dataMode
+    left.dataMode === right.dataMode &&
+    // A changed origin means the public URL was pointed somewhere else, which is exactly
+    // the case build-time constants cannot see from inside a cached bundle.
+    (left.servedBy ?? '') === (right.servedBy ?? '')
   );
+}
+
+/**
+ * Asks the origin who it is.
+ *
+ * The build-time constants below are baked into the bundle, so on their own they detect
+ * a redeploy but not a gateway swapping origins beneath a cached bundle. The server's
+ * answer is authoritative; the constants are the fallback when it cannot be reached.
+ */
+async function servedIdentity(): Promise<ServedIdentity | null> {
+  try {
+    const response = await fetch('/api/environment', { cache: 'no-store' });
+    if (!response.ok) return null;
+    return await response.json() as ServedIdentity;
+  } catch {
+    return null;
+  }
 }
 
 function clearStorage(storage: Storage) {
@@ -73,26 +96,38 @@ async function clearBrowserState() {
 
 export function EnvironmentBoundary({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const next = currentEnvironment();
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return;
-    }
+    let cancelled = false;
 
-    let previous: PublicEnvironment | null = null;
-    try {
-      previous = JSON.parse(stored) as PublicEnvironment;
-    } catch {
-      previous = null;
-    }
+    async function reconcile() {
+      // Server truth first; build constants only if the origin cannot be reached.
+      const next = await servedIdentity() ?? currentEnvironment();
+      if (cancelled) return;
 
-    if (previous && sameEnvironment(previous, next)) return;
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return;
+      }
 
-    void clearBrowserState().finally(() => {
+      let previous: ServedIdentity | null = null;
+      try {
+        previous = JSON.parse(stored) as ServedIdentity;
+      } catch {
+        previous = null;
+      }
+
+      if (previous && sameEnvironment(previous, next)) return;
+
+      await clearBrowserState().catch(() => undefined);
+      if (cancelled) return;
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       window.location.reload();
-    });
+    }
+
+    void reconcile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return <>{children}</>;

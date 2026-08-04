@@ -1,0 +1,20 @@
+# UNATTACHED gateway configuration.
+#
+# No route is declared, so deploying this publishes only to *.workers.dev. Adding a
+# `routes` entry for goalplace256.com is the step that requires the domain and explicit
+# approval — see README.md.
+
+name = "goalplace256-gateway"
+main = "worker.js"
+compatibility_date = "2026-08-04"
+
+[vars]
+# The origin this hostname currently serves. Switching environments is a change to this
+# value, not a DNS change.
+ACTIVE_ORIGIN = "https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app"
+ACTIVE_ENVIRONMENT = "demo"
+
+# EDGE_ORIGIN_SECRET is intentionally NOT set here. It is a Worker secret
+# (`wrangler secret put EDGE_ORIGIN_SECRET`) and must never be committed. While it is
+# unset the Worker forwards without the header, which matches the origin's current
+# GOALPLACE_REQUIRE_GATEWAY_SECRET=false.
