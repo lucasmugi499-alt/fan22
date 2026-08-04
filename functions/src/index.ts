@@ -11,6 +11,8 @@ import {
   sendDueConfirmationReminders,
   sweepOverdueConfirmations,
 } from './finalize';
+import { applySearchIndexChange } from './searchIndex';
+import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -193,3 +195,43 @@ export const reconcilePaymentIntents = onSchedule(
     logger.info('Payment reconciliation sweep complete', await response.json());
   },
 );
+
+
+/**
+ * Search index freshness.
+ *
+ * The index is a projection, and a stale projection fails silently: a newly created
+ * athlete simply never appears in search, with nothing erroring. These triggers keep it
+ * in step with the entities it describes, so `search:index:apply` is a repair and
+ * backfill tool rather than the only thing keeping search correct.
+ *
+ * Each handler is a cheap no-op when nothing searchable changed.
+ */
+function searchIndexTrigger(collection: string, type: SearchEntityType) {
+  return onDocumentWritten(
+    {
+      document: `${collection}/{entityId}`,
+      database: DATABASE_ID,
+      region: REGION,
+    },
+    async (event) => {
+      const entityId = event.params.entityId as string;
+      const after = event.data?.after?.exists ? event.data.after.data() : undefined;
+      try {
+        const outcome = await applySearchIndexChange(db, type, entityId, after);
+        if (outcome !== 'unchanged') {
+          logger.info('Search index updated', { type, entityId, outcome });
+        }
+      } catch (error) {
+        // Never fail the originating write because a discovery projection could not be
+        // updated. A repair pass can rebuild it; a blocked roster edit cannot be undone.
+        logger.error('Search index update failed', { type, entityId, error });
+      }
+    },
+  );
+}
+
+export const onAthleteWrittenIndexSearch = searchIndexTrigger('athletes', 'athlete');
+export const onTeamWrittenIndexSearch = searchIndexTrigger('teams', 'team');
+export const onLeagueWrittenIndexSearch = searchIndexTrigger('leagues', 'league');
+export const onSeasonWrittenIndexSearch = searchIndexTrigger('seasons', 'season');

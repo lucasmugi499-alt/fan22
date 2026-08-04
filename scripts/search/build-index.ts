@@ -2,7 +2,11 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { buildSearchTokens, normalizeSearchText } from '../../src/lib/search/searchTokens';
+import {
+  projectSearchEntry,
+  type SearchEntityType,
+  type SearchIndexEntry,
+} from '../../src/lib/search/searchProjection';
 
 /**
  * Builds the public search index.
@@ -17,88 +21,31 @@ import { buildSearchTokens, normalizeSearchText } from '../../src/lib/search/sea
 
 type JsonRecord = { id: string; [key: string]: unknown };
 
-type IndexEntry = {
-  id: string;
-  type: 'athlete' | 'team' | 'league' | 'season';
-  entityId: string;
-  title: string;
-  meta: string;
-  href: string;
-  searchText: string;
-  tokens: string[];
-};
-
-function text(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
-
 function valueAfter(argv: string[], flag: string) {
   const index = argv.indexOf(flag);
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
+/**
+ * Bulk projection over whole collections. The per-entity shape comes from the shared
+ * projector, so a rebuild and an incremental trigger update can never disagree.
+ */
 export function buildIndexEntries(input: {
   athletes: JsonRecord[];
   teams: JsonRecord[];
   leagues: JsonRecord[];
   seasons: JsonRecord[];
-}): IndexEntry[] {
-  const entries: IndexEntry[] = [];
+}): SearchIndexEntry[] {
+  const sources: Array<[SearchEntityType, JsonRecord[]]> = [
+    ['athlete', input.athletes],
+    ['team', input.teams],
+    ['league', input.leagues],
+    ['season', input.seasons],
+  ];
 
-  const push = (
-    type: IndexEntry['type'],
-    record: JsonRecord,
-    title: string,
-    meta: string,
-    href: string,
-    extra: Array<string | undefined>,
-  ) => {
-    if (!title.trim()) return;
-    const searchText = [title, ...extra].filter(Boolean).join(' ');
-    const tokens = buildSearchTokens(title, ...extra);
-    if (!tokens.length) return;
-    entries.push({
-      id: `${type}_${record.id}`,
-      type,
-      entityId: record.id,
-      title,
-      meta,
-      href,
-      searchText: normalizeSearchText(searchText),
-      tokens,
-    });
-  };
-
-  for (const athlete of input.athletes) {
-    push('athlete', athlete,
-      text(athlete.name),
-      `Athlete / ${text(athlete.position)} / ${text(athlete.city)}`.replace(/\s+\/\s+$/, ''),
-      `/athletes/${athlete.id}`,
-      [text(athlete.position), text(athlete.city), text(athlete.sport), text(athlete.teamName)]);
-  }
-  for (const team of input.teams) {
-    push('team', team,
-      text(team.name),
-      `Team / ${text(team.city)} / ${text(team.sport)}`,
-      `/teams/${team.id}`,
-      [text(team.city), text(team.sport)]);
-  }
-  for (const league of input.leagues) {
-    push('league', league,
-      text(league.name),
-      `League / ${text(league.city)} / ${text(league.sport)}`,
-      `/leagues/${league.id}`,
-      [text(league.city), text(league.sport), text(league.season)]);
-  }
-  for (const season of input.seasons) {
-    push('season', season,
-      text(season.name),
-      `Season / ${text(season.sport)}`,
-      `/leagues/${text(season.leagueId)}`,
-      [text(season.sport)]);
-  }
-
-  return entries;
+  return sources.flatMap(([type, records]) => records
+    .map((record) => projectSearchEntry(type, record.id, record))
+    .filter((entry): entry is SearchIndexEntry => entry !== null));
 }
 
 async function main() {

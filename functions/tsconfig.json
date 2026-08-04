@@ -27,7 +27,8 @@
     "../src/lib/resultSubmission.ts",
     "../src/server/resultFinalizer.ts",
     "../src/types/index.ts",
-    "../src/kernel/**/*.ts"
+    "../src/kernel/**/*.ts",
+    "../src/lib/search/**/*.ts"
   ],
   // Test files are not deployed, and the kernel suite imports the "@/kernel" barrel at
   // runtime, which the emitted CommonJS cannot resolve outside the Next build.
