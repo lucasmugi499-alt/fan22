@@ -36,6 +36,8 @@
     "access:migrate:gate": "tsx scripts/access/projection-migration.ts --firebase --strict",
     "access:backfill:dry-run": "tsx scripts/access/backfill-assignments.ts",
     "access:backfill:apply": "tsx scripts/access/backfill-assignments.ts --apply",
+    "search:index:dry-run": "tsx scripts/search/build-index.ts",
+    "search:index:apply": "tsx scripts/search/build-index.ts --apply",
     "clean:preview": "tsx scripts/clean-preview.ts",
     "clean:execute": "tsx scripts/clean-execute.ts",
     "deploy:staging:candidate": "firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",

@@ -10,7 +10,6 @@ import {
   SoccerBall,
   Wrench,
 } from '@phosphor-icons/react';
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Sheet } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { AppRole } from '@/types';
@@ -38,68 +37,81 @@ export function GlobalSearch({
   return <GlobalSearchDialog onClose={onClose} role={role} />;
 }
 
+const ICON_BY_TYPE: Record<string, SearchResult['icon']> = {
+  athlete: PersonSimpleRun,
+  team: SoccerBall,
+  league: Buildings,
+  season: CalendarBlank,
+};
+
 function GlobalSearchDialog({ onClose, role }: { onClose: () => void; role: AppRole | null }) {
   const [query, setQuery] = useState('');
-  const shouldLoadRecords = query.trim().length >= 2;
-  const { athletes, teams, leagues, matches, seasons, loading } = useGoalPlaceData({
-    collections: shouldLoadRecords ? ['athletes', 'teams', 'leagues', 'matches', 'seasons'] : [],
-    recordLimit: 60,
-  });
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const records = useMemo<SearchResult[]>(() => [
-    ...athletes.map((item) => ({
-      id: `athlete-${item.id}`,
-      title: item.name,
-      meta: `Athlete / ${item.position} / ${item.city}`,
-      href: `/athletes/${item.id}`,
-      icon: PersonSimpleRun,
-      terms: `${item.name} ${item.position} ${item.city} ${item.sport}`,
-    })),
-    ...teams.map((item) => ({
-      id: `team-${item.id}`,
-      title: item.name,
-      meta: `Team / ${item.city} / ${item.sport}`,
-      href: `/teams/${item.id}`,
-      icon: SoccerBall,
-      terms: `${item.name} ${item.city} ${item.sport}`,
-    })),
-    ...leagues.map((item) => ({
-      id: `league-${item.id}`,
-      title: item.name,
-      meta: `League / ${item.city} / ${item.sport}`,
-      href: `/leagues/${item.id}`,
-      icon: Buildings,
-      terms: `${item.name} ${item.city} ${item.sport} ${item.season}`,
-    })),
-    ...matches.map((item) => ({
-      id: `match-${item.id}`,
-      title: `${teamById.get(item.homeTeamId)?.name ?? 'Home'} vs ${teamById.get(item.awayTeamId)?.name ?? 'Away'}`,
-      meta: `Match / ${item.venue} / ${new Date(item.scheduledAt).toLocaleDateString('en-GB')}`,
-      href: `/matches/${item.id}`,
-      icon: CalendarBlank,
-      terms: `${teamById.get(item.homeTeamId)?.name ?? ''} ${teamById.get(item.awayTeamId)?.name ?? ''} ${item.venue} ${item.city}`,
-    })),
-    ...seasons.map((item) => ({
-      id: `season-${item.id}`,
-      title: item.name,
-      meta: `Season / ${item.sport} / ${item.status}`,
-      href: `/leagues/${item.leagueId}`,
-      icon: CalendarBlank,
-      terms: `${item.name} ${item.sport} ${item.status}`,
-    })),
-    ...actionsForRole(role),
-  ], [athletes, leagues, matches, role, seasons, teamById, teams]);
+  /**
+   * Queries the server-built search index.
+   *
+   * This previously loaded the first 60 records from each of five collections into the
+   * browser and filtered them here. Those 60 were neither the most relevant nor the most
+   * recent, so most athletes were unfindable — which reads to a fan as the platform not
+   * having their player. The index covers every entity.
+   */
+  const term = query.trim();
+  const searchable = term.length >= 2;
 
-  const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const results = records
-    .filter((item) => tokens.every((token) => `${item.title} ${item.terms}`.toLowerCase().includes(token)))
-    .slice(0, 24);
+  useEffect(() => {
+    if (!searchable) return;
+
+    let cancelled = false;
+    // Debounced so a typed word is one request rather than one per keystroke.
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
+        const body = await response.json().catch(() => ({ results: [] }));
+        if (cancelled) return;
+        setResults((body.results ?? []).map((item: {
+          type: string;
+          entityId: string;
+          title: string;
+          meta: string;
+          href: string;
+        }) => ({
+          id: `${item.type}-${item.entityId}`,
+          title: item.title,
+          meta: item.meta,
+          href: item.href,
+          icon: ICON_BY_TYPE[item.type] ?? CalendarBlank,
+          terms: '',
+        })));
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchable, term]);
+
+  const lowered = term.toLowerCase();
+  // Role actions stay client-side: they are navigation, not catalogue records.
+  const actions = useMemo(
+    () => actionsForRole(role).filter((action) =>
+      !lowered || `${action.title} ${action.terms}`.toLowerCase().includes(lowered)),
+    [lowered, role],
+  );
+  // Below the minimum query length nothing has been searched for yet.
+  const visible = searchable ? [...actions, ...results].slice(0, 24) : actions.slice(0, 24);
 
   return (
     <Sheet open onClose={onClose} title="Search GoalPlace256" description="Athletes, teams, leagues, matches, venues, seasons, and actions">
@@ -116,7 +128,7 @@ function GlobalSearchDialog({ onClose, role }: { onClose: () => void; role: AppR
 
       <div className="mt-4 max-h-[58dvh] space-y-1 overflow-y-auto">
         {loading ? Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-14 w-full" />) : null}
-        {!loading && results.length ? results.map((item) => {
+        {!loading && visible.length ? visible.map((item) => {
           const Icon = item.icon;
           return (
             <Link
@@ -135,7 +147,7 @@ function GlobalSearchDialog({ onClose, role }: { onClose: () => void; role: AppR
             </Link>
           );
         }) : null}
-        {!loading && !results.length ? (
+        {!loading && !visible.length ? (
           <p className="py-8 text-center text-sm text-muted">No matching records.</p>
         ) : null}
       </div>

@@ -622,6 +622,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Public discovery projection. Contains only fields already public on the entity's
+    // own page, and is written solely by the index builder.
+    match /searchIndex/{entryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /officialMatchReconciliation/{reconciliationId} {
       allow read: if true;
       allow write: if false;
