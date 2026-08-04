@@ -1,49 +1,193 @@
 'use client';
 
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/context/AuthProvider';
 import { Card } from '@/components/ui/Card';
-import { DirectoryRow, PlatformAdminHeader, PlatformStatGrid, StatusChip } from '@/components/platform/PlatformAdminPrimitives';
+import { Skeleton } from '@/components/ui/Skeleton';
+import {
+  DirectoryRow,
+  EmptyState,
+  PlatformAdminHeader,
+  PlatformStatGrid,
+} from '@/components/platform/PlatformAdminPrimitives';
+
+/**
+ * System health, read from the server.
+ *
+ * This panel previously read `process.env.GOALPLACE_REQUIRE_APP_CHECK` in the browser.
+ * That variable is server-only, so it was always undefined here and App Check always
+ * displayed as "optional" — including in an environment that required it. A safeguard
+ * indicator that fails toward "looks fine" is worse than none. It also showed a
+ * hardcoded "No secrets exposed" badge asserting a control nobody had verified; that
+ * claim is removed rather than restated.
+ */
+
+type SystemHealthPayload = {
+  environment: {
+    name: string;
+    firebaseProjectId: string | null;
+    firestoreDatabaseId: string | null;
+  };
+  safeguards: {
+    appCheckRequired: boolean;
+    schedulerAuthMode: string;
+    accessEngineMode: string;
+    accessAuthorityIsCanonical: boolean;
+    demoLoginEnabled: boolean;
+    seedingEnabled: boolean;
+    realPaymentsEnabled: boolean;
+    investorToolsEnabled: boolean;
+  };
+  backlogs: {
+    failedFinalizations: number;
+    projectionBacklog: number;
+    pendingMediaModeration: number;
+    rejectedUploads: number;
+    accessAuthorityDivergences: number;
+  };
+};
 
 export function SystemHealth() {
-  const data = useGoalPlaceData({
-    collections: ['finalizations', 'reports', 'matches'],
-    recordLimit: 300,
-  });
-  const failedFinalizations = data.finalizations.filter((item) => item.status === 'failed').length;
-  const criticalReports = data.reports.filter((item) => ['open', 'reviewing'].includes(item.status) && item.severity === 'Critical').length;
-  const projectionBacklog = data.matches.filter((item) => item.status === 'completed' && item.verificationStatus === 'pending').length;
+  const { currentUser, isDemoMode } = useAuth();
+  const [payload, setPayload] = useState<SystemHealthPayload | null>(null);
+  const [loading, setLoading] = useState(!isDemoMode);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isDemoMode) return;
+    async function load() {
+      setLoading(true);
+      setError('');
+      try {
+        const token = await currentUser?.getIdToken();
+        if (!token) throw new Error('Sign in again to read system health.');
+        const response = await fetch('/api/platform/system-health', {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error ?? 'System health is unavailable.');
+        if (!cancelled) setPayload(body);
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'System health is unavailable.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, isDemoMode]);
+
+  if (loading) return <Skeleton className="h-[520px] rounded-[var(--radius-lg)]" />;
+
+  if (error || !payload) {
+    return (
+      <section className="space-y-5">
+        <PlatformAdminHeader eyebrow="System" title="System health" description="Server-reported runtime state." />
+        <Card className="p-4">
+          <EmptyState title="System health is unavailable">
+            {error || 'No system health data was returned. Nothing is asserted about runtime safeguards while this is unknown.'}
+          </EmptyState>
+        </Card>
+      </section>
+    );
+  }
+
+  const { environment, safeguards, backlogs } = payload;
 
   return (
     <section className="space-y-5">
       <PlatformAdminHeader
         eyebrow="System"
         title="System health"
-        description="Environment, deployment and job health signals for Platform Operators. Infrastructure switching remains Super Admin only."
+        description="Runtime safeguards and backlogs, read from the server that enforces them. Infrastructure switching remains Super Admin only."
       />
+
       <PlatformStatGrid items={[
-        { label: 'Environment', value: process.env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT ?? process.env.NODE_ENV ?? 'unknown' },
-        { label: 'Firebase project', value: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unconfigured' },
-        { label: 'Database', value: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '(default)' },
-        { label: 'Failed jobs', value: failedFinalizations, tone: failedFinalizations ? 'bad' : 'good' },
+        { label: 'Environment', value: environment.name },
+        { label: 'Firebase project', value: environment.firebaseProjectId ?? 'unconfigured' },
+        { label: 'Database', value: environment.firestoreDatabaseId ?? '(default)' },
+        { label: 'Failed jobs', value: backlogs.failedFinalizations, tone: backlogs.failedFinalizations ? 'bad' : 'good' },
       ]} />
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="p-4">
           <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Runtime safeguards</h2>
           <div className="space-y-2.5">
-            <DirectoryRow title="Real payment authority" meta="Provider collection and payout commands are disabled in this demo readiness state." status="monitoring only" statusTone="warn" />
-            <DirectoryRow title="Demo login" meta="Controlled by deployment environment flags." status={process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === 'true' ? 'enabled' : 'disabled'} statusTone={process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === 'true' ? 'warn' : 'good'} />
-            <DirectoryRow title="App Check" meta="Server routes enforce App Check when the environment requires it." status={process.env.GOALPLACE_REQUIRE_APP_CHECK === 'true' ? 'required' : 'optional'} statusTone="neutral" />
+            <DirectoryRow
+              title="App Check"
+              meta="Whether the server currently rejects requests without a valid App Check token."
+              status={safeguards.appCheckRequired ? 'required' : 'not required'}
+              statusTone={safeguards.appCheckRequired ? 'good' : 'warn'}
+            />
+            <DirectoryRow
+              title="Access authority"
+              meta="Canonical assignments govern authorization only in 'assignments' mode; 'compare' and 'legacy' both answer from the legacy projection."
+              status={safeguards.accessEngineMode}
+              statusTone={safeguards.accessAuthorityIsCanonical ? 'good' : 'warn'}
+            />
+            <DirectoryRow
+              title="Scheduler authentication"
+              meta="OIDC is required for beta and production schedulers."
+              status={safeguards.schedulerAuthMode}
+              statusTone={safeguards.schedulerAuthMode === 'oidc' ? 'good' : 'warn'}
+            />
+            <DirectoryRow
+              title="Real payment authority"
+              meta="Provider collection and payout commands."
+              status={safeguards.realPaymentsEnabled ? 'ENABLED' : 'disabled'}
+              statusTone={safeguards.realPaymentsEnabled ? 'bad' : 'good'}
+            />
+            <DirectoryRow
+              title="Demo login"
+              meta="Must be disabled outside the demo environment."
+              status={safeguards.demoLoginEnabled ? 'enabled' : 'disabled'}
+              statusTone={safeguards.demoLoginEnabled ? 'warn' : 'good'}
+            />
+            <DirectoryRow
+              title="Seeding"
+              meta="Synthetic data writes."
+              status={safeguards.seedingEnabled ? 'enabled' : 'disabled'}
+              statusTone={safeguards.seedingEnabled ? 'warn' : 'good'}
+            />
           </div>
         </Card>
+
         <Card className="p-4">
           <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Operational backlogs</h2>
           <div className="space-y-2.5">
-            <DirectoryRow title="Result finalization backlog" meta="Failed trusted result-finalizer records in the loaded window." status={`${failedFinalizations}`} statusTone={failedFinalizations ? 'bad' : 'good'} />
-            <DirectoryRow title="Projection backlog" meta="Completed matches still waiting on verified result state." status={`${projectionBacklog}`} statusTone={projectionBacklog ? 'warn' : 'good'} />
-            <DirectoryRow title="Critical reports" meta="Open or reviewing trust cases marked Critical." status={`${criticalReports}`} statusTone={criticalReports ? 'bad' : 'good'} />
-            <div className="pt-1">
-              <StatusChip label="No secrets exposed" tone="good" />
-            </div>
+            <DirectoryRow
+              title="Result finalization failures"
+              meta="Trusted finalizer records in a failed state."
+              status={`${backlogs.failedFinalizations}`}
+              statusTone={backlogs.failedFinalizations ? 'bad' : 'good'}
+            />
+            <DirectoryRow
+              title="Projection backlog"
+              meta="Completed matches still waiting on a verified result."
+              status={`${backlogs.projectionBacklog}`}
+              statusTone={backlogs.projectionBacklog ? 'warn' : 'good'}
+            />
+            <DirectoryRow
+              title="Media awaiting moderation"
+              meta="Uploads verified against their authorization but not yet published."
+              status={`${backlogs.pendingMediaModeration}`}
+              statusTone={backlogs.pendingMediaModeration ? 'warn' : 'good'}
+            />
+            <DirectoryRow
+              title="Rejected uploads"
+              meta="Objects that failed verification against what was authorized."
+              status={`${backlogs.rejectedUploads}`}
+              statusTone="neutral"
+            />
+            <DirectoryRow
+              title="Access authority divergences"
+              meta="Scopes where legacy and canonical authority disagree. Must reach zero before legacy authorization is removed."
+              status={`${backlogs.accessAuthorityDivergences}`}
+              statusTone={backlogs.accessAuthorityDivergences ? 'bad' : 'good'}
+            />
           </div>
         </Card>
       </div>
