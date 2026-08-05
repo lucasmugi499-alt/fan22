@@ -46,7 +46,20 @@ const paymentCallbackBaseUrl = defineString('GOALPLACE_PAYMENT_CALLBACK_BASE_URL
   description: 'Registered App Hosting HTTPS origin used by the sandbox reconciliation job.',
 });
 const paymentReconciliationSecret = defineSecret('GOALPLACE_RECONCILIATION_SECRET');
-const fantasyScoringSecret = defineSecret('GOALPLACE_FANTASY_SCORING_SECRET');
+/**
+ * Deliberately the camelCase Secret Manager id that App Hosting already references, not
+ * the SCREAMING_SNAKE env-var name.
+ *
+ * App Hosting exposes env `GOALPLACE_FANTASY_SCORING_SECRET` backed by the Secret Manager
+ * secret `goalplaceFantasyScoringSecret`. Declaring the SCREAMING_SNAKE name here would
+ * demand a SECOND Secret Manager secret holding the same credential — and the function
+ * authenticates to `/api/fantasy/lock-lineups`, which compares against App Hosting's copy.
+ * Two copies of one shared credential drift on rotation: rotate one and lineup locking
+ * starts failing authentication with nothing obviously wrong.
+ *
+ * The code reads `.value()`, so the identifier is internal only.
+ */
+const fantasyScoringSecret = defineSecret('goalplaceFantasyScoringSecret');
 
 /**
  * Fires whenever a submission changes. Finalization runs only when the document is in a

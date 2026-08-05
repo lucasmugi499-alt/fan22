@@ -36,6 +36,10 @@ ui-debug.log
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# Non-secret Cloud Functions configuration. Committed deliberately so a deploy is
+# reproducible from a clean checkout; secrets stay in Secret Manager and must never
+# be added to this file.
+!functions/.env.manifest-quasar-479416-s7
 
 # vercel
 .vercel
