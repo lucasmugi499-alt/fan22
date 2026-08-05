@@ -20,9 +20,17 @@ export function GET(request: Request) {
 
   return Response.json({
     ...identity,
-    // The origin actually serving this request, so a client can tell it has been moved
+    // The PUBLIC host this request arrived on, so a client can tell it has been moved
     // even when the configured public URL has not changed.
-    servedBy: new URL(request.url).host,
+    //
+    // Not `new URL(request.url).host`: inside App Hosting that is the internal container
+    // address (0.0.0.0:8080), identical for every backend, which would make this field
+    // useless for the origin-change detection it exists to provide.
+    servedBy: request.headers.get('x-forwarded-host')
+      ?? request.headers.get('host')
+      ?? new URL(request.url).host,
+    // Set by the edge gateway when one is in front; absent on a direct origin.
+    servedVia: request.headers.get('x-goalplace-gateway-environment'),
     publicBaseUrl: process.env.GOALPLACE_APP_BASE_URL ?? null,
     // Reported so the boundary and an operator can see enforcement state without
     // guessing. Gateway-only protection is deliberately off for the direct demo origin.

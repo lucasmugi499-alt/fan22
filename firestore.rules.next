@@ -22,14 +22,6 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    function leaguePath(leagueId) {
-      return /databases/$(database)/documents/leagues/$(leagueId);
-    }
-
-    function teamPath(teamId) {
-      return /databases/$(database)/documents/teams/$(teamId);
-    }
-
     /**
      * Canonical authority.
      *
