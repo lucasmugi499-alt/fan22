@@ -12,6 +12,7 @@ import {
   sweepOverdueConfirmations,
 } from './finalize';
 import { applySearchIndexChange } from './searchIndex';
+import { currentFinalizerActivation, decideFinalization } from './finalizerMode';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 
 /**
@@ -62,12 +63,30 @@ export const onResultSubmissionWritten = onDocumentWritten(
     if (!after?.exists) return;
 
     const matchId = event.params.matchId;
+
+    // Activation gate. Checked before any read of the submission so an 'off' deployment
+    // cannot write an official record even if the rest of the handler regressed.
+    const activation = currentFinalizerActivation();
+    const decision = decideFinalization({
+      submissionId: matchId,
+      mode: activation.mode,
+      canaryAllowlist: activation.canaryAllowlist,
+    });
+    if (!decision.proceed) {
+      logger.info('Finalization suppressed by activation mode', {
+        matchId,
+        mode: decision.mode,
+        reason: decision.reason,
+      });
+      return;
+    }
+
     const result = await finalizeSubmission(db, matchId);
 
     if (result.action === 'finalized') {
-      logger.info('Result finalized', { matchId, key: result.finalizationKey });
+      logger.info('Result finalized', { matchId, key: result.finalizationKey, mode: decision.mode });
     } else {
-      logger.debug('No finalization required', { matchId, reason: result.reason });
+      logger.debug('No finalization required', { matchId, reason: result.reason, mode: decision.mode });
     }
   }
 );
