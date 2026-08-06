@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
+  SEARCH_PROJECTION_VERSION,
   projectSearchEntry,
   type SearchEntityType,
   type SearchIndexEntry,
@@ -74,14 +75,32 @@ async function main() {
   ]);
   const entries = buildIndexEntries({ athletes, teams, leagues, seasons });
 
+  // Orphans: index entries whose source entity no longer exists. The incremental trigger
+  // deletes an entry when it sees the deletion, so orphans accumulate only from deletions
+  // that happened while the triggers were absent — exactly the window this repair closes.
+  const existing = await db.collection('searchIndex').get();
+  const projected = new Set(entries.map((entry) => entry.id));
+  const orphans = existing.docs.filter((document) => !projected.has(document.id));
+
+  // Stale entries: present and still valid, but built by an older projection version, so
+  // their tokens may no longer match what the query side produces.
+  const staleVersion = existing.docs.filter((document) => {
+    const version = document.data().projectionVersion;
+    return projected.has(document.id) && version !== SEARCH_PROJECTION_VERSION;
+  });
+
   console.log('GoalPlace256 search index build');
   console.log(`Source: ${projectId}/${databaseId}`);
   console.log(`Mode: ${apply ? 'APPLY (writes)' : 'dry run (no writes)'}`);
   console.log(`Athletes: ${athletes.length}  Teams: ${teams.length}  Leagues: ${leagues.length}  Seasons: ${seasons.length}`);
   console.log(`Index entries: ${entries.length}`);
+  console.log(`Existing entries: ${existing.size}`);
+  console.log(`Orphans to delete: ${orphans.length}`);
+  console.log(`Stale projection version: ${staleVersion.length}`);
 
   if (!apply) {
-    console.log('Re-run with --apply to write the index.');
+    if (orphans.length) console.log(`  sample orphans: ${orphans.slice(0, 5).map((d) => d.id).join(', ')}`);
+    console.log('Re-run with --apply to write the index and remove orphans.');
     return;
   }
 
@@ -92,7 +111,13 @@ async function main() {
     }
     await batch.commit();
   }
-  console.log(`Wrote ${entries.length} search index entries.`);
+  for (let offset = 0; offset < orphans.length; offset += 400) {
+    const batch = db.batch();
+    for (const document of orphans.slice(offset, offset + 400)) batch.delete(document.ref);
+    await batch.commit();
+  }
+
+  console.log(`Wrote ${entries.length} search index entries and deleted ${orphans.length} orphan(s).`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

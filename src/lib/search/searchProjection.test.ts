@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectSearchEntry, searchIndexEntryId } from './searchProjection';
+import { SEARCH_PROJECTION_VERSION, projectSearchEntry, searchIndexEntryId } from './searchProjection';
 
 describe('projectSearchEntry', () => {
   it('projects an athlete with a deterministic id and public fields only', () => {
@@ -16,8 +16,9 @@ describe('projectSearchEntry', () => {
 
     expect(entry?.id).toBe('athlete_athlete_1');
     expect(entry?.href).toBe('/athletes/athlete_1');
+    // Pinned exactly, so any new field is a deliberate decision rather than a leak.
     expect(Object.keys(entry ?? {}).sort()).toEqual([
-      'entityId', 'href', 'id', 'meta', 'searchText', 'title', 'tokens', 'type',
+      'entityId', 'href', 'id', 'meta', 'projectionVersion', 'searchText', 'title', 'tokens', 'type',
     ]);
     expect(JSON.stringify(entry)).not.toContain('secret');
     expect(JSON.stringify(entry)).not.toContain('user_1');
@@ -56,5 +57,13 @@ describe('projectSearchEntry', () => {
 
   it('builds the same id the bulk builder and the trigger both use', () => {
     expect(searchIndexEntryId('league', 'league_1')).toBe('league_league_1');
+  });
+
+  it('stamps the projection version so a tokenizer change forces reindexing', () => {
+    const entry = projectSearchEntry('team', 'team_1', { name: 'Kisenyi United' });
+
+    // Without this the incremental trigger cannot tell a stale entry from a current one:
+    // a tokenizer change leaves title, meta, href and searchText identical.
+    expect(entry?.projectionVersion).toBe(SEARCH_PROJECTION_VERSION);
   });
 });

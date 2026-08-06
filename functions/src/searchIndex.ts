@@ -44,14 +44,23 @@ export async function applySearchIndexChange(
 
   // Tokens are the expensive part of the document; skip the write when nothing a
   // searcher could match on has changed.
+  //
+  // projectionVersion is compared first: a tokenizer change leaves title, meta, href and
+  // searchText identical, so without it a stale entry would never be rewritten and would
+  // keep matching on obsolete tokens with nothing failing.
   const existing = await entryRef.get();
   const current = existing.data();
+  const sameTokens = Array.isArray(current?.tokens)
+    && current.tokens.length === entry.tokens.length
+    && (current.tokens as string[]).every((token, index) => token === entry.tokens[index]);
   if (
     current
+    && current.projectionVersion === entry.projectionVersion
     && current.title === entry.title
     && current.meta === entry.meta
     && current.href === entry.href
     && current.searchText === entry.searchText
+    && sameTokens
   ) {
     return 'unchanged';
   }

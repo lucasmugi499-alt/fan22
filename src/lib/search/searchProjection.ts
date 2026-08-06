@@ -12,8 +12,19 @@ import { buildSearchTokens, normalizeSearchText } from './searchTokens';
 
 export type SearchEntityType = 'athlete' | 'team' | 'league' | 'season';
 
+/**
+ * Bump whenever tokenization, the searchable field set, or the entry shape changes.
+ *
+ * Without this the incremental trigger has no way to know an entry is stale: it compares
+ * the projected title, meta, href and searchText, all of which are unchanged by a
+ * tokenizer change. Entries would keep matching on old tokens indefinitely and only a
+ * full rebuild would fix it — silently, because nothing fails.
+ */
+export const SEARCH_PROJECTION_VERSION = 2;
+
 export type SearchIndexEntry = {
   id: string;
+  projectionVersion: number;
   type: SearchEntityType;
   entityId: string;
   title: string;
@@ -75,6 +86,7 @@ export function projectSearchEntry(
 
   return {
     id: searchIndexEntryId(type, entityId),
+    projectionVersion: SEARCH_PROJECTION_VERSION,
     type,
     entityId,
     title,
