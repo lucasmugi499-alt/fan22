@@ -255,6 +255,18 @@
       "expiresOn": "2026-08-30"
     },
     {
+      "package": "js-yaml",
+      "via": [
+        "GHSA-5p4m-2wfm-xmqj"
+      ],
+      "severity": "high",
+      "scope": "dev-deploy-tooling",
+      "status": "accepted-temporarily",
+      "reason": "Quadratic CPU consumption in !!omap resolution (CVE-2026-59870, CWE-407). The fix was not backported to the 4.x line, so no patched 4.x exists; only js-yaml 5.x carries it, and every path here is transitive through eslint, firebase-tools and shadcn, where a major bump risks breaking lint and the Firebase CLI that deploys the functions.",
+      "mitigation": "All three parents (eslint, firebase-tools, shadcn) are devDependencies and are absent from the Next build output, so no deployed code path parses YAML with this library. The tooling only reads YAML the operator controls — apphosting.yaml, firebase config — never attacker-supplied input. Revisit when eslint and firebase-tools move to js-yaml 5.x.",
+      "expiresOn": "2026-08-30"
+    },
+    {
       "package": "ip-address",
       "via": [
         "@modelcontextprotocol/sdk",
