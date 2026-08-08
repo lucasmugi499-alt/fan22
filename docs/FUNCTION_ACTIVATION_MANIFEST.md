@@ -1,8 +1,30 @@
 # Cloud Function Activation Manifest
 
-Generated from `functions/src/index.ts` at commit `0f2817d`. **No functions are deployed
-in `manifest-quasar-479416-s7`.** `firebase functions:list` returns none, so every
-capability below is implemented and tested but not running.
+Generated from `functions/src/index.ts`. Six of the nine exports are deployed in
+`manifest-quasar-479416-s7`: the four search-index triggers and the two finalizer
+triggers. The three scheduled jobs are **not** deployed — `firebase functions:list`
+returns six rows, and that is the check to run before believing any claim on this page.
+
+## Deployment tracker — result finalizer
+
+Last updated 2026-08-08, after Stage 4.
+
+| | |
+| --- | --- |
+| Implemented | **yes** |
+| Tested | **yes** |
+| Canary verified | **yes** |
+| Deployed to Demo | **yes** |
+| Enabled in Demo | **yes** |
+| Beta | **no** |
+| Production | **no** |
+
+`GOALPLACE_FINALIZER_MODE=enabled` in `functions/.env.manifest-quasar-479416-s7`,
+deployed 2026-08-08 to `onResultSubmissionWritten` and `onOfficialResultFinalized` only.
+Verified in the cloud against a live fixture: mode reported `enabled` in the function
+logs, all twelve canary checks passed, a duplicate delivery produced no additional
+official records, and every collection returned to its exact pre-activation count after
+teardown. Scheduled jobs were not deployed as part of this change.
 
 ## Region decision: keep `us-central1`
 
@@ -72,10 +94,14 @@ write (and is skipped entirely when no searchable field changed).
 1. Configuration and safety — activation flags, secret creation, region confirmed
 2. Search triggers only (4 exports, low risk)
 3. Search repair: dry run → sample → bounded apply → orphan cleanup → drift report
-4. Finalizer in **canary** mode (2 exports)
-5. One controlled canary submission, verified against the ten checks
-6. Finalizer enabled for demo
-7. Scheduled jobs individually, `reconcilePaymentIntents` last
+4. Finalizer in **canary** mode (2 exports) — done
+5. One controlled canary submission, verified against the twelve checks — done
+6. Finalizer enabled for demo — **done 2026-08-08, Demo only**
+7. Scheduled jobs individually, `reconcilePaymentIntents` last — not started
+
+Step 7 remains gated on observing the finalizer against real submissions.
+`reconcileResultSubmissions` must not be the first one deployed: see the sleeper-risk note
+above.
 
 ## Rollback
 
@@ -97,10 +123,10 @@ repository has been conflating them.
 
 | Capability | Implemented | Deployed | Cloud-verified |
 | --- | --- | --- | --- |
-| Result finalizer (kernel, participation, reconciliation, eligibility) | Yes | **No** | **No** |
-| Search index triggers | Yes | **No** | **No** |
-| Search index contents | n/a | snapshot only | snapshot only |
-| Fantasy scoring on finalization | Yes | **No** | **No** |
+| Result finalizer (kernel, participation, reconciliation, eligibility) | Yes | **Yes — Demo, `enabled`** | **Yes** — 12/12 checks + idempotent replay |
+| Search index triggers | Yes | **Yes** | **Yes** |
+| Search index contents | n/a | current, `projectionVersion: 2` | Yes |
+| Fantasy scoring on finalization | Yes | **Yes** | **Partly** — trigger fires and the endpoint returns 200; it scored 0 competitions because the canary league has none. Not yet proven end-to-end against a real fantasy competition. |
 | Fantasy lineup locking | Yes | **No** | **No** |
 | Result reconciliation sweep | Yes | **No** | **No** |
 | Payment reconciliation | Yes | **No** | **No** |
