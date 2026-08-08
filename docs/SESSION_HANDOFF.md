@@ -23,8 +23,29 @@ Read this top to bottom before running anything. The single most important secti
 | Git remote | `github.com/lucasmugi499-alt/fan22` |
 | Custom domain | **Not owned / not attached.** Do not attach. |
 
-**Pushing to `main` deploys the app.** The App Hosting backend builds from the connected
-repo. A build takes roughly 5 minutes; poll `/api/health` until it returns 200.
+**Pushing to `main` deploys the app** — usually. The App Hosting backend builds from the
+connected repo, and a build takes roughly 5 minutes. Two things learned the hard way on
+2026-08-08:
+
+1. **The push trigger is not reliable.** The first push produced a rollout in ~2 minutes;
+   the second produced none at all after 17. Force one with the commit pinned:
+
+   ```bash
+   npx firebase apphosting:rollouts:create fan22 --project manifest-quasar-479416-s7 \
+     -g <full-sha> --force
+   ```
+
+   Note `apphosting:rollouts:create` and `apphosting:backends:get` reject `--location`,
+   while `apphosting:rollouts:list` and `apphosting:builds:get` require it.
+
+2. **`/api/health` returning 200 does not mean your code shipped.** It has no build
+   identifier, so it says exactly as much about a three-day-old revision. Check
+   `/api/environment` and compare `environmentVersion` against the rollout id. That field
+   is the only externally visible proof of *which* build is serving.
+
+```bash
+npx firebase apphosting:rollouts:list fan22 --project manifest-quasar-479416-s7 --location us-east4
+```
 
 Credentials in `.env.local` (`FIREBASE_ADMIN_*`) work with
 `npx tsx --env-file=.env.local <script>`. `gcloud` was installed this session
@@ -37,7 +58,7 @@ revoked deliberately. `npx firebase` is authenticated as `lucasmugi499@gmail.com
 
 | Capability | Implemented | Deployed | Cloud-verified |
 | --- | --- | --- | --- |
-| Next app | Yes | **Yes** | Yes — probe ok, all public pages 200 |
+| Next app | Yes | **Yes — `fan22-build-2026-08-08-001`** | Yes — `/api/environment` reports the expected build, `servedBy` is the real origin |
 | Firestore Rules (canonical `accessIndex`) | Yes | **Yes** | Yes — 0 divergence under authenticated smoke |
 | Firestore indexes | Yes | **Yes** | Yes |
 | 4 search-index triggers | Yes | **Yes** | Yes — create / rename / delete / write-skip |
@@ -338,6 +359,20 @@ All dry-run first, verified after:
   triggers fire only on future changes. Scheduled jobs are the existing-data risk.
 - **Reported a hard IAM blocker when the error said "propagation".** All four bindings
   were already present; retrying after the delay worked. Read the error text.
+- **Nobody noticed the app had not deployed for three days.** (2026-08-08) Every push
+  after 2026-08-05 failed to build, so Stages 1–3 and the gateway origin-header fix sat in
+  `main` while Demo served Aug-5 code. Nothing alerted: `/api/health` kept returning 200
+  the whole time, because it reports process liveness, not build identity. The failure was
+  invisible from the app and only appeared in `apphosting:rollouts:list`. **After any
+  push, verify `environmentVersion` in `/api/environment` matches the new rollout id.**
+  This is the same *implemented ≠ deployed* trap §2 exists to prevent, one layer further
+  out: the code was committed, pushed, and still not running.
+- **A green local build is not a green cloud build.** The break was
+  `src/lib/finalizerMode.test.ts` importing `../../functions/src/finalizerMode`.
+  `tsconfig` excluded `functions/**`, but `exclude` only stops a file being a program
+  *root* — an import from an included file still pulls it in. It resolved locally because
+  `functions/node_modules` exists here and never will in App Hosting, which installs root
+  dependencies only. To reproduce that environment: `mv functions/node_modules /tmp && npm run build`.
 
 Two defects were found *only* by deploying: `servedBy` returned the internal container
 address `0.0.0.0:8080` (identical across backends, so useless for origin detection), and
