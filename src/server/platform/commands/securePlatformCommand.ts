@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
-import { compareLegacyCapability, indexGrantsCapability } from '@/server/access/capabilities';
+import { authorizeCapability, indexGrantsCapability } from '@/server/access/capabilities';
 import { jsonError, requireRole, type AuthenticatedActor } from '@/server/api/security';
 
 type PlatformCommandInput<TResult> = {
@@ -168,17 +168,16 @@ export async function secureLeagueCommand<TResult>({
 
   if (!isPlatformActor) {
     const leagueData = leagueSnapshot.data();
-    const isLegacyAdmin = Array.isArray(leagueData?.adminUserIds) && leagueData.adminUserIds.includes(actor.uid);
-    // Stage A of the access migration. Legacy stays enforced, the canonical decision is
-    // computed alongside it, and disagreements are recorded durably. `legacy_broader`
-    // events are operators still working from a stale adminUserIds entry after their
-    // assignment was revoked — that population must reach zero before Stage C drops the
-    // legacy arm and leaves canonical standing alone.
-    const decision = await compareLegacyCapability({
+    // Read only to be recorded. `adminUserIds` carries no authority: it cannot grant, and
+    // it cannot widen the canonical decision below. A disagreement is written to
+    // securityEvents so a cutover lockout is visible rather than silent.
+    const observedLegacyGrant = Array.isArray(leagueData?.adminUserIds)
+      && leagueData.adminUserIds.includes(actor.uid);
+    const decision = await authorizeCapability({
       userId: actor.uid,
       scope: { scopeType: 'league', scopeId: leagueId },
       capability: requiredCapability,
-      legacyGranted: isLegacyAdmin,
+      observedLegacyGrant,
       resource: `leagues/${leagueId}`,
       requestId,
     });

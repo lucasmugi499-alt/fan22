@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
 import { recordAccessDivergence } from './securityEvents';
-import { compareLegacyCapability, hasCapability, hasCapabilityOrPlatformGrant } from './capabilities';
+import { authorizeCapability, hasCapability, hasCapabilityOrPlatformGrant } from './capabilities';
 
 vi.mock('server-only', () => ({}));
 
@@ -77,26 +77,29 @@ describe('hasCapabilityOrPlatformGrant', () => {
   });
 });
 
-describe('compareLegacyCapability', () => {
+describe('authorizeCapability', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('records a legacy_broader divergence when the canonical assignment is gone', async () => {
+  /**
+   * The regression this file exists to prevent. Before the Stage C cutover this case
+   * returned `granted: true`, because a stale `adminUserIds` entry was OR'd into the
+   * decision and the Admin SDK bypasses the Firestore Rules that would have denied it.
+   */
+  it('DENIES when only the legacy field grants — legacy cannot authorize', async () => {
     installIndexes({});
 
-    const decision = await compareLegacyCapability({
+    const decision = await authorizeCapability({
       userId: 'user_1',
       scope: { scopeType: 'league', scopeId: 'league_1' },
       capability: 'league.profile.manage',
-      legacyGranted: true,
+      observedLegacyGrant: true,
       resource: 'leagues/league_1',
       requestId: 'req_1',
     });
 
-    // Stage A still enforces legacy, so access is preserved — but the disagreement is
-    // now on record. This population must reach zero before the legacy arm is removed.
-    expect(decision.granted).toBe(true);
-    expect(decision.canonical).toBe(false);
+    expect(decision.granted).toBe(false);
     expect(decision.diverged).toBe(true);
+    // Denied, but not silently: the lockout is on record as a legacy_broader event.
     expect(recordAccessDivergence).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'user_1',
       scopeType: 'league',
@@ -107,14 +110,14 @@ describe('compareLegacyCapability', () => {
     }));
   });
 
-  it('records the opposite divergence when only the canonical assignment grants access', async () => {
+  it('grants on the canonical assignment alone, with no legacy entry', async () => {
     installIndexes({ league_league_1_user_1: { capabilities: ['league.profile.manage'] } });
 
-    const decision = await compareLegacyCapability({
+    const decision = await authorizeCapability({
       userId: 'user_1',
       scope: { scopeType: 'league', scopeId: 'league_1' },
       capability: 'league.profile.manage',
-      legacyGranted: false,
+      observedLegacyGrant: false,
     });
 
     expect(decision.granted).toBe(true);
@@ -124,31 +127,47 @@ describe('compareLegacyCapability', () => {
     }));
   });
 
-  it('records nothing when both authorities agree', async () => {
+  it('records nothing when both agree', async () => {
     installIndexes({ league_league_1_user_1: { capabilities: ['league.profile.manage'] } });
 
-    const decision = await compareLegacyCapability({
+    const decision = await authorizeCapability({
       userId: 'user_1',
       scope: { scopeType: 'league', scopeId: 'league_1' },
       capability: 'league.profile.manage',
-      legacyGranted: true,
+      observedLegacyGrant: true,
     });
 
+    expect(decision.granted).toBe(true);
     expect(decision.diverged).toBe(false);
     expect(recordAccessDivergence).not.toHaveBeenCalled();
   });
 
-  it('denies when both authorities deny', async () => {
+  it('denies when neither grants', async () => {
     installIndexes({});
 
-    const decision = await compareLegacyCapability({
+    const decision = await authorizeCapability({
       userId: 'user_1',
       scope: { scopeType: 'league', scopeId: 'league_1' },
       capability: 'league.profile.manage',
-      legacyGranted: false,
+      observedLegacyGrant: false,
     });
 
     expect(decision.granted).toBe(false);
     expect(recordAccessDivergence).not.toHaveBeenCalled();
+  });
+
+  it('denies the capability the projection does not list, even with a legacy entry', async () => {
+    installIndexes({ league_league_1_user_1: { capabilities: ['league.season.manage'] } });
+
+    const decision = await authorizeCapability({
+      userId: 'user_1',
+      scope: { scopeType: 'league', scopeId: 'league_1' },
+      capability: 'league.profile.manage',
+      observedLegacyGrant: true,
+    });
+
+    // Exact scope + exact capability. Holding one capability in a scope is not authority
+    // over the whole scope.
+    expect(decision.granted).toBe(false);
   });
 });

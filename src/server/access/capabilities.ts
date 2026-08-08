@@ -60,35 +60,45 @@ export async function hasCapabilityOrPlatformGrant(
   return scoped || platform;
 }
 
-export type LegacyComparedDecision = {
-  /** The decision actually enforced right now. */
+export type CanonicalDecision = {
+  /** The decision enforced. Always the canonical one — there is no other arm. */
   granted: boolean;
-  canonical: boolean;
-  legacy: boolean;
+  /**
+   * What a legacy field would have decided, had it still carried authority. Recorded for
+   * observability only; it can never widen `granted`.
+   */
+  observedLegacy: boolean;
   diverged: boolean;
 };
 
 /**
- * Stage A of the access migration: legacy remains the enforced authority while the
- * canonical decision is computed alongside it and every disagreement is recorded
- * durably.
+ * The enforced capability check for scoped operator commands.
  *
- * This deliberately preserves today's behaviour, including its flaw — a stale
- * `adminUserIds` entry still authorizes after the canonical assignment was revoked. That
- * is why the recorded divergence matters: `legacy_broader` events are the exact
- * population that must reach zero before Stage C removes the legacy arm. Do not carry
- * this helper past the cutover; canonical must then stand alone, with no `OR`.
+ * Stage C of the access migration. Until 2026-08-08 this function returned
+ * `legacyGranted || canonical`, which meant a stale `adminUserIds` entry still authorized
+ * after the canonical assignment had been revoked — the Admin SDK bypasses Firestore
+ * Rules, so Rules could not correct it. That `OR` is gone: **canonical stands alone.**
+ *
+ * The legacy field is still read at the call site and passed here, but only as an
+ * observation. Removing the comparison entirely would make the cutover silent — an
+ * operator working from a stale `adminUserIds` entry would simply start getting 403s with
+ * nothing on record explaining why. A `legacy_broader` event is precisely that person, so
+ * the signal is worth more now than it was during the shadow period.
+ *
+ * `adminUserIds` holds zero authority. Do not reintroduce it into an authorization
+ * decision; it is membership metadata.
  */
-export async function compareLegacyCapability(input: {
+export async function authorizeCapability(input: {
   userId: string;
   scope: CapabilityScope;
   capability: PermissionCapability;
-  legacyGranted: boolean;
+  /** What the legacy field says. Observed and recorded, never enforced. */
+  observedLegacyGrant: boolean;
   resource?: string;
   requestId?: string;
-}): Promise<LegacyComparedDecision> {
+}): Promise<CanonicalDecision> {
   const canonical = await hasCapability(input.userId, input.scope, input.capability);
-  const diverged = canonical !== input.legacyGranted;
+  const diverged = canonical !== input.observedLegacyGrant;
 
   if (diverged) {
     await recordAccessDivergence({
@@ -97,16 +107,15 @@ export async function compareLegacyCapability(input: {
       scopeId: input.scope.scopeId,
       capability: input.capability,
       resource: input.resource,
-      legacyDecision: input.legacyGranted,
+      legacyDecision: input.observedLegacyGrant,
       assignmentDecision: canonical,
       requestId: input.requestId,
     });
   }
 
   return {
-    granted: input.legacyGranted || canonical,
-    canonical,
-    legacy: input.legacyGranted,
+    granted: canonical,
+    observedLegacy: input.observedLegacyGrant,
     diverged,
   };
 }
