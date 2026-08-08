@@ -31,5 +31,20 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "functions", "functions/**"]
+  "exclude": [
+    "node_modules",
+    "functions",
+    "functions/**",
+    // Excluding `functions/**` above is not enough on its own. TypeScript's `exclude`
+    // only stops a file being a program ROOT; a file still enters the program if an
+    // included file imports it. These two tests live under src/ and import
+    // ../../functions/src/*, which drags functions source — and its
+    // `firebase-functions/params` import — into the Next production type check.
+    //
+    // That resolves locally, where functions/node_modules exists, and fails in App
+    // Hosting, which installs root dependencies only. The Aug 8 rollout failed exactly
+    // there. Tests are type-checked by the test runner, not by `next build`.
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }
