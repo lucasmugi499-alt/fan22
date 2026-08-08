@@ -22,15 +22,21 @@ const gateway = {
     forwarded.headers.set('x-forwarded-host', incoming.host);
     forwarded.headers.set('x-goalplace-gateway-environment', env.ACTIVE_ENVIRONMENT ?? 'unknown');
 
-    // Only attached once the secret exists. While unset the origin is reachable
-    // directly and GOALPLACE_REQUIRE_GATEWAY_SECRET is false, so sending nothing is
-    // correct; sending an empty value would be worse than sending none.
+    // Strip BOTH trust headers from the inbound request before the gateway sets its own.
+    //
+    // This must happen before the conditional set below, not after. While
+    // EDGE_ORIGIN_SECRET is unset the gateway adds no header of its own — so without this
+    // deletion a caller-supplied x-goalplace-origin-secret would pass straight through to
+    // the origin and defeat gateway-only enforcement the moment it is switched on.
+    forwarded.headers.delete('x-goalplace-origin-secret');
+    forwarded.headers.delete('x-goalplace-staff-preview-secret');
+
+    // Attached only once the secret exists. While unset the origin is reachable directly
+    // and GOALPLACE_REQUIRE_GATEWAY_SECRET is false, so sending nothing is correct;
+    // sending an empty value would be worse than sending none.
     if (env.EDGE_ORIGIN_SECRET) {
       forwarded.headers.set('x-goalplace-origin-secret', env.EDGE_ORIGIN_SECRET);
     }
-
-    // A client must never be able to forge the gateway's own header.
-    forwarded.headers.delete('x-goalplace-staff-preview-secret');
 
     const response = await fetch(forwarded);
 
