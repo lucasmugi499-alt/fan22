@@ -26,6 +26,17 @@ export type PermissionCapability =
   | 'platform.organization.archive'
   | 'platform.user.suspend'
   | 'platform.audit.read'
+  // Added 2026-08-09 so the most powerful platform commands stop being gated by role
+  // alone. Each names one command in src/app/api/admin/actions/route.ts; they are
+  // deliberately separate capabilities rather than one broad grant, because revoking the
+  // ability to decide a trust case should not also revoke the ability to review an
+  // application.
+  | 'platform.accounts.lifecycle'
+  | 'platform.trust.decide'
+  | 'platform.access.revoke'
+  | 'platform.access.manage'
+  | 'platform.organizations.identity.manage'
+  | 'platform.verification.team.manage'
   | 'league.profile.manage'
   | 'league.season.manage'
   | 'league.team.create'
@@ -98,7 +109,7 @@ export type AccessContext = {
 export const PERMISSION_BUNDLES: PermissionBundle[] = [
   {
     id: 'super_admin_governance',
-    version: '1.0.0',
+    version: '1.1.0',
     roleKey: 'super_admin',
     label: 'Super Admin Governance',
     capabilities: [
@@ -108,13 +119,19 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.organization.archive',
       'platform.user.suspend',
       'platform.audit.read',
+      'platform.accounts.lifecycle',
+      'platform.trust.decide',
+      'platform.access.revoke',
+      'platform.access.manage',
+      'platform.organizations.identity.manage',
+      'platform.verification.team.manage',
       'ownership.transfer',
       'break_glass.activate',
     ],
   },
   {
     id: 'platform_admin',
-    version: '1.1.0',
+    version: '1.2.0',
     roleKey: 'platform_admin',
     label: 'Platform Admin',
     capabilities: [
@@ -132,6 +149,12 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.organization.archive',
       'platform.user.suspend',
       'platform.audit.read',
+      'platform.accounts.lifecycle',
+      'platform.trust.decide',
+      'platform.access.revoke',
+      'platform.access.manage',
+      'platform.organizations.identity.manage',
+      'platform.verification.team.manage',
       'league.profile.manage',
       'league.team.create',
       'league.team_admin.invite',

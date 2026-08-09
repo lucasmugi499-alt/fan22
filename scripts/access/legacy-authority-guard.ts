@@ -92,6 +92,30 @@ function countLegacyReads(source: string): number {
   return count;
 }
 
+/**
+ * Every platform command must name the capability it requires.
+ *
+ * `securePlatformCommand` skips the capability check when a command declares none, so an
+ * omitted `requiredCapability` is not a stricter default — it is no check at all. Eight of
+ * the most powerful commands on the platform shipped that way, including organization
+ * creation, account lifecycle and trust-case decisions.
+ */
+function findUngatedPlatformCommands(source: string): string[] {
+  const ungated: string[] = [];
+  // Each call opens with `securePlatformCommand({`; the declaration block ends at the
+  // handler. Checking the block rather than the whole file keeps one command's capability
+  // from covering for its neighbour's.
+  const marker = 'securePlatformCommand({';
+  let index = source.indexOf(marker);
+  while (index !== -1) {
+    const block = source.slice(index, source.indexOf('handler:', index) + 1);
+    const command = /command:\s*'([^']+)'/.exec(block)?.[1];
+    if (command && !/requiredCapability:\s*'/.test(block)) ungated.push(command);
+    index = source.indexOf(marker, index + marker.length);
+  }
+  return ungated;
+}
+
 export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
   const update = argv.includes('--update');
   const budgets = new Map(KNOWN_LEGACY_AUTHORITY.map((b) => [b.file, b]));
@@ -107,6 +131,17 @@ export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
 
   const violations: string[] = [];
   const regressions: string[] = [];
+
+  // Ungated platform commands are a hard failure with no budget: unlike the legacy reads
+  // below, there is no migration in progress here and no reason to add one.
+  const ungated: string[] = [];
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    if (!source.includes('securePlatformCommand({')) continue;
+    for (const command of findUngatedPlatformCommands(source)) {
+      ungated.push(`${file.split(path.sep).join('/')} -> ${command}`);
+    }
+  }
 
   for (const [file, count] of [...actual].sort()) {
     const budget = budgets.get(file);
@@ -126,6 +161,7 @@ export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
   console.log('Legacy authorization guard');
   console.log(`Files scanned: ${files.length}`);
   console.log(`Legacy authorization lines remaining: ${remaining} across ${actual.size} file(s)`);
+  console.log(`Ungated platform commands: ${ungated.length}`);
   console.log('');
 
   if (update) {
@@ -137,10 +173,19 @@ export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
     return { remaining, regressions, violations };
   }
 
+  for (const command of ungated) {
+    console.log(`  BLOCK  platform command declares no requiredCapability: ${command}`);
+  }
   for (const message of regressions) console.log(`  BLOCK  ${message}`);
   for (const message of violations) console.log(`  STALE  ${message}`);
 
-  if (regressions.length) {
+  if (ungated.length) {
+    console.log('');
+    console.log(`${ungated.length} platform command(s) declare no requiredCapability.`);
+    console.log('securePlatformCommand skips the check entirely when none is named, so this');
+    console.log('is not a stricter default — it is no capability check at all.');
+    process.exitCode = 1;
+  } else if (regressions.length) {
     console.log('');
     console.log(`${regressions.length} new legacy authorization site(s). The Admin SDK bypasses Firestore Rules,`);
     console.log('so a decision made from adminUserIds is not reviewable by the canonical authority.');

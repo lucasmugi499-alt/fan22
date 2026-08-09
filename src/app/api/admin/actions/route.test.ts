@@ -46,6 +46,26 @@ function installFirestoreMock(records: Record<string, Record<string, unknown>>) 
       accountStatus: 'active',
       status: 'active',
     },
+    // The platform commands are capability-gated, and holding the platform_admin role no
+    // longer implies any capability. A provisioned operator fixture has to carry the same
+    // grants a real account carries, or these tests would only ever prove the 403 path.
+    'accessIndex/platform_global_platform_1': {
+      userId: 'platform_1',
+      scopeType: 'platform',
+      scopeId: 'global',
+      capabilities: [
+        'platform.admin.manage',
+        'platform.audit.read',
+        'platform.organization.create',
+        'platform.organizations.identity.manage',
+        'platform.verification.team.manage',
+        'platform.accounts.lifecycle',
+        'platform.application.review',
+        'platform.access.revoke',
+        'platform.access.manage',
+        'platform.trust.decide',
+      ],
+    },
     ...records,
   };
   vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
@@ -572,7 +592,11 @@ describe('trusted admin actions route hardening', () => {
                 accountClass: 'platform_operator',
                 accountStatus: 'active',
               }
-            : undefined,
+            // transition_access_assignment is gated on platform.access.manage, and the
+            // role no longer implies it.
+            : collectionName === 'accessIndex' && id === 'platform_global_platform_1'
+              ? { capabilities: ['platform.access.manage'] }
+              : undefined,
         )),
       })),
       where: vi.fn(() => ({

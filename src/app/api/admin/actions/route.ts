@@ -262,6 +262,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'organization.create',
+        requiredCapability: 'platform.organization.create',
         handler: async ({ requestId }) => {
           const now = new Date();
           const year = now.getUTCFullYear();
@@ -337,6 +338,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'league.update_identity',
+        requiredCapability: 'platform.organizations.identity.manage',
         reason: body.note,
         requireReason: body.status === 'suspended',
         handler: async ({ requestId, reason }) => {
@@ -384,6 +386,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'team.update_verification',
+        requiredCapability: 'platform.verification.team.manage',
         reason: body.note,
         requireReason: Boolean(body.verificationStatus || body.verified !== undefined || body.plan !== undefined),
         handler: async ({ requestId, reason }) => {
@@ -432,6 +435,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'account.lifecycle',
+        requiredCapability: 'platform.accounts.lifecycle',
         reason: body.note,
         requireReason: true,
         handler: async ({ requestId, reason }) => {
@@ -815,6 +819,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'application.review',
+        requiredCapability: 'platform.application.review',
         reason: body.note,
         requireReason: body.decision !== 'approved',
         handler: async ({ requestId, reason }) => {
@@ -856,6 +861,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'assignment.revoke',
+        requiredCapability: 'platform.access.revoke',
         reason: body.note,
         requireReason: true,
         handler: async ({ requestId, reason }) => {
@@ -891,6 +897,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'assignment.transition',
+        requiredCapability: 'platform.access.manage',
         reason: body.note,
         requireReason: true,
         handler: async ({ requestId, reason }) => {
@@ -952,6 +959,7 @@ export async function POST(request: Request) {
       const guarded = await securePlatformCommand({
         actor,
         command: 'trust_case.decision',
+        requiredCapability: 'platform.trust.decide',
         reason: body.note,
         requireReason: true,
         handler: async ({ requestId, reason }) => {
