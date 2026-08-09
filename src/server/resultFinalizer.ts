@@ -15,6 +15,19 @@ const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';
 const FINALIZATIONS = 'finalizations';
 const OFFICIAL_SPORT_EVENTS = 'officialSportEvents';
+const RECONCILIATION_EXCEPTIONS = 'reconciliationExceptions';
+
+/**
+ * Deterministic, so a redelivered trigger finds the existing case instead of opening a
+ * second one. Keyed on the submission version because a corrected resubmission is a new
+ * case, not an update to the old one.
+ */
+export function reconciliationExceptionId(matchId: string, submissionVersion: number) {
+  return `reconciliation_${matchId}_${submissionVersion}`;
+}
+
+/** Set on the submission so a later write to it cannot re-enter finalization. */
+export const BLOCKED_RECONCILIATION = 'blocked_reconciliation';
 
 type OfficialSportEventRecord = {
   id: string;
@@ -601,7 +614,12 @@ function officialScorerEvents({
 
 export type FinalizeOutcome =
   | { action: 'finalized'; finalizationKey: string }
-  | { action: 'skipped'; reason: string };
+  | { action: 'skipped'; reason: string }
+  /**
+   * The submitted score and the events that are supposed to produce it disagree in the one
+   * direction that cannot be repaired by attribution. No official record was written.
+   */
+  | { action: 'blocked'; reason: 'reconciliation_surplus'; exceptionId: string };
 
 /**
  * Promote a settled claim onto the official match record in one idempotent transaction.
@@ -618,6 +636,21 @@ export async function finalizeSubmission(
     if (!submissionSnap.exists) return { action: 'skipped', reason: 'no_submission' };
 
     const submission = { id: submissionSnap.id, ...submissionSnap.data() } as ResultSubmission;
+
+    /**
+     * Eligibility, in order of authority: an already-official result and a result blocked
+     * for League review both stop here, before any planning work.
+     *
+     * The blocked check has to come first because the submission still *looks* finalizable
+     * — it is confirmed, it has a score, nothing about its own status says otherwise. Any
+     * later write to it re-fires this trigger, so without this the finalizer would retry a
+     * contradictory result on every touch and reopen the same case indefinitely.
+     */
+    const submissionData = submissionSnap.data() ?? {};
+    if (submissionData.finalizationStatus === BLOCKED_RECONCILIATION) {
+      return { action: 'skipped', reason: BLOCKED_RECONCILIATION };
+    }
+
     const matchRef = db.collection(MATCHES).doc(submission.matchId);
     const matchSnap = await tx.get(matchRef);
     if (!matchSnap.exists) return { action: 'skipped', reason: 'no_match' };
@@ -771,6 +804,107 @@ export async function finalizeSubmission(
       }
     }
 
+    /**
+     * The integrity gate. Everything above this line computes; nothing above it writes.
+     *
+     * Reconciliation runs here — after the complete candidate event set exists, and before
+     * the first official write is staged — because the two directions of disagreement are
+     * not the same kind of problem:
+     *
+     *   events total LESS than the official score is an attribution gap. The missing
+     *   points are recorded as an explicit `unattributed_team_score` event, the record
+     *   stays internally consistent, and finalization proceeds.
+     *
+     *   events total MORE than the official score is a contradiction. There is no honest
+     *   repair: deleting athlete events to force a fit would destroy submitted evidence,
+     *   and raising the official score would invent a result nobody claimed. It stops.
+     *
+     * Previously a surplus was recorded on the reconciliation document and finalization
+     * continued anyway, so an official result could be published whose own events said it
+     * was wrong.
+     */
+    const surplusGate = fantasySport
+      ? reconcileOfficialScore({
+        sport: fantasySport,
+        events: [...activeSquadEvents, ...scorerEvents, ...statLineEvents],
+        match,
+        submission,
+        score: plan.match.score,
+        resultVersion: plan.resultVersion,
+        finalizedAt,
+      })
+      : undefined;
+
+    if (surplusGate && (surplusGate.surplus.home > 0 || surplusGate.surplus.away > 0)) {
+      const exceptionId = reconciliationExceptionId(match.id, submission.resultVersion);
+      const exceptionRef = db.collection(RECONCILIATION_EXCEPTIONS).doc(exceptionId);
+      const existing = await tx.get(exceptionRef);
+
+      // Deterministic id plus create-once semantics: a redelivered event finds the same
+      // case and refreshes only its observation timestamp, so three deliveries are one
+      // case with no duplicated audit trail.
+      if (!existing.exists) {
+        tx.create(exceptionRef, {
+          exceptionId,
+          matchId: match.id,
+          leagueId: match.leagueId,
+          competitionId: match.seasonId ?? match.leagueId,
+          submissionId: submission.id,
+          submissionVersion: submission.resultVersion,
+          sport: fantasySport,
+          officialHomeScore: plan.match.score.home,
+          officialAwayScore: plan.match.score.away,
+          reconstructedHomeScore: surplusGate.trace.home,
+          reconstructedAwayScore: surplusGate.trace.away,
+          homeDifference: surplusGate.trace.home - plan.match.score.home,
+          awayDifference: surplusGate.trace.away - plan.match.score.away,
+          // The submitted events are preserved by reference, never rewritten. This is the
+          // evidence a League needs to decide which side is wrong.
+          eventIds: [...activeSquadEvents, ...scorerEvents, ...statLineEvents].map((e) => e.id),
+          evidenceRefs: submission.evidenceRefs ?? [],
+          reasonCode: 'scoring_events_exceed_submitted_result',
+          status: 'open',
+          reconciliationStatus: 'surplus',
+          finalizationStatus: 'blocked',
+          reviewStatus: 'league_review_required',
+          finalizationAttemptId: plan.finalizationKey,
+          createdAt: finalizedAt,
+          updatedAt: finalizedAt,
+        });
+      } else {
+        tx.set(exceptionRef, { updatedAt: finalizedAt }, { merge: true });
+      }
+
+      // Marks the workflow so a later write to this submission does not re-enter
+      // finalization. The submission's own `status` is left alone: it is a claim-lifecycle
+      // field with its own state machine, and overloading it is what made `status:
+      // 'verified'` ambiguous elsewhere in this codebase.
+      tx.update(submissionRef, {
+        finalizationStatus: BLOCKED_RECONCILIATION,
+        reviewStatus: 'league_review_required',
+        reconciliationExceptionId: exceptionId,
+        updatedAt: finalizedAt,
+      });
+
+      if (!existing.exists) {
+        tx.create(submissionRef.collection('events').doc(), {
+          submissionId: submission.id,
+          from: submission.status,
+          to: submission.status,
+          actor: 'system',
+          actorUserId: 'system:finalizer',
+          note: `Finalization blocked: recorded events exceed the submitted score `
+            + `(events ${surplusGate.trace.home}-${surplusGate.trace.away}, `
+            + `submitted ${plan.match.score.home}-${plan.match.score.away}). `
+            + `League review required.`,
+          reconciliationExceptionId: exceptionId,
+          createdAt: finalizedAt,
+        });
+      }
+
+      return { action: 'blocked', reason: 'reconciliation_surplus', exceptionId };
+    }
+
     if (archivedRef && archivedSnapshot && !archivedSnapshot.exists) {
       tx.create(archivedRef, {
         ...submissionSnap.data(),
@@ -818,19 +952,9 @@ export async function finalizeSubmission(
     if (fantasySport) {
       const officialEvents = [...activeSquadEvents, ...scorerEvents, ...statLineEvents];
 
-      // Reconcile the events against the official score before publishing anything
-      // derived from them. Where they disagree, the difference is recorded as an
-      // explicit unattributed-score event rather than silently producing an official
-      // record whose parts do not add up.
-      const reconciliation = reconcileOfficialScore({
-        sport: fantasySport,
-        events: officialEvents,
-        match,
-        submission,
-        score: plan.match.score,
-        resultVersion: plan.resultVersion,
-        finalizedAt,
-      });
+      // Already computed by the integrity gate above, which is the only place this may be
+      // decided. Recomputing here would risk the gate and the published record disagreeing.
+      const reconciliation = surplusGate!;
       officialEvents.push(...reconciliation.adjustmentEvents);
 
       for (const event of officialEvents) {
