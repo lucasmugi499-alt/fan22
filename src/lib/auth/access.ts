@@ -114,10 +114,19 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
   },
   {
     id: 'platform_admin',
-    version: '1.0.0',
+    version: '1.1.0',
     roleKey: 'platform_admin',
     label: 'Platform Admin',
     capabilities: [
+      // Added 2026-08-08 on the owner's instruction, so that the `hasRoleGrant` bypass in
+      // securePlatformCommand can be removed without locking anyone out. That bypass
+      // already gives every Platform Admin *every* capability; naming this one explicitly
+      // is strictly narrower than the status quo, not broader.
+      //
+      // Note this grants the capability to the platform_admin ROLE, not to two chosen
+      // accounts — the projection derives capabilities from this bundle and assignments
+      // carry no per-user overrides. Today that role is held by exactly two accounts.
+      'platform.admin.manage',
       'platform.application.review',
       'platform.organization.create',
       'platform.organization.archive',
