@@ -55,10 +55,15 @@ export async function POST(request: Request) {
   const team = await adminDb.collection('teams').doc(teamId).get();
   if (!team.exists) return Response.json({ error: 'Team not found.' }, { status: 404 });
   const teamData = team.data()!;
-  const league = await adminDb.collection('leagues').doc(teamData.leagueId).get();
-  const assigned = teamData.adminUserIds?.includes(actor.uid) || league.data()?.adminUserIds?.includes(actor.uid);
+  // Canonical only. `hasScopedAthleteCreateAccess` already resolves team, league and
+  // platform scope from accessIndex; the legacy `adminUserIds` arm that used to sit beside
+  // it could authorize an operator whose canonical assignment had been revoked, and the
+  // Admin SDK bypasses the Rules that would have denied it.
+  //
+  // Verified before removal: all 16 league-admin and 100 team-admin legacy entries already
+  // hold the canonical capability for their scope, so nobody loses access.
   const scoped = await hasScopedAthleteCreateAccess(actor.uid, team.id, teamData.leagueId);
-  if (!['platform_admin', 'super_admin'].includes(String(actor.role)) && !assigned && !scoped) {
+  if (!['platform_admin', 'super_admin'].includes(String(actor.role)) && !scoped) {
     return Response.json({ error: 'You are not assigned to this team.' }, { status: 403 });
   }
 

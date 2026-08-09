@@ -2,7 +2,8 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
-import type { AppRole, Match } from '@/types';
+import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import type { Match } from '@/types';
 
 export const runtime = 'nodejs';
 
@@ -30,12 +31,16 @@ export async function POST(
   const matchSnapshot = await adminDb.collection('matches').doc(matchId).get();
   if (!matchSnapshot.exists) return Response.json({ error: 'Match not found.' }, { status: 404 });
   const match = { id: matchSnapshot.id, ...matchSnapshot.data() } as Match;
-  const leagueSnapshot = await adminDb.collection('leagues').doc(match.leagueId).get();
-  const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
-  const isPlatform = role === 'platform_admin' || role === 'super_admin';
-  const isLeagueAdmin = Array.isArray(leagueSnapshot.data()?.adminUserIds) &&
-    leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
-  if (!isPlatform && !isLeagueAdmin) {
+  // Canonical authority for this exact league, or a platform-global grant. This route
+  // previously decided from `league.adminUserIds` alone plus a bare role comparison, so a
+  // stale membership entry authorized a venue QR after the assignment behind it had been
+  // revoked — and the Admin SDK bypasses the Rules that would have denied the read.
+  const permitted = await hasCapabilityOrPlatformGrant(
+    actor.uid,
+    { scopeType: 'league', scopeId: match.leagueId },
+    'league.profile.manage',
+  );
+  if (!permitted) {
     return Response.json({ error: 'Only the owning League Admin can generate a venue QR.' }, { status: 403 });
   }
   const kickoff = new Date(match.scheduledAt).getTime();
