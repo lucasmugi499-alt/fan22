@@ -22,8 +22,6 @@ import {
   SponsorReport,
   SponsorCampaign,
   Sponsor,
-  SportSlug,
-  SportType,
   StoredStanding,
   SupportNeed,
   Team,
@@ -35,19 +33,19 @@ import { useAuth } from '@/context/AuthProvider';
 import { useAppStore } from '@/lib/store';
 import {
   normalizeChallengeStatus,
-  normalizeMatchStatus,
-  normalizeMatchVerification,
   normalizeVerificationStatus,
 } from '@/lib/status';
 import { cacheData, privateCacheNamespace, readCachedData } from '@/lib/offline';
 import type { Contribution } from '@/types/money';
 import type { DataQueryOptions } from '@/data/providers/types';
 
-function toSportName(sport?: SportSlug | SportType): SportType {
-  if (sport === 'basketball' || sport === 'Basketball') return 'Basketball';
-  if (sport === 'rugby' || sport === 'Rugby') return 'Rugby';
-  return 'Football';
-}
+// `adaptMatch` and `toSportName` moved to @/lib/matchRecord so the server-rendered public
+// pages can apply the same mapping. Imported (not just re-exported) because this module
+// uses `toSportName` locally; re-exported because existing callers import `adaptMatch`
+// from here.
+import { adaptMatch, toSportName } from '@/lib/matchRecord';
+
+export { adaptMatch, toSportName };
 
 function toFeedType(type: FeedPost['type'] | string): FeedPost['type'] {
   const map: Record<string, FeedPost['type']> = {
@@ -118,21 +116,6 @@ export function adaptLeague(league: League): League {
     completionRate: league.completionRate ?? league.matchCompletionRate ?? 0,
     ranking: league.ranking ?? 1,
     indexSignals: signalsForLeague(league),
-  };
-}
-
-export function adaptMatch(match: Match): Match {
-  const sport = toSportName(match.sport);
-  return {
-    ...match,
-    sport,
-    teamAId: match.teamAId ?? match.homeTeamId,
-    teamBId: match.teamBId ?? match.awayTeamId,
-    teamAScore: match.teamAScore ?? match.score?.home ?? undefined,
-    teamBScore: match.teamBScore ?? match.score?.away ?? undefined,
-    date: match.date ?? match.scheduledAt,
-    status: normalizeMatchStatus(match.status),
-    verificationStatus: normalizeMatchVerification(match.verificationStatus, match.status),
   };
 }
 

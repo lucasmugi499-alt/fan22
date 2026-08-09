@@ -4,6 +4,7 @@ import { investorDemo } from '@/data/investorDemo';
 import { adminDb } from '@/lib/firebase/admin';
 import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
 import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
+import { adaptMatch } from '@/lib/matchRecord';
 
 export type PublicCatalogueSource = 'live' | 'curated_preview' | 'configured_preview';
 
@@ -78,6 +79,20 @@ function record<T>(id: string, data: FirebaseFirestore.DocumentData) {
 }
 
 /**
+ * Matches need the same adaptation the client data hook applies, or the two paths disagree
+ * about what is official.
+ *
+ * These server loaders feed `initialData` on the public league, team and match pages, and
+ * an anonymous visitor never gets past it — the client Firestore read is not available to
+ * them, so `initialData` is the whole page. Returning a raw document left legacy-shaped
+ * matches (`status: 'verified'`, no `teamAScore`) failing both `isOfficialMatch` and the
+ * `buildLeagueStandings` score check, so ten leagues rendered an empty table.
+ */
+function matchRecord(id: string, data: FirebaseFirestore.DocumentData): Match {
+  return adaptMatch(record<Match>(id, data));
+}
+
+/**
  * Returns the newest records, not an arbitrary page of them. A bare `.limit()` returns
  * documents in key order, so "recent" surfaces were showing whichever records happened to
  * sort first by ID. Every collection read here carries a required `createdAt`, so ordering
@@ -118,7 +133,7 @@ export async function getPublicLeagueDiscoveryData() {
         recentCollection<League>('leagues', 48),
         recentCollection<Team>('teams', 240),
         adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(700).get()
-          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+          .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
         recentCollection<Season>('seasons', 80),
       ]);
       return { leagues, teams, matches, seasons };
@@ -146,7 +161,7 @@ export async function getPublicLeagueProfileData(leagueId: string) {
         adminDb.collection('teams').where('leagueId', '==', leagueId).limit(80).get()
           .then((snapshot) => snapshot.docs.map((item) => record<Team>(item.id, item.data()))),
         adminDb.collection('matches').where('leagueId', '==', leagueId).limit(240).get()
-          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+          .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
         adminDb.collection('seasons').where('leagueId', '==', leagueId).limit(20).get()
           .then((snapshot) => snapshot.docs.map((item) => record<Season>(item.id, item.data()))),
         adminDb.collection('athletes').where('leagueId', '==', leagueId).limit(48).get()
@@ -178,7 +193,7 @@ export async function getPublicMatches() {
         .orderBy('scheduledAt', 'desc')
         .limit(700)
         .get();
-      return snapshot.docs.map((item) => record<Match>(item.id, item.data()));
+      return snapshot.docs.map((item) => matchRecord(item.id, item.data()));
     },
     () => investorDemo.matches,
   );
@@ -204,7 +219,7 @@ export async function getPublicLandingData() {
         recentCollection<Team>('teams', 80),
         recentCollection<Athlete>('athletes', 24),
         adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(40).get()
-          .then((snapshot) => snapshot.docs.map((item) => record<Match>(item.id, item.data()))),
+          .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
         recentCollection<Challenge>('challenges', 12),
       ]);
       return { leagues, teams, athletes, matches, challenges };
