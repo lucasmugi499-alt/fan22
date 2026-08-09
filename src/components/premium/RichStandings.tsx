@@ -4,7 +4,7 @@ import type { Match, Team } from '@/types';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { Crest } from '@/components/premium/Crest';
 import { cn } from '@/lib/utils';
-import { sportDisplayName, standingCellValue, standingColumns } from '@/lib/sportPresentation';
+import { sportDisplayName, standingCellValue, standingColumns, standingZoneFor } from '@/lib/sportPresentation';
 
 type FormResult = 'W' | 'D' | 'L';
 
@@ -117,7 +117,12 @@ export function RichStandings({
               const teamSport = sportById?.(r.teamId);
               const form = formFor(r.teamId, matches);
               const next = nextFor(r.teamId, matches, teamById);
-              const zone = rank <= 4 ? 'bg-[var(--state-verified)]' : rank >= rows.length - 2 ? 'bg-[var(--state-disputed)]' : 'bg-transparent';
+              const band = standingZoneFor(rank, rows.length);
+              const zone = band === 'qualify'
+                ? 'bg-[var(--state-verified)]'
+                : band === 'relegate'
+                  ? 'bg-[var(--state-disputed)]'
+                  : 'bg-transparent';
               return (
                 <tr key={r.teamId} className={cn('group border-b border-border', mine && 'bg-brand-subtle')}>
                   <td className={cn('sticky left-0 z-10 border-t border-border bg-surface-1 px-3 py-3', mine && '!bg-surface-2')}>

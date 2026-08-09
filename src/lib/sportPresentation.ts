@@ -135,6 +135,44 @@ export function standingColumns(value?: string): StandingColumn[] {
   ];
 }
 
+export type StandingZones = {
+  /** Rows 1..qualify are marked as the qualification band. 0 disables it. */
+  qualify: number;
+  /** The last `relegate` rows are marked as the drop band. 0 disables it. */
+  relegate: number;
+};
+
+/**
+ * How many rows the qualification and drop bands cover, given the size of the table.
+ *
+ * These were hardcoded to "top 4" and "bottom 3". In a four-club league every row
+ * satisfied `rank <= 4`, so the whole table rendered in qualification green and a club
+ * sitting second was labelled "Top four" — ten of the seventeen competitions here have
+ * four clubs, so that was the normal case rather than an edge one.
+ *
+ * A band only means something when the table is long enough to have a middle. Below six
+ * clubs there is nothing to qualify for and nothing to drop out of, so nothing is marked.
+ * At ten or more the original bands are kept, because that is the size they were chosen
+ * for.
+ *
+ * This is presentation, not competition rules: no league here declares promotion or
+ * relegation, so the bands must never be read as official qualification. When leagues can
+ * declare their own rules, this should defer to that instead of guessing from row count.
+ */
+export function standingZones(rowCount: number): StandingZones {
+  if (rowCount < 6) return { qualify: 0, relegate: 0 };
+  if (rowCount < 10) return { qualify: 2, relegate: 1 };
+  return { qualify: 4, relegate: 3 };
+}
+
+/** Which band a rank falls in, or `null` for the middle of the table. */
+export function standingZoneFor(rank: number, rowCount: number): 'qualify' | 'relegate' | null {
+  const zones = standingZones(rowCount);
+  if (zones.qualify && rank <= zones.qualify) return 'qualify';
+  if (zones.relegate && rank > rowCount - zones.relegate) return 'relegate';
+  return null;
+}
+
 export function standingCellValue(row: LeagueStanding, key: StandingColumnKey, leader?: LeagueStanding) {
   if (key === 'pct') {
     return row.played ? `.${Math.round((row.wins / row.played) * 1000).toString().padStart(3, '0')}` : '.000';

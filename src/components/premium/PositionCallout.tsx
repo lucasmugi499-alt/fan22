@@ -3,6 +3,7 @@ import { CaretUp, CaretDown, Minus } from '@phosphor-icons/react/dist/ssr';
 import type { LeagueStanding } from '@/lib/leagueModel';
 import { Crest } from '@/components/premium/Crest';
 import { cn } from '@/lib/utils';
+import { standingZoneFor, standingZones } from '@/lib/sportPresentation';
 
 function ordinal(n: number): { num: string; suffix: string } {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -30,6 +31,8 @@ export function PositionCallout({
   if (idx === -1) return null;
   const pos = idx + 1;
   const ord = ordinal(pos);
+  const zones = standingZones(rows.length);
+  const band = standingZoneFor(pos, rows.length);
   // Window of five centred on the club.
   const start = Math.max(0, Math.min(idx - 2, rows.length - 5));
   const window = rows.slice(start, start + 5);
@@ -45,9 +48,15 @@ export function PositionCallout({
           {ord.num}
           <sup className="text-2xl">{ord.suffix}</sup>
         </p>
+        {/* Bands scale with the table. "Top four" in a four-club league described every
+            club in it, which is how a second-placed side was labelled top four. */}
         <span className="inline-flex items-center gap-1 text-xs font-medium text-muted">
-          {pos <= 4 ? <CaretUp className="h-3.5 w-3.5 text-[var(--state-verified)]" weight="bold" /> : pos >= rows.length - 2 ? <CaretDown className="h-3.5 w-3.5 text-[var(--state-disputed)]" weight="bold" /> : <Minus className="h-3.5 w-3.5" />}
-          {pos <= 4 ? 'Top four' : pos >= rows.length - 2 ? 'Drop zone' : 'Mid-table'}
+          {band === 'qualify'
+            ? <CaretUp className="h-3.5 w-3.5 text-[var(--state-verified)]" weight="bold" />
+            : band === 'relegate'
+              ? <CaretDown className="h-3.5 w-3.5 text-[var(--state-disputed)]" weight="bold" />
+              : <Minus className="h-3.5 w-3.5" />}
+          {band === 'qualify' ? `Top ${zones.qualify}` : band === 'relegate' ? 'Drop zone' : 'Mid-table'}
         </span>
       </div>
 
