@@ -10,7 +10,7 @@ import { QueueItem } from '@/components/core/QueueItem';
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LeagueResolveSheet } from '@/components/league/LeagueResolveSheet';
-import { useLeagueResultExceptions } from '@/lib/resultSubmissionQueues';
+import { useLeagueResultExceptions, useReconciliationExceptions } from '@/lib/resultSubmissionQueues';
 import type { LeagueException } from '@/lib/league/leagueContext';
 import type { Match, ResultSubmission } from '@/types';
 import { ChallengeWorkflow } from '@/components/core/ChallengeWorkflow';
@@ -46,6 +46,7 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const { items: submissionExceptions, error: queueError, refresh: refreshExceptions } =
     useLeagueResultExceptions(league?.id);
+  const { items: blockedResults } = useReconciliationExceptions(league?.id);
   const queue = useMemo(() => {
     if (!league) return [];
     const byMatchId = new Map(matches.map((match) => [match.id, match]));
@@ -97,6 +98,45 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
         </div>
       ) : null}
 
+      {/*
+        Blocked finalizations come first: nothing was published, and only the League can
+        decide which side of the contradiction is wrong. Rendered from the canonical
+        exception record rather than guessed from match status, so the numbers shown here
+        are the ones the finalizer actually compared.
+      */}
+      {blockedResults.length ? (
+        <div className="space-y-2.5">
+          <h2 className="text-sm font-semibold text-text-strong">League review required</h2>
+          {blockedResults.map((blocked) => {
+            const match = matches.find((candidate) => candidate.id === blocked.matchId);
+            const home = match ? teamById.get(match.homeTeamId) : undefined;
+            const away = match ? teamById.get(match.awayTeamId) : undefined;
+            const submitted = `${blocked.officialHomeScore}-${blocked.officialAwayScore}`;
+            const reconstructed = `${blocked.reconstructedHomeScore}-${blocked.reconstructedAwayScore}`;
+            const gap = [
+              blocked.homeDifference ? `home +${blocked.homeDifference}` : null,
+              blocked.awayDifference ? `away +${blocked.awayDifference}` : null,
+            ].filter(Boolean).join(', ');
+            return (
+              <QueueItem
+                key={blocked.exceptionId}
+                state={STATE.disputed}
+                title={`${home?.name ?? 'Home'} vs ${away?.name ?? 'Away'}`}
+                subtitle={
+                  `Scoring events exceed submitted result — submitted ${submitted}, `
+                  + `events ${reconstructed} (${gap}). Not finalized.`
+                }
+                meta={
+                  `${blocked.evidenceRefs.length ? 'Evidence available · ' : ''}`
+                  + `Version ${blocked.submissionVersion}`
+                }
+                onClick={match ? () => setActive(match) : undefined}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
       {list.length ? (
         <div className="space-y-2.5">
           {list.map(({ match, kind }) => {
@@ -114,7 +154,8 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
             );
           })}
         </div>
-      ) : corrections.length ? null : (
+      ) : corrections.length || blockedResults.length ? null : (
+        // Never claim the queue is clear while a result is blocked awaiting this league.
         <EmptyState
           icon={ShieldCheck}
           title="Queue is clear"

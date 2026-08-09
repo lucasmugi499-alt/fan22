@@ -51,6 +51,7 @@ import {
   Match,
   Notification,
   Report,
+  ReconciliationException,
   ResultSubmission,
   ResultSubmissionActor,
   ResultSubmissionEvent,
@@ -542,6 +543,17 @@ export const firebaseProvider: GoalPlaceDataProvider = {
         !submission.correctionApprovedBy
       )
     );
+  },
+  async getReconciliationExceptions(leagueId) {
+    if (!isFirebaseConfigured) return mockProvider.getReconciliationExceptions(leagueId);
+    // Only the trusted finalizer writes these; clients read them to show the League what
+    // is blocked and why.
+    const cases = await readCollection<ReconciliationException>('reconciliationExceptions', [
+      where('leagueId', '==', leagueId),
+    ]);
+    return cases
+      .filter((item) => item.status === 'open')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   },
   async createContributionIntent(data: CreateContributionIntentInput) {
     if (!isFirebaseConfigured) return mockProvider.createContributionIntent(data);

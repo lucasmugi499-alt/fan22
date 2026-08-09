@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
-import type { ResultSubmission } from '@/types';
+import type { ReconciliationException, ResultSubmission } from '@/types';
 
 function useResultSubmissionQueue(
   ownerId: string | undefined,
@@ -65,4 +65,34 @@ export function useTeamConfirmationInbox(teamId?: string) {
 
 export function useLeagueResultExceptions(leagueId?: string) {
   return useResultSubmissionQueue(leagueId, loadLeagueExceptions);
+}
+
+/**
+ * Finalizations blocked because the recorded events contradict the submitted score.
+ *
+ * Separate from the submission queue because these are a different kind of object: the
+ * submission still looks confirmed and ready, and only the canonical exception record says
+ * why nothing was published. Reading the record rather than re-deriving it from the
+ * submission is what keeps one set of sporting numbers.
+ */
+export function useReconciliationExceptions(leagueId?: string) {
+  const { isDemoMode } = useAuth();
+  const provider = isDemoMode ? mockProvider : dataProvider;
+  const [items, setItems] = useState<ReconciliationException[]>([]);
+  const [error, setError] = useState<Error>();
+
+  useEffect(() => {
+    if (!leagueId) return;
+    let active = true;
+    void provider.getReconciliationExceptions(leagueId)
+      .then((next) => { if (active) { setItems(next); setError(undefined); } })
+      .catch((cause) => {
+        if (active) {
+          setError(cause instanceof Error ? cause : new Error('Blocked results could not load.'));
+        }
+      });
+    return () => { active = false; };
+  }, [leagueId, provider]);
+
+  return { items, error };
 }

@@ -31,6 +31,7 @@ import {
   Match,
   Notification,
   Report,
+  ReconciliationException,
   ResultSubmission,
   ResultSubmissionEvent,
   Roster,
@@ -89,6 +90,7 @@ export type FirestoreCollectionMap = {
   verifications: Verification;
   reports: Report;
   resultSubmissions: ResultSubmission;
+  reconciliationExceptions: ReconciliationException;
   adminLogs: AdminLog;
   adminAuditEvents: AdminAuditEvent;
   teamAssignments: TeamAssignment;

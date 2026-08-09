@@ -282,6 +282,23 @@ service cloud.firestore {
     // No client can write status 'official'. Promotion onto the match record is done by the
     // trusted server-side finalizer using the Admin SDK, which bypasses these rules. That
     // asymmetry is the trust boundary: team admins report, the server decides.
+    /**
+     * Finalizations blocked because recorded events contradict the submitted score.
+     *
+     * Written only by the trusted finalizer through the Admin SDK, which bypasses these
+     * rules, so every client write is denied: a blocked result is evidence about official
+     * data, and the governing League decides it through a reviewed command, never by
+     * editing the case record. Readable by the League that has to act on it.
+     *
+     * Without this block the collection falls through to the catch-all, which grants read
+     * to super_admin only — the League Admin queue would have rendered empty and the case
+     * would have been invisible to the only people who can resolve it.
+     */
+    match /reconciliationExceptions/{exceptionId} {
+      allow get, list: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow write: if false;
+    }
+
     match /resultSubmissions/{matchId} {
       allow get: if isPlatformAdmin() || canAccessMatchResult(matchId);
       allow list: if isPlatformAdmin() ||

@@ -276,6 +276,42 @@ export interface ResultSubmission {
   finalizedAt?: string;
 }
 
+/**
+ * A finalization blocked because the recorded events contradict the submitted score.
+ *
+ * Written by the trusted finalizer and never by a client. The id is deterministic
+ * (`reconciliation_<matchId>_<submissionVersion>`) so a redelivered trigger updates one
+ * case rather than opening several, and the submitted events and evidence are referenced
+ * rather than copied — the League needs the originals to decide which side is wrong.
+ */
+export interface ReconciliationException {
+  id: string;
+  exceptionId: string;
+  matchId: string;
+  leagueId: string;
+  competitionId: string;
+  submissionId: string;
+  submissionVersion: number;
+  sport: string;
+  officialHomeScore: number;
+  officialAwayScore: number;
+  reconstructedHomeScore: number;
+  reconstructedAwayScore: number;
+  /** Reconstructed minus official. Positive means the events claim more than the result. */
+  homeDifference: number;
+  awayDifference: number;
+  eventIds: string[];
+  evidenceRefs: string[];
+  reasonCode: string;
+  status: 'open' | 'resolved' | 'superseded';
+  reconciliationStatus: 'surplus';
+  finalizationStatus: 'blocked';
+  reviewStatus: 'league_review_required';
+  finalizationAttemptId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** One immutable entry per transition, stored in the submission's `events` subcollection. */
 export interface ResultSubmissionEvent {
   id: string;

@@ -1647,3 +1647,60 @@ describe('media lifecycle is server-owned', () => {
     }));
   });
 });
+
+describe('reconciliation exceptions', () => {
+  async function seedException() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reconciliationExceptions/reconciliation_match_001_1'), {
+        exceptionId: 'reconciliation_match_001_1',
+        matchId: 'match_001',
+        leagueId: 'league_001',
+        submissionId: 'match_001',
+        submissionVersion: 1,
+        officialHomeScore: 2,
+        reconstructedHomeScore: 3,
+        homeDifference: 1,
+        status: 'open',
+        reviewStatus: 'league_review_required',
+      });
+    });
+  }
+
+  it('lets the governing league read a blocked result', async () => {
+    await seedException();
+
+    // Without an explicit rule this collection falls through to the catch-all, which
+    // grants read to super_admin only — the League queue would render empty and the case
+    // would be invisible to the only people who can resolve it.
+    await assertSucceeds(
+      getDoc(doc(asUser(LEAGUE_ADMIN), 'reconciliationExceptions/reconciliation_match_001_1'))
+    );
+  });
+
+  it('denies an unrelated user', async () => {
+    await seedException();
+
+    await assertFails(
+      getDoc(doc(asUser(OUTSIDER), 'reconciliationExceptions/reconciliation_match_001_1'))
+    );
+  });
+
+  it('denies every client write, including the governing league', async () => {
+    await seedException();
+
+    // Only the finalizer writes these, through the Admin SDK. A league resolves a case
+    // through a reviewed command, never by editing the evidence.
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'reconciliationExceptions/reconciliation_match_001_1'), {
+        status: 'resolved',
+      })
+    );
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'reconciliationExceptions/forged'), {
+        matchId: 'match_001',
+        leagueId: 'league_001',
+        status: 'open',
+      })
+    );
+  });
+});

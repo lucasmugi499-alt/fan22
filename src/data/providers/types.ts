@@ -14,6 +14,7 @@ import {
   Notification,
   NotificationPreferences,
   Report,
+  ReconciliationException,
   ResultSubmission,
   ResultSubmissionEvent,
   Roster,
@@ -270,6 +271,8 @@ export interface GoalPlaceDataProvider {
   getResultSubmission(matchId: string): Promise<ResultSubmission | undefined>;
   getTeamConfirmationInbox(teamId: string): Promise<ResultSubmission[]>;
   getLeagueResultExceptions(leagueId: string): Promise<ResultSubmission[]>;
+  /** Canonical finalization blocks for a league, newest first. Read-only for clients. */
+  getReconciliationExceptions(leagueId: string): Promise<ReconciliationException[]>;
   createContributionIntent(data: CreateContributionIntentInput): Promise<DataWriteResult>;
   recordPointsAction(data: RecordPointsActionInput): Promise<DataWriteResult>;
   createFeedPost(data: CreateFeedPostInput): Promise<DataWriteResult>;
