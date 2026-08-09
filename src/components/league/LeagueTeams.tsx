@@ -289,7 +289,9 @@ export function LeagueTeams() {
           )
         ) : lTeams.length ? (
           <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-            {lTeams.map((t) => <TeamCard key={t.id} team={t} />)}
+            {lTeams.map((t) => (
+              <TeamCard key={t.id} team={t} standing={standings.find((row) => row.teamId === t.id)} />
+            ))}
           </div>
         ) : (
           <EmptyState icon={Buildings} title="No teams yet" description="Teams that join this league appear here." />

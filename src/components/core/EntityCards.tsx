@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { athletePhoto } from '@/lib/media';
 import { SealCheck, Users, TrendUp, MapPin, Trophy } from '@phosphor-icons/react/dist/ssr';
 import type { Athlete, League, Team } from '@/types';
+import type { LeagueStanding } from '@/lib/leagueModel';
 import { cn } from '@/lib/utils';
 
 function ugx(n: number): string {
@@ -59,22 +60,36 @@ export function AthleteCard({ athlete, className }: { athlete: Athlete; classNam
   );
 }
 
-/** Compact team row/card. */
+/**
+ * Compact team row/card.
+ *
+ * `standing` is the row computed from official results. When present it supplies BOTH the
+ * points and the W-D-L record, because the two must come from the same place: the stored
+ * `team.leaguePoints` and `team.wins/draws/losses` are seeded aggregates that do not derive
+ * from any match, so mixing a computed points total with a stored record produced cards
+ * reading "3-0-10 · 19pts" beside a league table showing the same club on zero.
+ *
+ * Without a standing the card falls back to the stored fields, which is all a surface that
+ * has not loaded a table can do.
+ */
 export function TeamCard({
   team,
   className,
-  computedPoints,
+  standing,
   rank,
   leagueName,
 }: {
   team: Team;
   className?: string;
-  computedPoints?: number;
+  standing?: Pick<LeagueStanding, 'points' | 'wins' | 'draws' | 'losses'>;
   rank?: number;
   leagueName?: string;
 }) {
   const accent = sportColor(String(team.sport));
-  const points = computedPoints ?? team.leaguePoints;
+  const points = standing?.points ?? team.leaguePoints;
+  const record = standing
+    ? `${standing.wins}-${standing.draws}-${standing.losses}`
+    : team.record ?? `${team.wins}-${team.draws ?? 0}-${team.losses}`;
   return (
     <Link
       href={`/teams/${team.id}`}
@@ -95,7 +110,7 @@ export function TeamCard({
           {team.verified ? <SealCheck className="h-4 w-4 shrink-0 text-[var(--state-verified)]" weight="fill" /> : null}
         </div>
         <span className="block truncate text-xs text-muted">
-          {leagueName ? `${leagueName} · ` : ''}{team.city} · <span className="tabular tabular-nums">{team.record ?? `${team.wins}-${team.draws ?? 0}-${team.losses}`}</span>
+          {leagueName ? `${leagueName} · ` : ''}{team.city} · <span className="tabular tabular-nums">{record}</span>
         </span>
         {rank ? (
           <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-brand">

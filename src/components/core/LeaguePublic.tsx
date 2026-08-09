@@ -86,6 +86,12 @@ export function LeaguePublic({
       scoring: season ? scoringForSeason(season, league.sport) : undefined,
     });
   }, [league, lTeams, matches, seasons, leagueId]);
+  // The club cards below the table read from this rather than the stored aggregates, so a
+  // club cannot show one points total beside a table showing another.
+  const standingByTeam = useMemo(
+    () => new Map(standings.map((row) => [row.teamId, row])),
+    [standings],
+  );
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-32 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-64 w-full rounded-[var(--radius-lg)]" /></div>;
   if (exact.error) return <ErrorState description="This league could not be loaded. Check your connection and try again." onRetry={exact.retry} />;
@@ -183,7 +189,9 @@ export function LeaguePublic({
       <section className="space-y-2.5">
         <h2 className="text-[15px] font-semibold text-text-strong">Clubs</h2>
         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-          {lTeams.map((t) => <TeamCard key={t.id} team={t} />)}
+          {lTeams.map((t) => (
+            <TeamCard key={t.id} team={t} standing={standingByTeam.get(t.id)} />
+          ))}
         </div>
       </section>
     </div>

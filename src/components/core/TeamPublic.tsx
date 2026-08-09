@@ -167,7 +167,15 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <Card className="p-4">
             <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Club</h2>
             <div className="space-y-3">
-              <InfoRow icon={Trophy} label="League points" value={String(team.leaguePoints)} accent="text-brand" />
+              {/* From the same computed table shown in the sidebar, never the stored
+                  team.leaguePoints — that aggregate is not derived from any match, so
+                  showing it here contradicted the league table on the previous screen. */}
+              <InfoRow
+                icon={Trophy}
+                label="League points"
+                value={String(officialRecord?.points ?? team.leaguePoints)}
+                accent="text-brand"
+              />
               <InfoRow icon={Users} label="Supporters" value={String(team.supportersCount)} />
               <InfoRow icon={Coins} label="Support raised" value={ugx(team.totalSupport)} accent="text-[var(--brand-2)]" />
             </div>

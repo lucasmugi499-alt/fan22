@@ -226,7 +226,7 @@ function TeamGrid({
             <TeamCard
               key={item.id}
               team={item}
-              computedPoints={standing?.row.points}
+              standing={standing?.row}
               rank={standing?.rank}
               leagueName={leagueById.get(item.leagueId)?.name}
             />

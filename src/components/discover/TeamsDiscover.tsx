@@ -135,7 +135,7 @@ export function TeamsDiscover({
                       <TeamCard
                         key={team.id}
                         team={team}
-                        computedPoints={standing?.row.points}
+                        standing={standing?.row}
                         rank={standing?.rank}
                         leagueName={league?.name}
                       />
