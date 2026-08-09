@@ -98,6 +98,17 @@ export const onResultSubmissionWritten = onDocumentWritten(
 
     if (result.action === 'finalized') {
       logger.info('Result finalized', { matchId, key: result.finalizationKey, mode: decision.mode });
+    } else if (result.action === 'blocked') {
+      // A contradictory result is the one outcome an operator has to find out about. It
+      // was previously indistinguishable from an ordinary no-op: both logged `debug` with
+      // "No finalization required", so a blocked official result was invisible in the
+      // very logs you would watch after activation.
+      logger.warn('Finalization blocked for League review', {
+        matchId,
+        reason: result.reason,
+        exceptionId: result.exceptionId,
+        mode: decision.mode,
+      });
     } else {
       logger.debug('No finalization required', { matchId, reason: result.reason, mode: decision.mode });
     }
