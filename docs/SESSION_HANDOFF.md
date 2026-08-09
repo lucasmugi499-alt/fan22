@@ -211,35 +211,42 @@ Client scope selection still uses legacy arrays and is unchanged: `src/lib/team/
 `src/components/core/MatchDetail.tsx`. These decide what to *render*, not what is
 permitted, so they are a correctness/UX issue rather than an authorization hole.
 
-### P0 — Platform capability model is misleading (OPEN — do not fix blind)
+### P0 — Platform capability model: CLOSED (2026-08-08)
 
-`securePlatformCommand()` still has `const hasRoleGrant = String(actor.role) === 'platform_admin'`
-at `src/server/platform/commands/securePlatformCommand.ts:101`, so any Platform Admin
-satisfies every `requiredCapability`.
+`securePlatformCommand()` no longer exempts anyone. It previously skipped the check
+entirely for `super_admin` and treated any `platform_admin` as satisfying every
+`requiredCapability`, which made the argument decorative. Both exemptions are gone: the
+platform projection is the only authority, for every role.
 
-**Measured 2026-08-08, before attempting the fix: deleting that line would lock out 2 of
-the 7 platform accounts.** The projection is not as complete as "the backfill created
-platform-scope assignments for all platform accounts" implies:
+Done in two steps, in this order, because the reverse order is a lockout:
 
-| Accounts | Role | `platform.admin.manage` | Capability count |
-| --- | --- | --- | --- |
-| 5 | `super_admin` | yes | 8 |
-| 2 | `platform_admin` | **no** | 17 |
+1. **Grant first.** The owner approved granting `platform.admin.manage`, which was added to
+   the `platform_admin` permission bundle (`src/lib/auth/access.ts`, version 1.1.0).
+   Capabilities derive from bundles; assignments carry no per-user override, so this
+   attaches to the role. The projection migration reported exactly 2 stale scopes, both
+   `platform/global`, and repaired exactly those 2.
+2. **Then remove the bypass.** Verified immediately before: all 7 platform accounts hold
+   both capabilities this guard ever requires — `platform.audit.read` and
+   `platform.admin.manage` — so 0 accounts lost access.
 
-Both `platform_admin` accounts are active, hold a platform-scope `accessIndex` doc, and
-carry 17 capabilities — but not `platform.admin.manage`. They were backfilled from a
-different template: they hold league/team capabilities (`league.profile.manage`,
-`team.roster.manage`, …) that the super_admins do not. `super_admin` bypasses the check
-entirely, so only the `platform_admin` pair is exposed.
+Break-glass is modelled as a capability (`break_glass.activate`) in the super_admin bundle,
+which is why a role-shaped exemption contradicted the design rather than implementing it.
 
-Only three capability values are actually required anywhere in the codebase:
-`platform.admin.manage`, `platform.audit.read`, `league.season.manage`.
+**If a platform operator is ever locked out**, the fix is to rebuild the projection —
+`npm run access:migrate:gate` reports it, the migration repairs it — never to reintroduce a
+role bypass.
 
-So this is a **data decision before it is a code change**, and it is the owner's: either
-grant `platform.admin.manage` to the two Platform Admin accounts (keeps today's behaviour,
-makes it explicit), or define a narrower Platform Operator capability set and accept that
-those accounts lose some commands. Removing `hasRoleGrant` without doing one of those
-first is a lockout, which is why it was left in place.
+`securePlatformCommand.test.ts` is new and covers this: a `platform_admin` *and* a
+`super_admin` lacking the capability must both get 403, and a missing projection must deny.
+All three fail against the old code, which is how they were checked.
+
+**Related gap, still open.** Eight commands in `src/app/api/admin/actions/route.ts` pass no
+`requiredCapability` at all — `organization.create`, `account.lifecycle`,
+`trust_case.decision`, `assignment.revoke`, `assignment.transition`, `application.review`,
+`league.update_identity`, `team.update_verification`. The guard skips the capability check
+when none is declared, so these are gated only by role plus account class. They are some of
+the most powerful commands on the platform. Assigning each an honest capability is the
+natural next step, and it pairs with splitting that 1,000-line route by domain.
 
 ### P0 — `goalplace256.com` is still the default public identity
 

@@ -13,7 +13,7 @@ function request(token = 'token') {
   });
 }
 
-function install(accountClass = 'platform_operator') {
+function install(accountClass = 'platform_operator', capabilities: string[] = ['platform.audit.read']) {
   vi.mocked(adminDb.collection).mockImplementation((name: string) => {
     const api = {
       where: vi.fn(() => api),
@@ -21,10 +21,17 @@ function install(accountClass = 'platform_operator') {
       count: vi.fn(() => ({ get: vi.fn(async () => ({ data: () => ({ count: 3 }) })) })),
       get: vi.fn(async () => ({ size: 3, docs: [] })),
       doc: () => ({
-        get: vi.fn(async () => ({
-          exists: name === 'users',
-          data: () => ({ role: 'platform_admin', accountClass, accountStatus: 'active' }),
-        })),
+        get: vi.fn(async () => (
+          // The platform projection is what authorizes the command now. Holding the
+          // platform_admin role no longer implies the capability, so an operator fixture
+          // has to be provisioned with it the way a real account is.
+          name === 'accessIndex'
+            ? { exists: true, data: () => ({ capabilities }) }
+            : {
+              exists: name === 'users',
+              data: () => ({ role: 'platform_admin', accountClass, accountStatus: 'active' }),
+            }
+        )),
       }),
     };
     return api as never;

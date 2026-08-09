@@ -93,13 +93,25 @@ export async function securePlatformCommand<TResult>({
     return { response: jsonError('This Platform Operator account is not active.', 403) };
   }
 
-  if (requiredCapability && String(actor.role) !== 'super_admin') {
+  // One model, applied to everyone: holding a platform role is not holding a capability.
+  //
+  // This previously exempted `super_admin` from the check entirely and then treated any
+  // `platform_admin` as satisfying every `requiredCapability`, which made the capability
+  // argument decorative — the audit was right to call the model misleading. Break-glass is
+  // modelled as a capability (`break_glass.activate`) in the super_admin bundle, not as a
+  // role that skips the check, so a role-shaped exemption here contradicted the design.
+  //
+  // Verified against live data before removal: all 7 platform accounts hold both
+  // capabilities this guard ever requires (`platform.audit.read`, `platform.admin.manage`),
+  // so no account loses access. If a projection ever goes missing, the recovery is to
+  // rebuild it — `npm run access:migrate:gate` reports it and the migration repairs it —
+  // not to reintroduce a role bypass.
+  if (requiredCapability) {
     const platformAccess = await adminDb
       .collection('accessIndex')
       .doc(accessIndexId('platform', 'global', actor.uid))
       .get();
-    const hasRoleGrant = String(actor.role) === 'platform_admin';
-    if (!hasRoleGrant && !indexGrantsCapability(platformAccess.data(), requiredCapability)) {
+    if (!indexGrantsCapability(platformAccess.data(), requiredCapability)) {
       return { response: jsonError(`Missing platform capability: ${requiredCapability}.`, 403) };
     }
   }

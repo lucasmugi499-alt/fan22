@@ -43,6 +43,16 @@ const PLATFORM_OPERATOR: Row = {
   data: { role: 'platform_admin', accountClass: 'platform_operator', accountStatus: 'active' },
 };
 
+/**
+ * The operator's own platform projection. The route is gated on `platform.audit.read`, and
+ * the platform_admin role no longer implies it, so the fixture has to grant it explicitly
+ * the way a provisioned account does.
+ */
+const PLATFORM_GRANT: Row = {
+  id: 'platform_global_admin_1',
+  data: { capabilities: ['platform.audit.read'] },
+};
+
 describe('platform access directory route', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -81,7 +91,7 @@ describe('platform access directory route', () => {
           validFrom: '2026-01-01T00:00:00.000Z',
         },
       }],
-      accessIndex: [{
+      accessIndex: [PLATFORM_GRANT, {
         id: 'team_team_1_user_1',
         data: { capabilities: ['team.roster.manage', 'team.result.submit'] },
       }],
@@ -114,7 +124,7 @@ describe('platform access directory route', () => {
           validFrom: '2026-01-01T00:00:00.000Z',
         },
       }],
-      accessIndex: [],
+      accessIndex: [PLATFORM_GRANT],
     });
 
     const body = await (await GET(request())).json();

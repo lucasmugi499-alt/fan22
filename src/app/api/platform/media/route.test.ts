@@ -22,7 +22,15 @@ function decision(body: unknown) {
 }
 
 function install(record: Record<string, unknown> | null) {
-  store = { 'users/admin_1': PLATFORM_OPERATOR };
+  store = {
+    'users/admin_1': PLATFORM_OPERATOR,
+    // Both capabilities this route gates on: the queue read wants platform.audit.read and
+    // a moderation decision wants platform.admin.manage. The platform_admin role no longer
+    // implies either, so the operator fixture is provisioned like a real account.
+    'accessIndex/platform_global_admin_1': {
+      capabilities: ['platform.audit.read', 'platform.admin.manage'],
+    },
+  };
   if (record) store['mediaRecords/media_1'] = record;
   deletedObjects = [];
 
