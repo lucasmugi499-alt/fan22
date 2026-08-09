@@ -64,50 +64,32 @@ export function RichStandings({
         <p className="text-sm font-semibold text-text-strong">{sportDisplayName(sport)} table</p>
         <p className="text-xs text-muted">Official results only</p>
       </div>
-      <div className="divide-y divide-border sm:hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_3rem_3rem_3.5rem] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">
-          <span>Club</span>
-          <span className="text-center">PL</span>
-          <span className="text-center">GD</span>
-          <span className="text-center">PTS</span>
-        </div>
-        {rows.map((r, i) => {
-          const rank = i + 1;
-          const mine = r.teamId === highlightTeamId;
-          const teamSport = sportById?.(r.teamId);
-          const form = formFor(r.teamId, matches);
-          return (
-            <div key={r.teamId} className={cn('grid grid-cols-[minmax(0,1fr)_3rem_3rem_3.5rem] gap-2 px-3 py-3 text-sm', mine && 'bg-brand-subtle')}>
-              <Link href={`/teams/${r.teamId}`} className="min-w-0">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span data-numeric className="w-5 shrink-0 text-xs font-bold tabular-nums text-muted">{rank}</span>
-                  <Crest name={r.teamName} sport={teamSport} size={26} />
-                  <span className={cn('truncate font-semibold', mine ? 'text-brand' : 'text-text-strong')}>{r.teamName}</span>
-                </span>
-                <span className="mt-1 flex items-center gap-1 pl-7">
-                  {form.length ? form.map((f, k) => (
-                    <span key={k} className={cn('grid h-4 w-4 place-items-center rounded-[3px] text-[9px] font-bold', FORM_COLOR[f])}>{f}</span>
-                  )) : <span className="text-xs text-subtle">No form</span>}
-                </span>
-              </Link>
-              <span data-numeric className="self-center text-center tabular-nums text-muted">{standingCellValue(r, 'played', leader)}</span>
-              <span data-numeric className={cn('self-center text-center tabular-nums text-muted', r.difference > 0 && 'text-[var(--state-verified)]')}>{standingCellValue(r, 'difference', leader)}</span>
-              <span data-numeric className="self-center text-center font-bold tabular-nums text-text-strong">{standingCellValue(r, 'points', leader)}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="hidden min-w-0 max-w-full overflow-x-auto [scrollbar-width:thin] sm:block">
-        <table className="min-w-[780px] w-full border-separate border-spacing-0 text-left text-sm">
+      {/*
+        One table at every width, not a table plus a card list.
+        The phone layout used to collapse to three columns and stack form badges under each
+        club, which doubled the row height and read as a card list. A published table keeps
+        its core columns — Pl W D L GD Pts — at phone width and drops only the supporting
+        ones, which is what Sky and ESPN do on the same screens.
+      */}
+      <div className="min-w-0 max-w-full overflow-x-auto [scrollbar-width:thin]">
+        <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
-            <tr className="text-[11px] font-semibold uppercase tracking-wide text-subtle">
-              <th className="sticky left-0 z-10 w-12 bg-surface-1 px-3 py-3">#</th>
-              <th className="sticky left-12 z-10 min-w-52 bg-surface-1 px-3 py-3">Club</th>
+            <tr className="text-[10px] font-semibold uppercase tracking-wide text-subtle sm:text-[11px]">
+              <th className="w-8 px-1.5 py-2.5 text-center sm:w-12 sm:px-3 sm:py-3">#</th>
+              <th className="min-w-0 px-1 py-2.5 sm:min-w-52 sm:px-3 sm:py-3">Club</th>
               {columns.map((column) => (
-                <th key={column.key} className="w-16 px-2 py-3 text-center">{column.label}</th>
+                <th
+                  key={column.key}
+                  className={cn(
+                    'w-9 px-1 py-2.5 text-center sm:w-16 sm:px-2 sm:py-3',
+                    column.priority === 'extended' && 'hidden sm:table-cell',
+                  )}
+                >
+                  {column.label}
+                </th>
               ))}
-              <th className="w-28 px-2 py-3 text-center">Form</th>
-              <th className="w-16 px-2 py-3 text-center">Next</th>
+              <th className="hidden w-28 px-2 py-3 text-center md:table-cell">Form</th>
+              <th className="hidden w-16 px-2 py-3 text-center md:table-cell">Next</th>
             </tr>
           </thead>
           <tbody>
@@ -117,24 +99,29 @@ export function RichStandings({
               const teamSport = sportById?.(r.teamId);
               const form = formFor(r.teamId, matches);
               const next = nextFor(r.teamId, matches, teamById);
+              // A published table marks a zone with a rule across the boundary, not a
+              // coloured tag on every row in it. The rule sits under the last row of the
+              // band, so it reads as a division rather than a decoration.
               const band = standingZoneFor(rank, rows.length);
-              const zone = band === 'qualify'
-                ? 'bg-[var(--state-verified)]'
-                : band === 'relegate'
-                  ? 'bg-[var(--state-disputed)]'
-                  : 'bg-transparent';
+              const nextBand = standingZoneFor(rank + 1, rows.length);
+              const boundary = rank < rows.length && band !== nextBand;
+              const cell = 'border-t border-border px-1 py-2 sm:px-2 sm:py-3';
               return (
-                <tr key={r.teamId} className={cn('group border-b border-border', mine && 'bg-brand-subtle')}>
-                  <td className={cn('sticky left-0 z-10 border-t border-border bg-surface-1 px-3 py-3', mine && '!bg-surface-2')}>
-                    <span className="relative flex items-center gap-1.5">
-                      <span className={cn('absolute -left-3 h-7 w-1 rounded-r', zone)} aria-hidden />
-                      <span data-numeric className="tabular text-sm font-bold tabular-nums text-muted">{rank}</span>
-                    </span>
+                <tr
+                  key={r.teamId}
+                  className={cn(
+                    'group',
+                    mine && 'bg-brand-subtle',
+                    boundary && '[&>td]:!border-b-2 [&>td]:!border-b-border-strong',
+                  )}
+                >
+                  <td className={cn(cell, 'text-center', mine && 'bg-surface-2')}>
+                    <span data-numeric className="text-xs font-bold tabular-nums text-muted sm:text-sm">{rank}</span>
                   </td>
-                  <td className={cn('sticky left-12 z-10 border-t border-border bg-surface-1 px-3 py-3', mine && '!bg-surface-2')}>
-                    <Link href={`/teams/${r.teamId}`} className="flex min-w-0 items-center gap-2.5 hover:underline">
-                      <Crest name={r.teamName} sport={teamSport} size={28} />
-                      <span className={cn('max-w-40 truncate font-semibold', mine ? 'text-brand' : 'text-text-strong')}>{r.teamName}</span>
+                  <td className={cn(cell, 'min-w-0', mine && 'bg-surface-2')}>
+                    <Link href={`/teams/${r.teamId}`} className="flex min-w-0 items-center gap-1.5 hover:underline sm:gap-2.5">
+                      <span className="shrink-0"><Crest name={r.teamName} sport={teamSport} size={22} /></span>
+                      <span className={cn('truncate font-semibold', mine ? 'text-brand' : 'text-text-strong')}>{r.teamName}</span>
                     </Link>
                   </td>
                   {columns.map((column) => (
@@ -142,7 +129,9 @@ export function RichStandings({
                       key={column.key}
                       data-numeric
                       className={cn(
-                        'border-t border-border px-2 py-3 text-center tabular-nums text-muted',
+                        cell,
+                        'text-center tabular-nums text-muted',
+                        column.priority === 'extended' && 'hidden sm:table-cell',
                         column.key === 'points' && 'font-bold text-text-strong',
                         column.key === 'difference' && r.difference > 0 && 'text-[var(--state-verified)]',
                         column.key === 'gb' && 'text-subtle',
@@ -151,14 +140,14 @@ export function RichStandings({
                       {standingCellValue(r, column.key, leader)}
                     </td>
                   ))}
-                  <td className="border-t border-border px-2 py-3">
+                  <td className={cn(cell, 'hidden md:table-cell')}>
                     <span className="flex items-center justify-center gap-0.5">
                       {form.length ? form.map((f, k) => (
                         <span key={k} className={cn('grid h-4 w-4 place-items-center rounded-[3px] text-[9px] font-bold', FORM_COLOR[f])}>{f}</span>
                       )) : <span className="text-xs text-subtle">-</span>}
                     </span>
                   </td>
-                  <td className="border-t border-border px-2 py-3">
+                  <td className={cn(cell, 'hidden md:table-cell')}>
                     <span className="flex justify-center">
                       {next ? <Crest name={next.name} sport={String(next.sport)} size={24} /> : <span className="text-xs text-subtle">-</span>}
                     </span>

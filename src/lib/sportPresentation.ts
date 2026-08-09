@@ -18,6 +18,16 @@ export type StandingColumn = {
   key: StandingColumnKey;
   label: string;
   className?: string;
+  /**
+   * `core` columns are the ones a published table is unreadable without, and they stay
+   * visible at every width. `extended` columns are the supporting detail that a broadsheet
+   * shows and a phone drops.
+   *
+   * The split exists because the mobile table used to collapse to three columns and stack
+   * form badges under each club, which read as a card list rather than a standings table.
+   * Sky and ESPN both fit the full core set on the same phone width; so can this.
+   */
+  priority: 'core' | 'extended';
 };
 
 export type LineupSlot = {
@@ -108,30 +118,34 @@ export function lineupSlots(value?: string): LineupSlot[] {
 export function standingColumns(value?: string): StandingColumn[] {
   const key = sportKey(value);
   if (key === 'basketball') {
+    // Basketball standings are read on win percentage, so PCT is core and games-behind is
+    // the supporting detail — the ordering ESPN uses.
     return [
-      { key: 'played', label: 'GP' },
-      { key: 'wins', label: 'W' },
-      { key: 'losses', label: 'L' },
-      { key: 'pct', label: 'PCT' },
-      { key: 'gb', label: 'GB' },
-      { key: 'pointsFor', label: 'PF' },
-      { key: 'pointsAgainst', label: 'PA' },
-      { key: 'difference', label: 'DIFF' },
-      { key: 'points', label: 'PTS' },
+      { key: 'played', label: 'GP', priority: 'core' },
+      { key: 'wins', label: 'W', priority: 'core' },
+      { key: 'losses', label: 'L', priority: 'core' },
+      { key: 'pct', label: 'PCT', priority: 'core' },
+      { key: 'gb', label: 'GB', priority: 'extended' },
+      { key: 'pointsFor', label: 'PF', priority: 'extended' },
+      { key: 'pointsAgainst', label: 'PA', priority: 'extended' },
+      { key: 'difference', label: 'DIFF', priority: 'extended' },
+      { key: 'points', label: 'PTS', priority: 'core' },
     ];
   }
   const scoringLabels = key === 'rugby'
     ? { for: 'PF', against: 'PA', difference: 'PD' }
     : { for: 'GF', against: 'GA', difference: 'GD' };
+  // Pl W D L GD Pts is the set every published football and rugby table carries, and the
+  // set Sky fits on a phone. Scored-for/against are the broadsheet extras.
   return [
-    { key: 'played', label: 'PL' },
-    { key: 'wins', label: 'W' },
-    { key: 'draws', label: 'D' },
-    { key: 'losses', label: 'L' },
-    { key: 'pointsFor', label: scoringLabels.for },
-    { key: 'pointsAgainst', label: scoringLabels.against },
-    { key: 'difference', label: scoringLabels.difference },
-    { key: 'points', label: 'PTS' },
+    { key: 'played', label: 'PL', priority: 'core' },
+    { key: 'wins', label: 'W', priority: 'core' },
+    { key: 'draws', label: 'D', priority: 'core' },
+    { key: 'losses', label: 'L', priority: 'core' },
+    { key: 'pointsFor', label: scoringLabels.for, priority: 'extended' },
+    { key: 'pointsAgainst', label: scoringLabels.against, priority: 'extended' },
+    { key: 'difference', label: scoringLabels.difference, priority: 'core' },
+    { key: 'points', label: 'PTS', priority: 'core' },
   ];
 }
 
