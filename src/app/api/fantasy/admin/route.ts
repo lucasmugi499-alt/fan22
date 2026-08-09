@@ -93,20 +93,17 @@ async function scopedLeagueIdsForActor(userId: string) {
   }
 }
 
-function legacyAdminIds(league: FirebaseFirestore.DocumentData | undefined) {
-  return Array.isArray(league?.adminUserIds) ? league.adminUserIds.map(String) : [];
-}
-
 function canAdministerLeague(
   role: string | undefined,
-  actorUid: string,
   leagueId: string,
-  league: FirebaseFirestore.DocumentData | undefined,
   scopedLeagueIds: Set<string>,
 ) {
   if (role === 'platform_admin' || role === 'super_admin') return true;
   if (role !== 'league_admin') return false;
-  return scopedLeagueIds.has(leagueId) || legacyAdminIds(league).includes(actorUid);
+  // Canonical only. `scopedLeagueIds` is derived from accessIndex; the legacy
+  // adminUserIds arm that sat beside it could authorize a league admin whose canonical
+  // assignment had been revoked.
+  return scopedLeagueIds.has(leagueId);
 }
 
 export async function GET(request: Request) {
@@ -143,7 +140,7 @@ export async function GET(request: Request) {
   const allLeagues = leaguesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
   const visibleLeagues = role === 'league_admin'
     ? allLeagues.filter((league) =>
-      canAdministerLeague(role, actor.uid, String(league.id), league, scopedLeagueIds),
+      canAdministerLeague(role, String(league.id), scopedLeagueIds),
     )
     : allLeagues;
   const visibleLeagueIds = new Set(visibleLeagues.map((league) => String(league.id)));
@@ -224,13 +221,7 @@ export async function POST(request: Request) {
     }
     if (
       role === 'league_admin'
-      && !canAdministerLeague(
-        role,
-        actor.uid,
-        input.leagueId,
-        league.data(),
-        await scopedLeagueIdsForActor(actor.uid),
-      )
+      && !canAdministerLeague(role, input.leagueId, await scopedLeagueIdsForActor(actor.uid))
     ) {
       return Response.json({ error: 'You do not administer this league.' }, { status: 403 });
     }

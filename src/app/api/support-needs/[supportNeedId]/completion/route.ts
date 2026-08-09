@@ -2,7 +2,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
-import type { AppRole, SupportNeed } from '@/types';
+import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import type { SupportNeed } from '@/types';
 
 export const runtime = 'nodejs';
 
@@ -36,12 +37,15 @@ export async function POST(
       const snapshot = await transaction.get(needRef);
       if (!snapshot.exists) throw new Error('Support need not found.');
       const need = { id: snapshot.id, ...snapshot.data() } as SupportNeed;
-      const leagueSnapshot = await transaction.get(adminDb.collection('leagues').doc(need.leagueId));
-      const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
-      const isPlatform = role === 'platform_admin' || role === 'super_admin';
-      const isLeagueAdmin = Array.isArray(leagueSnapshot.data()?.adminUserIds) &&
-        leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
-      if (!isPlatform && !isLeagueAdmin) {
+      // Canonical authority for this exact league, or a platform-global grant. Reading the
+      // projection outside the transaction is deliberate: an authorization decision is not
+      // part of the transactional invariant, and a retry simply re-reads it.
+      const permitted = await hasCapabilityOrPlatformGrant(
+        actor.uid,
+        { scopeType: 'league', scopeId: need.leagueId },
+        'league.profile.manage',
+      );
+      if (!permitted) {
         throw new Error('Only the owning League Admin can verify completion.');
       }
       if (need.createdByUserId === actor.uid || need.teamVerifiedByUserId === actor.uid) {
