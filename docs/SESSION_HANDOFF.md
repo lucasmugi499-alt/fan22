@@ -199,12 +199,31 @@ Evidence that this was behaviour-preserving, gathered before the change:
 - 968 tests pass; the capability test now asserts the inverse of what it used to —
   legacy-only grant must **deny**.
 
-**Still open, and deliberately not done in the same pass:** 9 routes decide access by
-reading `adminUserIds` directly rather than going through the guard. They are enumerated
-with the capability each one owes in `scripts/access/legacy-authority-guard.ts`, which
-runs in `deploy:ready` and fails the build on any *new* legacy authorization. The budget
-is 29 lines across 11 files and is designed to only shrink — it also fails if a number is
-too high, so the list cannot rot into fiction.
+**Closed 2026-08-16: zero live authorization references remain.** All 9 routes that decided
+access from `adminUserIds` now require a canonical capability on the exact scope. The
+budget fell from 29 lines across 11 files to 7 across 4, and every remaining line is
+classified as *not* an authorization decision:
+
+| Remaining reference | What it actually is |
+| --- | --- |
+| `payments/intents` (1) | A self-dealing **deny**. Removing it would widen who can route money to an account they control. |
+| `admin/actions` (2) | A request-schema field and a record initialiser (`adminUserIds: []` at creation). |
+| `access/route.ts` (2) | Legacy assignment maintenance, so a pre-migration `teamAssignment` can still be revoked. Authorization there is by **token hash**. |
+| `securePlatformCommand` (2) | Observation only — recorded to `securityEvents`, cannot widen a decision. |
+
+Each conversion was preceded by a lockout scan against live data, per capability rather
+than in general: 16 league-admin and 100 team-admin legacy entries, **0 would lose access**
+for `league.profile.manage`, `league.result.resolve`, `league.roster.verify`,
+`league.team.create`, `league.team_admin.invite`, `team.profile.manage`,
+`team.athlete.create` and `team.result.submit`. Running that check per capability mattered:
+the general scan would have missed `league.roster.verify` and `team.result.submit`
+entirely.
+
+`access:guard` runs in `deploy:ready` and fails on any *new* legacy authorization, on a
+stale budget, and on any platform command that declares no `requiredCapability`.
+
+**The scan proves nobody loses access. It says nothing about who gains it** — which is why
+`payments/intents` was strengthened rather than stripped.
 
 Client scope selection still uses legacy arrays and is unchanged: `src/lib/team/teamContext.ts`,
 `src/lib/league/leagueContext.ts`, `src/components/layout/TopBar.tsx`,

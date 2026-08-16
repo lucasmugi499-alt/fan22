@@ -647,7 +647,9 @@ export async function POST(request: Request) {
       const leagueData = league.data();
       if (
         !hasRole(actor, ['platform_admin', 'super_admin'])
-        && !leagueData?.adminUserIds?.includes(actor.uid)
+        // Canonical only. The legacy adminUserIds arm that sat here could authorize an
+        // operator whose assignment had been revoked, and the Admin SDK bypasses the Rules
+        // that would have denied it.
         && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team_admin.invite'))
       ) {
         return Response.json({ error: 'You do not manage this league.' }, { status: 403 });
@@ -779,7 +781,7 @@ export async function POST(request: Request) {
         if (!league?.exists) return Response.json({ error: `League ${leagueId} not found.` }, { status: 404 });
         if (
           !hasRole(actor, ['platform_admin', 'super_admin'])
-          && !league.data()?.adminUserIds?.includes(actor.uid)
+          // Canonical only; see above.
           && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team.create'))
         ) {
           return Response.json({ error: `You do not manage league ${leagueId}.` }, { status: 403 });

@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { checkCorrectionRequest } from '@/lib/resultSubmission';
 import { finalizeSubmission } from '@/server/resultFinalizer';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, ResultSubmission } from '@/types';
 
 export const runtime = 'nodejs';
@@ -52,18 +53,17 @@ export async function POST(
         if (!snapshot.exists) throw new Error('Result submission not found.');
         const submission = { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
         if (submission.status !== 'official') throw new Error('Only an official result can enter correction review.');
-        const [leagueSnapshot, homeTeamSnapshot, awayTeamSnapshot] = await Promise.all([
-          transaction.get(adminDb.collection('leagues').doc(submission.leagueId)),
-          transaction.get(adminDb.collection('teams').doc(submission.submittedByTeamId)),
-          transaction.get(adminDb.collection('teams').doc(submission.opponentTeamId)),
-        ]);
         const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
         const isPlatform = role === 'platform_admin' || role === 'super_admin';
-        const managesLeague = Array.isArray(leagueSnapshot.data()?.adminUserIds)
-          && leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
-        const managesTeam = [homeTeamSnapshot, awayTeamSnapshot].some((team) =>
-          Array.isArray(team.data()?.adminUserIds) && team.data()!.adminUserIds.includes(actor.uid),
-        );
+        // Canonical authority on the exact league, or on either team in the fixture. A
+        // correction is requested by someone party to the result, so the team side asks
+        // for the capability that lets them report one at all.
+        const [managesLeague, ...teamGrants] = await Promise.all([
+          hasCapability(actor.uid, { scopeType: 'league', scopeId: submission.leagueId }, 'league.result.resolve'),
+          hasCapability(actor.uid, { scopeType: 'team', scopeId: submission.submittedByTeamId }, 'team.result.submit'),
+          hasCapability(actor.uid, { scopeType: 'team', scopeId: submission.opponentTeamId }, 'team.result.submit'),
+        ]);
+        const managesTeam = teamGrants.some(Boolean);
         if (!isPlatform && !managesLeague && !managesTeam) {
           throw new Error('Only an assigned Team, League, or Platform Admin can request a correction.');
         }
@@ -90,11 +90,15 @@ export async function POST(
       const snapshot = await transaction.get(submissionRef);
       if (!snapshot.exists) throw new Error('Result submission not found.');
       const submission = { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
-      const leagueSnapshot = await transaction.get(adminDb.collection('leagues').doc(submission.leagueId));
       const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
       const isPlatform = role === 'platform_admin' || role === 'super_admin';
-      const isLeagueAdmin = Array.isArray(leagueSnapshot.data()?.adminUserIds) &&
-        leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
+      // Approving a correction changes an official result, so it needs the league's
+      // result-resolution capability on this exact league — not membership of it.
+      const isLeagueAdmin = await hasCapability(
+        actor.uid,
+        { scopeType: 'league', scopeId: submission.leagueId },
+        'league.result.resolve',
+      );
       if (!isPlatform && !isLeagueAdmin) throw new Error('Only the owning League Admin can approve a correction.');
       const decision = checkCorrectionRequest({
         submission,
@@ -143,6 +147,15 @@ export async function POST(
       });
     });
     const outcome = await finalizeSubmission(adminDb, matchId);
+    if (outcome.action === 'blocked') {
+      // A correction is the intended way out of a reconciliation block, so it can land on
+      // one: the corrected score may still contradict the recorded events. Saying
+      // "skipped" here would describe a governed, recorded outcome as a no-op.
+      throw new Error(
+        'The corrected result still contradicts the recorded scoring events, so it was not '
+        + 'made official. The league review case has been updated.',
+      );
+    }
     if (outcome.action !== 'finalized') throw new Error(`Correction was recorded but finalization was skipped: ${outcome.reason}.`);
     return Response.json({ ok: true, version });
   } catch (error) {

@@ -59,8 +59,9 @@ const KNOWN_LEGACY_AUTHORITY: Budget[] = [
   // The canonical assignment was added alongside it rather than substituted for it, so the
   // deny is a union and neither source can grant anything.
   { file: 'src/app/api/payments/intents/route.ts', reads: 1, owedCapability: 'none — self-dealing deny, must not be removed' },
-  { file: 'src/app/api/result-submissions/[matchId]/correction/route.ts', reads: 5, owedCapability: 'league.result.resolve' },
-  { file: 'src/app/api/admin/actions/route.ts', reads: 4, owedCapability: 'league.profile.manage', note: 'split this route by domain first — see the Build 32 P1' },
+  // Remaining lines are schema fields and record initialisers (adminUserIds: [] on
+  // creation, z.array in the request schema), not authorization decisions.
+  { file: 'src/app/api/admin/actions/route.ts', reads: 2, owedCapability: 'none — schema and record initialisation' },
   // Not authorization: these maintain the legacy record so an operator can still revoke a
   // pre-migration teamAssignment. They are counted because the field should eventually go,
   // not because they decide anything.
