@@ -56,8 +56,6 @@ const KNOWN_LEGACY_AUTHORITY: Budget[] = [
   { file: 'src/app/api/payments/intents/route.ts', reads: 2, owedCapability: 'team.profile.manage / league.profile.manage', note: 'recipient-side check, branches on recipientType' },
   { file: 'src/app/api/result-submissions/[matchId]/correction/route.ts', reads: 5, owedCapability: 'league.result.resolve' },
   { file: 'src/app/api/admin/actions/route.ts', reads: 4, owedCapability: 'league.profile.manage', note: 'split this route by domain first — see the Build 32 P1' },
-  { file: 'src/app/api/challenges/[challengeId]/transition/route.ts', reads: 4, owedCapability: 'league.profile.manage + team.profile.manage' },
-  { file: 'src/app/api/support-needs/[supportNeedId]/review/route.ts', reads: 4, owedCapability: 'league.profile.manage + team.profile.manage' },
   // Not authorization: these maintain the legacy record so an operator can still revoke a
   // pre-migration teamAssignment. They are counted because the field should eventually go,
   // not because they decide anything.

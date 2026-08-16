@@ -8,6 +8,7 @@ import {
   type ChallengeAction,
 } from '@/lib/challenge';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, Challenge } from '@/types';
 
 export const runtime = 'nodejs';
@@ -90,18 +91,17 @@ export async function POST(
       return Response.json({ error: 'Challenge athlete not found.' }, { status: 409 });
     }
     const athlete = athleteSnapshot.data()!;
-    const [teamSnapshot, leagueSnapshot] = await Promise.all([
-      adminDb.collection('teams').doc(athlete.teamId).get(),
-      adminDb.collection('leagues').doc(challenge.leagueId).get(),
-    ]);
-
     const tokenRole = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
     const isPlatform = tokenRole === 'platform_admin' || tokenRole === 'super_admin';
     const isAthlete = athlete.userId === actor.uid;
-    const isTeamAdmin = Array.isArray(teamSnapshot.data()?.adminUserIds) &&
-      teamSnapshot.data()!.adminUserIds.includes(actor.uid);
-    const isLeagueAdmin = Array.isArray(leagueSnapshot.data()?.adminUserIds) &&
-      leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
+    // The effective role is derived from canonical assignments on the exact scopes this
+    // challenge belongs to, not from membership arrays. Both checks are strictly narrower
+    // than the legacy reads they replace, and every current league- and team-admin entry
+    // already holds the corresponding capability, so no operator loses a transition.
+    const [isTeamAdmin, isLeagueAdmin] = await Promise.all([
+      hasCapability(actor.uid, { scopeType: 'team', scopeId: String(athlete.teamId) }, 'team.profile.manage'),
+      hasCapability(actor.uid, { scopeType: 'league', scopeId: challenge.leagueId }, 'league.profile.manage'),
+    ]);
     const effectiveRole: AppRole = isPlatform
       ? tokenRole
       : isLeagueAdmin

@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, SupportNeed } from '@/types';
 
 export const runtime = 'nodejs';
@@ -40,16 +41,17 @@ export async function POST(
       ? await adminDb.collection('athletes').doc(need.athleteId).get()
       : null;
     const teamId = need.teamId ?? athleteSnapshot?.data()?.teamId;
-    const [teamSnapshot, leagueSnapshot] = await Promise.all([
-      teamId ? adminDb.collection('teams').doc(teamId).get() : Promise.resolve(null),
-      adminDb.collection('leagues').doc(need.leagueId).get(),
-    ]);
     const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
     const isPlatform = role === 'platform_admin' || role === 'super_admin';
-    const isTeamAdmin = Array.isArray(teamSnapshot?.data()?.adminUserIds) &&
-      teamSnapshot!.data()!.adminUserIds.includes(actor.uid);
-    const isLeagueAdmin = Array.isArray(leagueSnapshot.data()?.adminUserIds) &&
-      leagueSnapshot.data()!.adminUserIds.includes(actor.uid);
+    // Canonical assignments on the exact scopes this need belongs to. A need with no
+    // resolvable team cannot grant team authority to anyone, which the legacy read
+    // expressed accidentally through a null snapshot and this states directly.
+    const [isTeamAdmin, isLeagueAdmin] = await Promise.all([
+      teamId
+        ? hasCapability(actor.uid, { scopeType: 'team', scopeId: String(teamId) }, 'team.profile.manage')
+        : Promise.resolve(false),
+      hasCapability(actor.uid, { scopeType: 'league', scopeId: need.leagueId }, 'league.profile.manage'),
+    ]);
     const teamAction = input.action === 'team_verify' || input.action === 'team_reject';
     if (teamAction && !isTeamAdmin && !isPlatform) {
       return Response.json({ error: 'Only the recipient’s Team Admin can verify this need.' }, { status: 403 });
