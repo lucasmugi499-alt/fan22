@@ -148,7 +148,13 @@ export const onOfficialResultFinalized = onDocumentCreated(
       },
       body: JSON.stringify({ matchId }),
     });
-    if (!response.ok) throw new Error(`Fantasy scoring endpoint returned ${response.status}.`);
+    if (!response.ok) {
+      // The endpoint returns its reason in the body. Logging only the status made a real
+      // failure — a competition pointing at a scoring profile that does not exist — look
+      // like a bare 409, and the cause had to be found by reproducing the call by hand.
+      const detail = await response.text().catch(() => '');
+      throw new Error(`Fantasy scoring endpoint returned ${response.status}: ${detail.slice(0, 400)}`);
+    }
     logger.info('Official Fantasy Points generated', {
       matchId,
       finalizationId: event.params.finalizationId,

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyTeam, teamRecord } from '@/lib/team/teamContext';
+import { useTeamOfficialStanding } from '@/lib/team/useTeamStanding';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -37,6 +38,7 @@ export function TeamProfile() {
     recordLimit: 250,
   });
   const { athletes, retry } = detail;
+  const { standing } = useTeamOfficialStanding(team ?? undefined);
   const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -132,8 +134,20 @@ export function TeamProfile() {
 
       {/* Season snapshot */}
       <div className="grid grid-cols-2 gap-2.5">
-        <Stat icon={Trophy} label="Record" value={teamRecord(team)} accent="text-text-strong" />
-        <Stat icon={Trophy} label="League points" value={String(team.leaguePoints)} accent="text-brand" />
+        {/* Both read the official standings projection. team.record and
+            team.leaguePoints are stored aggregates that derive from no match. */}
+        <Stat
+          icon={Trophy}
+          label="Record"
+          value={standing ? `${standing.wins}-${standing.draws}-${standing.losses}` : teamRecord(team)}
+          accent="text-text-strong"
+        />
+        <Stat
+          icon={Trophy}
+          label="League points"
+          value={String(standing?.points ?? team.leaguePoints)}
+          accent="text-brand"
+        />
         <Stat icon={Users} label="Supporters" value={String(team.supportersCount)} accent="text-text-strong" />
         <Stat icon={Coins} label="Total support" value={ugx(team.totalSupport)} accent="text-[var(--brand-2)]" />
       </div>

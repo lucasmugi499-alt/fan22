@@ -67,6 +67,28 @@ revoked deliberately. `npx firebase` is authenticated as `lucasmugi499@gmail.com
 | `reconcileResultSubmissions` | Yes | **No** | No |
 | `lockFantasyLineups` | Yes | **No** | No |
 | `reconcilePaymentIntents` | Yes | **No** | No |
+| Fantasy scoring on finalization | Yes | **Yes** | **Yes — proven end to end 2026-08-16** |
+
+### Fantasy chain: proven
+
+`scripts/canary/fantasy-canary.ts` runs the whole chain against cloud data — competition,
+round, squad, lineup, past deadline, result, confirmation, finalizer, canonical events,
+athlete projection, fantasy point events, leaderboard — then approves a correction and
+checks the recalculation.
+
+Fourteen checks pass, including the exact arithmetic: captain `1+2+5+1 = 9` base, ×1.5,
+plus starter 4 and bench 1 = **18.5** on the leaderboard. The correction (a second try)
+moves captain base 9 → 14 and the leaderboard 18.5 → **26**, which is `14×1.5 + 4 + 1`.
+
+Two things the canary corrected in my own understanding:
+
+- **A benched athlete is not worth zero.** Being named in a squad earns the
+  `active_squad` point. What must never happen is a benched athlete earning points for
+  *playing*, so the assertion is rule-level: `active_squad` only, never `appearance` or
+  `win_participation`. A bare "scored nothing" test would have been wrong.
+- **The competition pointed at a scoring profile that did not exist.** The first run failed
+  with a bare `409`, because the function logged only the status and threw the body away.
+  It now logs the reason.
 
 ### Finalizer activation state
 

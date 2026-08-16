@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "security:audit": "tsx scripts/release/advisory-gate.ts",
-    "deploy:ready": "npm run lint && npm test && npm run test:rules && npm run functions:typecheck && npm run functions:build && npm run demo:validate && npm run access:compat && npm run access:guard && npm run security:audit && npm run build",
+    "deploy:ready": "npm run lint && npm test && npm run test:rules && npm run functions:typecheck && npm run functions:build && npm run demo:validate && npm run access:compat && npm run access:guard && npm run data:guard && npm run security:audit && npm run build",
     "deploy:ready:production": "npm run deploy:ready && npm run prod:assert-clean",
     "seed:mock": "tsx --env-file=.env.local scripts/seed-mock-data.ts",
     "seed:firebase": "tsx scripts/seed-firestore.ts",
@@ -59,7 +59,10 @@
     "demo:validate": "tsx scripts/demo/data-lifecycle.ts --action=validate",
     "demo:reset": "tsx scripts/demo/data-lifecycle.ts --action=demo-reset",
     "beta:seed": "tsx scripts/demo/data-lifecycle.ts --action=beta-seed",
-    "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset"
+    "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset",
+    "data:guard": "tsx scripts/data/deprecated-fields-guard.ts",
+    "data:repair:aggregates:dry-run": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts",
+    "data:repair:aggregates:apply": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts --apply"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

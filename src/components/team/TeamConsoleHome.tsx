@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useTeamOfficialStanding } from '@/lib/team/useTeamStanding';
 import {
   resolveMyTeam,
   pendingActions,
@@ -71,6 +72,7 @@ export function TeamConsoleHome() {
     recordLimit: 250,
   });
   const { matches, athletes, error, retry } = detail;
+  const { standing } = useTeamOfficialStanding(team ?? undefined);
   const teams = catalog.teams;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
@@ -151,7 +153,8 @@ export function TeamConsoleHome() {
       <div className="grid grid-cols-3 gap-2.5">
         <Metric label="Needs action" value={actions.length} tone={actions.length ? 'pending' : 'default'} />
         <Metric label="Squad" value={roster.length} />
-        <Metric label="Points" value={team.leaguePoints} tone="brand" />
+        {/* Official standings projection, not the stored aggregate. */}
+        <Metric label="Points" value={standing?.points ?? team.leaguePoints} tone="brand" />
       </div>
 
       {/* Support pool strip */}

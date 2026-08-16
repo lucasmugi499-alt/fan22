@@ -193,6 +193,16 @@ async function teardown(store: Firestore) {
       removed += 1;
     }
   }
+  // Subcollections outlive a deleted parent, so they are cleared BEFORE the document
+  // itself. Skipping this stranded two audit documents under a submission that no longer
+  // existed, which had to be removed later under a separate evidence-backed cleanup.
+  const submissionRef = store.collection('resultSubmissions').doc(MATCH_ID);
+  for (const sub of await submissionRef.listCollections()) {
+    for (const document of (await sub.get()).docs) {
+      await document.ref.delete();
+      removed += 1;
+    }
+  }
   for (const [collection, id] of [
     ['officialMatchReconciliation', `${MATCH_ID}_v1`],
     ['resultSubmissions', MATCH_ID],
