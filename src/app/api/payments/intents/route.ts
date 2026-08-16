@@ -6,6 +6,7 @@ import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderCon
 import { recordProviderAttempt } from '@/server/payments/providerAttempts';
 import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
 import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
+import { hasCapability } from '@/server/access/capabilities';
 
 export const runtime = 'nodejs';
 
@@ -27,10 +28,34 @@ function recipientCollection(type: 'athlete' | 'team' | 'league' | 'programme') 
   return { athlete: 'athletes', team: 'teams', league: 'leagues', programme: 'programmes' }[type];
 }
 
-function isLinkedRecipient(recipient: FirebaseFirestore.DocumentData, recipientType: string, uid: string) {
-  return recipient.userId === uid ||
-    (recipientType === 'team' && Array.isArray(recipient.adminUserIds) && recipient.adminUserIds.includes(uid)) ||
-    (recipientType === 'league' && Array.isArray(recipient.adminUserIds) && recipient.adminUserIds.includes(uid));
+/**
+ * Conflict-of-interest control, NOT an authorization grant.
+ *
+ * A true result denies the payment: you may not support a recipient you control. That
+ * makes this the one place in the access migration where the legacy `adminUserIds` read
+ * must not simply be deleted — removing it would widen who can route money to an account
+ * they run, which is a weaker fraud control rather than a closed hole.
+ *
+ * So the canonical assignment is added to the check rather than substituted for it. The
+ * union is the conservative choice for a deny: canonical catches an operator holding a
+ * current assignment who was never added to the membership array, and the legacy array
+ * still catches a stale entry. Neither can grant anything here.
+ */
+async function isLinkedRecipient(
+  recipient: FirebaseFirestore.DocumentData,
+  recipientType: string,
+  recipientId: string,
+  uid: string,
+) {
+  if (recipient.userId === uid) return true;
+  if (recipientType !== 'team' && recipientType !== 'league') return false;
+  const legacyMember = Array.isArray(recipient.adminUserIds) && recipient.adminUserIds.includes(uid);
+  if (legacyMember) return true;
+  return hasCapability(
+    uid,
+    { scopeType: recipientType, scopeId: recipientId },
+    recipientType === 'team' ? 'team.profile.manage' : 'league.profile.manage',
+  );
 }
 
 export async function POST(request: Request) {
@@ -95,7 +120,7 @@ export async function POST(request: Request) {
     const recipientSnapshot = await adminDb.collection(recipientCollection(effectiveRecipientType)).doc(input.recipientId).get();
     if (!recipientSnapshot.exists) return Response.json({ error: 'The selected support recipient was not found.' }, { status: 404 });
     const recipient = recipientSnapshot.data()!;
-    if (isLinkedRecipient(recipient, effectiveRecipientType, actor.uid)) {
+    if (await isLinkedRecipient(recipient, effectiveRecipientType, input.recipientId, actor.uid)) {
       return Response.json({ error: 'You cannot support a recipient account you control. Contact support for an exception review.' }, { status: 409 });
     }
     const eligibility = await adminDb.collection('recipientEligibility').doc(`${effectiveRecipientType}_${input.recipientId}`).get();

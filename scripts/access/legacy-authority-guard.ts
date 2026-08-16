@@ -53,7 +53,12 @@ type Budget = { file: string; reads: number; owedCapability: string; note?: stri
  * how a cutover turns into either a lockout or a privilege escalation.
  */
 const KNOWN_LEGACY_AUTHORITY: Budget[] = [
-  { file: 'src/app/api/payments/intents/route.ts', reads: 2, owedCapability: 'team.profile.manage / league.profile.manage', note: 'recipient-side check, branches on recipientType' },
+  // NOT authorization. `isLinkedRecipient` is a conflict-of-interest control: a true
+  // result DENIES the payment, because you may not support a recipient you control.
+  // Deleting the legacy read here would widen who can route money to an account they run.
+  // The canonical assignment was added alongside it rather than substituted for it, so the
+  // deny is a union and neither source can grant anything.
+  { file: 'src/app/api/payments/intents/route.ts', reads: 1, owedCapability: 'none — self-dealing deny, must not be removed' },
   { file: 'src/app/api/result-submissions/[matchId]/correction/route.ts', reads: 5, owedCapability: 'league.result.resolve' },
   { file: 'src/app/api/admin/actions/route.ts', reads: 4, owedCapability: 'league.profile.manage', note: 'split this route by domain first — see the Build 32 P1' },
   // Not authorization: these maintain the legacy record so an operator can still revoke a
