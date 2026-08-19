@@ -732,7 +732,7 @@ export const mockProvider: GoalPlaceDataProvider = {
         ['pending_confirmation', 'confirmation_overdue'].includes(submission.status),
     );
   },
-  async getReconciliationExceptions(leagueId: string): Promise<ReconciliationException[]> {
+  async getReconciliationExceptions(leagueId?: string): Promise<ReconciliationException[]> {
     // The demo dataset carries no blocked finalizations: a surplus is a data contradiction,
     // and seeding one would put a permanently broken result in the showcase.
     void leagueId;

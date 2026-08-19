@@ -75,16 +75,18 @@ export function useLeagueResultExceptions(leagueId?: string) {
  * why nothing was published. Reading the record rather than re-deriving it from the
  * submission is what keeps one set of sporting numbers.
  */
-export function useReconciliationExceptions(leagueId?: string) {
+export function useReconciliationExceptions(leagueId?: string, options?: { platformWide?: boolean }) {
   const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [items, setItems] = useState<ReconciliationException[]>([]);
   const [error, setError] = useState<Error>();
 
+  const platformWide = options?.platformWide === true;
   useEffect(() => {
-    if (!leagueId) return;
+    // A league surface needs a league; the platform queue deliberately has no scope.
+    if (!leagueId && !platformWide) return;
     let active = true;
-    void provider.getReconciliationExceptions(leagueId)
+    void provider.getReconciliationExceptions(platformWide ? undefined : leagueId)
       .then((next) => { if (active) { setItems(next); setError(undefined); } })
       .catch((cause) => {
         if (active) {
@@ -92,7 +94,7 @@ export function useReconciliationExceptions(leagueId?: string) {
         }
       });
     return () => { active = false; };
-  }, [leagueId, provider]);
+  }, [leagueId, platformWide, provider]);
 
   return { items, error };
 }

@@ -338,3 +338,54 @@ describe('official events exclude ineligible athletes', () => {
     expect(events.filter((event) => event.primaryAthleteId === 'athlete_1').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The outbox is the contract that lets notification delivery exist later without the
+ * finalizer knowing about it.
+ */
+describe('transactional outbox', () => {
+  function outboxFor(records: Map<string, RecordData>) {
+    return [...records.entries()].filter(([path]) => path.startsWith('outbox/'));
+  }
+
+  it('emits one deterministic event alongside the case', async () => {
+    const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 3 }));
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    const events = outboxFor(records);
+    expect(events).toHaveLength(1);
+    const [path, event] = events[0];
+    // Derived from the exception id, which is itself deterministic.
+    expect(path).toBe('outbox/result_reconciliation_exception_created_reconciliation_match_1_1');
+    expect(event).toMatchObject({
+      type: 'result.reconciliation_exception.created',
+      exceptionId: reconciliationExceptionId('match_1', 1),
+      matchId: 'match_1',
+      leagueId: 'league_1',
+      status: 'pending',
+      reviewStatus: 'league_review_required',
+      officialScore: { home: 2, away: 0 },
+      reconstructedScore: { home: 3, away: 0 },
+    });
+  });
+
+  it('does not re-emit on a redelivered trigger', async () => {
+    const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 3 }));
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    // One case, one event. A duplicate event would become a duplicate notification.
+    expect(outboxFor(records)).toHaveLength(1);
+    expect([...records.keys()].filter((path) => path.startsWith('reconciliationExceptions/'))).toHaveLength(1);
+  });
+
+  it('emits nothing when the result finalizes cleanly', async () => {
+    const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 2 }));
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    expect(outboxFor(records)).toEqual([]);
+  });
+});

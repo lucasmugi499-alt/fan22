@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useReconciliationExceptions } from '@/lib/resultSubmissionQueues';
+import { useAuth } from '@/context/AuthProvider';
+import type { ReconciliationException } from '@/types';
 import { isOfficialMatch } from '@/lib/status';
 import { disputedMatches } from '@/lib/platform/platformContext';
 import { Card } from '@/components/ui/Card';
@@ -12,6 +16,12 @@ export function CompetitionIntegrity() {
     collections: ['matches', 'finalizations', 'leagues', 'teams'],
     recordLimit: 500,
   });
+  // The canonical blocked-finalization cases, platform-wide. These come first because they
+  // are the only item here where official data was deliberately NOT written and someone has
+  // to decide what happens next.
+  const { items: blocked } = useReconciliationExceptions(undefined, { platformWide: true });
+  const teamName = (id: string) => data.teams.find((team) => team.id === id)?.name ?? id;
+  const leagueName = (id: string) => data.leagues.find((league) => league.id === id)?.name ?? id;
   const disputes = disputedMatches(data.matches);
   const failedFinalizations = data.finalizations.filter((item) => item.status === 'failed');
   const overdue = data.matches.filter((item) => item.verificationStatus === 'pending' && item.status === 'completed');
@@ -27,11 +37,19 @@ export function CompetitionIntegrity() {
         description="Supervise disputes, failed finalizations, corrections and projection readiness without manually rewriting official statistics."
       />
       <PlatformStatGrid items={[
+        { label: 'Reconciliation exceptions', value: blocked.length, tone: blocked.length ? 'bad' : 'good' },
         { label: 'Result disputes', value: disputes.length, tone: disputes.length ? 'bad' : 'good' },
         { label: 'Failed finalizations', value: failedFinalizations.length, tone: failedFinalizations.length ? 'bad' : 'good' },
         { label: 'Pending confirmations', value: overdue.length, tone: overdue.length ? 'warn' : 'good' },
         { label: 'Verified-result rate', value: `${Math.round((official.length / Math.max(1, data.matches.length)) * 100)}%` },
       ]} />
+      <ReconciliationQueue
+        cases={blocked}
+        teamName={teamName}
+        leagueName={leagueName}
+        onChanged={data.retry}
+      />
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="p-4">
           <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Result exceptions</h2>
@@ -71,5 +89,110 @@ export function CompetitionIntegrity() {
         </Card>
       </div>
     </section>
+  );
+}
+
+/**
+ * Blocked finalizations, with the workflow actions Platform actually owns.
+ *
+ * There is no score field and no way to reach one. Platform can acknowledge that a case is
+ * being handled, escalate it, or close it — the sporting outcome is corrected by the
+ * governing League through the correction path, which re-runs the finalizer and produces a
+ * new official version with its own audit trail. Two authorities able to decide the same
+ * fact is the split this platform spent a migration removing.
+ */
+function ReconciliationQueue({
+  cases,
+  teamName,
+  leagueName,
+  onChanged,
+}: {
+  cases: ReconciliationException[];
+  teamName: (id: string) => string;
+  leagueName: (id: string) => string;
+  onChanged: () => void;
+}) {
+  const { currentUser } = useAuth();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function transition(exceptionId: string, status: 'acknowledged' | 'escalated' | 'resolved') {
+    const note = window.prompt(
+      status === 'resolved'
+        ? 'Why is this case being closed? The sporting result is not changed by this action.'
+        : `Add a note for marking this case ${status}.`,
+    );
+    if (!note || note.trim().length < 4) return;
+    setBusyId(exceptionId);
+    setError(null);
+    try {
+      const token = await currentUser?.getIdToken();
+      const response = await fetch('/api/platform/competition-integrity', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token ?? ''}` },
+        body: JSON.stringify({ exceptionId, status, note: note.trim() }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? 'The case could not be updated.');
+      }
+      onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The case could not be updated.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold text-text-strong">Reconciliation exceptions</h2>
+        <span className="text-xs text-muted">Official data was not written for these</span>
+      </div>
+      {error ? <p className="mb-3 text-sm text-[var(--state-disputed)]">{error}</p> : null}
+      <div className="space-y-2.5">
+        {cases.length ? cases.map((item) => (
+          <div key={item.exceptionId} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-text-strong">
+                {teamName(item.matchId)} — {leagueName(item.leagueId)}
+              </p>
+              <StatusChip label={item.status} />
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              Submitted <span className="tabular-nums">{item.officialHomeScore}-{item.officialAwayScore}</span>,
+              {' '}events reconstruct <span className="tabular-nums">{item.reconstructedHomeScore}-{item.reconstructedAwayScore}</span>
+              {' '}({item.homeDifference ? `home +${item.homeDifference}` : ''}
+              {item.homeDifference && item.awayDifference ? ', ' : ''}
+              {item.awayDifference ? `away +${item.awayDifference}` : ''}).
+            </p>
+            <p className="mt-1 text-xs text-subtle">
+              Version {item.submissionVersion} · {item.evidenceRefs?.length ? `${item.evidenceRefs.length} evidence reference(s)` : 'no evidence attached'} · opened {item.createdAt}
+            </p>
+            <p className="mt-1 text-xs text-subtle">
+              The governing League corrects the result. Platform manages the case only.
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {(['acknowledged', 'escalated', 'resolved'] as const).map((next) => (
+                <button
+                  key={next}
+                  type="button"
+                  disabled={busyId === item.exceptionId || item.status === next}
+                  onClick={() => transition(item.exceptionId, next)}
+                  className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-xs font-medium text-text-strong disabled:opacity-40"
+                >
+                  {next === 'acknowledged' ? 'Acknowledge' : next === 'escalated' ? 'Escalate' : 'Close case'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )) : (
+          <EmptyState title="No blocked finalizations">
+            A result whose recorded events contradict its submitted score appears here, unpublished.
+          </EmptyState>
+        )}
+      </div>
+    </Card>
   );
 }

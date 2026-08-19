@@ -17,6 +17,18 @@ const MATCHES = 'matches';
 const FINALIZATIONS = 'finalizations';
 const OFFICIAL_SPORT_EVENTS = 'officialSportEvents';
 const RECONCILIATION_EXCEPTIONS = 'reconciliationExceptions';
+const OUTBOX = 'outbox';
+
+/** The one event type this module emits. Consumers subscribe to it; it knows none of them. */
+export const RECONCILIATION_EXCEPTION_CREATED = 'result.reconciliation_exception.created';
+
+/**
+ * Deterministic, so a redelivered trigger cannot emit the event twice. Derived from the
+ * exception id, which is itself deterministic.
+ */
+export function reconciliationOutboxId(exceptionId: string) {
+  return `result_reconciliation_exception_created_${exceptionId}`;
+}
 
 /**
  * Deterministic, so a redelivered trigger finds the existing case instead of opening a
@@ -910,6 +922,38 @@ export async function finalizeSubmission(
           finalizationAttemptId: plan.finalizationKey,
           createdAt: finalizedAt,
           updatedAt: finalizedAt,
+        });
+
+        /**
+         * Transactional outbox.
+         *
+         * Written in the SAME transaction as the case, so the event and the record it
+         * describes cannot disagree: either both exist or neither does. A consumer that
+         * later sends a League notice, opens a Platform queue item or emits analytics reads
+         * from here.
+         *
+         * The finalizer deliberately knows none of those consumers. Teaching the trusted
+         * sports finalizer to send email would put a delivery failure on the path that
+         * publishes official records.
+         *
+         * The id is deterministic and this sits inside the create-once branch, so a
+         * redelivered trigger neither reopens the case nor re-emits the event.
+         */
+        tx.create(db.collection(OUTBOX).doc(reconciliationOutboxId(exceptionId)), {
+          id: reconciliationOutboxId(exceptionId),
+          type: RECONCILIATION_EXCEPTION_CREATED,
+          exceptionId,
+          matchId: match.id,
+          leagueId: match.leagueId,
+          competitionId: match.seasonId ?? match.leagueId,
+          submissionId: submission.id,
+          submissionVersion: submission.resultVersion,
+          // Enough for a consumer to route and summarise without re-reading the case.
+          officialScore: { home: plan.match.score.home, away: plan.match.score.away },
+          reconstructedScore: { home: surplusGate.trace.home, away: surplusGate.trace.away },
+          reviewStatus: 'league_review_required',
+          status: 'pending',
+          createdAt: finalizedAt,
         });
       } else {
         tx.set(exceptionRef, { updatedAt: finalizedAt }, { merge: true });

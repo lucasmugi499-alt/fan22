@@ -303,7 +303,18 @@ export interface ReconciliationException {
   eventIds: string[];
   evidenceRefs: string[];
   reasonCode: string;
-  status: 'open' | 'resolved' | 'superseded';
+  /**
+   * Workflow state, owned by Platform. It is deliberately NOT the sporting outcome:
+   * resolving a case does not decide the result. The governing League still owns the
+   * correction path, so Platform can acknowledge, escalate or close the operational item
+   * without ever editing a score.
+   */
+  status: 'open' | 'acknowledged' | 'escalated' | 'resolved' | 'superseded';
+  acknowledgedByUserId?: string;
+  acknowledgedAt?: string;
+  resolvedByUserId?: string;
+  resolvedAt?: string;
+  workflowNote?: string;
   reconciliationStatus: 'surplus';
   finalizationStatus: 'blocked';
   reviewStatus: 'league_review_required';

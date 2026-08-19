@@ -1685,6 +1685,23 @@ describe('reconciliation exceptions', () => {
     );
   });
 
+  it('denies a client moving the workflow state, even to a legitimate value', async () => {
+    await seedException();
+
+    // Case transitions go through the audited platform command, which writes with the
+    // Admin SDK. A client that could set `resolved` directly would close a blocked official
+    // result with no capability check and no audit entry.
+    for (const status of ['acknowledged', 'escalated', 'resolved']) {
+      await assertFails(
+        setDoc(
+          doc(asUser(LEAGUE_ADMIN), 'reconciliationExceptions/reconciliation_match_001_1'),
+          { status },
+          { merge: true },
+        ),
+      );
+    }
+  });
+
   it('denies every client write, including the governing league', async () => {
     await seedException();
 

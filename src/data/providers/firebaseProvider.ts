@@ -546,13 +546,16 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   },
   async getReconciliationExceptions(leagueId) {
     if (!isFirebaseConfigured) return mockProvider.getReconciliationExceptions(leagueId);
-    // Only the trusted finalizer writes these; clients read them to show the League what
-    // is blocked and why.
-    const cases = await readCollection<ReconciliationException>('reconciliationExceptions', [
-      where('leagueId', '==', leagueId),
-    ]);
+    // Only the trusted finalizer writes these; clients read them to see what is blocked
+    // and why. Without a leagueId this is the platform-wide integrity queue.
+    const cases = await readCollection<ReconciliationException>(
+      'reconciliationExceptions',
+      leagueId ? [where('leagueId', '==', leagueId)] : [],
+    );
     return cases
-      .filter((item) => item.status === 'open')
+      // Resolved and superseded cases leave the queue; acknowledged and escalated stay,
+      // because they are still someone's outstanding work.
+      .filter((item) => item.status !== 'resolved' && item.status !== 'superseded')
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   },
   async createContributionIntent(data: CreateContributionIntentInput) {
