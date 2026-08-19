@@ -294,6 +294,20 @@ service cloud.firestore {
      * to super_admin only — the League Admin queue would have rendered empty and the case
      * would have been invisible to the only people who can resolve it.
      */
+    /**
+     * Environment activation requests.
+     *
+     * Written only by the audited platform command through the Admin SDK. Every client
+     * write is denied: an activation record is the evidence that a guarded process was
+     * followed, so a client able to write one could manufacture an approval — including its
+     * own second-operator sign-off, which is the single control the workflow exists to
+     * enforce.
+     */
+    match /environmentActivations/{activationId} {
+      allow get, list: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     match /reconciliationExceptions/{exceptionId} {
       allow get, list: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
       allow write: if false;

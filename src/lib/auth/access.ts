@@ -37,6 +37,10 @@ export type PermissionCapability =
   | 'platform.access.manage'
   | 'platform.organizations.identity.manage'
   | 'platform.verification.team.manage'
+  // Deliberately its own capability, and deliberately governance-only. Moving an
+  // environment is the most consequential act on the platform, so it is not folded into
+  // day-to-day platform administration.
+  | 'platform.environment.activate'
   | 'league.profile.manage'
   | 'league.season.manage'
   | 'league.team.create'
@@ -109,7 +113,7 @@ export type AccessContext = {
 export const PERMISSION_BUNDLES: PermissionBundle[] = [
   {
     id: 'super_admin_governance',
-    version: '1.1.0',
+    version: '1.2.0',
     roleKey: 'super_admin',
     label: 'Super Admin Governance',
     capabilities: [
@@ -125,6 +129,7 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.access.manage',
       'platform.organizations.identity.manage',
       'platform.verification.team.manage',
+      'platform.environment.activate',
       'ownership.transfer',
       'break_glass.activate',
     ],

@@ -137,6 +137,37 @@ export function ControlPlane() {
         <h2 className="mb-2 text-[15px] font-semibold text-text-strong">Traffic routing</h2>
         <p className="text-sm text-muted">{state.trafficSwitching.reason}</p>
       </Card>
+
+      <Card className="p-4">
+        <h2 className="mb-2 text-[15px] font-semibold text-text-strong">Activation workflow</h2>
+        <p className="text-sm text-muted">
+          Activating an environment is a recorded process, not a control on this page:
+          readiness measured at the moment of each step, typed confirmation, approval by a
+          second operator, a maintenance request, a routing instruction, smoke confirmation,
+          and an immutable audit entry for every transition.
+        </p>
+        <ol className="mt-3 space-y-1.5 text-sm text-muted">
+          {[
+            'Readiness recorded',
+            'Approved by a second operator',
+            'Maintenance requested',
+            'Routing instruction issued',
+            'Smoke tests confirmed — blocked, no routing mechanism exists',
+            'Completed',
+          ].map((step, index) => (
+            <li key={step} className="flex gap-2">
+              <span className="tabular-nums text-subtle">{index + 1}.</span>
+              <span className={index === 4 ? 'text-[var(--state-disputed)]' : undefined}>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-xs text-subtle">
+          A request can reach the routing step and stop there indefinitely. That is a
+          truthful end state: the outstanding work needs infrastructure, not a click. The
+          workflow requires the <code>platform.environment.activate</code> capability, which
+          is governance-only and is not held by Platform Admins.
+        </p>
+      </Card>
     </section>
   );
 }

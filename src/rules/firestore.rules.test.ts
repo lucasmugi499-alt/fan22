@@ -1648,6 +1648,24 @@ describe('media lifecycle is server-owned', () => {
   });
 });
 
+describe('environment activation records', () => {
+  it('denies a client forging an activation approval', async () => {
+    // The second-operator approval is the control this workflow exists to enforce. A client
+    // able to write these could approve its own activation request.
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'environmentActivations/forged'), {
+        environment: 'production',
+        stage: 'approved',
+        requestedByUserId: LEAGUE_ADMIN,
+        approvedByUserId: LEAGUE_ADMIN,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'environmentActivations/forged_2'), { stage: 'completed' }),
+    );
+  });
+});
+
 describe('reconciliation exceptions', () => {
   async function seedException() {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
