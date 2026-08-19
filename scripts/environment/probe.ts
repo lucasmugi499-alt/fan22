@@ -23,6 +23,7 @@ export type ProbeResult = {
   firebaseProjectId?: string;
   servedBy?: string;
   gatewayRequired?: boolean;
+  finalizerMode?: string;
   checks?: Record<string, string>;
   problems: string[];
 };
@@ -88,6 +89,7 @@ export async function probeOrigin(
     firebaseProjectId,
     servedBy: typeof body.servedBy === 'string' ? body.servedBy : undefined,
     gatewayRequired: body.gatewayRequired === true,
+    finalizerMode: typeof body.finalizerMode === 'string' ? body.finalizerMode : undefined,
     checks: (healthBody.checks ?? {}) as Record<string, string>,
     problems,
   };
@@ -110,6 +112,9 @@ async function main() {
   console.log(`Project: ${result.firebaseProjectId ?? 'unknown'}`);
   console.log(`Served by: ${result.servedBy ?? 'unknown'}`);
   console.log(`Gateway required: ${result.gatewayRequired ? 'yes' : 'no'}`);
+  // The activation this origin would apply to a correction or a /finalize call. `off` here
+  // while the Cloud Functions are `enabled` means the two runtimes disagree.
+  console.log(`Finalizer mode (this origin): ${result.finalizerMode ?? 'unreported'}`);
   console.log(`Dependencies: ${JSON.stringify(result.checks ?? {})}`);
   for (const problem of result.problems) console.log(`  ! ${problem}`);
 

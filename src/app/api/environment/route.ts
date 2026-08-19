@@ -1,4 +1,5 @@
 import { publicEnvironment } from '@/lib/environment';
+import { activationFromEnvironment } from '@/server/finalizerActivation';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,14 @@ export function GET(request: Request) {
     // Reported so the boundary and an operator can see enforcement state without
     // guessing. Gateway-only protection is deliberately off for the direct demo origin.
     gatewayRequired: process.env.GOALPLACE_REQUIRE_GATEWAY_SECRET === 'true',
+    // The finalizer activation this runtime believes it is in.
+    //
+    // The gate binds to the finalization path, and App Hosting reaches that path through
+    // the correction and /finalize routes, so this runtime has its own copy of the switch.
+    // An unset variable resolves to `off`, which would silently stop those routes
+    // finalizing — reporting the mode makes that visible instead of a mystery. It is the
+    // mode only, never the canary allowlist: submission ids are not public.
+    finalizerMode: activationFromEnvironment().mode,
   }, {
     headers: {
       // Never cached: a stale identity is worse than none, since the entire purpose is
