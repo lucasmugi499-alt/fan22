@@ -38,11 +38,29 @@ import type { IconComponent } from '@/lib/icons';
  * "More". Every href resolves to a route the role can actually reach (see
  * `canAccessRoute`), so the shell never offers a link that a guard will refuse.
  */
+/**
+ * The order groups appear in, and the single definition of what a group IS.
+ *
+ * The desktop rail previously carried its own hardcoded copy of this list, so a nav item in
+ * a group the rail did not know about was silently dropped — present in the config,
+ * invisible on screen. Exporting the order means adding a workspace cannot half-land.
+ */
+export const NAV_GROUP_ORDER = [
+  'COMMAND',
+  'NETWORK',
+  'INTEGRITY',
+  'CONTROL PLANE',
+  'GROWTH',
+  'SYSTEM',
+] as const;
+
+export type NavGroup = (typeof NAV_GROUP_ORDER)[number];
+
 export interface NavDestination {
   name: string;
   href: string;
   icon: IconComponent;
-  group?: 'COMMAND' | 'NETWORK' | 'INTEGRITY' | 'GROWTH' | 'SYSTEM';
+  group?: NavGroup;
 }
 
 export interface RoleNav {
@@ -139,24 +157,39 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       ...COMMON_MORE,
     ],
   },
+  /**
+   * Four workspaces, not five loose groups.
+   *
+   * League and Team management were previously reachable only by drilling through
+   * Organizations — the detail routes existed but no index did, so the two most common
+   * operational objects on the platform had no front door. They are first-class here.
+   *
+   * Competition Integrity is its own workspace because it is where official data that was
+   * deliberately NOT written waits for a decision, and Control Plane is separated from
+   * System health because reporting release readiness is a different job from watching
+   * infrastructure.
+   */
   platform_admin: {
     workspace: 'Platform Command',
     primary: [
-      { name: 'Command', href: '/admin', icon: SlidersHorizontal, group: 'COMMAND' },
-      { name: 'Work', href: '/admin/work', icon: ListBullets, group: 'COMMAND' },
-      { name: 'Organizations', href: '/admin/organizations', icon: Buildings, group: 'NETWORK' },
-      { name: 'Trust', href: '/admin/trust', icon: Gavel, group: 'INTEGRITY' },
+      { name: 'Command centre', href: '/admin', icon: SlidersHorizontal, group: 'COMMAND' },
+      { name: 'Leagues', href: '/admin/leagues', icon: Trophy, group: 'NETWORK' },
+      { name: 'Teams', href: '/admin/teams', icon: Buildings, group: 'NETWORK' },
+      { name: 'Integrity', href: '/admin/competition', icon: Gavel, group: 'INTEGRITY' },
     ],
     more: [
-      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'NETWORK' },
+      { name: 'Work queue', href: '/admin/work', icon: ListBullets, group: 'COMMAND' },
+      { name: 'Organizations', href: '/admin/organizations', icon: Buildings, group: 'NETWORK' },
       { name: 'People', href: '/admin/people', icon: UserList, group: 'NETWORK' },
       { name: 'Access', href: '/admin/access', icon: Key, group: 'NETWORK' },
-      { name: 'Competition', href: '/admin/competition', icon: Trophy, group: 'INTEGRITY' },
-      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'GROWTH' },
+      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'NETWORK' },
+      { name: 'Trust cases', href: '/admin/trust', icon: Gavel, group: 'INTEGRITY' },
       { name: 'Finance', href: '/admin/finance', icon: Wallet, group: 'INTEGRITY' },
+      { name: 'Control plane', href: '/admin/control-plane', icon: SlidersHorizontal, group: 'CONTROL PLANE' },
+      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'CONTROL PLANE' },
+      { name: 'Activation audit', href: '/admin/audit', icon: Scroll, group: 'CONTROL PLANE' },
+      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'GROWTH' },
       { name: 'Reports', href: '/admin/reports', icon: ChartLine, group: 'GROWTH' },
-      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'SYSTEM' },
-      { name: 'Audit', href: '/admin/audit', icon: Scroll, group: 'SYSTEM' },
       ...COMMON_MORE,
     ],
   },

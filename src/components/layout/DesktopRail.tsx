@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import type { RoleNav } from '@/lib/nav';
+import type { NavGroup, RoleNav } from '@/lib/nav';
+import { NAV_GROUP_ORDER } from '@/lib/nav';
 import { activeHref } from './navActive';
 import { GoalPlaceLockup } from '@/components/brand/GoalPlaceBrand';
 
@@ -45,7 +46,8 @@ function GroupedRail({
   destinations: RoleNav['primary'];
   active: string | null;
 }) {
-  const groups = ['COMMAND', 'NETWORK', 'INTEGRITY', 'GROWTH', 'SYSTEM'] as const;
+  // From nav.ts, so a new workspace cannot appear in the config and vanish from the rail.
+  const groups: readonly NavGroup[] = NAV_GROUP_ORDER;
   return (
     <div className="space-y-4">
       {groups.map((group) => {
