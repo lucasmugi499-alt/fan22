@@ -188,9 +188,12 @@ async function replay(store: Firestore) {
 
 async function teardown(store: Firestore) {
   let removed = 0;
+  // `outbox` included: the finalizer emits an event alongside the case, and a teardown
+  // that clears the case but not its event leaves a dangling notification instruction
+  // pointing at a record that no longer exists.
   for (const collection of [
     'officialSportEvents', 'officialAthleteMatchStats', 'finalizations', 'standings',
-    'fantasyPointEvents', 'reconciliationExceptions',
+    'fantasyPointEvents', 'reconciliationExceptions', 'outbox',
   ]) {
     const snapshot = await store.collection(collection).where('matchId', '==', MATCH_ID).get()
       .catch(() => null);
