@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeSubmission } from './resultFinalizer';
 
+/** Every test that expects work to happen runs with the gate open. */
+const ENABLED = { mode: 'enabled' as const, canaryAllowlist: [] };
+
 type RecordData = Record<string, unknown>;
 
 function docRef(path: string) {
@@ -131,7 +134,7 @@ describe('trusted result finalizer', () => {
       },
     });
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     expect(records.get('officialSportEvents/match_1_v1_event_0001')).toMatchObject({
@@ -279,7 +282,7 @@ describe('trusted result finalizer', () => {
       'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
     });
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     const reconciliation = writes.find((write) => write.path === 'officialMatchReconciliation/match_1_v1');
     expect(reconciliation?.data).toMatchObject({
@@ -315,7 +318,7 @@ describe('trusted result finalizer', () => {
       'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
     });
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     const performances = writes.filter((write) => write.path.startsWith('officialAthleteMatchStats/'));
     expect(performances.length).toBeGreaterThan(0);
@@ -336,7 +339,7 @@ describe('trusted result finalizer', () => {
       'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row', teamId: 'team_away' },
     });
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     const performances = writes
       .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))
@@ -372,7 +375,7 @@ describe('trusted result finalizer', () => {
       'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
     });
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     const performances = writes
       .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))
@@ -398,7 +401,7 @@ describe('trusted result finalizer', () => {
       'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
     });
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     const performances = writes
       .filter((write) => write.path.startsWith('officialAthleteMatchStats/'))

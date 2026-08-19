@@ -7,6 +7,7 @@ import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
 import type { OfficialSportEvent } from '../kernel/types';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
+import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 
 /** Bound to the kernel rather than hardcoded, so a definition change is traceable. */
 const EVENT_SCHEMA_VERSION = '1.0.0';
@@ -484,7 +485,10 @@ function reconcileOfficialScore({
     away: Math.max(0, trace.away - score.away),
   };
 
-  let sequence = events.length + 1;
+  // Derived from the highest sequence present, not the array length. Once ineligible
+  // athletes are filtered out the array is shorter than the sequence numbers it carries, so
+  // length + 1 could reuse an id that survived the filter.
+  let sequence = events.reduce((highest, event) => Math.max(highest, event.sequence), 0) + 1;
   const adjustmentEvents: OfficialSportEventRecord[] = [];
   for (const side of ['home', 'away'] as const) {
     const points = shortfall[side];
@@ -627,9 +631,26 @@ export type FinalizeOutcome =
  */
 export async function finalizeSubmission(
   db: Firestore,
-  matchId: string
+  matchId: string,
+  /**
+   * Required, with no default. The activation gate binds to the finalization path itself
+   * rather than to one caller: previously only the Firestore trigger consulted it, so the
+   * scheduled sweeper, the correction route and the authenticated /finalize endpoint could
+   * each publish official records while the mode was `off` or `canary`. Making this
+   * mandatory means a new caller cannot forget the switch — it will not compile.
+   */
+  activation: FinalizerActivation,
 ): Promise<FinalizeOutcome> {
   const submissionRef = db.collection(SUBMISSIONS).doc(matchId);
+
+  // Checked before the transaction opens and before any read of the submission, so an
+  // `off` deployment cannot write an official record even if the rest of this regressed.
+  const gate = decideFinalization({
+    submissionId: matchId,
+    mode: activation.mode,
+    canaryAllowlist: activation.canaryAllowlist,
+  });
+  if (!gate.proceed) return { action: 'skipped', reason: gate.reason };
 
   return db.runTransaction(async (tx: Transaction) => {
     const submissionSnap = await tx.get(submissionRef);
@@ -823,10 +844,29 @@ export async function finalizeSubmission(
      * continued anyway, so an official result could be published whose own events said it
      * was wrong.
      */
+    /**
+     * Official events are filtered to eligible athletes before anything reads them.
+     *
+     * Eligibility already excluded these athletes from `officialAthleteMatchStats`, but the
+     * candidate event arrays were still written to `officialSportEvents` unfiltered. That
+     * produced a split-brain official record: the event stream credited a try to an athlete
+     * the same finalization had ruled ineligible, while the athlete's own official stats
+     * showed nothing. For a platform whose product is sports truth, one official record
+     * cannot contradict another.
+     *
+     * Removing an ineligible scorer's events makes the remaining events total LESS than the
+     * submitted score, so reconciliation records the difference as an explicit
+     * `unattributed_team_score`. That is the honest outcome: the points were scored, and
+     * this platform cannot say by whom.
+     */
+    const ineligibleAthleteIds = new Set(eligibilityIssues.map((issue) => issue.athleteId));
+    const eligibleOfficialEvents = [...activeSquadEvents, ...scorerEvents, ...statLineEvents]
+      .filter((event) => !event.primaryAthleteId || !ineligibleAthleteIds.has(event.primaryAthleteId));
+
     const surplusGate = fantasySport
       ? reconcileOfficialScore({
         sport: fantasySport,
-        events: [...activeSquadEvents, ...scorerEvents, ...statLineEvents],
+        events: eligibleOfficialEvents,
         match,
         submission,
         score: plan.match.score,
@@ -860,7 +900,7 @@ export async function finalizeSubmission(
           awayDifference: surplusGate.trace.away - plan.match.score.away,
           // The submitted events are preserved by reference, never rewritten. This is the
           // evidence a League needs to decide which side is wrong.
-          eventIds: [...activeSquadEvents, ...scorerEvents, ...statLineEvents].map((e) => e.id),
+          eventIds: eligibleOfficialEvents.map((event) => event.id),
           evidenceRefs: submission.evidenceRefs ?? [],
           reasonCode: 'scoring_events_exceed_submitted_result',
           status: 'open',
@@ -950,7 +990,7 @@ export async function finalizeSubmission(
     });
 
     if (fantasySport) {
-      const officialEvents = [...activeSquadEvents, ...scorerEvents, ...statLineEvents];
+      const officialEvents = [...eligibleOfficialEvents];
 
       // Already computed by the integrity gate above, which is the only place this may be
       // decided. Recomputing here would risk the gate and the published record disagreeing.

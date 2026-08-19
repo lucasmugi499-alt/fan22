@@ -2,6 +2,7 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { canRequestTrustedFinalization } from '@/lib/resultSubmission';
 import { finalizeSubmission } from '@/server/resultFinalizer';
 import type { ResultSubmission } from '@/types';
+import { activationFromEnvironment } from '@/server/finalizerActivation';
 
 export const runtime = 'nodejs';
 
@@ -57,7 +58,7 @@ export async function POST(
       );
     }
 
-    return Response.json(await finalizeSubmission(adminDb, matchId));
+    return Response.json(await finalizeSubmission(adminDb, matchId, activationFromEnvironment()));
   } catch (error) {
     console.error('Trusted result finalization failed', error);
     return Response.json(

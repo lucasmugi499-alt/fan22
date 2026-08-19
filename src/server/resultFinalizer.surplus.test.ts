@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeSubmission, reconciliationExceptionId } from './resultFinalizer';
 
+/** Every test that expects work to happen runs with the gate open. */
+const ENABLED = { mode: 'enabled' as const, canaryAllowlist: [] };
+
 type RecordData = Record<string, unknown>;
 
 let autoId = 0;
@@ -142,7 +145,7 @@ describe('surplus reconciliation blocks finalization', () => {
     // Football: two goals, submitted 2-0.
     const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 2 }));
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     expect(records.has(`reconciliationExceptions/${reconciliationExceptionId('match_1', 1)}`)).toBe(false);
@@ -153,7 +156,7 @@ describe('surplus reconciliation blocks finalization', () => {
     // contradiction, so the remainder is published explicitly and the result stands.
     const { db, records } = setup('football', submissionFor({ homeScore: 3, awayScore: 0, homeScorerCount: 2 }));
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     const unattributed = [...records.entries()].filter(([path, value]) =>
@@ -171,7 +174,7 @@ describe('surplus reconciliation blocks finalization', () => {
       // Submitted 2, events reconstruct more than 2.
       const { db, records } = setup(sport, submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: scorerCount }));
 
-      const outcome = await finalizeSubmission(db as never, 'match_1');
+      const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
       expect(outcome).toMatchObject({ action: 'blocked', reason: 'reconciliation_surplus' });
       expectNoOfficialWrites(records);
@@ -203,7 +206,7 @@ describe('surplus reconciliation blocks finalization', () => {
   it('blocks an away surplus the same way', async () => {
     const { db, records } = setup('football', submissionFor({ homeScore: 0, awayScore: 1, awayScorerCount: 2 }));
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'blocked' });
     expectNoOfficialWrites(records);
@@ -219,7 +222,7 @@ describe('surplus reconciliation blocks finalization', () => {
       homeScore: 1, awayScore: 1, homeScorerCount: 3, awayScorerCount: 2,
     }));
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'blocked' });
     const cases = [...records.keys()].filter((p) => p.startsWith('reconciliationExceptions/'));
@@ -231,8 +234,8 @@ describe('surplus reconciliation blocks finalization', () => {
   it('is idempotent across a redelivered trigger', async () => {
     const { db, records, writes } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 3 }));
 
-    const first = await finalizeSubmission(db as never, 'match_1');
-    const second = await finalizeSubmission(db as never, 'match_1');
+    const first = await finalizeSubmission(db as never, 'match_1', ENABLED);
+    const second = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(first).toMatchObject({ action: 'blocked' });
     // The second delivery is refused by the eligibility check, before any planning.
@@ -248,7 +251,7 @@ describe('surplus reconciliation blocks finalization', () => {
   it('marks the submission so a later write cannot re-enter finalization', async () => {
     const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 3 }));
 
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(records.get('resultSubmissions/match_1')).toMatchObject({
       finalizationStatus: 'blocked_reconciliation',
@@ -261,7 +264,7 @@ describe('surplus reconciliation blocks finalization', () => {
 
   it('finalizes once a corrected resubmission reconciles', async () => {
     const { db, records } = setup('football', submissionFor({ homeScore: 2, awayScore: 0, homeScorerCount: 3 }));
-    await finalizeSubmission(db as never, 'match_1');
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     // League review corrects the claim: a new version that reconciles, with the block
     // cleared. The old case stays on record against version 1.
@@ -272,11 +275,66 @@ describe('surplus reconciliation blocks finalization', () => {
       reviewStatus: null,
     });
 
-    const outcome = await finalizeSubmission(db as never, 'match_1');
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     // Exactly one official result, and the original case is still there as evidence.
     expect([...records.keys()].filter((p) => p.startsWith('finalizations/'))).toHaveLength(1);
     expect(records.has(`reconciliationExceptions/${reconciliationExceptionId('match_1', 1)}`)).toBe(true);
+  });
+});
+
+/**
+ * An official record must not contradict itself.
+ *
+ * Eligibility already kept ineligible athletes out of `officialAthleteMatchStats`, but the
+ * event stream was written unfiltered — so `officialSportEvents` could credit a goal to an
+ * athlete the same finalization had ruled ineligible.
+ */
+describe('official events exclude ineligible athletes', () => {
+  function eventsFor(records: Map<string, RecordData>) {
+    return [...records.entries()]
+      .filter(([path]) => path.startsWith('officialSportEvents/'))
+      .map(([, value]) => value);
+  }
+
+  it('publishes no event crediting an athlete registered to another club', async () => {
+    const { db, records } = fakeDb({
+      'resultSubmissions/match_1': submissionFor({ homeScore: 1, awayScore: 0, homeScorerCount: 1 }),
+      'matches/match_1': matchFor('football'),
+      // The claimed scorer is registered to a club that is not in this fixture.
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Ineligible', position: 'Striker', teamId: 'team_elsewhere' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Away', position: 'Striker', teamId: 'team_away' },
+    });
+
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
+    expect(outcome).toMatchObject({ action: 'finalized' });
+
+    const events = eventsFor(records);
+    expect(events.length).toBeGreaterThan(0);
+    // The contradiction: no official event may name an athlete excluded from official stats.
+    expect(events.filter((event) => event.primaryAthleteId === 'athlete_1')).toEqual([]);
+    expect(records.get('officialAthleteMatchStats/match_1_v1_athlete_1')).toBeUndefined();
+
+    // The goal still happened, so the score is preserved and the gap is stated explicitly
+    // rather than credited to someone this platform cannot stand behind.
+    const unattributed = events.filter((event) => String(event.eventType).endsWith('unattributed_team_score'));
+    expect(unattributed).toHaveLength(1);
+    expect(unattributed[0]).toMatchObject({ payload: { value: 1 } });
+    expect(records.get('matches/match_1')).toMatchObject({ score: { home: 1, away: 0 } });
+
+    const reconciliation = records.get('officialMatchReconciliation/match_1_v1');
+    expect((reconciliation as RecordData)?.eligibilityIssues).toMatchObject([
+      { athleteId: 'athlete_1', reason: 'not_registered_to_claimed_team' },
+    ]);
+  });
+
+  it('still publishes events for eligible athletes in the same match', async () => {
+    const { db, records } = setup('football', submissionFor({ homeScore: 1, awayScore: 0, homeScorerCount: 1 }));
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    const events = eventsFor(records);
+    expect(events.filter((event) => event.primaryAthleteId === 'athlete_1').length).toBeGreaterThan(0);
   });
 });

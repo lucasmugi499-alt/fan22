@@ -8,6 +8,7 @@ import {
 } from '../../src/lib/resultSubmission';
 import { ResultSubmission } from '../../src/types';
 import { finalizeSubmission } from '../../src/server/resultFinalizer';
+import type { FinalizerActivation } from '../../src/server/finalizerActivation';
 
 export { finalizeSubmission } from '../../src/server/resultFinalizer';
 
@@ -124,7 +125,10 @@ export async function sweepOverdueConfirmations(db: Firestore): Promise<string[]
  * Retries settled submissions that never reached `official`, covering transient trigger
  * failures. Safe to run repeatedly — `finalizeSubmission` is idempotent via the ledger.
  */
-export async function retryStalledFinalizations(db: Firestore): Promise<string[]> {
+export async function retryStalledFinalizations(
+  db: Firestore,
+  activation: FinalizerActivation,
+): Promise<string[]> {
   const snap = await db
     .collection(SUBMISSIONS)
     .where('status', '==', 'confirmed')
@@ -134,7 +138,7 @@ export async function retryStalledFinalizations(db: Firestore): Promise<string[]
   const retried: string[] = [];
 
   for (const doc of snap.docs) {
-    const outcome = await finalizeSubmission(db, doc.id);
+    const outcome = await finalizeSubmission(db, doc.id, activation);
     if (outcome.action === 'finalized') {
       logger.warn('Sweep finalized a submission the trigger missed', { matchId: doc.id });
       retried.push(doc.id);

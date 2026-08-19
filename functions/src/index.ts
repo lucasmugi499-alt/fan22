@@ -12,7 +12,7 @@ import {
   sweepOverdueConfirmations,
 } from './finalize';
 import { applySearchIndexChange } from './searchIndex';
-import { currentFinalizerActivation, decideFinalization } from './finalizerMode';
+import { currentFinalizerActivation } from './finalizerMode';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 
 /**
@@ -77,27 +77,23 @@ export const onResultSubmissionWritten = onDocumentWritten(
 
     const matchId = event.params.matchId;
 
-    // Activation gate. Checked before any read of the submission so an 'off' deployment
-    // cannot write an official record even if the rest of the handler regressed.
+    // The gate now lives inside finalizeSubmission, so every caller honours it rather
+    // than just this one. The activation is still resolved here because only the Functions
+    // runtime can read the deployed params.
     const activation = currentFinalizerActivation();
-    const decision = decideFinalization({
-      submissionId: matchId,
-      mode: activation.mode,
-      canaryAllowlist: activation.canaryAllowlist,
-    });
-    if (!decision.proceed) {
+    const result = await finalizeSubmission(db, matchId, activation);
+    if (result.action === 'skipped'
+      && (result.reason === 'finalizer_off' || result.reason === 'not_in_canary_allowlist')) {
       logger.info('Finalization suppressed by activation mode', {
         matchId,
-        mode: decision.mode,
-        reason: decision.reason,
+        mode: activation.mode,
+        reason: result.reason,
       });
       return;
     }
 
-    const result = await finalizeSubmission(db, matchId);
-
     if (result.action === 'finalized') {
-      logger.info('Result finalized', { matchId, key: result.finalizationKey, mode: decision.mode });
+      logger.info('Result finalized', { matchId, key: result.finalizationKey, mode: activation.mode });
     } else if (result.action === 'blocked') {
       // A contradictory result is the one outcome an operator has to find out about. It
       // was previously indistinguishable from an ordinary no-op: both logged `debug` with
@@ -107,10 +103,10 @@ export const onResultSubmissionWritten = onDocumentWritten(
         matchId,
         reason: result.reason,
         exceptionId: result.exceptionId,
-        mode: decision.mode,
+        mode: activation.mode,
       });
     } else {
-      logger.debug('No finalization required', { matchId, reason: result.reason, mode: decision.mode });
+      logger.debug('No finalization required', { matchId, reason: result.reason, mode: activation.mode });
     }
   }
 );
@@ -182,7 +178,9 @@ export const reconcileResultSubmissions = onSchedule(
   async () => {
     const reminders = await sendDueConfirmationReminders(db);
     const escalated = await sweepOverdueConfirmations(db);
-    const retried = await retryStalledFinalizations(db);
+    // Forwards the same activation the trigger uses: a scheduled sweep must not be able
+    // to finalize while the mode is off or canary.
+    const retried = await retryStalledFinalizations(db, currentFinalizerActivation());
     logger.info('Reconciliation sweep complete', {
       escalated: escalated.length,
       reminders: reminders.length,

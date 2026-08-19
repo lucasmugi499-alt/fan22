@@ -6,6 +6,7 @@ import { finalizeSubmission } from '@/server/resultFinalizer';
 import { requireAuthenticatedMutation } from '@/server/api/security';
 import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, ResultSubmission } from '@/types';
+import { activationFromEnvironment } from '@/server/finalizerActivation';
 
 export const runtime = 'nodejs';
 
@@ -146,7 +147,7 @@ export async function POST(
         createdAt: FieldValue.serverTimestamp(),
       });
     });
-    const outcome = await finalizeSubmission(adminDb, matchId);
+    const outcome = await finalizeSubmission(adminDb, matchId, activationFromEnvironment());
     if (outcome.action === 'blocked') {
       // A correction is the intended way out of a reconciliation block, so it can land on
       // one: the corrected score may still contradict the recorded events. Saying
