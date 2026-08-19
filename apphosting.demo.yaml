@@ -1,10 +1,7 @@
 # Investor Demo. Keeps the current preview-style app behavior explicit.
 env:
   - variable: GOALPLACE_FINALIZER_MODE
-    value: enabled
-    availability: [RUNTIME]
-  - variable: GOALPLACE_FINALIZER_CANARY_SUBMISSION_IDS
-    value: ""
+    value: "enabled"
     availability: [RUNTIME]
   - variable: GOALPLACE_ENVIRONMENT
     value: demo
