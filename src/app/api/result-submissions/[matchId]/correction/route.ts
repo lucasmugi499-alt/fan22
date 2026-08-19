@@ -91,10 +91,14 @@ export async function POST(
       const snapshot = await transaction.get(submissionRef);
       if (!snapshot.exists) throw new Error('Result submission not found.');
       const submission = { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
-      const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
-      const isPlatform = role === 'platform_admin' || role === 'super_admin';
-      // Approving a correction changes an official result, so it needs the league's
-      // result-resolution capability on this exact league — not membership of it.
+      // Approving a correction rewrites an official sporting result, so the platform side
+      // has to hold the platform operating grant rather than merely carry the role.
+      const isPlatform = await hasCapability(
+        actor.uid,
+        { scopeType: 'platform', scopeId: 'global' },
+        'platform.admin.manage',
+      );
+      // The league's result-resolution capability on this exact league, not membership.
       const isLeagueAdmin = await hasCapability(
         actor.uid,
         { scopeType: 'league', scopeId: submission.leagueId },

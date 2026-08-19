@@ -187,6 +187,15 @@ describe('fantasy admin activation route', () => {
           ])),
         }),
       },
+      // Public activation is gated on the platform operating capability, not the role, so
+      // the operator fixture has to be provisioned the way a real account is.
+      accessIndex: {
+        doc: () => ({
+          get: vi.fn().mockResolvedValue(doc('platform_global_platform_user', {
+            capabilities: ['platform.admin.manage'],
+          })),
+        }),
+      },
     };
     vi.mocked(adminDb.collection).mockImplementation((name: string) => collections[name] as never);
 

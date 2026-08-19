@@ -62,7 +62,9 @@
     "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset",
     "data:guard": "tsx scripts/data/deprecated-fields-guard.ts",
     "data:repair:aggregates:dry-run": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts",
-    "data:repair:aggregates:apply": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts --apply"
+    "data:repair:aggregates:apply": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts --apply",
+    "postinstall": "npm --prefix functions ci || npm --prefix functions install",
+    "bootstrap": "npm ci && npm --prefix functions ci"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

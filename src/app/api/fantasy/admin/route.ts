@@ -13,6 +13,7 @@ import type {
   FantasySquadRules,
 } from '@/types/fantasy';
 import { parseJsonBody, requireAuthenticatedUser } from '@/server/api/security';
+import { hasCapability } from '@/server/access/capabilities';
 
 export const runtime = 'nodejs';
 
@@ -330,7 +331,10 @@ export async function POST(request: Request) {
     }, { status: 201 });
   }
 
-  if (!['platform_admin', 'super_admin'].includes(role ?? '')) {
+  // Activating a public fantasy competition is a platform decision, so it asks for the
+  // platform operating capability. Role alone used to be enough, which meant the grant
+  // could be revoked in the access model and this path would carry on regardless.
+  if (!(await hasCapability(actor.uid, { scopeType: 'platform', scopeId: 'global' }, 'platform.admin.manage'))) {
     return Response.json({ error: 'Platform approval is required for public activation.' }, { status: 403 });
   }
   const competitionRef = adminDb.collection('fantasyCompetitions').doc(parsed.data.competitionId);

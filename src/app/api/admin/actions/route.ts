@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser, requireRole, type AuthenticatedActor } from '@/server/api/security';
+import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { platformAuditEvent, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import type {
@@ -30,10 +30,6 @@ function audit(
     ...(note ? { note } : {}),
     createdAt: FieldValue.serverTimestamp(),
   };
-}
-
-function hasRole(actor: AuthenticatedActor, roles: string[]) {
-  return roles.includes(String(actor.role));
 }
 
 function transitionPatch(status: AccessAssignmentStatus, nowIso: string, note?: string) {
@@ -69,8 +65,16 @@ function transitionPatch(status: AccessAssignmentStatus, nowIso: string, note?: 
   };
 }
 
+/**
+ * The league capability on that exact league, or the platform-global operating grant.
+ *
+ * The platform fallback is `platform.admin.manage`, not the league capability repeated. A
+ * super_admin holds no league.* capabilities at all — governance, not operations — so
+ * asking for the same capability at platform scope would have locked super_admins out the
+ * moment the surrounding role bypass was removed.
+ */
 async function hasScopedLeagueCapability(userId: string, leagueId: string, capability: PermissionCapability) {
-  return hasCapabilityOrPlatformGrant(userId, { scopeType: 'league', scopeId: leagueId }, capability, capability);
+  return hasCapabilityOrPlatformGrant(userId, { scopeType: 'league', scopeId: leagueId }, capability);
 }
 
 function publicBaseUrl(request: Request) {
@@ -645,13 +649,10 @@ export async function POST(request: Request) {
       const { teamId, leagueId, seasonId, invitedEmail } = body;
       const league = await adminDb.collection('leagues').doc(leagueId).get();
       const leagueData = league.data();
-      if (
-        !hasRole(actor, ['platform_admin', 'super_admin'])
-        // Canonical only. The legacy adminUserIds arm that sat here could authorize an
-        // operator whose assignment had been revoked, and the Admin SDK bypasses the Rules
-        // that would have denied it.
-        && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team_admin.invite'))
-      ) {
+      // Capability only. The `!hasRole(...)` arm that sat here let a platform role invite a
+      // team admin to any league with no capability anywhere; platform operators now pass
+      // through the platform-global grant inside hasScopedLeagueCapability.
+      if (!(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team_admin.invite'))) {
         return Response.json({ error: 'You do not manage this league.' }, { status: 403 });
       }
       const team = await adminDb.collection('teams').doc(teamId).get();
@@ -779,11 +780,8 @@ export async function POST(request: Request) {
       for (const leagueId of leagueIds) {
         const league = leagueById.get(leagueId);
         if (!league?.exists) return Response.json({ error: `League ${leagueId} not found.` }, { status: 404 });
-        if (
-          !hasRole(actor, ['platform_admin', 'super_admin'])
-          // Canonical only; see above.
-          && !(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team.create'))
-        ) {
+        // Capability only; see the invitation command above.
+        if (!(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team.create'))) {
           return Response.json({ error: `You do not manage league ${leagueId}.` }, { status: 403 });
         }
       }
