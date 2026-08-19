@@ -116,6 +116,59 @@ function findUngatedPlatformCommands(source: string): string[] {
   return ungated;
 }
 
+
+/**
+ * A role is not a capability.
+ *
+ * `requireRole(...)` is a legitimate coarse filter — it DENIES anyone outside a role set
+ * before any work happens. What this counts is the opposite shape: a role comparison used
+ * to GRANT, short-circuiting a capability check or standing in for one entirely.
+ *
+ * This budget exists because "the role bypasses are fixed" was claimed once after closing
+ * only the four sites an audit happened to name. The pattern outlived the list. A number
+ * that has to shrink is harder to overstate than a checklist.
+ */
+const ROLE_GRANT_PATTERNS = [
+  // Quote-agnostic on purpose. The first version of this matched only single quotes, so a
+  // double-quoted grant passed the guard silently — a detector with a blind spot is worse
+  // than none, because it certifies what it cannot see.
+  /role\s*===\s*['"`](platform_admin|super_admin)['"`]/,
+  /\[['"`]platform_admin['"`],\s*['"`]super_admin['"`]\]\.includes/,
+  /includes\(String\(actor\.role/,
+];
+
+/** Coarse role FILTERS deny rather than grant, and are not what this counts. */
+const NOT_A_ROLE_GRANT = [
+  /requireRole\(/,
+  /^\s*\*/,
+  /^\s*\/\//,
+  // Selecting which account class is required is not an authorization decision.
+  /requiredAccountClass/,
+];
+
+type RoleBudget = { file: string; grants: number; owedCapability: string };
+
+const KNOWN_ROLE_GRANTS: RoleBudget[] = [
+  { file: 'src/app/api/matches/[matchId]/evidence/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
+  { file: 'src/app/api/athlete-claims/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
+  { file: 'src/app/api/payments/intents/[paymentIntentId]/status/route.ts', grants: 1, owedCapability: 'platform.audit.read' },
+  { file: 'src/app/api/athletes/route.ts', grants: 1, owedCapability: 'platform.admin.manage — super_admin holds no team.athlete.create, so grant first' },
+  { file: 'src/app/api/result-submissions/[matchId]/correction/route.ts', grants: 1, owedCapability: 'platform.admin.manage (correction REQUEST path; approval already converted)' },
+  { file: 'src/app/api/support-needs/[supportNeedId]/review/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
+  { file: 'src/app/api/fantasy/admin/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
+  // Chooses which account class is demanded, then authorizes by capability either way.
+  { file: 'src/server/platform/commands/securePlatformCommand.ts', grants: 1, owedCapability: 'none — selects required account class, not authority' },
+];
+
+function countRoleGrants(source: string): number {
+  let count = 0;
+  for (const line of source.split('\n')) {
+    if (NOT_A_ROLE_GRANT.some((pattern) => pattern.test(line))) continue;
+    if (ROLE_GRANT_PATTERNS.some((pattern) => pattern.test(line))) count += 1;
+  }
+  return count;
+}
+
 export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
   const update = argv.includes('--update');
   const budgets = new Map(KNOWN_LEGACY_AUTHORITY.map((b) => [b.file, b]));
@@ -157,11 +210,34 @@ export async function runLegacyAuthorityGuard(argv = process.argv.slice(2)) {
     if (!actual.has(file)) violations.push(`${file} has no legacy sites left — remove its budget entry.`);
   }
 
+  // Role-grant budget, measured the same way.
+  const roleBudgets = new Map(KNOWN_ROLE_GRANTS.map((entry) => [entry.file, entry]));
+  const roleActual = new Map<string, number>();
+  for (const file of files) {
+    const normalized = file.split(path.sep).join('/');
+    // security.ts DEFINES requireRole; its implementation line is the coarse filter itself,
+    // not a grant that uses one.
+    if (normalized === 'src/server/api/security.ts') continue;
+    const count = countRoleGrants(await readFile(file, 'utf8'));
+    if (count > 0) roleActual.set(normalized, count);
+  }
+  for (const [file, count] of [...roleActual].sort()) {
+    const budget = roleBudgets.get(file);
+    if (!budget) regressions.push(`NEW role-as-capability grant in ${file} (${count}). Authorize with a capability — see src/server/access/capabilities.ts.`);
+    else if (count > budget.grants) regressions.push(`${file} grew from ${budget.grants} to ${count} role grant(s).`);
+    else if (count < budget.grants) violations.push(`${file} is down to ${count} role grant(s) (budget ${budget.grants}) — lower it.`);
+  }
+  for (const file of roleBudgets.keys()) {
+    if (!roleActual.has(file)) violations.push(`${file} has no role grants left — remove its budget entry.`);
+  }
+  const roleRemaining = [...roleActual.values()].reduce((a, b) => a + b, 0);
+
   const remaining = [...actual.values()].reduce((a, b) => a + b, 0);
   console.log('Legacy authorization guard');
   console.log(`Files scanned: ${files.length}`);
   console.log(`Legacy authorization lines remaining: ${remaining} across ${actual.size} file(s)`);
   console.log(`Ungated platform commands: ${ungated.length}`);
+  console.log(`Role-as-capability grants: ${roleRemaining} across ${roleActual.size} file(s)`);
   console.log('');
 
   if (update) {
