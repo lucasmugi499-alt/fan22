@@ -38,12 +38,11 @@ function extensionFrom(fileName: string, contentType: string) {
 
 const PLATFORM_SCOPE = { scopeType: 'platform', scopeId: 'global' } as const;
 
-function actorIsPlatform(actor: AuthenticatedActor) {
-  return actor.role === 'platform_admin' || actor.role === 'super_admin';
-}
-
 async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'user' | 'athlete' | 'team' | 'league', ownerId: string) {
-  if (actorIsPlatform(actor) || await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
+  // Capability only. The `actorIsPlatform(actor) ||` short-circuit that sat here meant the
+  // role alone authorized any upload, so the capability beside it never decided anything.
+  // Every platform account holds platform.admin.manage, so this is narrower, not stricter.
+  if (await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   if (ownerType === 'user') return ownerId === actor.uid;
   if (ownerType === 'athlete') return hasCapability(actor.uid, { scopeType: 'athlete', scopeId: ownerId }, 'athlete.media.manage');
   if (ownerType === 'team') return hasCapability(actor.uid, { scopeType: 'team', scopeId: ownerId }, 'team.profile.manage');
@@ -51,7 +50,10 @@ async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'us
 }
 
 async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string, teamId: string) {
-  if (actorIsPlatform(actor) || await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
+  // Capability only. The `actorIsPlatform(actor) ||` short-circuit that sat here meant the
+  // role alone authorized any upload, so the capability beside it never decided anything.
+  // Every platform account holds platform.admin.manage, so this is narrower, not stricter.
+  if (await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   const match = await adminDb.collection('matches').doc(matchId).get();
   if (!match.exists) return false;
   const data = match.data() ?? {};

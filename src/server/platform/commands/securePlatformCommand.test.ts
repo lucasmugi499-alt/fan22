@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
 import type { AuthenticatedActor } from '@/server/api/security';
-import { securePlatformCommand } from './securePlatformCommand';
+import { secureLeagueCommand, securePlatformCommand } from './securePlatformCommand';
 
 vi.mock('server-only', () => ({}));
 
@@ -134,5 +134,106 @@ describe('securePlatformCommand capability enforcement', () => {
     });
     expect(outcome).toHaveProperty('response');
     expect((outcome as { response: Response }).response.status).toBe(403);
+  });
+});
+
+/**
+ * League commands used to skip authorization entirely for a platform role.
+ *
+ * `secureLeagueCommand` wrapped its capability check in `if (!isPlatformActor)`, so holding
+ * platform_admin or super_admin let an actor run any league command against any league
+ * without a capability anywhere. Being a platform operator is a scope, not a licence — the
+ * same authority now has to be held as `platform.admin.manage`.
+ */
+describe('secureLeagueCommand authorizes platform actors too', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function installLeague({
+    accountClass,
+    leagueCaps,
+    platformCaps,
+  }: {
+    accountClass: string;
+    leagueCaps?: string[];
+    platformCaps?: string[];
+  }) {
+    vi.mocked(adminDb.collection).mockImplementation((name: string) => ({
+      doc: (id: string) => ({
+        get: vi.fn(async () => {
+          if (name === 'users') {
+            return { exists: true, data: () => ({ accountClass, accountStatus: 'active' }) };
+          }
+          if (name === 'leagues') {
+            return { exists: true, data: () => ({ id, adminUserIds: [] }) };
+          }
+          // accessIndex
+          const caps = String(id).startsWith('platform_') ? platformCaps : leagueCaps;
+          return { exists: Boolean(caps), data: () => (caps ? { capabilities: caps } : undefined) };
+        }),
+      }),
+    }) as never);
+  }
+
+  async function runLeague(role: string) {
+    return secureLeagueCommand({
+      actor: { uid: 'user_1', role, accountClass: 'platform_operator' } as AuthenticatedActor,
+      command: 'league.update_identity',
+      leagueId: 'league_1',
+      requiredCapability: 'league.profile.manage',
+      handler: async () => 'ran',
+    });
+  }
+
+  it('DENIES a platform_admin holding no capability on the league or the platform', async () => {
+    // The regression: this previously ran the handler purely because of the role.
+    installLeague({ accountClass: 'platform_operator', leagueCaps: undefined, platformCaps: ['platform.audit.read'] });
+
+    const outcome = await runLeague('platform_admin');
+
+    expect(outcome).toHaveProperty('response');
+    expect((outcome as { response: Response }).response.status).toBe(403);
+  });
+
+  it('DENIES a super_admin holding no capability either', async () => {
+    installLeague({ accountClass: 'platform_operator', leagueCaps: undefined, platformCaps: [] });
+
+    const outcome = await runLeague('super_admin');
+
+    expect(outcome).toHaveProperty('response');
+    expect((outcome as { response: Response }).response.status).toBe(403);
+  });
+
+  it('allows a platform actor through the platform-global grant', async () => {
+    // The authority platform operators actually have, expressed as a capability rather
+    // than an exemption — reviewable and revocable.
+    installLeague({ accountClass: 'platform_operator', leagueCaps: undefined, platformCaps: ['platform.admin.manage'] });
+
+    expect(await runLeague('platform_admin')).toEqual({ result: 'ran' });
+  });
+
+  it('allows a league operator holding the scoped capability', async () => {
+    vi.mocked(adminDb.collection).mockImplementation((name: string) => ({
+      doc: (id: string) => ({
+        get: vi.fn(async () => {
+          if (name === 'users') {
+            return { exists: true, data: () => ({ accountClass: 'organization_operator', accountStatus: 'active' }) };
+          }
+          if (name === 'leagues') return { exists: true, data: () => ({ id, adminUserIds: [] }) };
+          return String(id).startsWith('platform_')
+            ? { exists: false, data: () => undefined }
+            : { exists: true, data: () => ({ capabilities: ['league.profile.manage'] }) };
+        }),
+      }),
+    }) as never);
+
+    const outcome = await secureLeagueCommand({
+      actor: { uid: 'user_1', role: 'league_admin', accountClass: 'organization_operator' } as AuthenticatedActor,
+      command: 'league.update_identity',
+      leagueId: 'league_1',
+      requiredCapability: 'league.profile.manage',
+      handler: async () => 'ran',
+    });
+
+    expect(outcome).toEqual({ result: 'ran' });
   });
 });

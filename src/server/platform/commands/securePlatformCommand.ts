@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
-import { authorizeCapability, indexGrantsCapability } from '@/server/access/capabilities';
+import { authorizeCapability, hasCapability, indexGrantsCapability } from '@/server/access/capabilities';
 import { jsonError, requireRole, type AuthenticatedActor } from '@/server/api/security';
 
 type PlatformCommandInput<TResult> = {
@@ -178,24 +178,36 @@ export async function secureLeagueCommand<TResult>({
 
   const requestId = `${command}_${randomUUID()}`;
 
-  if (!isPlatformActor) {
-    const leagueData = leagueSnapshot.data();
-    // Read only to be recorded. `adminUserIds` carries no authority: it cannot grant, and
-    // it cannot widen the canonical decision below. A disagreement is written to
-    // securityEvents so a cutover lockout is visible rather than silent.
-    const observedLegacyGrant = Array.isArray(leagueData?.adminUserIds)
-      && leagueData.adminUserIds.includes(actor.uid);
-    const decision = await authorizeCapability({
+  // Authorization runs for EVERY actor, including platform operators.
+  //
+  // This used to be wrapped in `if (!isPlatformActor)`, so holding the platform_admin or
+  // super_admin role skipped the league capability check entirely — a platform operator
+  // could run any league command on any league without a capability anywhere. Being a
+  // platform operator is a scope, not a licence.
+  //
+  // A platform actor now satisfies the check through the platform-global grant rather than
+  // by exemption, which is the same authority expressed as a capability. All seven platform
+  // accounts hold `platform.admin.manage`, so this preserves their access while making it
+  // reviewable and revocable.
+  const leagueData = leagueSnapshot.data();
+  // Read only to be recorded. `adminUserIds` carries no authority: it cannot grant, and
+  // it cannot widen the canonical decision below. A disagreement is written to
+  // securityEvents so a cutover lockout is visible rather than silent.
+  const observedLegacyGrant = Array.isArray(leagueData?.adminUserIds)
+    && leagueData.adminUserIds.includes(actor.uid);
+  const [scopedDecision, platformGranted] = await Promise.all([
+    authorizeCapability({
       userId: actor.uid,
       scope: { scopeType: 'league', scopeId: leagueId },
       capability: requiredCapability,
       observedLegacyGrant,
       resource: `leagues/${leagueId}`,
       requestId,
-    });
-    if (!decision.granted) {
-      return { response: jsonError('You do not manage this league.', 403) };
-    }
+    }),
+    hasCapability(actor.uid, { scopeType: 'platform', scopeId: 'global' }, 'platform.admin.manage'),
+  ]);
+  if (!scopedDecision.granted && !platformGranted) {
+    return { response: jsonError('You do not manage this league.', 403) };
   }
 
   return {
