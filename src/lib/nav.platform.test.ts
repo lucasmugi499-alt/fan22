@@ -36,11 +36,22 @@ describe('platform admin navigation', () => {
     expect(primaryHrefs).toContain('/admin/teams');
   });
 
-  it('exposes the four workspaces', () => {
+  it('exposes all six workspaces', () => {
+    // Named for the work rather than for the system boundary: what needs me now, who is in
+    // the network, is the competition sound, what does the public see, where is the money,
+    // and who did what. Every one must actually carry destinations — a workspace declared in
+    // NAV_GROUP_ORDER but holding nothing renders as an empty heading.
     const groups = new Set(destinations.map((destination) => destination.group));
-    for (const workspace of ['COMMAND', 'NETWORK', 'INTEGRITY', 'CONTROL PLANE']) {
-      expect(groups).toContain(workspace);
+    for (const workspace of NAV_GROUP_ORDER) {
+      expect(groups, `${workspace} has no destinations`).toContain(workspace);
     }
+    expect(NAV_GROUP_ORDER).toHaveLength(6);
+  });
+
+  it('gives athlete management a front door', () => {
+    // Athletes are managed profiles now, so the console owns those records and needs an
+    // index for them exactly as it does for the leagues and teams that hold them.
+    expect(destinations.map((destination) => destination.href)).toContain('/admin/athletes');
   });
 
   it('only uses groups the rail knows how to render', () => {

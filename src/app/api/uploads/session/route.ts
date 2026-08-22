@@ -44,9 +44,24 @@ async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'us
   // Every platform account holds platform.admin.manage, so this is narrower, not stricter.
   if (await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   if (ownerType === 'user') return ownerId === actor.uid;
-  if (ownerType === 'athlete') return hasCapability(actor.uid, { scopeType: 'athlete', scopeId: ownerId }, 'athlete.media.manage');
+  // Athlete media follows athlete profile authority: the team that manages the roster owns
+  // the photo, because the athlete is a managed record rather than an account holder. The
+  // athlete-scoped `athlete.media.manage` grant this used to check no longer exists.
+  if (ownerType === 'athlete') return canManageAthleteMedia(actor, ownerId);
   if (ownerType === 'team') return hasCapability(actor.uid, { scopeType: 'team', scopeId: ownerId }, 'team.profile.manage');
   return hasCapability(actor.uid, { scopeType: 'league', scopeId: ownerId }, 'league.profile.manage');
+}
+
+/**
+ * Resolved through the athlete's team rather than a stored admin list: the roster capability
+ * on the team the athlete actually belongs to is the same authority that can edit the rest
+ * of their profile, so a photo cannot be changed by someone who could not change the name.
+ */
+async function canManageAthleteMedia(actor: AuthenticatedActor, athleteId: string) {
+  const athlete = await adminDb.collection('athletes').doc(athleteId).get();
+  const teamId = athlete.data()?.teamId;
+  if (typeof teamId !== 'string' || !teamId) return false;
+  return hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.roster.manage');
 }
 
 async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string, teamId: string) {

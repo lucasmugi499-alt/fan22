@@ -1,9 +1,12 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { hasCapability } from '@/server/access/capabilities';
 import { activationFromEnvironment } from '@/server/finalizerActivation';
+import {
+  environmentReadiness,
+  routingMechanismAvailable,
+  type EnvironmentReadiness,
+} from '@/server/platform/environmentReadiness';
 
 export const runtime = 'nodejs';
 
@@ -18,24 +21,11 @@ export const runtime = 'nodejs';
  *
  * Reporting "ready" for an environment whose config is still placeholders would be the
  * worst possible lie for an operator to act on.
+ *
+ * Readiness comes from the same module the activation workflow gates on, so the page that
+ * says "not ready" and the workflow that refuses to approve can never drift into telling an
+ * operator two different things about one environment.
  */
-const PLACEHOLDER_MARKERS = ['Fill with', 'REPLACE', 'TODO', 'placeholder', 'xxx'];
-
-async function environmentConfigState(file: string) {
-  try {
-    const contents = await readFile(path.join(process.cwd(), file), 'utf8');
-    const markers = PLACEHOLDER_MARKERS.filter((marker) =>
-      contents.toLowerCase().includes(marker.toLowerCase()));
-    return {
-      present: true,
-      placeholders: markers.length > 0,
-      // Named so an operator can see WHY it is not ready rather than being told a verdict.
-      placeholderMarkers: markers,
-    };
-  } catch {
-    return { present: false, placeholders: true, placeholderMarkers: ['config file missing'] };
-  }
-}
 
 export async function GET(request: Request) {
   const auth = await requireAuthenticatedUser(request);
@@ -47,9 +37,10 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Missing platform capability: platform.audit.read.' }, { status: 403 });
   }
 
+  const routingAvailable = routingMechanismAvailable();
   const [beta, production, openCases] = await Promise.all([
-    environmentConfigState('apphosting.beta.yaml'),
-    environmentConfigState('apphosting.production.yaml'),
+    environmentReadiness('beta', routingAvailable),
+    environmentReadiness('production', routingAvailable),
     adminDb.collection('reconciliationExceptions')
       .where('status', 'in', ['open', 'acknowledged', 'escalated'])
       .get()
@@ -71,21 +62,11 @@ export async function GET(request: Request) {
       modeThisOrigin: activation.mode,
       canaryAllowlistSize: activation.canaryAllowlist.length,
     },
-    beta: {
-      ...beta,
-      ready: false,
-      // Stated as a reason, not a boolean, so nobody reads "not ready" as "nearly ready".
-      blockedBy: beta.placeholders
-        ? 'Configuration still contains placeholder values.'
-        : 'No gateway or routing mechanism exists to move traffic.',
-    },
-    production: {
-      ...production,
-      ready: false,
-      blockedBy: production.placeholders
-        ? 'Configuration still contains placeholder values.'
-        : 'No gateway or routing mechanism exists to move traffic.',
-    },
+    // Every outstanding blocker is listed, not summarised to one line: an operator told
+    // only about placeholders would fix them and expect to be ready, when the routing wall
+    // is still there behind it. "Not ready" must never be read as "nearly ready".
+    beta: environmentReport(beta),
+    production: environmentReport(production),
     // Deployment state the console cannot infer from the app alone. Reported as unknown
     // rather than guessed: only the Firebase API knows what is deployed, and this runtime
     // does not query it.
@@ -98,8 +79,19 @@ export async function GET(request: Request) {
       note: openCases === null ? 'Case count unavailable.' : undefined,
     },
     trafficSwitching: {
-      available: false,
+      available: routingAvailable,
       reason: 'Environment activation prepares configuration and records intent. It does not retarget traffic; no gateway or DNS control exists in this deployment.',
     },
   }, { headers: { 'cache-control': 'no-store' } });
+}
+
+function environmentReport(readiness: EnvironmentReadiness) {
+  return {
+    present: readiness.configPresent,
+    placeholders: readiness.placeholderMarkers.length > 0,
+    // Named so an operator can see WHY it is not ready rather than being told a verdict.
+    placeholderMarkers: readiness.placeholderMarkers,
+    ready: readiness.ready,
+    blockers: readiness.blockers,
+  };
 }

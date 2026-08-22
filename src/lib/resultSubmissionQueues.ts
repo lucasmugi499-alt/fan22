@@ -82,8 +82,27 @@ export function useReconciliationExceptions(leagueId?: string, options?: { platf
   const [error, setError] = useState<Error>();
 
   const platformWide = options?.platformWide === true;
-  useEffect(() => {
+
+  /**
+   * Re-read the queue after a case changes.
+   *
+   * Exposed because acknowledging or closing a case changes THIS collection and nothing
+   * else. A caller that refreshed its surrounding match and league data instead would leave
+   * the case list showing the state before the action, which reads as the action having
+   * silently failed.
+   */
+  const refresh = useCallback(async () => {
     // A league surface needs a league; the platform queue deliberately has no scope.
+    if (!leagueId && !platformWide) return;
+    try {
+      setItems(await provider.getReconciliationExceptions(platformWide ? undefined : leagueId));
+      setError(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error('Blocked results could not load.'));
+    }
+  }, [leagueId, platformWide, provider]);
+
+  useEffect(() => {
     if (!leagueId && !platformWide) return;
     let active = true;
     void provider.getReconciliationExceptions(platformWide ? undefined : leagueId)
@@ -96,5 +115,5 @@ export function useReconciliationExceptions(leagueId?: string, options?: { platf
     return () => { active = false; };
   }, [leagueId, platformWide, provider]);
 
-  return { items, error };
+  return { items, error, refresh };
 }

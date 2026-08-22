@@ -41,6 +41,22 @@ export type PermissionCapability =
   // environment is the most consequential act on the platform, so it is not folded into
   // day-to-day platform administration.
   | 'platform.environment.activate'
+  // Added 2026-08-22 with the operating console. Creating, editing and archiving the
+  // network is day-to-day platform work, but it is separable from deciding trust cases or
+  // reading the audit trail, so it is its own capability rather than another use of
+  // platform.admin.manage.
+  | 'platform.network.manage'
+  // Athlete profiles are managed records: the team that knows the athlete writes them, and
+  // Platform can too. Separate from network.manage because a support operator may need to
+  // fix an athlete's name without being able to archive a league.
+  | 'platform.athlete.manage'
+  // Public site copy, registration windows and feature visibility. Explicitly NOT traffic
+  // routing, payments enablement, finalizer mode or environment activation — those are
+  // approval workflows, and `GOVERNED_SWITCHES` keeps them off the settings surface.
+  | 'platform.site.manage'
+  // Attesting that payout details belong to the athlete they name. Held apart from every
+  // other platform capability because it is the one that decides where money goes.
+  | 'platform.payee.verify'
   | 'league.profile.manage'
   | 'league.season.manage'
   | 'league.team.create'
@@ -56,10 +72,18 @@ export type PermissionCapability =
   | 'team.result.submit'
   | 'team.result.confirm'
   | 'team.update.publish'
-  | 'athlete.profile.manage'
-  | 'athlete.media.manage'
+  // `athlete.profile.manage` and `athlete.media.manage` were removed on 2026-08-22 when
+  // athletes became managed profiles. The team that knows the athlete writes their name,
+  // photo, position and roster status through team.roster.manage; an athlete no longer
+  // needs an account to exist in the sporting record, and self-editing a public sporting
+  // identity is not a thing this platform wants to offer.
+  //
+  // What an athlete keeps is what is genuinely theirs: proposing, and their money.
   | 'athlete.support_need.propose'
   | 'athlete.challenge.propose'
+  // The athlete or guardian's own payout identity, submitted through their portal. Never
+  // held by a team: see src/lib/platform/athletePayee.ts for why that line exists.
+  | 'athlete.payee.submit'
   | 'ownership.transfer'
   | 'break_glass.activate';
 
@@ -130,6 +154,10 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.organizations.identity.manage',
       'platform.verification.team.manage',
       'platform.environment.activate',
+      'platform.network.manage',
+      'platform.athlete.manage',
+      'platform.site.manage',
+      'platform.payee.verify',
       'ownership.transfer',
       'break_glass.activate',
     ],
@@ -160,6 +188,10 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.access.manage',
       'platform.organizations.identity.manage',
       'platform.verification.team.manage',
+      'platform.network.manage',
+      'platform.athlete.manage',
+      'platform.site.manage',
+      'platform.payee.verify',
       'league.profile.manage',
       'league.team.create',
       'league.team_admin.invite',
@@ -237,17 +269,20 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
   },
   {
     id: 'athlete_self',
-    version: '1.0.0',
+    // 2.0.0: profile and media authority removed. Claiming an athlete profile no longer
+    // makes the athlete an editor of their own public sporting record — it gives them their
+    // payee portal and the ability to propose. The team remains the author of the record.
+    version: '2.0.0',
     roleKey: 'athlete_self',
     label: 'Athlete Self',
-    capabilities: ['athlete.profile.manage', 'athlete.media.manage', 'athlete.support_need.propose', 'athlete.challenge.propose'],
+    capabilities: ['athlete.support_need.propose', 'athlete.challenge.propose', 'athlete.payee.submit'],
   },
   {
     id: 'athlete_guardian',
-    version: '1.0.0',
+    version: '2.0.0',
     roleKey: 'athlete_guardian',
     label: 'Athlete Guardian',
-    capabilities: ['athlete.profile.manage', 'athlete.media.manage', 'athlete.support_need.propose'],
+    capabilities: ['athlete.support_need.propose', 'athlete.payee.submit'],
   },
 ];
 
@@ -407,10 +442,19 @@ export function canCreateAthleteInScope(context: AccessContext | undefined, team
   );
 }
 
+/**
+ * Who may write an athlete's public sporting record.
+ *
+ * Not the athlete. An athlete profile is a managed record held by the team that knows them,
+ * so the authority runs team-first: the club that put them on the roster is the party that
+ * can say what their position is. The athlete-scoped self grant that used to appear here
+ * went with `athlete.profile.manage` — an athlete no longer needs an account to exist in the
+ * record, and what they keep is their payee identity, which this function has no say over.
+ */
 export function canManageAthleteInScope(context: AccessContext | undefined, athleteId: string) {
   return (
-    hasPlatformCapability(context, 'athlete.profile.manage')
-    || hasScopeCapability(context, 'athlete', athleteId, 'athlete.profile.manage')
+    hasPlatformCapability(context, 'platform.athlete.manage')
+    || hasTeamCapabilityForAthlete(context, athleteId, 'team.roster.manage')
     || hasTeamCapabilityForAthlete(context, athleteId, 'team.athlete.create')
   );
 }

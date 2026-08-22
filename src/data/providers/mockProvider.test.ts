@@ -43,7 +43,9 @@ describe('mock provider league applications', () => {
       scopeType: 'athlete',
       scopeId: 'ath_football_01_01_01',
       activeRoles: ['athlete_self'],
-      capabilities: expect.arrayContaining(['athlete.profile.manage']),
+      // Athletes are managed profiles: the claim carries payee and proposal authority, and
+      // deliberately no authority over the sporting record itself.
+      capabilities: expect.arrayContaining(['athlete.payee.submit']),
     }));
   });
 

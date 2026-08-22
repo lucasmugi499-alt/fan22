@@ -5,6 +5,7 @@ import { CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { bannerImage } from '@/lib/media';
 import type { FeedPost } from '@/types';
 import { useAuth } from '@/context/AuthProvider';
+import { SnapRow } from '@/components/ui/ScrollRail';
 
 const CATEGORY: Record<string, string> = {
   transfer: 'Transfers',
@@ -33,9 +34,9 @@ export function NewsRow({ title, posts, badge, seeAllHref = '/feed' }: { title: 
         </Link>
       </div>
       <div className="sm:hidden">
-        <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)]">
+        <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)]">
           {stories.map((post) => <NewsCard key={post.id} post={post} mobile />)}
-        </div>
+        </SnapRow>
       </div>
       <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
         {stories.map((post) => <NewsCard key={post.id} post={post} />)}

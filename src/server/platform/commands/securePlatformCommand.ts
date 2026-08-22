@@ -65,6 +65,34 @@ export function platformAuditEvent(input: {
   };
 }
 
+/**
+ * A refusal an operator is meant to read.
+ *
+ * Handlers reject work by throwing — "archive it instead, these six things are attached",
+ * "these settings moved while you were editing". Those sentences are the product: they name
+ * the blocking dependency or the stale version so the operator knows what to do next.
+ *
+ * Without this class they were plain Errors propagating out of the route uncaught, which in
+ * App Router means a bare 500 with no body. The command was correctly refused and the reason
+ * never left the server. Tagging deliberate refusals lets them be returned as themselves,
+ * while an unexpected failure — Firestore unreachable, a bug — still becomes a 500 rather
+ * than leaking its internals into an operator-facing message.
+ */
+export class PlatformCommandRefusal extends Error {
+  readonly status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'PlatformCommandRefusal';
+    this.status = status;
+  }
+}
+
+/** Throw helper, so handlers read as prose rather than as ceremony. */
+export function refuse(message: string, status = 400): never {
+  throw new PlatformCommandRefusal(message, status);
+}
+
 export async function securePlatformCommand<TResult>({
   actor,
   command,
@@ -117,14 +145,24 @@ export async function securePlatformCommand<TResult>({
   }
 
   const requestId = `${command}_${randomUUID()}`;
-  return {
-    result: await handler({
-      actor,
-      requestId,
-      reason: normalizedReason,
-      profile,
-    }),
-  };
+  try {
+    return {
+      result: await handler({
+        actor,
+        requestId,
+        reason: normalizedReason,
+        profile,
+      }),
+    };
+  } catch (cause) {
+    // Deliberate refusals are returned to the operator verbatim. Anything else is a genuine
+    // failure and is left to propagate, because turning an unexpected exception into a
+    // friendly 400 would tell an operator their command was rejected when it in fact broke.
+    if (cause instanceof PlatformCommandRefusal) {
+      return { response: jsonError(cause.message, cause.status) };
+    }
+    throw cause;
+  }
 }
 
 export async function secureLeagueCommand<TResult>({

@@ -20,6 +20,7 @@ import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { getSportTheme } from '@/lib/sportThemes';
 import { LeagueNoticeList } from '@/components/core/LeagueNoticeList';
 import type { Athlete, FeedPost, League, LeagueNotice, Match, Season, Team } from '@/types';
+import { SnapRow } from '@/components/ui/ScrollRail';
 
 const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
   football: 'pitch',
@@ -165,9 +166,9 @@ export function LeaguePublic({
       {leaders.length ? (
         <section className="space-y-2.5">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-text-strong"><Trophy className="h-4 w-4 text-brand-2" /> Players to watch</h2>
-          <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+          <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
             {leaders.map((athlete) => <AthleteCard key={athlete.id} athlete={athlete} className="snap-item w-44" />)}
-          </div>
+          </SnapRow>
         </section>
       ) : null}
 

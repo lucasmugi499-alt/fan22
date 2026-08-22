@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight, MagnifyingGlass } from '@phosphor-icons/react';
 import { Card } from '@/components/ui/Card';
+import { ScrollRail } from '@/components/ui/ScrollRail';
 import { cn } from '@/lib/utils';
 
 export function PlatformAdminHeader({
@@ -140,5 +141,110 @@ export function EmptyState({ title, children }: { title: string; children: React
       <p className="text-sm font-semibold text-text-strong">{title}</p>
       <p className="mt-1 text-sm leading-6 text-muted">{children}</p>
     </Card>
+  );
+}
+
+/**
+ * The console's table.
+ *
+ * Directory rows were the right primitive when every admin surface was a read-only list, but
+ * an operating console compares objects — which league has no clubs, which athlete cannot be
+ * paid — and comparison wants columns. Rows carry actions rather than links, because the
+ * work here is running a command, not navigating away.
+ *
+ * The table scrolls inside its own rail rather than widening the page: on a phone a wide
+ * admin table would otherwise push the whole layout sideways, and the fade edges say the
+ * columns continue instead of leaving them looking cut off.
+ */
+export type PlatformColumn<T> = {
+  header: string;
+  cell: (row: T) => ReactNode;
+  /** Columns that earn their place on a phone. Everything else hides below `sm`. */
+  primary?: boolean;
+  align?: 'start' | 'end';
+};
+
+export function PlatformTable<T>({
+  columns,
+  rows,
+  getKey,
+  empty,
+}: {
+  columns: PlatformColumn<T>[];
+  rows: T[];
+  getKey: (row: T) => string;
+  empty: ReactNode;
+}) {
+  if (!rows.length) return <>{empty}</>;
+
+  return (
+    <ScrollRail wrapperClassName="rounded-[var(--radius-md)] border border-border">
+      <table className="w-full min-w-[640px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border bg-surface-2">
+            {columns.map((column) => (
+              <th
+                key={column.header}
+                scope="col"
+                className={cn(
+                  'px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-subtle',
+                  column.align === 'end' ? 'text-right' : 'text-left',
+                  !column.primary && 'hidden sm:table-cell',
+                )}
+              >
+                {column.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={getKey(row)} className="border-b border-border last:border-b-0 hover:bg-surface-2">
+              {columns.map((column) => (
+                <td
+                  key={column.header}
+                  className={cn(
+                    'px-3 py-2.5 align-middle text-text-strong',
+                    column.align === 'end' ? 'text-right' : 'text-left',
+                    !column.primary && 'hidden sm:table-cell',
+                  )}
+                >
+                  {column.cell(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </ScrollRail>
+  );
+}
+
+/** The action cluster on a table row or a page header. */
+export function CommandButton({
+  label,
+  onClick,
+  tone = 'default',
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  tone?: 'default' | 'primary' | 'destructive';
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'min-h-9 shrink-0 rounded-[var(--radius-sm)] border px-2.5 text-xs font-semibold transition disabled:opacity-40',
+        tone === 'primary' && 'border-transparent bg-brand text-on-brand',
+        tone === 'destructive' && 'border-[color-mix(in_srgb,var(--state-error),transparent_45%)] text-[var(--state-error)]',
+        tone === 'default' && 'border-border text-text-strong hover:border-border-strong',
+      )}
+    >
+      {label}
+    </button>
   );
 }

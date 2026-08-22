@@ -10,6 +10,7 @@ import {
   canManageTeamInScope,
   canSubmitResultInScope,
   createAccessContext,
+  PERMISSION_BUNDLES,
 } from './access';
 
 const now = '2026-07-30T12:00:00.000Z';
@@ -130,5 +131,62 @@ describe('access assignments and scope-aware authorization', () => {
 
     expect(canManageTeamInScope(context, 'any_team')).toBe(true);
     expect(canManageLeagueInScope(context, 'any_league')).toBe(true);
+  });
+});
+
+describe('athletes are managed profiles, not account holders', () => {
+  /**
+   * A regression guard on the authority model itself.
+   *
+   * Restoring profile or media authority to an athlete bundle would be a one-line change
+   * that looks generous and quietly reopens self-editing of the public sporting record. The
+   * capability names are asserted as strings because the point is that they should not come
+   * back under any spelling.
+   */
+  const athleteBundles = PERMISSION_BUNDLES.filter(
+    (bundle) => bundle.roleKey === 'athlete_self' || bundle.roleKey === 'athlete_guardian',
+  );
+
+  it('covers both athlete bundles', () => {
+    expect(athleteBundles.map((bundle) => bundle.roleKey).sort())
+      .toEqual(['athlete_guardian', 'athlete_self']);
+  });
+
+  it.each(['athlete.profile.manage', 'athlete.media.manage'])(
+    'never grants %s to an athlete or guardian',
+    (removed) => {
+      for (const bundle of athleteBundles) {
+        expect(bundle.capabilities as string[]).not.toContain(removed);
+      }
+    },
+  );
+
+  it('grants an athlete the one thing that is genuinely theirs', () => {
+    // Their money. Everything else about them is written by the club that knows them.
+    for (const bundle of athleteBundles) {
+      expect(bundle.capabilities).toContain('athlete.payee.submit');
+    }
+  });
+
+  it('never lets a team or league bundle submit payout details', () => {
+    // The fraud path this model exists to close: whoever can invent an athlete must not be
+    // able to name the account their supporters pay into.
+    const clubBundles = PERMISSION_BUNDLES.filter((bundle) =>
+      bundle.roleKey.startsWith('team_')
+      || bundle.roleKey.startsWith('league_')
+      || bundle.roleKey === 'roster_manager'
+      || bundle.roleKey === 'result_reporter');
+    expect(clubBundles.length).toBeGreaterThan(0);
+    for (const bundle of clubBundles) {
+      expect(bundle.capabilities as string[]).not.toContain('athlete.payee.submit');
+      expect(bundle.capabilities as string[]).not.toContain('platform.payee.verify');
+    }
+  });
+
+  it('keeps payout verification out of every non-platform bundle', () => {
+    const holders = PERMISSION_BUNDLES
+      .filter((bundle) => (bundle.capabilities as string[]).includes('platform.payee.verify'))
+      .map((bundle) => bundle.roleKey);
+    expect(holders.sort()).toEqual(['platform_admin', 'super_admin']);
   });
 });

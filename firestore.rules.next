@@ -182,7 +182,24 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
+      // The key allowlist is a hardening the deployed ruleset has and this one had lost.
+      //
+      // It is restored here with the fields the live registration path actually writes —
+      // `accountClass` and `pendingInvitationPath` included, which the deployed list is
+      // missing. That omission is not cosmetic: the deployed rules reject the exact document
+      // /register produces, so restoring the stale list verbatim would have traded one
+      // loosening for a broken signup.
+      //
+      // `accountClass` is self-declared at create and deliberately carries no authority:
+      // every operator path re-derives it from custom claims, and `role == 'fan'` below
+      // means a self-registered document can never claim an operator role.
       allow create: if isOwner(uid) &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'email', 'name', 'role', 'accountClass', 'accountStatus',
+          'pendingInvitationPath', 'status', 'points', 'walletBalance',
+          'followedAthletes', 'followedTeams', 'followedLeagues',
+          'createdAt', 'updatedAt'
+        ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.role == 'fan' &&
         request.resource.data.status == 'active' &&
@@ -199,14 +216,20 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // An athlete profile is a managed record, not an account holder's page.
+    //
+    // The self-edit clause that used to sit here let anyone holding `userId` rewrite their
+    // own name, photo and bio. That is the wrong authority model for a public sporting
+    // record: the club that put the athlete on the roster is the party that knows what is
+    // true, and an athlete should not need an account to exist in the record at all. Profile
+    // writes now run through the audited platform command or the team's roster authority.
+    //
+    // Mirrored from firestore.rules deliberately. Leaving the clause here would mean the
+    // next deploy of this pending ruleset silently reinstated athlete self-editing.
     match /athletes/{athleteId} {
       allow read: if true;
       allow create: if isPlatformAdmin();
-      allow update: if isPlatformAdmin() ||
-        (isOwner(resource.data.userId) && changedKeysWithin([
-          'name', 'bio', 'city', 'avatarUrl', 'avatarURL',
-          'coverUrl', 'coverURL', 'impactNeeds', 'updatedAt'
-        ]));
+      allow update: if isPlatformAdmin();
       allow delete: if isSuperAdmin();
     }
 
@@ -1017,9 +1040,45 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /{document=**} {
-      allow read: if isSuperAdmin();
+    // Public site copy and feature visibility. Readable by anyone because the public site
+    // renders from it; writable by nobody through this path. Every change goes through the
+    // audited settings command, which is also what keeps governed switches — traffic
+    // routing, payments, finalizer mode, environment activation — off this document.
+    match /platformSettings/{settingId} {
+      allow read: if true;
       allow write: if false;
+    }
+
+    // Athlete payout identity. Denied to every client credential this rule can reach.
+    //
+    // Payout details are read by exactly one thing — the server command that hands them to
+    // the payment provider — and a console that can display an account number is a console
+    // that can leak one. Every other surface asks "can this athlete be paid", which the API
+    // answers from a redacted view without the details ever reaching a browser.
+    //
+    // One honest caveat: Firestore evaluates every matching rule and grants on ANY allow, so
+    // the `{document=**}` super_admin read grant at the bottom of this file still reaches
+    // this collection and no deny here can override it. Closing that requires narrowing the
+    // catch-all, which in turn requires explicitly modelling the ~16 collections currently
+    // relying on it — a separate, deliberate change. Until then the super_admin path is the
+    // known residual exposure, and it is stated here rather than implied away.
+    match /athletePayees/{athleteId} {
+      allow read, write: if false;
+    }
+
+
+    // Deny by default, including super_admin.
+    //
+    // This used to grant super_admin a blanket read of anything without an explicit rule,
+    // which sounds like a break-glass convenience and is actually a hole no specific rule can
+    // close: Firestore grants on ANY matching allow, so `athletePayees` denying everyone was
+    // overridden here for one role. Payout destinations are not normal admin data.
+    //
+    // Narrowing it is only safe because this ruleset models every collection the client
+    // reads. A new collection now starts unreadable, which is the right default — the fix is
+    // to write its rule, not to fall back on a role.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

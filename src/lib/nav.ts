@@ -49,9 +49,9 @@ export const NAV_GROUP_ORDER = [
   'COMMAND',
   'NETWORK',
   'INTEGRITY',
-  'CONTROL PLANE',
-  'GROWTH',
-  'SYSTEM',
+  'WEBSITE & SETTINGS',
+  'FINANCE & SUPPORT',
+  'AUDIT & ACCESS',
 ] as const;
 
 export type NavGroup = (typeof NAV_GROUP_ORDER)[number];
@@ -113,15 +113,21 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       ...COMMON_MORE,
     ],
   },
+  /**
+   * An athlete's account is not a place they edit their sporting record — their club writes
+   * that. Payouts is promoted to a primary destination because it is the one thing an
+   * athlete account genuinely exists for, and an athlete who cannot find it cannot be paid.
+   */
   athlete: {
     workspace: 'My Career',
     primary: [
       { name: 'Dashboard', href: '/athlete-dashboard', icon: SquaresFour },
       { name: 'Matches', href: '/matches', icon: Calendar },
-      { name: 'My support', href: '/contributions', icon: Wallet },
+      { name: 'Payouts', href: '/athlete/payouts', icon: Wallet },
       { name: 'Account', href: '/profile', icon: User },
     ],
     more: [
+      { name: 'My support', href: '/contributions', icon: HandHeart },
       { name: 'Feed', href: '/feed', icon: ListBullets },
       { name: 'Leagues', href: '/leagues', icon: Buildings },
       { name: 'Awards', href: '/awards', icon: Trophy },
@@ -158,16 +164,22 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
   },
   /**
-   * Four workspaces, not five loose groups.
+   * Six workspaces, each answering one operational question.
    *
-   * League and Team management were previously reachable only by drilling through
-   * Organizations — the detail routes existed but no index did, so the two most common
-   * operational objects on the platform had no front door. They are first-class here.
+   * The previous shape grouped by system boundary — a CONTROL PLANE group holding release
+   * state next to a GROWTH group holding sponsors — which meant an operator had to know how
+   * the platform is built to find where a job lives. These six are named for the work:
+   * what needs me now, who is in the network, is the competition sound, what does the public
+   * see, where is the money, and who did what.
    *
-   * Competition Integrity is its own workspace because it is where official data that was
-   * deliberately NOT written waits for a decision, and Control Plane is separated from
-   * System health because reporting release readiness is a different job from watching
-   * infrastructure.
+   * Athlete management joins Leagues and Teams under NETWORK because athletes became managed
+   * profiles: the platform and their club write those records, so the console needs a front
+   * door to them exactly as it does for the objects that own them.
+   *
+   * Control plane and system health sit under WEBSITE & SETTINGS as the read-only end of
+   * platform configuration — what the environment currently is, next to what the public
+   * currently sees. Neither switches anything; both describe state an operator changing site
+   * settings needs in front of them.
    */
   platform_admin: {
     workspace: 'Platform Command',
@@ -179,17 +191,19 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
     more: [
       { name: 'Work queue', href: '/admin/work', icon: ListBullets, group: 'COMMAND' },
+      { name: 'Athletes', href: '/admin/athletes', icon: Users, group: 'NETWORK' },
       { name: 'Organizations', href: '/admin/organizations', icon: Buildings, group: 'NETWORK' },
-      { name: 'People', href: '/admin/people', icon: UserList, group: 'NETWORK' },
-      { name: 'Access', href: '/admin/access', icon: Key, group: 'NETWORK' },
-      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'NETWORK' },
       { name: 'Trust cases', href: '/admin/trust', icon: Gavel, group: 'INTEGRITY' },
-      { name: 'Finance', href: '/admin/finance', icon: Wallet, group: 'INTEGRITY' },
-      { name: 'Control plane', href: '/admin/control-plane', icon: SlidersHorizontal, group: 'CONTROL PLANE' },
-      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'CONTROL PLANE' },
-      { name: 'Activation audit', href: '/admin/audit', icon: Scroll, group: 'CONTROL PLANE' },
-      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'GROWTH' },
-      { name: 'Reports', href: '/admin/reports', icon: ChartLine, group: 'GROWTH' },
+      { name: 'Website & settings', href: '/admin/site', icon: Gear, group: 'WEBSITE & SETTINGS' },
+      { name: 'Control plane', href: '/admin/control-plane', icon: SlidersHorizontal, group: 'WEBSITE & SETTINGS' },
+      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'WEBSITE & SETTINGS' },
+      { name: 'Finance', href: '/admin/finance', icon: Wallet, group: 'FINANCE & SUPPORT' },
+      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'FINANCE & SUPPORT' },
+      { name: 'Reports', href: '/admin/reports', icon: ChartLine, group: 'FINANCE & SUPPORT' },
+      { name: 'Access', href: '/admin/access', icon: Key, group: 'AUDIT & ACCESS' },
+      { name: 'People', href: '/admin/people', icon: UserList, group: 'AUDIT & ACCESS' },
+      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'AUDIT & ACCESS' },
+      { name: 'Audit trail', href: '/admin/audit', icon: Scroll, group: 'AUDIT & ACCESS' },
       ...COMMON_MORE,
     ],
   },

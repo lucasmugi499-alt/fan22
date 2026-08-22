@@ -154,9 +154,18 @@ describe('athlete claim access projection', () => {
       scopeType: 'athlete',
       scopeId: 'athlete_1',
       activeRoles: ['athlete_self'],
-      capabilities: expect.arrayContaining(['athlete.profile.manage', 'athlete.challenge.propose']),
+      // A verified claim gives the athlete their payee portal and the ability to propose —
+      // not authority over their own public sporting record, which the team owns.
+      capabilities: expect.arrayContaining(['athlete.payee.submit', 'athlete.challenge.propose']),
       assignmentIds: ['assignment_athlete_athlete_1_athlete_user_1'],
     }), { merge: false });
+    // Stated as an absence too: the removed capabilities must not reappear by way of a
+    // bundle edit that looks harmless.
+    const projectedIndex = transaction.set.mock.calls
+      .map((call: unknown[]) => call[1] as { capabilities?: string[] })
+      .find((value) => Array.isArray(value?.capabilities));
+    expect(projectedIndex?.capabilities).not.toContain('athlete.profile.manage');
+    expect(projectedIndex?.capabilities).not.toContain('athlete.media.manage');
     expect(adminAuth.setCustomUserClaims).toHaveBeenCalledWith('athlete_user_1', expect.objectContaining({
       role: 'athlete',
     }));

@@ -1,6 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ROUTING_BLOCKER } from '@/lib/platform/environmentActivation';
 
 /**
  * Whether an environment's configuration is fit to activate.
@@ -9,6 +10,14 @@ import path from 'node:path';
  * that says "not ready" and the workflow that refuses to approve computed readiness
  * separately, they would eventually disagree, and an operator would be told two different
  * things about the same environment on the same console.
+ *
+ * Readiness is reported as two lists rather than one, because the two kinds of blocker have
+ * to be enforced at different points. Configuration faults are ours to fix and must stop an
+ * approval. The absent routing mechanism is infrastructure that no approval can conjure, and
+ * gating approval on it would wall the workflow in at `readiness_checked` — the operator
+ * could never record the maintenance window or the routing instruction that the process
+ * exists to capture. It is enforced instead at the step where it actually bites: smoke
+ * confirmation, which would otherwise record that traffic moved when nothing can move it.
  */
 const PLACEHOLDER_MARKERS = ['Fill with', 'REPLACE', 'TODO', 'placeholder', 'xxx'];
 
@@ -17,11 +26,24 @@ const CONFIG_BY_ENVIRONMENT: Record<'beta' | 'production', string> = {
   production: 'apphosting.production.yaml',
 };
 
+export { ROUTING_BLOCKER };
+
 export type EnvironmentReadiness = {
   environment: 'beta' | 'production';
   configPresent: boolean;
   placeholderMarkers: string[];
-  /** Everything standing between this environment and activation, in plain words. */
+  /**
+   * Faults in this environment's own configuration. These gate approval: approving an
+   * environment whose config is still placeholders is approving something nobody checked.
+   */
+  configBlockers: string[];
+  /** Whether this deployment can retarget traffic at all. Today: never. */
+  routingAvailable: boolean;
+  /**
+   * Everything standing between this environment and activation, in plain words —
+   * configuration faults plus the routing wall. This is the reporting list, and the list
+   * recorded in the audit trail. It is NOT the list approval is gated on.
+   */
   blockers: string[];
   ready: boolean;
 };
@@ -30,32 +52,39 @@ export async function environmentReadiness(
   environment: 'beta' | 'production',
   routingAvailable = false,
 ): Promise<EnvironmentReadiness> {
-  const blockers: string[] = [];
+  const configBlockers: string[] = [];
   let configPresent = false;
   let placeholderMarkers: string[] = [];
 
   try {
-    const contents = await readFile(path.join(process.cwd(), CONFIG_BY_ENVIRONMENT[environment]), 'utf8');
+    // turbopackIgnore stops the tracer following process.cwd() and pulling the entire
+    // project into the route's file trace. The two files this can reach are named in
+    // outputFileTracingIncludes instead, so they still ship with the server.
+    const configPath = path.join(/* turbopackIgnore: true */ process.cwd(), CONFIG_BY_ENVIRONMENT[environment]);
+    const contents = await readFile(configPath, 'utf8');
     configPresent = true;
     placeholderMarkers = PLACEHOLDER_MARKERS.filter((marker) =>
       contents.toLowerCase().includes(marker.toLowerCase()));
     if (placeholderMarkers.length) {
-      blockers.push(`Configuration still contains placeholder values (${placeholderMarkers.join(', ')}).`);
+      configBlockers.push(`Configuration still contains placeholder values (${placeholderMarkers.join(', ')}).`);
     }
   } catch {
-    blockers.push('Configuration file is missing.');
+    configBlockers.push('Configuration file is missing.');
   }
 
+  const blockers = [...configBlockers];
   if (!routingAvailable) {
     // Named as a blocker rather than hidden, because it is the real reason this cannot
     // finish today and an operator deserves to know that before starting.
-    blockers.push('No traffic-routing mechanism exists, so traffic cannot be moved to this environment.');
+    blockers.push(ROUTING_BLOCKER);
   }
 
   return {
     environment,
     configPresent,
     placeholderMarkers,
+    configBlockers,
+    routingAvailable,
     blockers,
     ready: blockers.length === 0,
   };

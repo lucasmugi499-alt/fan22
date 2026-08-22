@@ -11,7 +11,15 @@ import { mockProvider } from '@/data/providers/mockProvider';
 import { uploadPublishedMedia } from '@/lib/firebase/storage';
 import type { Athlete, Match, SupportNeed } from '@/types';
 
-export type AthleteManageMode = 'profile' | 'support' | 'challenge' | 'highlight';
+/**
+ * `'profile'` was removed on 2026-08-22 when athletes became managed profiles.
+ *
+ * Leaving it would have left a form that writes fields Firestore Rules now refuse — a save
+ * button that reports success and changes nothing. What an athlete can still do here is
+ * propose: a support need, a challenge, a highlight. Those are proposals about their own
+ * career, not edits to the public sporting record their club maintains.
+ */
+export type AthleteManageMode = 'support' | 'challenge' | 'highlight';
 
 export function AthleteManageSheet({
   athlete,
@@ -30,10 +38,9 @@ export function AthleteManageSheet({
   const provider = isDemoMode ? mockProvider : dataProvider;
   const actorUserId = currentUser?.uid ?? userProfile?.uid;
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState(athlete.name);
-  const [city, setCity] = useState(athlete.city);
-  const [bio, setBio] = useState(athlete.bio);
-  const [impactNeeds, setImpactNeeds] = useState(athlete.impactNeeds.join(', '));
+  // Name, city, bio and impact-need state went with the removed `profile` mode: those are
+  // the club's to write now, so holding a draft copy of them here would be a form waiting to
+  // be reconnected to a write that no longer exists.
   const [title, setTitle] = useState('');
   const [story, setStory] = useState('');
   const [targetAmount, setTargetAmount] = useState('300000');
@@ -52,17 +59,6 @@ export function AthleteManageSheet({
     }
     setSaving(true);
     try {
-      if (mode === 'profile') {
-        await provider.updateAthleteProfile(athlete.id, {
-          name: name.trim(),
-          city: city.trim(),
-          bio: bio.trim(),
-          impactNeeds: impactNeeds.split(',').map((item) => item.trim()).filter(Boolean),
-          avatarUrl: athlete.avatarUrl,
-          coverUrl: athlete.coverUrl,
-        });
-        toast.success('Your public profile was updated.');
-      }
       if (mode === 'support') {
         if (!title.trim() || !story.trim() || Number(targetAmount) <= 0) {
           throw new Error('Add a title, story, and target amount.');
@@ -176,15 +172,6 @@ export function AthleteManageSheet({
       description={content.description}
       footer={<Button block icon={Check} onClick={save} disabled={saving}>{saving ? 'Saving...' : content.label}</Button>}
     >
-      {mode === 'profile' ? (
-        <div className="space-y-4">
-          <Field label="Name"><input className="field" value={name} onChange={(event) => setName(event.target.value)} /></Field>
-          <Field label="City"><input className="field" value={city} onChange={(event) => setCity(event.target.value)} /></Field>
-          <Field label="Bio"><textarea className="field min-h-28 py-3" value={bio} onChange={(event) => setBio(event.target.value)} /></Field>
-          <Field label="Development needs"><input className="field" value={impactNeeds} onChange={(event) => setImpactNeeds(event.target.value)} placeholder="Boots, transport, nutrition" /></Field>
-          <p className="text-xs text-muted">Team, league, verification, support totals, points, and official statistics cannot be edited here.</p>
-        </div>
-      ) : null}
       {mode === 'support' ? (
         <div className="space-y-4">
           <Field label="Need"><input className="field" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Transport for away fixtures" /></Field>

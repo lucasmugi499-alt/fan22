@@ -280,6 +280,15 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
   if (pathname.startsWith('/fantasy')) {
     return hasRole(auth, 'fan');
   }
+  if (pathname.startsWith('/athlete/payouts')) {
+    // Deliberately open to any signed-in person, and deliberately not gated on the athlete
+    // role: a guardian acting for a minor holds athlete-scoped access without ever holding
+    // that role, and locking them out here would leave the minor unable to be paid.
+    //
+    // Reaching the page grants nothing. It resolves which athlete the viewer is, and the API
+    // behind it refuses anyone without payee authority over that specific athlete.
+    return true;
+  }
   if (pathname.startsWith('/athlete-dashboard')) {
     return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'athlete'))
       || hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);

@@ -19,9 +19,18 @@ export function CompetitionIntegrity() {
   // The canonical blocked-finalization cases, platform-wide. These come first because they
   // are the only item here where official data was deliberately NOT written and someone has
   // to decide what happens next.
-  const { items: blocked } = useReconciliationExceptions(undefined, { platformWide: true });
+  const { items: blocked, refresh: refreshBlocked } = useReconciliationExceptions(undefined, { platformWide: true });
   const teamName = (id: string) => data.teams.find((team) => team.id === id)?.name ?? id;
   const leagueName = (id: string) => data.leagues.find((league) => league.id === id)?.name ?? id;
+  /**
+   * A reconciliation exception carries a match, not two teams. Resolving through the match
+   * is what turns the row heading into the fixture an operator recognises; feeding the match
+   * id to the team lookup produced a confident-looking label for the wrong thing.
+   */
+  const matchLabel = (matchId: string) => {
+    const match = data.matches.find((item) => item.id === matchId);
+    return match ? `${teamName(match.homeTeamId)} vs ${teamName(match.awayTeamId)}` : matchId;
+  };
   const disputes = disputedMatches(data.matches);
   const failedFinalizations = data.finalizations.filter((item) => item.status === 'failed');
   const overdue = data.matches.filter((item) => item.verificationStatus === 'pending' && item.status === 'completed');
@@ -45,9 +54,15 @@ export function CompetitionIntegrity() {
       ]} />
       <ReconciliationQueue
         cases={blocked}
-        teamName={teamName}
+        matchLabel={matchLabel}
         leagueName={leagueName}
-        onChanged={data.retry}
+        onChanged={() => {
+          // The case list is the thing the action changed, so it is the thing that has to
+          // be re-read. The surrounding platform data is refreshed too because a closed
+          // case can unblock a finalization.
+          void refreshBlocked();
+          data.retry();
+        }}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -103,12 +118,12 @@ export function CompetitionIntegrity() {
  */
 function ReconciliationQueue({
   cases,
-  teamName,
+  matchLabel,
   leagueName,
   onChanged,
 }: {
   cases: ReconciliationException[];
-  teamName: (id: string) => string;
+  matchLabel: (matchId: string) => string;
   leagueName: (id: string) => string;
   onChanged: () => void;
 }) {
@@ -126,10 +141,15 @@ function ReconciliationQueue({
     setBusyId(exceptionId);
     setError(null);
     try {
-      const token = await currentUser?.getIdToken();
+      // The demo persona holds a stand-in user with no token method. Saying so plainly
+      // beats letting a TypeError surface as the case's error text.
+      if (!currentUser || typeof currentUser.getIdToken !== 'function') {
+        throw new Error('Case actions need a signed-in platform operator. The demo session cannot change a case.');
+      }
+      const token = await currentUser.getIdToken();
       const response = await fetch('/api/platform/competition-integrity', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token ?? ''}` },
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({ exceptionId, status, note: note.trim() }),
       });
       if (!response.ok) {
@@ -156,7 +176,7 @@ function ReconciliationQueue({
           <div key={item.exceptionId} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-text-strong">
-                {teamName(item.matchId)} — {leagueName(item.leagueId)}
+                {matchLabel(item.matchId)} — {leagueName(item.leagueId)}
               </p>
               <StatusChip label={item.status} />
             </div>

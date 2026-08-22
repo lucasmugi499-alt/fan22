@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { athletePhoto } from '@/lib/media';
 import type { Athlete } from '@/types';
+import { SnapRow } from '@/components/ui/ScrollRail';
 
 /**
  * A horizontal, scroll-snap rail of people (a squad or a set of teammates) with real
@@ -14,7 +15,7 @@ export function PeopleCarousel({ title, athletes, seeAllHref }: { title: string;
         <h2 className="text-[15px] font-semibold text-text-strong">{title}</h2>
         {seeAllHref ? <Link href={seeAllHref} className="text-sm font-medium text-brand hover:underline">See all</Link> : null}
       </div>
-      <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+      <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
         {athletes.map((a, i) => {
           const photo = athletePhoto(a);
           return (
@@ -33,7 +34,7 @@ export function PeopleCarousel({ title, athletes, seeAllHref }: { title: string;
             </Link>
           );
         })}
-      </div>
+      </SnapRow>
     </section>
   );
 }

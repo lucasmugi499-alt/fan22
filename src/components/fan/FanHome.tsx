@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { FanOnboarding } from '@/components/fan/FanOnboarding';
 import { FAN_HOME_RECORD_LIMIT } from '@/components/fan/fanHomeData';
 import type { Match } from '@/types';
+import { SnapRow } from '@/components/ui/ScrollRail';
 
 function dayLabel(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -145,7 +146,7 @@ export function FanHome() {
           </Button>
         </div>
         {followedLeagues.length ? (
-          <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+          <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
             {followedLeagues.map((league) => (
               <Link
                 key={league.id}
@@ -160,7 +161,7 @@ export function FanHome() {
                 <CaretRight className="ml-auto h-4 w-4 shrink-0 text-muted" />
               </Link>
             ))}
-          </div>
+          </SnapRow>
         ) : (
           <button
             type="button"
@@ -187,7 +188,7 @@ export function FanHome() {
             View all matches <CaretRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+        <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
           {[...byDay.entries()].map(([day, dayMatches]) => (
             <div key={day} className="snap-item w-[300px] max-w-[86vw]">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">{day}</p>
@@ -198,7 +199,7 @@ export function FanHome() {
               </div>
             </div>
           ))}
-        </div>
+        </SnapRow>
       </section>
 
       <NewsRow title="Latest" posts={news} />
@@ -211,13 +212,13 @@ export function FanHome() {
           </h2>
           <Link href="/athletes" className="text-sm font-medium text-brand hover:underline">More</Link>
         </div>
-        <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+        <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
           {topAthletes.map((a) => (
             <div key={a.id} className="snap-item w-[160px]">
               <AthleteCard athlete={a} />
             </div>
           ))}
-        </div>
+        </SnapRow>
       </section>
 
       {/* Featured table */}

@@ -1,3 +1,21 @@
+// SUPERSEDED — this is not what is deployed.
+//
+// This file is the pre-2026-08-22 production baseline, the ruleset restored during the
+// 2026-07-22 rollback (see docs/INCIDENT-2026-07-22-rules-deploy.md). On 2026-08-22
+// `firestore.rules.next` was promoted to both staging (studio-534174814-9df36) and
+// production (manifest-quasar-479416-s7), and every firebase config in this repo —
+// firebase.json, firebase.staging.json, firebase.production-candidate.json — points at that
+// file. Nothing deploys this one.
+//
+// It is retained as the rollback artifact rather than deleted: if the promoted ruleset has
+// to be reverted, this is the known-good ruleset production ran for a month. Do not edit it
+// to add new collections — changes belong in firestore.rules.next.
+//
+// Known defect, and the reason promotion became urgent: the `users` create allowlist below
+// omits `accountClass`, which the live registration path writes. This ruleset denies the
+// exact document /register produces, so public signup was broken for as long as it was live.
+// See the "live registration path" case in src/rules/firestore.rules.test.ts.
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -81,14 +99,20 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // An athlete profile is a managed record, not an account holder's page.
+    //
+    // The self-edit clause that used to sit here let anyone holding `userId` rewrite their
+    // own name, photo and bio. That is the wrong authority model for a public sporting
+    // record: the club that put the athlete on the roster is the party that knows what is
+    // true, and an athlete should not need an account to exist in the record at all. Profile
+    // writes now run through the audited platform command or the team's roster authority.
+    //
+    // What the athlete keeps is their money, and that lives in /athletePayees below — a
+    // collection no client can read or write at any tier.
     match /athletes/{athleteId} {
       allow read: if true;
       allow create: if isPlatformAdmin();
-      allow update: if isPlatformAdmin() ||
-        (isOwner(resource.data.userId) && changedKeysWithin([
-          'name', 'bio', 'city', 'avatarUrl', 'avatarURL',
-          'coverUrl', 'coverURL', 'impactNeeds', 'updatedAt'
-        ]));
+      allow update: if isPlatformAdmin();
       allow delete: if isSuperAdmin();
     }
 
@@ -228,6 +252,45 @@ service cloud.firestore {
 
     match /adminLogs/{logId} {
       allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    // Public site copy and feature visibility. Readable by anyone because the public site
+    // renders from it; writable by nobody through this path. Every change goes through the
+    // audited settings command, which is also what keeps governed switches — traffic
+    // routing, payments, finalizer mode, environment activation — off this document.
+    match /platformSettings/{settingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Athlete payout identity. Denied to every client credential this rule can reach.
+    //
+    // Payout details are read by exactly one thing — the server command that hands them to
+    // the payment provider — and a console that can display an account number is a console
+    // that can leak one. Every other surface asks "can this athlete be paid", which the API
+    // answers from a redacted view without the details ever reaching a browser.
+    //
+    // One honest caveat: Firestore evaluates every matching rule and grants on ANY allow, so
+    // the `{document=**}` super_admin read grant at the bottom of this file still reaches
+    // this collection and no deny here can override it. Closing that requires narrowing the
+    // catch-all, which in turn requires explicitly modelling the ~16 collections currently
+    // relying on it — a separate, deliberate change. Until then the super_admin path is the
+    // known residual exposure, and it is stated here rather than implied away.
+    match /athletePayees/{athleteId} {
+      allow read, write: if false;
+    }
+
+
+    // Blocked finalizations. Written only by the trusted finalizer through the Admin SDK,
+    // which is why every client write is refused.
+    //
+    // Modelled explicitly because it was previously reachable only through the
+    // `{document=**}` catch-all, and that grants read to super_admin alone — so a Platform
+    // Admin opening Competition Integrity in production got an empty queue rather than the
+    // cases waiting for them. Being unmodelled was the bug.
+    match /reconciliationExceptions/{exceptionId} {
+      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 

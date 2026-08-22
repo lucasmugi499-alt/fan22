@@ -49,6 +49,16 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // Environment readiness is read from the App Hosting config files at request time, and
+  // those live at the repo root — nothing in the import graph points at them, so the tracer
+  // cannot find them on its own. Without this the deployed server would report
+  // "Configuration file is missing", which is a verdict about what got packaged rather than
+  // about whether the environment is configured. The Control Plane and the activation
+  // workflow must not be able to say that.
+  outputFileTracingIncludes: {
+    "/api/platform/control-plane": ["./apphosting.beta.yaml", "./apphosting.production.yaml"],
+    "/api/platform/environment-activation": ["./apphosting.beta.yaml", "./apphosting.production.yaml"],
+  },
   async headers() {
     return [
       {

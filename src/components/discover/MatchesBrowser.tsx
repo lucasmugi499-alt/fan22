@@ -7,6 +7,7 @@ import { dataProvider } from '@/data/dataProvider';
 import { isUpcomingMatch } from '@/lib/status';
 import { sportDisplayName, sportKey, type SportKey } from '@/lib/sportPresentation';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { ScrollRail } from '@/components/ui/ScrollRail';
 import { GradientBanner } from '@/components/premium/GradientBanner';
 import { MatchCard } from '@/components/core/MatchCard';
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
@@ -104,7 +105,7 @@ export function MatchesBrowser({
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
       </div>
       <div className="px-[var(--gutter)] md:px-0">
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filter matches by sport">
+        <ScrollRail wrapperClassName="mb-4" className="flex gap-2 pb-1" role="group" aria-label="Filter matches by sport">
           {SPORT_FILTERS.map((sport) => {
             const active = sportFilter === sport;
             const count = sport === 'all' ? list.length : sportCounts[sport];
@@ -126,7 +127,7 @@ export function MatchesBrowser({
               </button>
             );
           })}
-        </div>
+        </ScrollRail>
 
         {filteredList.length ? (
           <>

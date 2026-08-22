@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { SealCheck, PencilSimple, Coins, Users, Star, Target, Question, Camera, Heart, CalendarBlank, CheckCircle } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { SealCheck, Coins, Users, Star, Target, Question, Camera, Heart, CalendarBlank, CheckCircle, Wallet, Buildings } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyAthlete } from '@/lib/athlete/athleteContext';
@@ -79,9 +80,13 @@ export function AthleteDashboard() {
               <p className="truncate text-sm text-muted">{athlete.position} · {team?.name ?? athlete.city}</p>
               <div className="mt-2"><VerificationBadge status={vs} size="sm" /></div>
             </div>
-            <Button size="sm" variant="secondary" icon={PencilSimple} onClick={() => setManageMode('profile')}>
-              Edit
-            </Button>
+            <Link
+              href="/athlete/payouts"
+              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] border border-border px-3 text-xs font-semibold text-text-strong hover:border-brand/40"
+            >
+              <Wallet className="h-4 w-4" weight="bold" />
+              Payouts
+            </Link>
           </div>
         </div>
       </div>
@@ -102,9 +107,9 @@ export function AthleteDashboard() {
             value={nextMatch ? new Date(nextMatch.scheduledAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No fixture published'}
           />
           <TodayItem
-            icon={PencilSimple}
-            label="Profile task"
-            value={athlete.bio && athlete.impactNeeds?.length ? 'Profile is ready' : 'Complete your career story'}
+            icon={Wallet}
+            label="Payout details"
+            value="Set where your support is paid"
           />
           <TodayItem
             icon={myChallenges.length ? Target : CheckCircle}
@@ -120,11 +125,13 @@ export function AthleteDashboard() {
       {/* Editable profile, clearly separated */}
       <Card className="p-4">
         <div className="mb-2 flex items-center gap-1.5">
-          <PencilSimple className="h-4 w-4 text-muted" weight="bold" />
+          <Buildings className="h-4 w-4 text-muted" weight="bold" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">Your profile</span>
-          <span className="text-[11px] text-subtle">· you control this</span>
+          <span className="text-[11px] text-subtle">· managed by {team?.name ?? 'your club'}</span>
         </div>
-        <p className="text-sm leading-relaxed text-muted">{athlete.bio || 'Add a short bio so fans and sponsors know your story.'}</p>
+        <p className="text-sm leading-relaxed text-muted">
+          {athlete.bio || 'Your club has not added a bio yet. Ask them to add one so fans and sponsors know your story.'}
+        </p>
         {athlete.impactNeeds?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {athlete.impactNeeds.map((need, i) => (

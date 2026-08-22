@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
-import { platformAuditEvent, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
+import { platformAuditEvent, refuse, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import { environmentReadiness, routingMechanismAvailable } from '@/server/platform/environmentReadiness';
 import { decideActivationTransition, type ActivationRequest } from '@/lib/platform/environmentActivation';
 
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
       const ref = collection.doc(guarded.data.requestId);
       const snapshot = await ref.get();
-      if (!snapshot.exists) throw new Error('Activation request not found.');
+      if (!snapshot.exists) refuse('Activation request not found.', 404);
       const current = snapshot.data() as ActivationRequest;
 
       // Readiness is re-measured at the moment of the transition, never trusted from when
@@ -100,14 +100,17 @@ export async function POST(request: Request) {
           stage: current.stage,
           environment: current.environment,
           requestedByUserId: current.requestedByUserId,
-          readinessBlockers: guarded.data.action === 'approve' ? readiness.blockers : current.readinessBlockers,
         },
         action: guarded.data.action,
         actorUserId: actor.uid,
         typedConfirmation: guarded.data.typedConfirmation,
+        // Configuration faults only. The absent routing mechanism is a readiness blocker
+        // too, but it is enforced at smoke confirmation — refusing approval for it would
+        // leave every stage after readiness unreachable and the recorded process fictional.
+        approvalBlockers: readiness.configBlockers,
         routingAvailable: routingMechanismAvailable(),
       });
-      if (!decision.ok) throw new Error(decision.reason);
+      if (!decision.ok) refuse(decision.reason, 409);
 
       const now = new Date().toISOString();
       const patch: Record<string, unknown> = { stage: decision.nextStage, updatedAt: now };

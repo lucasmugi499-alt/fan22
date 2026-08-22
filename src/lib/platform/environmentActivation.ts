@@ -14,6 +14,16 @@
 
 export type ActivationEnvironment = 'beta' | 'production';
 
+/**
+ * The one sentence for the missing routing mechanism.
+ *
+ * Lives here rather than beside the readiness check so the console, the workflow and the
+ * tests all quote the same words. An operator who reads a different phrasing on the page
+ * than in the refusal has to work out whether they are looking at two problems or one.
+ */
+export const ROUTING_BLOCKER =
+  'No traffic-routing mechanism exists, so traffic cannot be moved to this environment.';
+
 export type ActivationStage =
   | 'draft'
   | 'readiness_checked'
@@ -39,7 +49,12 @@ export type ActivationRequest = {
   stage: ActivationStage;
   requestedByUserId: string;
   approvedByUserId?: string;
-  /** Every readiness blocker found at the time readiness was recorded. */
+  /**
+   * Every readiness blocker found at the time readiness was recorded, the routing wall
+   * included. Kept whole for the audit trail: what the operator was told when they started
+   * is the thing worth being able to read back later. Approval is gated on a freshly
+   * measured subset, not on this snapshot.
+   */
   readinessBlockers?: string[];
   createdAt: string;
   updatedAt: string;
@@ -65,11 +80,22 @@ export type ActivationDecision =
   | { ok: false; reason: string };
 
 export function decideActivationTransition(input: {
-  request: Pick<ActivationRequest, 'stage' | 'environment' | 'requestedByUserId' | 'readinessBlockers'>;
+  request: Pick<ActivationRequest, 'stage' | 'environment' | 'requestedByUserId'>;
   action: ActivationAction;
   actorUserId: string;
   /** What the operator typed. Must match the environment name exactly. */
   typedConfirmation?: string;
+  /**
+   * Configuration faults measured at this moment. Approval is refused while any stand.
+   *
+   * Deliberately narrower than the full readiness blocker list. The missing routing
+   * mechanism is also a readiness blocker, but gating approval on it would make every
+   * stage past `readiness_checked` unreachable — the workflow could never record the
+   * approval, the maintenance window or the routing instruction it exists to capture, and
+   * the console would describe a process no operator could actually walk. The routing wall
+   * is enforced at `confirm_smoke` instead, which is the step it truthfully blocks.
+   */
+  approvalBlockers?: string[];
   /** Whether a routing mechanism actually exists. Today: never. */
   routingAvailable: boolean;
 }): ActivationDecision {
@@ -99,10 +125,10 @@ export function decideActivationTransition(input: {
     if (input.actorUserId === input.request.requestedByUserId) {
       return { ok: false, reason: 'Activation approval requires a second operator.' };
     }
-    if (input.request.readinessBlockers?.length) {
+    if (input.approvalBlockers?.length) {
       return {
         ok: false,
-        reason: `Readiness is blocked: ${input.request.readinessBlockers.join('; ')}`,
+        reason: `Readiness is blocked: ${input.approvalBlockers.join('; ')}`,
       };
     }
   }

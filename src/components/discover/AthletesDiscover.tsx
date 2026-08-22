@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/EmptyState';
 import type { Athlete } from '@/types';
+import { SnapRow } from '@/components/ui/ScrollRail';
 
 const SPORTS = ['All', 'Football', 'Basketball', 'Rugby'] as const;
 type SportFilter = (typeof SPORTS)[number];
@@ -67,7 +68,7 @@ export function AthletesDiscover({ initialAthletes = [] }: { initialAthletes?: A
     <div className="space-y-4">
       <GradientBanner title="Players" subtitle="Back the athletes building their careers." variant="gold" />
 
-      <div className="snap-row -mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
+      <SnapRow className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
         {SPORTS.map((s) => (
           <button
             key={s}
@@ -80,7 +81,7 @@ export function AthletesDiscover({ initialAthletes = [] }: { initialAthletes?: A
             {s}
           </button>
         ))}
-      </div>
+      </SnapRow>
 
       {list.length ? (
         <>

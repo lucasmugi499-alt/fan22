@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { ScrollRail } from '@/components/ui/ScrollRail';
 
 /**
  * Workspace tabs — the *which section* layer, distinct from global nav (*where*) and
@@ -19,13 +20,14 @@ export function SegmentedTabs<T extends string>({
   className?: string;
 }) {
   return (
-    <div
+    <ScrollRail
       role="group"
       aria-label="Workspace sections"
-      className={cn(
-        'flex gap-1 overflow-x-auto border-b border-border px-[var(--gutter)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
-        className
-      )}
+      // The border belongs to the wrapper: on the rail it would fade with the tabs at an
+      // overflowing edge and read as the section rule breaking off. Everything callers pass
+      // stays on the rail, where their gutter overrides apply.
+      wrapperClassName="border-b border-border"
+      className={cn('flex gap-1 px-[var(--gutter)]', className)}
     >
       {tabs.map((tab) => {
         const isActive = tab === active;
@@ -49,6 +51,6 @@ export function SegmentedTabs<T extends string>({
           </button>
         );
       })}
-    </div>
+    </ScrollRail>
   );
 }

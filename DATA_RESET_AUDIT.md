@@ -49,8 +49,9 @@ Collections the codebase expects but which **do not exist in production**: `seas
 `resultSubmissions`, `notifications`, `comments`, `reports`, `adminLogs`, `invitations`.
 
 The absence of `seasons` and `resultSubmissions` confirms that the season model and the
-result-submission trust workflow were never deployed. This aligns with `firestore.rules.next`
-never having been promoted to the deployed `firestore.rules`.
+result-submission trust workflow were never deployed. That was true while `firestore.rules.next`
+remained unpromoted; it was promoted to staging and production on 2026-08-22, so this
+observation describes the state before that date rather than the current one.
 
 ---
 

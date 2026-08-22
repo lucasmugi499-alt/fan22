@@ -99,8 +99,10 @@ application: App Hosting uses its managed runtime identity and no private key is
 npm run deploy:staging
 ```
 
-`firebase.staging.json` explicitly deploys `firestore.rules.next`. The normal `firebase.json`
-still points to the production baseline in `firestore.rules`.
+Every firebase config in this repo — `firebase.json`, `firebase.staging.json` and
+`firebase.production-candidate.json` — deploys `firestore.rules.next`. That ruleset was
+promoted to staging and production on 2026-08-22; `firestore.rules` is the superseded
+baseline, kept as a rollback artifact and deployed by nothing.
 
 ```bash
 npm run test:rules

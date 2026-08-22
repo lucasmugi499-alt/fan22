@@ -619,15 +619,18 @@ describe('profile and assignment integrity', () => {
     }
   });
 
-  it('lets an athlete edit their story but not official sporting fields', async () => {
+  it('refuses athlete self-editing entirely, story fields included', async () => {
+    // Athletes became managed profiles on 2026-08-22. This test previously asserted the
+    // opposite — that an athlete could edit their own bio and impact needs — and inverting
+    // it is the point: a public sporting record is written by the club that knows what is
+    // true, and an athlete no longer needs an account to exist in that record at all.
     const athleteRef = doc(asUser(OUTSIDER), 'athletes/athlete_001');
 
-    await assertSucceeds(updateDoc(athleteRef, {
-      bio: 'Updated athlete story',
-      impactNeeds: ['Training boots'],
-    }));
-
-    for (const protectedUpdate of [
+    for (const attemptedUpdate of [
+      { bio: 'Updated athlete story' },
+      { impactNeeds: ['Training boots'] },
+      { name: 'Renamed By Self' },
+      { avatarUrl: 'https://example.test/self.png' },
       { teamId: 'team_b' },
       { verified: false },
       { verificationStatus: 'pending' },
@@ -635,7 +638,98 @@ describe('profile and assignment integrity', () => {
       { totalSupport: 9999 },
       { goalPlacePoints: 9999 },
     ]) {
-      await assertFails(updateDoc(athleteRef, protectedUpdate));
+      await assertFails(updateDoc(athleteRef, attemptedUpdate));
+    }
+  });
+
+  it('closes athlete payout identity to every client credential, super_admin included', async () => {
+    // Payout details are read by one server command and handed to the payment provider. A
+    // console that can display an account number is a console that can leak one.
+    //
+    // super_admin is in this list now. It could not be while the `{document=**}` catch-all
+    // granted a blanket read, because Firestore grants on ANY matching allow and no deny can
+    // override it — narrowing that catch-all is what made the guarantee real rather than
+    // aspirational.
+    for (const context of [
+      asUser(OUTSIDER),
+      asUser(TEAM_A_ADMIN),
+      asUser(LEAGUE_ADMIN),
+      asUserWithClaims('user_platform_payee', { role: 'platform_admin' }),
+      asUserWithClaims('user_super_payee', { role: 'super_admin' }),
+    ]) {
+      const payeeRef = doc(context, 'athletePayees/athlete_001');
+      await assertFails(getDoc(payeeRef));
+      await assertFails(setDoc(payeeRef, { status: 'verified' }));
+    }
+  });
+
+  it('gives an unmodelled collection to nobody, not even super_admin', async () => {
+    // What the narrowed catch-all now means: a collection someone adds without writing a
+    // rule for it is unreadable rather than silently super_admin-readable. That default is
+    // the reason the payout guarantee above holds.
+    for (const context of [
+      asUser(OUTSIDER),
+      asUserWithClaims('user_super_catchall', { role: 'super_admin' }),
+    ]) {
+      await assertFails(getDoc(doc(context, 'someCollectionNobodyModelled/doc_1')));
+      await assertFails(setDoc(doc(context, 'someCollectionNobodyModelled/doc_1'), { a: 1 }));
+    }
+  });
+
+  it('accepts the exact document the live registration path writes', async () => {
+    // Pinned against src/lib/firebase/auth.ts `registerAccount`, which is what /register
+    // calls. A ruleset that refuses this payload does not "lag" — it breaks public signup,
+    // and the failure is invisible until a real person tries to create an account.
+    const uid = 'user_new_signup';
+    await assertSucceeds(setDoc(doc(asUser(uid), `users/${uid}`), {
+      uid,
+      email: 'new@example.test',
+      name: 'New Supporter',
+      role: 'fan',
+      accountClass: 'fan',
+      accountStatus: 'active',
+      status: 'active',
+      points: 0,
+      walletBalance: 0,
+      followedAthletes: [],
+      followedTeams: [],
+      followedLeagues: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+  });
+
+  it('refuses a signup document carrying keys nobody asked for', async () => {
+    // The allowlist has to bite, or restoring it was decoration. `accountClass` is permitted
+    // above precisely because it carries no authority; an unlisted field is refused outright
+    // rather than being quietly stored for something later to read.
+    const uid = 'user_sneaky_signup';
+    await assertFails(setDoc(doc(asUser(uid), `users/${uid}`), {
+      uid,
+      email: 'sneaky@example.test',
+      name: 'Sneaky',
+      role: 'fan',
+      accountClass: 'fan',
+      status: 'active',
+      points: 0,
+      walletBalance: 0,
+      followedAthletes: [],
+      followedTeams: [],
+      followedLeagues: [],
+      capabilities: ['platform.admin.manage'],
+    }));
+  });
+
+  it('publishes site settings to everyone and lets nobody write them', async () => {
+    // Public because the site renders from it; unwritable because every change belongs to
+    // the audited settings command, which is also what keeps governed switches off it.
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'platformSettings/site')));
+    for (const context of [
+      asUser(OUTSIDER),
+      asUserWithClaims('user_platform_settings', { role: 'platform_admin' }),
+      asUserWithClaims('user_super_settings', { role: 'super_admin' }),
+    ]) {
+      await assertFails(setDoc(doc(context, 'platformSettings/site'), { fantasyVisible: false }));
     }
   });
 
@@ -998,7 +1092,7 @@ describe('new operational write surfaces', () => {
     await assertFails(getDoc(doc(asUser(OUTSIDER), 'adminAuditEvents/decision')));
   });
 
-  it('prevents Super Admin browser clients from using the catch-all as a write bypass', async () => {
+  it('gives Super Admin browser clients no catch-all read or write bypass', async () => {
     const superAdmin = asUserWithClaims('super', { role: 'super_admin' });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'serverOnlyRecords/secret'), {
@@ -1017,7 +1111,11 @@ describe('new operational write surfaces', () => {
       });
     });
 
-    await assertSucceeds(getDoc(doc(superAdmin, 'serverOnlyRecords/secret')));
+    // This read asserted success until 2026-08-22, when the catch-all stopped granting
+    // super_admin a blanket read. It was the reason `athletePayees` could not be closed:
+    // Firestore grants on ANY matching allow, so a role-shaped exemption here overrode every
+    // specific deny in the file. Server-owned data is now server-owned from every client.
+    await assertFails(getDoc(doc(superAdmin, 'serverOnlyRecords/secret')));
     await assertFails(setDoc(doc(superAdmin, 'serverOnlyRecords/forged'), { value: 'forged' }));
     await assertFails(updateDoc(doc(superAdmin, 'serverOnlyRecords/secret'), { value: 'rewritten' }));
     await assertFails(setDoc(doc(superAdmin, 'adminLogs/forged'), {
