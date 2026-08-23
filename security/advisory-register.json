@@ -2,308 +2,76 @@
   "reviewedAt": "2026-08-23",
   "entries": [
     {
-      "package": "next",
-      "via": [
-        "postcss"
-      ],
-      "severity": "high",
-      "scope": "runtime-build",
-      "status": "accepted-temporarily",
-      "reason": "Next 16.2.12 is the current stable package version. npm audit proposes an unsafe downgrade to Next 9.3.3 because Next pins postcss 8.4.31 internally.",
-      "mitigation": "No user-supplied CSS is processed at runtime. Recheck when a patched Next release is available.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "postcss",
-      "via": [
-        "GHSA-qx2v-qp2m-jg93",
-        "GHSA-6g55-p6wh-862q",
-        "GHSA-r28c-9q8g-f849"
-      ],
-      "severity": "high",
-      "scope": "runtime-build",
-      "status": "accepted-temporarily",
-      "reason": "Vulnerable copy is nested under Next and cannot be safely overridden without npm marking the dependency invalid.",
-      "mitigation": "No untrusted source maps or CSS are accepted from users. Track patched Next release.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "firebase-admin",
-      "via": [
-        "@google-cloud/storage"
-      ],
-      "severity": "moderate",
-      "scope": "server-runtime",
-      "status": "accepted-temporarily",
-      "reason": "firebase-admin 14.2.0 is current. npm audit proposes an unsafe downgrade to 10.3.0.",
-      "mitigation": "Server code does not expose uuid v3/v5/v6 buffer parameters to untrusted callers. Recheck upstream @google-cloud/storage/teeny-request chain.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "@google-cloud/storage",
-      "via": [
-        "retry-request",
-        "teeny-request"
-      ],
-      "severity": "moderate",
-      "scope": "server-runtime",
-      "status": "accepted-temporarily",
-      "reason": "Transitive dependency of current firebase-admin.",
-      "mitigation": "Used only by trusted Firebase Admin SDK paths; no user-controlled uuid buffer APIs are exposed.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "teeny-request",
-      "via": [
-        "uuid"
-      ],
-      "severity": "moderate",
-      "scope": "server-runtime",
-      "status": "accepted-temporarily",
-      "reason": "Transitive dependency of current firebase-admin storage stack.",
-      "mitigation": "No direct application usage; monitor firebase-admin release chain.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "retry-request",
-      "via": [
-        "teeny-request"
-      ],
-      "severity": "moderate",
-      "scope": "server-runtime",
-      "status": "accepted-temporarily",
-      "reason": "Transitive dependency of current firebase-admin storage stack.",
-      "mitigation": "No direct application usage; monitor firebase-admin release chain.",
-      "expiresOn": "2026-08-30"
-    },
-    {
+      "advisoryId": "GHSA-w5hq-g745-h8pq",
       "package": "uuid",
-      "via": [
-        "GHSA-w5hq-g745-h8pq"
-      ],
-      "severity": "moderate",
-      "scope": "server-runtime-and-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Pulled through current firebase-admin and Firebase tooling chains.",
-      "mitigation": "Application uses server-generated Firestore IDs for security-sensitive identifiers; no uuid v3/v5/v6 buffer API is exposed.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "firebase-tools",
-      "via": [
-        "@google-cloud/pubsub",
-        "archiver",
-        "exegesis",
-        "exegesis-express",
-        "gaxios",
-        "glob",
-        "minimatch",
-        "superstatic"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "firebase-tools 15.25.0 is current. npm audit suggests a breaking downgrade.",
-      "mitigation": "Firebase CLI is not bundled into the deployed app. Use it only from trusted operator machines/CI with controlled inputs.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "@opentelemetry/core",
-      "via": [
-        "GHSA-8988-4f7v-96qf"
-      ],
-      "severity": "moderate",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive of current firebase-tools through @google-cloud/pubsub.",
-      "mitigation": "Not bundled into production app runtime.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "@google-cloud/pubsub",
-      "via": [
-        "@opentelemetry/core"
-      ],
-      "severity": "moderate",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive of current firebase-tools.",
-      "mitigation": "Not bundled into production app runtime.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "brace-expansion",
-      "via": [
-        "GHSA-mh99-v99m-4gvg"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Remaining vulnerable majors are pulled through Firebase CLI and ESLint/minimatch chains.",
-      "mitigation": "Do not pass attacker-controlled glob patterns to CLI/lint tooling. Refresh when upstream minimatch/glob chains move.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "minimatch",
-      "via": [
-        "brace-expansion"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive tooling dependency via Firebase CLI and ESLint.",
-      "mitigation": "No public request path reaches tooling glob expansion.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "eslint",
-      "via": [
-        "@eslint/config-array",
-        "@eslint/eslintrc",
-        "minimatch"
-      ],
-      "severity": "high",
-      "scope": "dev-tooling",
-      "status": "accepted-temporarily",
-      "reason": "ESLint is development-only and current declared range resolves to a vulnerable audit classification until upstream moves.",
-      "mitigation": "No production bundle exposure.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "eslint-config-next",
-      "via": [
-        "eslint-plugin-import",
-        "eslint-plugin-jsx-a11y",
-        "eslint-plugin-react"
-      ],
-      "severity": "high",
-      "scope": "dev-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Development-only lint chain; audit proposes unsafe major downgrade.",
-      "mitigation": "No production bundle exposure.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "*",
-      "via": [
-        "tooling-minimatch-chain"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Covers audit effect packages whose only reported vulnerable path is minimatch/glob inside Firebase CLI, ESLint, or archiving tooling.",
-      "mitigation": "No public runtime exposure; controlled CI/operator inputs only.",
-      "expiresOn": "2026-08-30",
       "packages": [
-        "@eslint/config-array",
-        "@eslint/eslintrc",
-        "eslint-plugin-import",
-        "eslint-plugin-jsx-a11y",
-        "eslint-plugin-react",
-        "archiver",
-        "archiver-utils",
-        "exegesis",
-        "exegesis-express",
+        "uuid",
         "gaxios",
-        "glob",
-        "google-gax",
-        "googleapis-common",
-        "readdir-glob",
-        "rimraf",
-        "superstatic",
-        "zip-stream"
-      ]
-    },
-    {
-      "package": "@modelcontextprotocol/sdk",
-      "via": [
-        "fast-uri",
-        "hono",
-        "ip-address"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Pulled in by firebase-tools 15.25.1, which is the current release. The advisories appeared upstream after the last review and there is no patched firebase-tools yet.",
-      "mitigation": "Firebase CLI is a devDependency and is not bundled into the deployed application; verified absent from the Next build output. Use it only from trusted operator machines and CI with controlled inputs.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "fast-uri",
-      "via": [
-        "@modelcontextprotocol/sdk",
-        "ajv"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive of current firebase-tools through the MCP SDK's ajv chain.",
-      "mitigation": "Not bundled into the deployed application. No attacker-controlled URIs are parsed by CLI tooling.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "hono",
-      "via": [
-        "@modelcontextprotocol/sdk",
-        "@hono/node-server"
+        "teeny-request",
+        "retry-request",
+        "@google-cloud/storage",
+        "firebase-admin",
+        "firebase-functions"
       ],
       "severity": "moderate",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive of current firebase-tools. The MCP SDK's local HTTP server is not started by any GoalPlace256 script.",
-      "mitigation": "Not bundled into the deployed application and never exposed to a public network.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "js-yaml",
-      "via": [
-        "GHSA-5p4m-2wfm-xmqj"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Quadratic CPU consumption in !!omap resolution (CVE-2026-59870, CWE-407). The fix was not backported to the 4.x line, so no patched 4.x exists; only js-yaml 5.x carries it, and every path here is transitive through eslint, firebase-tools and shadcn, where a major bump risks breaking lint and the Firebase CLI that deploys the functions.",
-      "mitigation": "All three parents (eslint, firebase-tools, shadcn) are devDependencies and are absent from the Next build output, so no deployed code path parses YAML with this library. The tooling only reads YAML the operator controls \u2014 apphosting.yaml, firebase config \u2014 never attacker-supplied input. Revisit when eslint and firebase-tools move to js-yaml 5.x.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "ip-address",
-      "via": [
-        "@modelcontextprotocol/sdk",
-        "express-rate-limit",
-        "proxy-agent"
-      ],
-      "severity": "high",
-      "scope": "dev-deploy-tooling",
-      "status": "accepted-temporarily",
-      "reason": "Transitive of current firebase-tools through the MCP SDK and proxy-agent.",
-      "mitigation": "Not bundled into the deployed application. The application's own rate limiting is Firestore-backed and does not use this package.",
-      "expiresOn": "2026-08-30"
-    },
-    {
-      "package": "@google-cloud/firestore",
-      "via": [
-        "google-gax",
-        "uuid"
-      ],
-      "severity": "moderate",
+      "tree": "functions",
+      "dependencyPath": "firebase-admin > @google-cloud/storage 7.22.0 > gaxios 6.7.1 > uuid 9.0.1",
+      "classification": "functions-runtime",
       "scope": "functions-runtime",
       "status": "accepted-temporarily",
-      "reason": "Surfaced on 2026-08-23 when the advisory gate began auditing the functions/ dependency tree, which it had never inspected. Transitive through firebase-admin's own chain; the root advisory is uuid's missing buffer bounds check in v3/v5/v6 when a `buf` argument is supplied. npm's only offered remedy is a major DOWNGRADE of firebase-admin to 10.3.0, which is materially worse than the advisory.",
-      "mitigation": "Cloud Functions call uuid through firebase-admin, which does not pass a `buf` argument, so the vulnerable path is not reached. Recheck when firebase-admin ships a chain with patched uuid. Needs an owner decision at expiry \u2014 do not roll this date forward mechanically.",
-      "expiresOn": "2026-08-30"
+      "reason": "No safe upgrade exists. firebase-admin was raised to 14.3.0 on 2026-08-23 (the current latest) and still pins @google-cloud/storage 7.22.0, whose gaxios 6.7.1 depends on uuid 9.0.1. npm's only proposed remedy is firebase-admin@10.3.0, a major DOWNGRADE of three majors that would reintroduce years of fixed issues. Resolution requires firebase-admin to advance its @google-cloud/storage dependency upstream.",
+      "reachability": "Not reachable. GHSA-w5hq-g745-h8pq affects uuid v3/v5/v6 only, and only when the caller supplies a `buf` argument to write into. Verified in node_modules on 2026-08-23: the two consumers on this path call the unaffected v4 generator with no arguments at all \u2014 gaxios/build/src/gaxios.js:417 `uuid_1.v4()` and teeny-request/build/src/index.js:135 `uuid.v4()`. No GoalPlace code calls uuid directly. There is no code path, attacker controlled or otherwise, that reaches the vulnerable branch.",
+      "mitigation": "Vulnerable branch is unreachable (see reachability). Cloud Functions run server-side with no attacker-supplied buffer reaching uuid. Re-check on each firebase-admin release; the advisory clears as soon as the @google-cloud/storage chain moves to uuid >= 11.1.1.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-08-23",
+      "expiresOn": "2026-10-22",
+      "fixedIn": "uuid >= 11.1.1 (awaiting upstream firebase-admin dependency bump)",
+      "reference": "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
     },
     {
-      "package": "firebase-functions",
-      "via": [
-        "firebase-admin"
+      "advisoryId": "GHSA-w5hq-g745-h8pq",
+      "package": "uuid",
+      "packages": [
+        "uuid",
+        "firebase-tools"
       ],
       "severity": "moderate",
-      "scope": "functions-runtime",
+      "tree": "root",
+      "dependencyPath": "firebase-tools 15.28.1 > gaxios > uuid",
+      "classification": "dev-tooling",
+      "scope": "dev",
       "status": "accepted-temporarily",
-      "reason": "Same uuid chain as @google-cloud/firestore above, reached through firebase-admin. npm proposes a major downgrade to firebase-functions 4.9.0.",
-      "mitigation": "Same as above: the vulnerable uuid path requires a caller-supplied `buf`, which this chain does not use. Re-review with the rest of the register.",
-      "expiresOn": "2026-08-30"
+      "reason": "Reached only through firebase-tools, a devDependency used for local emulators and deploys. firebase-tools was raised to 15.28.1 (current latest) on 2026-08-23 and still carries the chain; npm proposes firebase-tools@14.23.0, a major downgrade of the CLI.",
+      "reachability": "Not reachable. GHSA-w5hq-g745-h8pq affects uuid v3/v5/v6 only, and only when the caller supplies a `buf` argument to write into. Verified in node_modules on 2026-08-23: the two consumers on this path call the unaffected v4 generator with no arguments at all \u2014 gaxios/build/src/gaxios.js:417 `uuid_1.v4()` and teeny-request/build/src/index.js:135 `uuid.v4()`. No GoalPlace code calls uuid directly. There is no code path, attacker controlled or otherwise, that reaches the vulnerable branch. This copy is additionally never shipped: firebase-tools is a devDependency and is not part of any deployed artifact.",
+      "mitigation": "Not shipped to any runtime. Executed only on developer and CI machines running deploy commands. Clears when firebase-tools advances its gaxios dependency.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-08-23",
+      "expiresOn": "2026-11-21",
+      "fixedIn": "uuid >= 11.1.1 (awaiting upstream firebase-tools dependency bump)",
+      "reference": "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+    },
+    {
+      "advisoryId": "GHSA-8988-4f7v-96qf",
+      "package": "@opentelemetry/core",
+      "packages": [
+        "@opentelemetry/core",
+        "@google-cloud/pubsub",
+        "firebase-tools"
+      ],
+      "severity": "moderate",
+      "tree": "root",
+      "dependencyPath": "firebase-tools 15.28.1 > @google-cloud/pubsub > @opentelemetry/core (<2.8.0)",
+      "classification": "dev-tooling",
+      "scope": "dev",
+      "status": "accepted-temporarily",
+      "reason": "Reached only through firebase-tools' Pub/Sub emulator support. firebase-tools 15.28.1 is the current latest and still resolves @opentelemetry/core below 2.8.0; npm proposes firebase-tools@14.23.0, a major CLI downgrade.",
+      "reachability": "Not reachable in any deployed artifact. The advisory is unbounded memory allocation in W3C Baggage propagation, which requires processing attacker-controlled baggage headers. This copy exists only inside firebase-tools, a devDependency; GoalPlace ships no OpenTelemetry instrumentation and no deployed service parses baggage headers through this package.",
+      "mitigation": "Not shipped. Runs only on developer and CI machines invoking the Firebase CLI, against local emulators rather than untrusted network input.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-08-23",
+      "expiresOn": "2026-11-21",
+      "fixedIn": "@opentelemetry/core >= 2.8.0 (awaiting upstream firebase-tools bump)",
+      "reference": "https://github.com/advisories/GHSA-8988-4f7v-96qf"
     }
   ]
 }
