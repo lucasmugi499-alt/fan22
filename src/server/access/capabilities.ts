@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { adminDb } from '@/lib/firebase/admin';
-import { accessIndexId, type AccessScopeType, type PermissionCapability } from '@/lib/auth/access';
+import { accessIndexId, isAccessIndexLive, type AccessScopeType, type PermissionCapability } from '@/lib/auth/access';
 import { recordAccessDivergence } from './securityEvents';
 
 /**
@@ -25,7 +25,12 @@ export type CapabilityScope = {
 export function indexGrantsCapability(
   data: FirebaseFirestore.DocumentData | undefined,
   capability: PermissionCapability,
+  now: Date = new Date(),
 ) {
+  // Expiry first. A projection whose earliest contributing assignment has lapsed grants
+  // nothing at all, regardless of what its capability array still says — the array is a
+  // cache of a decision that is no longer valid.
+  if (!isAccessIndexLive(data, now)) return false;
   const capabilities = data?.capabilities;
   return Array.isArray(capabilities) && capabilities.includes(capability);
 }

@@ -11,7 +11,7 @@ import type {
   PermissionCapability,
 } from '@/lib/auth/access';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
-import { normalizeAccessAssignment, readScopeProjection } from '@/server/access/projector';
+import { normalizeAccessAssignment, readScopeProjection, rebuildUserProjections } from '@/server/access/projector';
 
 export const runtime = 'nodejs';
 
@@ -466,7 +466,43 @@ export async function POST(request: Request) {
             }));
           });
           if (['suspended', 'disabled', 'deletion_pending'].includes(accountStatus)) {
+            // Suspending an account has to suspend the AUTHORITY the account holds, not just
+            // the account record.
+            //
+            // Revoking refresh tokens alone left every accessIndex projection standing, so
+            // Firestore Rules and any capability check went on granting `team.result.submit`
+            // and the rest from a projection nobody had told about the suspension. The UI
+            // said "suspended" while the principal still held operational authority — the
+            // exact inversion an authority engine must not have.
+            //
+            // Assignments are suspended first, then the projection is rebuilt from them, so
+            // the projector stays the single owner of accessIndex writes rather than this
+            // route reaching in and editing projections directly.
+            const assignments = await adminDb
+              .collection('accessAssignments')
+              .where('userId', '==', userId)
+              .where('status', '==', 'active')
+              .get();
+            const suspendedAt = new Date().toISOString();
+            await Promise.all(assignments.docs.map((assignmentDoc) => assignmentDoc.ref.update({
+              status: 'suspended',
+              suspendedAt,
+              updatedAt: FieldValue.serverTimestamp(),
+            })));
+            await rebuildUserProjections(userId);
             await adminAuth.revokeRefreshTokens(userId);
+            await adminDb.collection('adminAuditEvents').add({
+              ...platformAuditEvent({
+                actor,
+                requestId,
+                action: 'access.suspended_with_account',
+                targetCollection: 'accessAssignments',
+                targetId: userId,
+                note: reason,
+                afterSummary: { suspendedAssignments: assignments.size, accountStatus },
+              }),
+              createdAt: FieldValue.serverTimestamp(),
+            });
           }
           if (accountStatus === 'disabled' || accountStatus === 'deletion_pending') {
             await adminAuth.updateUser(userId, { disabled: true });

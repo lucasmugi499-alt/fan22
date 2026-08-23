@@ -152,7 +152,6 @@ const KNOWN_ROLE_GRANTS: RoleBudget[] = [
   { file: 'src/app/api/matches/[matchId]/evidence/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
   { file: 'src/app/api/athlete-claims/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
   { file: 'src/app/api/payments/intents/[paymentIntentId]/status/route.ts', grants: 1, owedCapability: 'platform.audit.read' },
-  { file: 'src/app/api/athletes/route.ts', grants: 1, owedCapability: 'platform.admin.manage — super_admin holds no team.athlete.create, so grant first' },
   { file: 'src/app/api/result-submissions/[matchId]/correction/route.ts', grants: 1, owedCapability: 'platform.admin.manage (correction REQUEST path; approval already converted)' },
   { file: 'src/app/api/support-needs/[supportNeedId]/review/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },
   { file: 'src/app/api/fantasy/admin/route.ts', grants: 1, owedCapability: 'platform.admin.manage' },

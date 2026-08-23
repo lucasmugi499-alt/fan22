@@ -3,7 +3,8 @@ import { createHash, randomBytes } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
-import { accessIndexId } from '@/lib/auth/access';
+import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
+import { indexGrantsCapability } from '@/server/access/capabilities';
 import { sendAthleteInvitationEmail } from '@/server/email/athleteInvitation';
 
 export const runtime = 'nodejs';
@@ -18,10 +19,11 @@ const athleteCreateSchema = z.object({
 
 function indexHasCapability(
   snapshot: FirebaseFirestore.DocumentSnapshot,
-  capability: 'team.athlete.create' | 'league.roster.verify',
+  capability: PermissionCapability,
 ) {
-  const capabilities = snapshot.data()?.capabilities;
-  return Array.isArray(capabilities) && capabilities.includes(capability);
+  // Routed through the shared check so an expired projection is refused here too, rather
+  // than this route re-implementing the capability lookup without the expiry rule.
+  return indexGrantsCapability(snapshot.data(), capability);
 }
 
 async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leagueId: string) {
@@ -32,13 +34,30 @@ async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leag
   ]);
   return indexHasCapability(teamAccess, 'team.athlete.create')
     || indexHasCapability(leagueAccess, 'league.roster.verify')
-    || indexHasCapability(platformAccess, 'team.athlete.create');
+    // `platform.athlete.manage` rather than the team capability repeated at platform scope:
+    // super_admin is governance and holds no `team.*` capabilities at all, so asking for the
+    // team one here would lock super_admins out the moment the role bypass was removed.
+    || indexHasCapability(platformAccess, 'platform.athlete.manage');
 }
 
-function publicBaseUrl(request: Request) {
-  return process.env.NEXT_PUBLIC_APP_URL
-    ?? request.headers.get('origin')
-    ?? new URL(request.url).origin;
+/**
+ * The base URL for invitation links, from configuration only.
+ *
+ * This used to fall back to the request's `Origin` header. That is caller-controlled, so an
+ * authenticated operator could send a request with a hostile origin and make GoalPlace's own
+ * mail identity deliver an invitation pointing at a site they control — a phishing primitive
+ * borrowed from the platform's credibility, whether or not the link itself grants anything.
+ *
+ * `GOALPLACE_APP_BASE_URL` is what App Hosting actually sets, which is why it is checked
+ * first; `NEXT_PUBLIC_APP_URL` remains for local development. If neither is configured the
+ * caller gets an error rather than a link built from whatever they sent.
+ */
+function publicBaseUrl() {
+  const configured = process.env.GOALPLACE_APP_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) {
+    throw new Error('GOALPLACE_APP_BASE_URL is not configured, so invitation links cannot be generated.');
+  }
+  return configured.replace(/\/+$/, '');
 }
 
 export async function POST(request: Request) {
@@ -62,8 +81,15 @@ export async function POST(request: Request) {
   //
   // Verified before removal: all 16 league-admin and 100 team-admin legacy entries already
   // hold the canonical capability for their scope, so nobody loses access.
+  // Platform authority resolves through a capability, not through the role string.
+  //
+  // This previously exempted anyone holding `platform_admin` or `super_admin` from the
+  // scoped check entirely, so a Platform Admin could create an athlete under any team
+  // without holding the capability that is supposed to authorize it — the same role-as-
+  // capability shape the rest of this codebase has been removing. `platform.athlete.manage`
+  // is held by both platform bundles, so this is narrower than the status quo, not stricter.
   const scoped = await hasScopedAthleteCreateAccess(actor.uid, team.id, teamData.leagueId);
-  if (!['platform_admin', 'super_admin'].includes(String(actor.role)) && !scoped) {
+  if (!scoped) {
     return Response.json({ error: 'You are not assigned to this team.' }, { status: 403 });
   }
 
@@ -109,7 +135,7 @@ export async function POST(request: Request) {
   });
   const email = await sendAthleteInvitationEmail({
     to: invitedEmail,
-    inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
+    inviteUrl: new URL(actionUrl, publicBaseUrl()).toString(),
     athleteName: name,
     teamName: String(teamData.name ?? team.id),
     inviterName: String(actor.name ?? actor.email ?? 'your Team Admin'),

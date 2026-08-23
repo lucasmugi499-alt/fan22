@@ -4,6 +4,9 @@ import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { POST } from './route';
 import { expectNoDomainCollectionAccess, expectNoDomainTransaction } from '@/test/firestoreAssertions';
 
+/** Batch writes back the access projector, which suspension now rebuilds. */
+const batchWrites: { op: string; id: string }[] = [];
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
     verifyIdToken: vi.fn(),
@@ -13,6 +16,11 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: vi.fn(),
     runTransaction: vi.fn(),
+    batch: () => ({
+      set: (ref: { id?: string }) => { batchWrites.push({ op: 'set', id: ref?.id ?? '' }); },
+      delete: (ref: { id?: string }) => { batchWrites.push({ op: 'delete', id: ref?.id ?? '' }); },
+      commit: async () => undefined,
+    }),
   },
 }));
 
@@ -68,14 +76,32 @@ function installFirestoreMock(records: Record<string, Record<string, unknown>>) 
     },
     ...records,
   };
-  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
-    doc: (id = `${collectionName}_generated`) => ({
-      collectionName,
-      id,
-      get: vi.fn(async () => snapshot(id, allRecords[`${collectionName}/${id}`])),
-      set: vi.fn(async () => undefined),
-    }),
-  }) as never);
+  vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => {
+    // `where(...).get()` backs the suspension path, which now suspends a user's canonical
+    // assignments before rebuilding their projections. Records are matched from the same
+    // fixture map so a test can seed assignments and see them suspended.
+    const query = (clauses: [string, unknown][] = []) => ({
+      where: (field: string, _op: string, value: unknown) => query([...clauses, [field, value]]),
+      get: vi.fn(async () => {
+        const docs = Object.entries(allRecords)
+          .filter(([key]) => key.startsWith(`${collectionName}/`))
+          .map(([key, data]) => ({ id: key.split('/')[1], data: () => data, ref: { update: vi.fn(async () => undefined) } }))
+          .filter((entry) => clauses.every(([field, value]) => (entry.data() as Record<string, unknown>)?.[field] === value));
+        return { docs, size: docs.length, empty: docs.length === 0 };
+      }),
+    });
+    return {
+      doc: (id = `${collectionName}_generated`) => ({
+        collectionName,
+        id,
+        get: vi.fn(async () => snapshot(id, allRecords[`${collectionName}/${id}`])),
+        set: vi.fn(async () => undefined),
+        update: vi.fn(async () => undefined),
+      }),
+      where: (field: string, op: string, value: unknown) => query().where(field, op, value),
+      add: vi.fn(async () => ({ id: `${collectionName}_added` })),
+    } as never;
+  });
 }
 
 const teamPayload = {
@@ -315,6 +341,51 @@ describe('trusted admin actions route hardening', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Platform Admin access required.' });
     expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
+  });
+
+  it('strips a suspended account of its authority, not just its status flag', async () => {
+    /**
+     * The C2 defect: suspension updated the user record and revoked refresh tokens, and
+     * stopped there. Every accessIndex projection stayed exactly as it was, so Firestore
+     * Rules and every capability check went on granting the suspended operator's
+     * capabilities from a projection nobody had told about the suspension.
+     *
+     * The console said "suspended" while the principal still held operational authority.
+     */
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => snapshot(ref.id, { id: 'user_1', role: 'team_admin' })),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    batchWrites.length = 0;
+    installFirestoreMock({
+      'accessAssignments/assignment_live': {
+        id: 'assignment_live',
+        userId: 'user_1',
+        status: 'active',
+        scopeType: 'team',
+        scopeId: 'team_a',
+        roleKey: 'team_admin',
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'update_user_account',
+      userId: 'user_1',
+      accountStatus: 'suspended',
+      note: 'Credential compromise reported by the club.',
+    })));
+
+    expect(response.status).toBe(200);
+    // Refresh tokens revoked — necessary, and on its own never sufficient.
+    expect(adminAuth.revokeRefreshTokens).toHaveBeenCalledWith('user_1');
+    // The projector ran, which is what actually removes the standing grant.
+    expect(batchWrites.length).toBeGreaterThan(0);
+    // And the suspension of authority is itself auditable.
+    expect(vi.mocked(adminDb.collection).mock.calls.map((call) => String(call[0])))
+      .toContain('accessAssignments');
   });
 
   it('records audited account lifecycle changes through the trusted admin route', async () => {

@@ -124,6 +124,26 @@ export type AccessIndexDocument = {
   assignmentIds: string[];
   accessVersion: number;
   updatedAt: string;
+  /**
+   * The earliest moment any assignment behind this projection stops being valid, or absent
+   * when none of them expire.
+   *
+   * This field exists because the projector previously filtered expired assignments only at
+   * the moment it ran. A `validUntil` that passed on Tuesday left Monday's projection in
+   * place, and every reader — Firestore Rules included — went on granting capabilities from
+   * it. A time-limited grant could outlive its own expiry indefinitely, bounded only by
+   * whether something unrelated happened to touch that user's assignments again.
+   *
+   * Carrying expiry INTO the projection makes the guarantee independent of any worker
+   * running: a reader can tell an expired projection is expired. The sweeper further down is
+   * hygiene — it removes dead documents — not the control that makes expiry safe.
+   *
+   * Stored twice on purpose. The ISO string is what humans and audit records read; the epoch
+   * milliseconds are what Firestore Rules can actually compare against `request.time`, since
+   * rules cannot parse ISO strings.
+   */
+  expiresAt?: string;
+  expiresAtMillis?: number;
 };
 
 export type AccessContext = {
@@ -336,11 +356,42 @@ export function buildAccessIndexDocuments({
     existing.activeRoles = [...new Set([...existing.activeRoles, assignment.roleKey])].sort();
     existing.capabilities = [...new Set([...existing.capabilities, ...capabilitiesForAssignment(assignment)])].sort();
     existing.assignmentIds = [...new Set([...existing.assignmentIds, assignment.id])].sort();
+
+    // The EARLIEST expiry wins, not the latest.
+    //
+    // A scope can be held through several assignments at once. Taking the latest would let a
+    // long-lived grant keep a short-lived one's capabilities alive past their expiry, which
+    // is the same defect one level up. Taking the earliest means the projection stops being
+    // trusted the moment any contributing grant lapses, and the next rebuild re-derives
+    // whatever legitimately remains.
+    if (assignment.validUntil) {
+      const millis = Date.parse(assignment.validUntil);
+      if (Number.isFinite(millis) && (existing.expiresAtMillis === undefined || millis < existing.expiresAtMillis)) {
+        existing.expiresAtMillis = millis;
+        existing.expiresAt = assignment.validUntil;
+      }
+    }
     grouped.set(key, existing);
   }
   return [...grouped.values()].sort((left, right) =>
     `${left.scopeType}:${left.scopeId}:${left.userId}`.localeCompare(`${right.scopeType}:${right.scopeId}:${right.userId}`),
   );
+}
+
+/**
+ * Whether a projection is still inside its validity window.
+ *
+ * Every reader of an access index must pass through this. A projection is a cache of a
+ * decision, and a cache that cannot say when it went stale is a cache that never does.
+ */
+export function isAccessIndexLive(
+  index: Pick<AccessIndexDocument, 'expiresAtMillis'> | { expiresAtMillis?: unknown } | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!index) return false;
+  const expiry = (index as { expiresAtMillis?: unknown }).expiresAtMillis;
+  if (typeof expiry !== 'number') return true;
+  return now.getTime() < expiry;
 }
 
 export function accessIndexId(scopeType: AccessScopeType, scopeId: string, userId: string) {
@@ -376,6 +427,7 @@ export function hasPlatformCapability(context: AccessContext | undefined, capabi
   return Boolean(context?.indexes.some((index) =>
     index.scopeType === 'platform'
     && index.scopeId === 'global'
+    && isAccessIndexLive(index)
     && index.capabilities.includes(capability),
   ));
 }
@@ -389,6 +441,9 @@ export function hasScopeCapability(
   return Boolean(context?.indexes.some((index) =>
     index.scopeType === scopeType
     && index.scopeId === scopeId
+    // Expiry is checked here rather than only at projection time, so a stale index cannot
+    // keep granting after its earliest assignment lapsed.
+    && isAccessIndexLive(index)
     && index.capabilities.includes(capability),
   ));
 }

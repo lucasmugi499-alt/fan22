@@ -7,8 +7,15 @@ import { expect } from 'vitest';
  * purpose: a caller that is about to be rejected should still be prevented from probing
  * the endpoint at unlimited speed. So "rejected without touching Firestore" now means
  * "touched no domain collection", not "touched nothing at all".
+ *
+ * `users` joined this set on 2026-08-23 when the wrapper began resolving the active
+ * principal before authorization — a suspended operator must be refused by every mutation
+ * route, including ones that never reached the platform command guard. That read is
+ * authorization work rather than handler work, which is why it belongs here; the assertion
+ * still catches a rejected request touching organizations, teams, leagues or any other
+ * domain collection.
  */
-const INFRASTRUCTURE_COLLECTIONS = new Set(['apiRateLimits']);
+const INFRASTRUCTURE_COLLECTIONS = new Set(['apiRateLimits', 'users']);
 
 /**
  * Asserts a route rejected a request without reading or writing any domain data.

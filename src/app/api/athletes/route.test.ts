@@ -44,6 +44,10 @@ function installFirestoreMock(records: Record<string, Record<string, unknown>>) 
   }) as never);
 }
 
+// Invitation links are built from configuration only — never from the request's Origin
+// header, which a caller controls. Tests configure it the way a deployment does.
+process.env.GOALPLACE_APP_BASE_URL = 'https://goalplace256.test';
+
 describe('athlete creation route hardening', () => {
   beforeEach(() => {
     vi.clearAllMocks();

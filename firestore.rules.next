@@ -2,6 +2,23 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Two rules this file no longer contains, and the reasons.
+    //
+    // 1. NO BROWSER DELETES, for anyone, including super_admin. A stolen super_admin session
+    //    could previously delete result submissions and their nested events — the append-only
+    //    provenance that explains who submitted a result, who disputed it and how it changed.
+    //    That is history destruction wearing an administrator's badge. Exceptional deletion
+    //    (legal, privacy) belongs in a break-glass command with reauthentication, an explicit
+    //    target, a reason and a tombstone — not in a browser credential.
+    //
+    // 2. NO ROLE-ONLY PLATFORM WRITES. `isPlatformAdmin()` grants on a role claim alone, so a
+    //    Platform Admin browser could edit teams, leagues, athletes, sponsors and users
+    //    directly, skipping the command layer's capability check, validation, reason and
+    //    audit entry. A governance model that the browser can walk around is not a governance
+    //    model. Collections owned by platform commands are closed here; scoped operator
+    //    capabilities (hasScopeCapability) are untouched, because those ARE the canonical
+    //    model rather than a bypass of it.
+
     function signedIn() {
       return request.auth != null;
     }
@@ -43,13 +60,29 @@ service cloud.firestore {
       return /databases/$(database)/documents/accessIndex/$(scopeType + '_' + scopeId + '_' + request.auth.uid);
     }
 
+    function scopeIndex(scopeType, scopeId) {
+      return get(accessIndexPath(scopeType, scopeId)).data;
+    }
+
     function scopeCapabilities(scopeType, scopeId) {
-      return get(accessIndexPath(scopeType, scopeId)).data.capabilities;
+      return scopeIndex(scopeType, scopeId).capabilities;
+    }
+
+    // A projection past its earliest assignment expiry grants nothing.
+    //
+    // Without this, `validUntil` was enforced only at the moment the projector happened to
+    // run: a grant that lapsed on Tuesday kept working from Monday's document until
+    // something unrelated rewrote it. Rules cannot parse ISO strings, which is why the
+    // projection carries `expiresAtMillis` alongside the human-readable timestamp.
+    function scopeIndexLive(scopeType, scopeId) {
+      return !('expiresAtMillis' in scopeIndex(scopeType, scopeId)) ||
+        request.time.toMillis() < scopeIndex(scopeType, scopeId).expiresAtMillis;
     }
 
     function hasScopeCapability(scopeType, scopeId, capabilities) {
       return signedIn() &&
         exists(accessIndexPath(scopeType, scopeId)) &&
+        scopeIndexLive(scopeType, scopeId) &&
         scopeCapabilities(scopeType, scopeId).hasAny(capabilities);
     }
 
@@ -141,9 +174,27 @@ service cloud.firestore {
         request.resource.data.awayScore is int &&
         request.resource.data.awayScore >= 0 &&
         request.resource.data.scorers is list &&
-        (!request.resource.data.keys().hasAny(['activeSquads']) || request.resource.data.activeSquads is map) &&
-        (!request.resource.data.keys().hasAny(['athleteStatLines']) || request.resource.data.athleteStatLines is list) &&
+        // Size caps, not just type checks.
+        //
+        // The finalizer expands these lists into squad, scoring and stat events inside one
+        // transaction. Unbounded input is an unbounded write plan; a plan over Firestore's
+        // operation budget fails, the trigger retries, and one oversized document becomes a
+        // permanently retrying function with the match stuck out of official state. The
+        // ceilings are generous by design — they stop amplification, they do not referee
+        // team sheets. Mirrored in src/lib/sport/submissionLimits.ts.
+        request.resource.data.scorers.size() <= 60 &&
+        request.resource.data.homeScore <= 300 &&
+        request.resource.data.awayScore <= 300 &&
+        (!request.resource.data.keys().hasAny(['activeSquads']) || (
+          request.resource.data.activeSquads is map &&
+          request.resource.data.activeSquads.keys().size() <= 2
+        )) &&
+        (!request.resource.data.keys().hasAny(['athleteStatLines']) || (
+          request.resource.data.athleteStatLines is list &&
+          request.resource.data.athleteStatLines.size() <= 120
+        )) &&
         request.resource.data.evidenceRefs is list &&
+        request.resource.data.evidenceRefs.size() <= 20 &&
         get(matchPath(matchId)).data.status in ['completed', 'live'] &&
         get(matchPath(matchId)).data.verificationStatus != 'verified' &&
         !('officialResultVersion' in get(matchPath(matchId)).data) &&
@@ -177,8 +228,7 @@ service cloud.firestore {
 
     match /sports/{sportId} {
       allow read: if true;
-      allow create, update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /users/{uid} {
@@ -206,14 +256,14 @@ service cloud.firestore {
         request.resource.data.points == 0 &&
         request.resource.data.walletBalance == 0;
       allow read: if isOwner(uid) || isPlatformAdmin();
-      allow update: if isPlatformAdmin() ||
+      allow update: if
         (isOwner(uid) && changedKeysWithin([
           'name', 'displayName', 'city', 'avatarUrl', 'photoURL',
           'followedAthletes', 'followedTeams', 'followedLeagues',
           'sportPreferences', 'notificationPreferences', 'onboardingCompletedAt',
           'lowDataMode', 'updatedAt'
         ]));
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     // An athlete profile is a managed record, not an account holder's page.
@@ -228,9 +278,7 @@ service cloud.firestore {
     // next deploy of this pending ruleset silently reinstated athlete self-editing.
     match /athletes/{athleteId} {
       allow read: if true;
-      allow create: if isPlatformAdmin();
-      allow update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /athleteClaims/{claimId} {
@@ -258,28 +306,29 @@ service cloud.firestore {
 
     match /teams/{teamId} {
       allow read: if true;
-      allow create: if isPlatformAdmin() ||
+      allow create: if
         (canManageLeagueById(request.resource.data.leagueId) &&
           request.resource.data.adminUserIds is list &&
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
-      allow update: if isPlatformAdmin() ||
+      allow update: if
         (hasScopeCapability('team', teamId, ['team.profile.manage']) && changedKeysWithin([
           'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
           'teamAdminName', 'teamAdminEmail', 'lastUpdated', 'updatedAt'
         ]));
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /leagues/{leagueId} {
       allow read: if true;
-      allow create: if isPlatformAdmin();
-      allow update: if isPlatformAdmin() ||
+      // Created by the audited server command, never from a browser.
+      allow create: if false;
+      allow update: if
         (hasScopeCapability('league', leagueId, ['league.profile.manage']) && changedKeysWithin([
           'name', 'city', 'description', 'logoUrl', 'logoURL',
           'currentSeasonId', 'verificationRules', 'updatedAt'
         ]));
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     // Seasons are league-owned competition containers. Publicly readable so fans can browse
@@ -422,7 +471,7 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
 
       // Append-only audit trail. Entries are never edited, so the history of a disputed
       // result cannot be rewritten after the fact.
@@ -472,7 +521,7 @@ service cloud.firestore {
             )
           );
         allow update: if false;
-        allow delete: if isSuperAdmin();
+        allow delete: if false;
       }
     }
 
@@ -534,7 +583,7 @@ service cloud.firestore {
         request.resource.data.status in ['confirmed', 'returned'] &&
         request.resource.data.approvedByUserId == request.auth.uid &&
         changedKeysWithin(['status', 'approvedByUserId', 'updatedAt']);
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /teamAssignments/{assignmentId} {
@@ -564,7 +613,7 @@ service cloud.firestore {
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'leagueId', 'seasonId', 'publishedByUserId', 'createdAt'
         ]);
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /supportNeeds/{needId} {
@@ -587,7 +636,7 @@ service cloud.firestore {
             canManageTeamById(request.resource.data.teamId)
           )
         );
-      allow update: if isPlatformAdmin() ||
+      allow update: if
         (
           signedIn() &&
           resource.data.createdByUserId == request.auth.uid &&
@@ -595,7 +644,7 @@ service cloud.firestore {
           resource.data.status != 'completed' &&
           changedKeysWithin(['recipientUpdates', 'updatedAt'])
         );
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /supportNeedApprovals/{approvalId} {
@@ -631,7 +680,7 @@ service cloud.firestore {
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.userId == request.auth.uid);
       allow update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /invitations/{invitationId} {
@@ -698,7 +747,8 @@ service cloud.firestore {
 
     match /sponsorCampaigns/{campaignId} {
       allow read: if true;
-      allow create, update, delete: if isPlatformAdmin();
+      // Command-owned: no browser client writes these, and none should.
+      allow write: if false;
     }
 
     match /standings/{standingId} {
@@ -735,14 +785,14 @@ service cloud.firestore {
             canManageAthleteById(request.resource.data.relatedAthleteId)
           )
         );
-      allow update: if isPlatformAdmin() ||
+      allow update: if
         (
           signedIn() &&
           resource.data.authorId == request.auth.uid &&
           request.resource.data.authorId == resource.data.authorId &&
           changedKeysWithin(['caption', 'mediaUrl', 'mediaURL', 'mediaType', 'updatedAt'])
         );
-      allow delete: if isSuperAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow delete: if false;
     }
 
     match /comments/{commentId} {
@@ -995,38 +1045,41 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow create: if isPlatformAdmin();
+      // Created by the audited server command, never from a browser.
+      allow create: if false;
       allow read: if isPlatformAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update: if isPlatformAdmin() ||
+      allow update: if
         (
           signedIn() &&
           resource.data.userId == request.auth.uid &&
           changedKeysWithin(['read'])
         );
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /sponsors/{sponsorId} {
       allow read: if true;
-      allow create: if isPlatformAdmin();
+      // Command-owned: no browser client writes these, and none should.
+      allow write: if false;
       // Sponsor records carry no scoped assignment model of their own, so the legacy
       // array here is retired outright rather than migrated: platform operators manage
       // sponsors through trusted commands.
-      allow update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow write: if false;
+      allow delete: if false;
     }
 
     match /awards/{awardId} {
       allow read: if true;
-      allow create, update: if isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      // Command-owned: no browser client writes these, and none should.
+      allow write: if false;
+      allow delete: if false;
     }
 
     match /verifications/{verificationId} {
       allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
       allow create: if canManageLeagueById(request.resource.data.leagueId) || isPlatformAdmin();
       allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
-      allow delete: if isSuperAdmin();
+      allow delete: if false;
     }
 
     match /reports/{reportId} {

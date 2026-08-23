@@ -10,6 +10,7 @@ import {
   canManageTeamInScope,
   canSubmitResultInScope,
   createAccessContext,
+  isAccessIndexLive,
   PERMISSION_BUNDLES,
 } from './access';
 
@@ -188,5 +189,97 @@ describe('athletes are managed profiles, not account holders', () => {
       .filter((bundle) => (bundle.capabilities as string[]).includes('platform.payee.verify'))
       .map((bundle) => bundle.roleKey);
     expect(holders.sort()).toEqual(['platform_admin', 'super_admin']);
+  });
+});
+
+describe('time-limited authority actually expires', () => {
+  /**
+   * The C1 defect: `validUntil` was evaluated only while the projector ran. A grant that
+   * lapsed on Tuesday kept working from Monday's projection until something unrelated
+   * rewrote it, so a time-limited assignment could outlive its own expiry indefinitely.
+   *
+   * The fix carries expiry into the projection so every reader can see it, which is what
+   * makes the guarantee independent of any sweeper running.
+   */
+  const monday = '2026-08-24T12:00:00.000Z';
+  const expiry = '2026-08-24T23:59:00.000Z';
+  const tuesday = new Date('2026-08-25T09:00:00.000Z');
+
+  function temporaryAssignment(): AccessAssignment {
+    return assignment({
+      id: 'assignment_temp',
+      userId: 'user_temp',
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: 'team_x',
+      permissionBundleId: 'full_team_admin',
+      status: 'active',
+      validFrom: '2026-08-20T00:00:00.000Z',
+      validUntil: expiry,
+    });
+  }
+
+  it('stamps the projection with the assignment expiry', () => {
+    const [index] = buildAccessIndexDocuments({
+      assignments: [temporaryAssignment()],
+      accessVersion: 1,
+      updatedAt: monday,
+    });
+    expect(index.capabilities).toContain('team.roster.manage');
+    expect(index.expiresAt).toBe(expiry);
+    expect(index.expiresAtMillis).toBe(Date.parse(expiry));
+  });
+
+  it('stops granting once the expiry passes, without the projector re-running', () => {
+    // Monday's document, read on Tuesday. Nothing rebuilt it — that is the whole point.
+    const [mondayIndex] = buildAccessIndexDocuments({
+      assignments: [temporaryAssignment()],
+      accessVersion: 1,
+      updatedAt: monday,
+    });
+    expect(isAccessIndexLive(mondayIndex, new Date(monday))).toBe(true);
+    expect(isAccessIndexLive(mondayIndex, tuesday)).toBe(false);
+  });
+
+  it('takes the earliest expiry when a scope is held through several assignments', () => {
+    // Taking the latest would let a long-lived grant keep a short-lived one's capabilities
+    // alive past their expiry — the same defect one level up.
+    const longer = assignment({
+      id: 'assignment_longer',
+      userId: 'user_temp',
+      roleKey: 'result_reporter',
+      scopeType: 'team',
+      scopeId: 'team_x',
+      permissionBundleId: 'results_only',
+      status: 'active',
+      validFrom: '2026-08-20T00:00:00.000Z',
+      validUntil: '2026-12-31T23:59:00.000Z',
+    });
+    const [index] = buildAccessIndexDocuments({
+      assignments: [temporaryAssignment(), longer],
+      accessVersion: 1,
+      updatedAt: monday,
+    });
+    expect(index.expiresAt).toBe(expiry);
+  });
+
+  it('leaves permanent assignments unexpiring', () => {
+    const permanent = assignment({
+      id: 'assignment_permanent',
+      userId: 'user_perm',
+      roleKey: 'team_admin',
+      scopeType: 'team',
+      scopeId: 'team_y',
+      permissionBundleId: 'full_team_admin',
+      status: 'active',
+      validFrom: '2026-08-20T00:00:00.000Z',
+    });
+    const [index] = buildAccessIndexDocuments({
+      assignments: [permanent],
+      accessVersion: 1,
+      updatedAt: monday,
+    });
+    expect(index.expiresAtMillis).toBeUndefined();
+    expect(isAccessIndexLive(index, new Date('2030-01-01T00:00:00.000Z'))).toBe(true);
   });
 });

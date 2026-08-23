@@ -7,6 +7,7 @@ import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
 import type { OfficialSportEvent } from '../kernel/types';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
+import { submissionLimitBreaches, type SubmissionShape } from '@/lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 
 /** Bound to the kernel rather than hardcoded, so a definition change is traceable. */
@@ -41,6 +42,8 @@ export function reconciliationExceptionId(matchId: string, submissionVersion: nu
 
 /** Set on the submission so a later write to it cannot re-enter finalization. */
 export const BLOCKED_RECONCILIATION = 'blocked_reconciliation';
+/** Distinct from a surplus block: the input is unsafe to expand, not contradictory. */
+export const BLOCKED_OVERSIZED = 'blocked_oversized_submission';
 
 type OfficialSportEventRecord = {
   id: string;
@@ -635,7 +638,13 @@ export type FinalizeOutcome =
    * The submitted score and the events that are supposed to produce it disagree in the one
    * direction that cannot be repaired by attribution. No official record was written.
    */
-  | { action: 'blocked'; reason: 'reconciliation_surplus'; exceptionId: string };
+  | { action: 'blocked'; reason: 'reconciliation_surplus'; exceptionId: string }
+  /**
+   * The submission is larger than a single finalization may safely expand. No official
+   * record was written and, crucially, none will be attempted again until a human looks —
+   * the alternative is a transaction that fails on its operation budget and retries forever.
+   */
+  | { action: 'blocked'; reason: 'submission_too_large'; exceptionId: string };
 
 /**
  * Promote a settled claim onto the official match record in one idempotent transaction.
@@ -682,6 +691,58 @@ export async function finalizeSubmission(
     const submissionData = submissionSnap.data() ?? {};
     if (submissionData.finalizationStatus === BLOCKED_RECONCILIATION) {
       return { action: 'skipped', reason: BLOCKED_RECONCILIATION };
+    }
+    if (submissionData.finalizationStatus === BLOCKED_OVERSIZED) {
+      return { action: 'skipped', reason: BLOCKED_OVERSIZED };
+    }
+
+    /**
+     * Write-amplification preflight, before any planning work.
+     *
+     * Rules now cap these lists at write time, but a submission stored before those caps
+     * existed is still sitting in the collection, and any touch of it re-fires this trigger.
+     * Expanding one is how a single document becomes a transaction that exceeds Firestore's
+     * operation budget, fails, retries, and fails again — burning cost and log volume while
+     * the match stays stuck out of official state, with nothing surfacing to a human.
+     *
+     * Blocking converts that silent loop into a reviewable case. It is deliberately checked
+     * against the raw submission rather than a computed plan: the point is to refuse before
+     * doing the work, not to discover the size after building it.
+     */
+    const oversizeBreaches = submissionLimitBreaches(submissionData as SubmissionShape);
+    if (oversizeBreaches.length) {
+      const exceptionId = reconciliationExceptionId(matchId, Number(submissionData.resultVersion ?? 1));
+      const blockedAt = new Date().toISOString();
+      const exceptionRef = db.collection(RECONCILIATION_EXCEPTIONS).doc(exceptionId);
+      const existingException = await tx.get(exceptionRef);
+      if (!existingException.exists) {
+        tx.create(exceptionRef, {
+          id: exceptionId,
+          exceptionId,
+          matchId,
+          leagueId: submissionData.leagueId ?? '',
+          competitionId: submissionData.seasonId ?? submissionData.leagueId ?? '',
+          submissionId: matchId,
+          submissionVersion: Number(submissionData.resultVersion ?? 1),
+          reasonCode: 'submission_exceeds_finalization_limits',
+          // The breaches themselves, so a reviewer sees which limit and by how much rather
+          // than a bare refusal.
+          issues: oversizeBreaches,
+          status: 'open',
+          reconciliationStatus: 'not_attempted',
+          finalizationStatus: 'blocked',
+          reviewStatus: 'league_review_required',
+          createdAt: blockedAt,
+          updatedAt: blockedAt,
+        });
+      }
+      tx.update(submissionRef, {
+        finalizationStatus: BLOCKED_OVERSIZED,
+        reviewStatus: 'league_review_required',
+        reconciliationExceptionId: exceptionId,
+        updatedAt: blockedAt,
+      });
+      return { action: 'blocked', reason: 'submission_too_large', exceptionId };
     }
 
     const matchRef = db.collection(MATCHES).doc(submission.matchId);

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -53,16 +53,49 @@ const severityRank: Record<Severity, number> = {
   critical: 4,
 };
 
-export function loadAuditReport(file?: string): AuditReport {
-  if (file) return JSON.parse(readFileSync(file, 'utf8')) as AuditReport;
-  const audit = spawnSync('npm', ['audit', '--json'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-  });
+/**
+ * Cloud Functions carry their own dependency tree, and it was never being audited.
+ *
+ * `functions/package.json` declares a separate dependency set — including a different
+ * `firebase-admin` major line — and it ships to production as the trusted runtime that
+ * writes official results. Auditing only the repository root meant the gate reported a clean
+ * bill of health for a codebase whose most privileged half it had not looked at.
+ */
+const AUDIT_TREES = [
+  { label: 'root', cwd: ROOT },
+  { label: 'functions', cwd: path.join(ROOT, 'functions') },
+];
+
+function auditTree(cwd: string, label: string): AuditReport {
+  const audit = spawnSync('npm', ['audit', '--json'], { cwd, encoding: 'utf8' });
   if (!audit.stdout.trim()) {
-    throw new Error(audit.stderr.trim() || 'npm audit did not produce JSON output.');
+    throw new Error(audit.stderr.trim() || `npm audit produced no JSON output for the ${label} tree.`);
   }
   return JSON.parse(audit.stdout) as AuditReport;
+}
+
+/**
+ * Merges the trees into one report, tagging each advisory with where it came from so a
+ * waiver decision can tell a build-time dev dependency from one running in the finalizer.
+ */
+export function loadAuditReport(file?: string): AuditReport {
+  if (file) return JSON.parse(readFileSync(file, 'utf8')) as AuditReport;
+
+  const vulnerabilities: NonNullable<AuditReport['vulnerabilities']> = {};
+  for (const tree of AUDIT_TREES) {
+    if (!existsSync(path.join(tree.cwd, 'package.json'))) continue;
+    const report = auditTree(tree.cwd, tree.label);
+    for (const [name, vulnerability] of Object.entries(report.vulnerabilities ?? {})) {
+      // Same package in both trees keeps the higher severity rather than whichever was read
+      // second, so a merge can never quietly downgrade a finding.
+      const existing = vulnerabilities[name];
+      const incoming = { ...vulnerability, tree: tree.label };
+      if (!existing || severityRank[incoming.severity] > severityRank[existing.severity]) {
+        vulnerabilities[name] = incoming;
+      }
+    }
+  }
+  return { vulnerabilities };
 }
 
 export function loadRegister(file = DEFAULT_REGISTER): AdvisoryRegister {

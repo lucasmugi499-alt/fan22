@@ -37,9 +37,38 @@ export function bearerToken(request: Request) {
 export async function requireAuthenticatedUser(request: Request) {
   const token = bearerToken(request);
   if (!token) return { response: jsonError('Authentication required.', 401) } as const;
-  const actor = await adminAuth.verifyIdToken(token).catch(() => null);
+  // `checkRevoked: true`, not the bare verify this used to do.
+  //
+  // Suspension revokes refresh tokens, but a bare verify accepts any ID token that has not
+  // yet reached its natural expiry — so a compromised session stayed usable for up to an
+  // hour after an operator pressed Suspend. Revocation-aware verification is what makes the
+  // button mean something immediately. It costs a lookup per request, which is the correct
+  // trade for an authority engine.
+  const actor = await adminAuth.verifyIdToken(token, true).catch(() => null);
   if (!actor) return { response: jsonError('Your session is invalid or expired.', 401) } as const;
   return { actor } as const;
+}
+
+/**
+ * The account behind the token, and whether it may still act.
+ *
+ * Revocation closes the token window; this closes the account-state window. A principal
+ * whose account is suspended, disabled or pending deletion must not be able to mutate
+ * anything, even holding a technically valid token issued moments before.
+ */
+const INACTIVE_ACCOUNT_STATUSES = ['suspended', 'disabled', 'deletion_pending'];
+
+export async function requireActivePrincipal(actor: AuthenticatedActor) {
+  const profile = await adminDb.collection('users').doc(actor.uid).get();
+  const data = profile.data();
+  if (!data) return null;
+  const status = typeof data.accountStatus === 'string' ? data.accountStatus : undefined;
+  const legacyStatus = typeof data.status === 'string' ? data.status : undefined;
+  if ((status && INACTIVE_ACCOUNT_STATUSES.includes(status))
+    || (legacyStatus && INACTIVE_ACCOUNT_STATUSES.includes(legacyStatus))) {
+    return jsonError('This account is not active.', 403);
+  }
+  return null;
 }
 
 export function requireRole(actor: AuthenticatedActor, roles: string[], message = 'You do not have permission to perform this action.') {
@@ -180,6 +209,11 @@ export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
       response: jsonError(options.invalidBodyError, parsed.response.status),
     };
   }
+
+  // Checked on every mutation rather than only inside the platform command guard, so a
+  // suspended operator cannot write through any route that skipped that guard.
+  const inactive = await requireActivePrincipal(auth.actor);
+  if (inactive) return { response: inactive };
 
   const appCheck = await verifyOptionalAppCheck(request);
   if ('response' in appCheck) {

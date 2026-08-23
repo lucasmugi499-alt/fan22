@@ -1,5 +1,5 @@
 {
-  "reviewedAt": "2026-08-03",
+  "reviewedAt": "2026-08-23",
   "entries": [
     {
       "package": "next",
@@ -263,7 +263,7 @@
       "scope": "dev-deploy-tooling",
       "status": "accepted-temporarily",
       "reason": "Quadratic CPU consumption in !!omap resolution (CVE-2026-59870, CWE-407). The fix was not backported to the 4.x line, so no patched 4.x exists; only js-yaml 5.x carries it, and every path here is transitive through eslint, firebase-tools and shadcn, where a major bump risks breaking lint and the Firebase CLI that deploys the functions.",
-      "mitigation": "All three parents (eslint, firebase-tools, shadcn) are devDependencies and are absent from the Next build output, so no deployed code path parses YAML with this library. The tooling only reads YAML the operator controls — apphosting.yaml, firebase config — never attacker-supplied input. Revisit when eslint and firebase-tools move to js-yaml 5.x.",
+      "mitigation": "All three parents (eslint, firebase-tools, shadcn) are devDependencies and are absent from the Next build output, so no deployed code path parses YAML with this library. The tooling only reads YAML the operator controls \u2014 apphosting.yaml, firebase config \u2014 never attacker-supplied input. Revisit when eslint and firebase-tools move to js-yaml 5.x.",
       "expiresOn": "2026-08-30"
     },
     {
@@ -278,6 +278,31 @@
       "status": "accepted-temporarily",
       "reason": "Transitive of current firebase-tools through the MCP SDK and proxy-agent.",
       "mitigation": "Not bundled into the deployed application. The application's own rate limiting is Firestore-backed and does not use this package.",
+      "expiresOn": "2026-08-30"
+    },
+    {
+      "package": "@google-cloud/firestore",
+      "via": [
+        "google-gax",
+        "uuid"
+      ],
+      "severity": "moderate",
+      "scope": "functions-runtime",
+      "status": "accepted-temporarily",
+      "reason": "Surfaced on 2026-08-23 when the advisory gate began auditing the functions/ dependency tree, which it had never inspected. Transitive through firebase-admin's own chain; the root advisory is uuid's missing buffer bounds check in v3/v5/v6 when a `buf` argument is supplied. npm's only offered remedy is a major DOWNGRADE of firebase-admin to 10.3.0, which is materially worse than the advisory.",
+      "mitigation": "Cloud Functions call uuid through firebase-admin, which does not pass a `buf` argument, so the vulnerable path is not reached. Recheck when firebase-admin ships a chain with patched uuid. Needs an owner decision at expiry \u2014 do not roll this date forward mechanically.",
+      "expiresOn": "2026-08-30"
+    },
+    {
+      "package": "firebase-functions",
+      "via": [
+        "firebase-admin"
+      ],
+      "severity": "moderate",
+      "scope": "functions-runtime",
+      "status": "accepted-temporarily",
+      "reason": "Same uuid chain as @google-cloud/firestore above, reached through firebase-admin. npm proposes a major downgrade to firebase-functions 4.9.0.",
+      "mitigation": "Same as above: the vulnerable uuid path requires a caller-supplied `buf`, which this chain does not use. Re-review with the rest of the register.",
       "expiresOn": "2026-08-30"
     }
   ]

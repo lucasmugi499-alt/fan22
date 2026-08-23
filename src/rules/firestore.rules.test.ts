@@ -237,6 +237,40 @@ describe('result submission: creating a claim', () => {
     );
   });
 
+  it('refuses a submission large enough to break the finalizer', async () => {
+    /**
+     * C6. The finalizer expands these lists into squad, scoring and stat events inside one
+     * transaction. An unbounded list is an unbounded write plan; a plan past Firestore's
+     * operation budget fails, the trigger retries, and one document becomes a permanently
+     * retrying function with the match stuck out of official state.
+     *
+     * Refusing the write is the cheapest place to stop that — before the document exists.
+     */
+    for (const oversized of [
+      { scorers: Array.from({ length: 61 }, () => ({ athleteId: 'athlete_a_1', count: 1 })) },
+      { athleteStatLines: Array.from({ length: 121 }, () => ({ athleteId: 'athlete_a_1' })) },
+      { evidenceRefs: Array.from({ length: 21 }, (_, i) => `uploads/e${i}.jpg`) },
+      { activeSquads: { team_a: ['x'], team_b: ['y'], team_ghost: ['z'] } },
+      { homeScore: 9999 },
+    ]) {
+      await assertFails(
+        setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc(oversized))
+      );
+    }
+  });
+
+  it('still accepts a realistic fixture at the caps', async () => {
+    // The caps must stop amplification without refereeing real team sheets.
+    await assertSucceeds(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc({
+        scorers: Array.from({ length: 12 }, () => ({ athleteId: 'athlete_a_1', count: 1 })),
+        evidenceRefs: ['uploads/teamsheet.jpg'],
+        homeScore: 128,
+        awayScore: 119,
+      }))
+    );
+  });
+
   it('lets the submitting team include active squads and athlete stat lines', async () => {
     await assertSucceeds(
       setDoc(doc(asUser(TEAM_A_ADMIN), 'resultSubmissions/match_001'), submissionDoc({
@@ -718,6 +752,43 @@ describe('profile and assignment integrity', () => {
       followedLeagues: [],
       capabilities: ['platform.admin.manage'],
     }));
+  });
+
+  it('gives a Platform Admin browser no direct write path around the command layer', async () => {
+    // C4. `isPlatformAdmin()` grants on a role claim alone, so a Platform Admin browser could
+    // edit these collections directly — skipping the command layer's capability check,
+    // validation, reason and audit entry. A governance model the browser can walk around is
+    // not a governance model.
+    const platform = asUserWithClaims('user_platform_bypass', { role: 'platform_admin' });
+    for (const path of [
+      'athletes/athlete_001',
+      'sports/football',
+      'sponsors/sponsor_1',
+      'awards/award_1',
+      'sponsorCampaigns/campaign_1',
+      'leagues/league_new_from_browser',
+    ]) {
+      await assertFails(setDoc(doc(platform, path), { name: '__rules_smoke', __probe: true }));
+    }
+  });
+
+  it('lets nobody delete provenance from a browser, super_admin included', async () => {
+    // C5. A stolen super_admin session could delete result submissions and their nested
+    // events — the append-only record of who submitted a result, who disputed it, and how it
+    // changed. That is history destruction wearing an administrator's badge.
+    const superAdmin = asUserWithClaims('user_super_delete', { role: 'super_admin' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'resultSubmissions/match_delete_probe'), {
+        matchId: 'match_delete_probe', leagueId: 'league_a', status: 'confirmed',
+      });
+      await setDoc(doc(ctx.firestore(), 'resultSubmissions/match_delete_probe/events/event_1'), {
+        submissionId: 'match_delete_probe', actor: 'system',
+      });
+    });
+    await assertFails(deleteDoc(doc(superAdmin, 'resultSubmissions/match_delete_probe')));
+    await assertFails(deleteDoc(doc(superAdmin, 'resultSubmissions/match_delete_probe/events/event_1')));
+    await assertFails(deleteDoc(doc(superAdmin, 'athletes/athlete_001')));
+    await assertFails(deleteDoc(doc(superAdmin, 'teams/team_a')));
   });
 
   it('publishes site settings to everyone and lets nobody write them', async () => {

@@ -8,11 +8,21 @@
  * default project.
  */
 
-export type Environment = 'production' | 'staging';
+/**
+ * `demo` is a first-class environment, not a flavour of production.
+ *
+ * The `prod` alias used to point at manifest-quasar-479416-s7, which is the investor demo
+ * project running synthetic data. Anyone typing `--project prod` got the demo, and every
+ * guard keyed off that alias agreed with them — including the confirmation phrase, which
+ * asked them to type RESET-GOALPLACE-PRODUCTION before wiping a demo. The alias is now
+ * `demo`, and no `prod` alias exists until a real production project does.
+ */
+export type Environment = 'production' | 'staging' | 'demo';
 
 export const CONFIRM_PHRASES: Record<Environment, string> = {
   production: 'RESET-GOALPLACE-PRODUCTION',
   staging: 'RESET-GOALPLACE-STAGING',
+  demo: 'RESET-GOALPLACE-DEMO',
 };
 
 /** Placeholder left in .firebaserc until a real staging project exists. */
@@ -83,6 +93,7 @@ export function buildProjectMap(aliases: Record<string, string>): ProjectMap {
     if (!projectId || projectId === STAGING_PLACEHOLDER) continue;
     if (alias === 'prod' || alias === 'production') map[projectId] = 'production';
     else if (alias === 'staging' || alias === 'stage') map[projectId] = 'staging';
+    else if (alias === 'demo') map[projectId] = 'demo';
   }
   return map;
 }

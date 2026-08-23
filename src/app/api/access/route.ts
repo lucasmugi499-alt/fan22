@@ -190,17 +190,60 @@ export async function POST(request: Request) {
       }
       if (data.status !== 'invited') return Response.json({ error: 'Invitation is no longer active.' }, { status: 409 });
 
+      // A legacy invitation link must still produce CANONICAL authority.
+      //
+      // This path used to write `teamAssignments` and `team.adminUserIds` and stop there. The
+      // person was told they were a Team Admin, their role claim said so, and the canonical
+      // model — the one Firestore Rules and every capability check actually consult — had
+      // never heard of them. That is split-brain identity: an administrative UI they can
+      // enter and cannot use, or worse, legacy surfaces that keep pretending they own a team.
+      //
+      // Rather than reject old links and strand invitees, acceptance now flows into the same
+      // canonical assignment plus projection that the modern invitation produces. There is
+      // one path by which authority becomes real; this is now a second door onto it, not a
+      // second mechanism.
+      const canonicalAssignmentId = `assignment_team_${data.teamId}_${actor.uid}`;
+      const canonicalAssignment = assignmentRecord({
+        id: canonicalAssignmentId,
+        userId: actor.uid,
+        roleKey: 'team_admin',
+        scopeType: 'team',
+        scopeId: data.teamId,
+        permissionBundleId: 'full_team_admin',
+        grantedByUserId: String(data.invitedByUserId ?? data.createdByUserId ?? actor.uid),
+        invitationId: assignment.id,
+      });
+      const legacyNow = new Date();
+      const projectedLegacyAssignment = normalizeAccessAssignment(
+        canonicalAssignmentId,
+        canonicalAssignment,
+        legacyNow.toISOString(),
+      );
+
       await adminDb.runTransaction(async (transaction) => {
         const current = await transaction.get(assignmentRef);
         if (!current.exists || current.data()?.status !== 'invited') {
           throw new Error('Invitation is no longer active.');
         }
+        const projection = await readScopeProjection(
+          transaction,
+          { userId: actor.uid, scopeType: 'team', scopeId: data.teamId },
+          { now: legacyNow, pending: [{ operation: 'upsert', assignment: projectedLegacyAssignment }] },
+        );
         transaction.update(assignmentRef, {
           userId: actor.uid,
           status: 'active',
           acceptedAt: FieldValue.serverTimestamp(),
+          // Recorded so a migration sweep can tell which legacy rows already have a canonical
+          // equivalent and retire the collection without guessing.
+          canonicalAssignmentId,
         });
+        transaction.set(adminDb.collection('accessAssignments').doc(canonicalAssignmentId), canonicalAssignment);
+        projection.apply(transaction);
         transaction.update(adminDb.collection('teams').doc(data.teamId), {
+          // Still written, and no longer authority. Rules and capability checks read the
+          // projection above; this array survives only because result-reminder notifications
+          // still resolve recipients from it. Removing it belongs with that fix, not here.
           adminUserIds: FieldValue.arrayUnion(actor.uid),
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -214,9 +257,10 @@ export async function POST(request: Request) {
         }, { merge: true });
         transaction.set(adminDb.collection('adminAuditEvents').doc(), {
           actorUserId: actor.uid,
-          action: 'accepted',
+          action: 'accepted_legacy_migrated',
           targetCollection: 'teamAssignments',
           targetId: assignment.id,
+          afterSummary: { canonicalAssignmentId, scopeType: 'team', scopeId: data.teamId },
           createdAt: FieldValue.serverTimestamp(),
         });
       });

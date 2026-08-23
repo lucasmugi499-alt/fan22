@@ -63,7 +63,7 @@
     "data:guard": "tsx scripts/data/deprecated-fields-guard.ts",
     "data:repair:aggregates:dry-run": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts",
     "data:repair:aggregates:apply": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts --apply",
-    "postinstall": "npm --prefix functions ci || npm --prefix functions install",
+    "postinstall": "npm --prefix functions ci",
     "bootstrap": "npm ci && npm --prefix functions ci",
     "rules:smoke": "tsx --env-file=.env.local scripts/staging/deployed-rules-smoke.ts"
   },
