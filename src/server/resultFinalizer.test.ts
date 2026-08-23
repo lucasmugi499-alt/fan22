@@ -475,3 +475,68 @@ describe('one sports truth: the athlete projection follows the canonical events'
     expect(internalRecord?.data).toHaveProperty('eligibilityIssues');
   });
 });
+
+describe('the finalizer refuses to expand an amplification payload', () => {
+  /**
+   * B1. `scorers.size() <= 60` counts entries, not what is inside them. One well-formed
+   * scorer claiming 100,000,000 passed every length check, and the finalizer would then
+   * construct a hundred million event objects — before reconciliation, before the
+   * transaction, before any guard that could refuse it. The surplus check would eventually
+   * have rejected the contradiction, but only after the explosion it was meant to prevent.
+   */
+  it('blocks a single scorer entry claiming an enormous count', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': {
+        ...submission,
+        scorers: [{ athleteId: 'athlete_1', teamId: 'team_home', count: 100_000_000 }],
+      },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+    });
+
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    expect(outcome).toMatchObject({ action: 'blocked', reason: 'submission_too_large' });
+    // Nothing was expanded: no official events were written at all.
+    expect(writes.filter((write) => write.path.startsWith('officialSportEvents/'))).toEqual([]);
+    // And it became a reviewable case rather than a retrying function.
+    const exception = writes.find((write) => write.path.startsWith('reconciliationExceptions/'));
+    expect(exception?.data).toMatchObject({ reasonCode: 'submission_exceeds_finalization_limits' });
+    expect(String((exception?.data as { issues?: string[] })?.issues?.join(' '))).toContain('scorer count');
+  });
+
+  it('blocks a claim whose total expansion exceeds the write budget', async () => {
+    // Each entry is individually legal; together they plan more writes than one transaction
+    // can carry. This is the check that existed as dead code until 2026-08-24.
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': {
+        ...submission,
+        scorers: Array.from({ length: 20 }, () => ({
+          athleteId: 'athlete_1', teamId: 'team_home', count: 90,
+        })),
+      },
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+    });
+
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    expect(outcome).toMatchObject({ action: 'blocked', reason: 'submission_too_large' });
+    const exception = writes.find((write) => write.path.startsWith('reconciliationExceptions/'));
+    expect(String((exception?.data as { issues?: string[] })?.issues?.join(' '))).toContain('safe budget');
+  });
+
+  it('still finalizes a realistic result', async () => {
+    // The bound must not refuse real matches.
+    const { db } = fakeDb({
+      'resultSubmissions/match_1': submission,
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    const outcome = await finalizeSubmission(db as never, 'match_1', ENABLED);
+    expect(outcome).toMatchObject({ action: 'finalized' });
+  });
+});

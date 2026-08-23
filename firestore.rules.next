@@ -90,9 +90,24 @@ service cloud.firestore {
         scopeCapabilities(scopeType, scopeId).hasAny(capabilities);
     }
 
-    function canManageLeagueById(leagueId) {
-      return isPlatformAdmin() ||
-        hasScopeCapability('league', leagueId, [
+    /**
+     * Read and write authority are different questions, and one helper answering both is how
+     * a role bypass survives a cleanup.
+     *
+     * `hasLeagueOperatorCapability` and `hasTeamOperatorCapability` each began with `isPlatformAdmin() ||`,
+     * so every write rule built on them carried a role-only path — including result
+     * adjudication. A Platform Admin with a browser credential could alter a corrected score
+     * or a resolution directly, skipping the `platform.trust.decide` command, its reason and
+     * its audit entry, and the finalizer would then consume that state as sporting truth.
+     * Removing the bypass from the visible `allow` lines while leaving it inside the helper
+     * fixed the appearance of the problem.
+     *
+     * So: operator helpers carry no role at all and are what write rules use. Read helpers
+     * add Platform Admin deliberately, because reading is the thing a platform operator
+     * legitimately does from a console.
+     */
+    function hasLeagueOperatorCapability(leagueId) {
+      return hasScopeCapability('league', leagueId, [
           'league.profile.manage',
           'league.season.manage',
           'league.team.create',
@@ -103,9 +118,8 @@ service cloud.firestore {
         ]);
     }
 
-    function canManageTeamById(teamId) {
-      return isPlatformAdmin() ||
-        hasScopeCapability('team', teamId, [
+    function hasTeamOperatorCapability(teamId) {
+      return hasScopeCapability('team', teamId, [
           'team.profile.manage',
           'team.staff.invite',
           'team.roster.manage',
@@ -115,6 +129,15 @@ service cloud.firestore {
           'team.result.confirm',
           'team.update.publish',
         ]);
+    }
+
+    /** Reading is what a platform operator legitimately does from a console. */
+    function canReadLeagueById(leagueId) {
+      return isPlatformAdmin() || hasLeagueOperatorCapability(leagueId);
+    }
+
+    function canReadTeamById(teamId) {
+      return isPlatformAdmin() || hasTeamOperatorCapability(teamId);
     }
 
     function athletePath(athleteId) {
@@ -135,9 +158,9 @@ service cloud.firestore {
       return signedIn() &&
         exists(matchPath(matchId)) &&
         (
-          canManageLeagueById(get(matchPath(matchId)).data.leagueId) ||
-          canManageTeamById(get(matchPath(matchId)).data.homeTeamId) ||
-          canManageTeamById(get(matchPath(matchId)).data.awayTeamId)
+          canReadLeagueById(get(matchPath(matchId)).data.leagueId) ||
+          canReadTeamById(get(matchPath(matchId)).data.homeTeamId) ||
+          canReadTeamById(get(matchPath(matchId)).data.awayTeamId)
         );
     }
 
@@ -288,8 +311,8 @@ service cloud.firestore {
     match /athleteClaims/{claimId} {
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.requesterUserId == request.auth.uid) ||
-        canManageTeamById(resource.data.teamId) ||
-        canManageLeagueById(resource.data.leagueId);
+        canReadTeamById(resource.data.teamId) ||
+        canReadLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 
@@ -311,7 +334,7 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if true;
       allow create: if
-        (canManageLeagueById(request.resource.data.leagueId) &&
+        (hasLeagueOperatorCapability(request.resource.data.leagueId) &&
           request.resource.data.adminUserIds is list &&
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
@@ -385,36 +408,36 @@ service cloud.firestore {
     }
 
     match /reconciliationExceptions/{exceptionId} {
-      allow get, list: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow get, list: if isPlatformAdmin() || canReadLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 
     match /resultSubmissions/{matchId} {
       allow get: if isPlatformAdmin() || canAccessMatchResult(matchId);
       allow list: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId) ||
-        canManageTeamById(resource.data.submittedByTeamId) ||
-        canManageTeamById(resource.data.opponentTeamId);
+        canReadLeagueById(resource.data.leagueId) ||
+        canReadTeamById(resource.data.submittedByTeamId) ||
+        canReadTeamById(resource.data.opponentTeamId);
 
       // Only an admin of the submitting team may open a claim, only against a team they are
       // not also running, and only in the awaiting-response state.
-      allow create: if canManageTeamById(request.resource.data.submittedByTeamId) &&
-        !canManageTeamById(request.resource.data.opponentTeamId) &&
+      allow create: if hasTeamOperatorCapability(request.resource.data.submittedByTeamId) &&
+        !hasTeamOperatorCapability(request.resource.data.opponentTeamId) &&
         validNewSubmission(matchId);
 
       // A rejected or withdrawn claim may be replaced in place. The revision advances,
       // while the official result version remains stable because neither terminal claim
       // ever became official.
       allow update: if resource.data.status in ['rejected', 'withdrawn'] &&
-        canManageTeamById(request.resource.data.submittedByTeamId) &&
-        !canManageTeamById(request.resource.data.opponentTeamId) &&
+        hasTeamOperatorCapability(request.resource.data.submittedByTeamId) &&
+        !hasTeamOperatorCapability(request.resource.data.opponentTeamId) &&
         validNewSubmission(matchId) &&
         request.resource.data.revision == resource.data.revision + 1 &&
         request.resource.data.resultVersion == resource.data.resultVersion;
 
       // The opponent answers: confirm or dispute. They may never edit the claimed score.
-      allow update: if canManageTeamById(resource.data.opponentTeamId) &&
-        !canManageTeamById(resource.data.submittedByTeamId) &&
+      allow update: if hasTeamOperatorCapability(resource.data.opponentTeamId) &&
+        !hasTeamOperatorCapability(resource.data.submittedByTeamId) &&
         resource.data.status in ['pending_confirmation', 'confirmation_overdue'] &&
         request.resource.data.status in ['confirmed', 'disputed'] &&
         claimUnchanged() &&
@@ -432,7 +455,7 @@ service cloud.firestore {
         );
 
       // The submitter may retract an unanswered claim, and nothing else.
-      allow update: if canManageTeamById(resource.data.submittedByTeamId) &&
+      allow update: if hasTeamOperatorCapability(resource.data.submittedByTeamId) &&
         resource.data.status == 'pending_confirmation' &&
         request.resource.data.status == 'withdrawn' &&
         claimUnchanged() &&
@@ -440,7 +463,7 @@ service cloud.firestore {
 
       // The league adjudicates. It may correct a score, but only into the corrected fields,
       // and it still cannot declare a result official.
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
+      allow update: if hasLeagueOperatorCapability(resource.data.leagueId) &&
         resource.data.status in ['pending_confirmation', 'confirmation_overdue', 'confirmed', 'disputed'] &&
         // 'pending_confirmation' is how a league extends the window: it resets the clock
         // rather than deciding anything.
@@ -493,21 +516,21 @@ service cloud.firestore {
           (
             (
               request.resource.data.actor == 'submitting_team' &&
-              canManageTeamById(
+              hasTeamOperatorCapability(
                 getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
                   .data.submittedByTeamId
               )
             ) ||
             (
               request.resource.data.actor == 'opponent_team' &&
-              canManageTeamById(
+              hasTeamOperatorCapability(
                 getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
                   .data.opponentTeamId
               )
             ) ||
             (
               request.resource.data.actor == 'league_admin' &&
-              canManageLeagueById(
+              hasLeagueOperatorCapability(
                 getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
                   .data.leagueId
               )
@@ -551,8 +574,8 @@ service cloud.firestore {
 
     match /challengeApprovals/{approvalId} {
       allow read: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId) ||
-        canManageTeamById(resource.data.teamId) ||
+        canReadLeagueById(resource.data.leagueId) ||
+        canReadTeamById(resource.data.teamId) ||
         canManageAthleteById(resource.data.athleteId);
       allow write: if false;
     }
@@ -564,11 +587,11 @@ service cloud.firestore {
 
     match /rosters/{rosterId} {
       allow read: if true;
-      allow create: if canManageTeamById(request.resource.data.teamId) &&
+      allow create: if hasTeamOperatorCapability(request.resource.data.teamId) &&
         request.resource.data.submittedByUserId == request.auth.uid &&
         request.resource.data.status in ['draft', 'submitted'] &&
         !('approvedByUserId' in request.resource.data);
-      allow update: if canManageTeamById(resource.data.teamId) &&
+      allow update: if hasTeamOperatorCapability(resource.data.teamId) &&
         request.resource.data.teamId == resource.data.teamId &&
         request.resource.data.leagueId == resource.data.leagueId &&
         request.resource.data.seasonId == resource.data.seasonId &&
@@ -577,7 +600,7 @@ service cloud.firestore {
         changedKeysWithin([
           'athleteIds', 'status', 'completeness', 'submittedByUserId', 'updatedAt'
         ]);
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
+      allow update: if hasLeagueOperatorCapability(resource.data.leagueId) &&
         request.resource.data.teamId == resource.data.teamId &&
         request.resource.data.leagueId == resource.data.leagueId &&
         request.resource.data.seasonId == resource.data.seasonId &&
@@ -592,7 +615,7 @@ service cloud.firestore {
 
     match /teamAssignments/{assignmentId} {
       allow get: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId) ||
+        canReadLeagueById(resource.data.leagueId) ||
         (signedIn() && (
           resource.data.userId == request.auth.uid ||
           (
@@ -601,7 +624,7 @@ service cloud.firestore {
             resource.data.invitedEmail == request.auth.token.get('email', '')
           )
         ));
-      allow list: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow list: if isPlatformAdmin() || canReadLeagueById(resource.data.leagueId);
       allow create: if false;
       // Acceptance and assignment changes are handled by the trusted access endpoint.
       allow update, delete: if false;
@@ -610,10 +633,10 @@ service cloud.firestore {
     match /leagueNotices/{noticeId} {
       allow read: if resource.data.audience == 'public' ||
         isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId);
-      allow create: if canManageLeagueById(request.resource.data.leagueId) &&
+        canReadLeagueById(resource.data.leagueId);
+      allow create: if hasLeagueOperatorCapability(request.resource.data.leagueId) &&
         request.resource.data.publishedByUserId == request.auth.uid;
-      allow update: if canManageLeagueById(resource.data.leagueId) &&
+      allow update: if hasLeagueOperatorCapability(resource.data.leagueId) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'leagueId', 'seasonId', 'publishedByUserId', 'createdAt'
         ]);
@@ -630,14 +653,14 @@ service cloud.firestore {
         request.resource.data.verificationStatus == 'pending' &&
         request.resource.data.payoutDestinationStatus == 'pending_verification' &&
         (
-          canManageLeagueById(request.resource.data.leagueId) ||
+          hasLeagueOperatorCapability(request.resource.data.leagueId) ||
           (
             request.resource.data.athleteId is string &&
             canManageAthleteById(request.resource.data.athleteId)
           ) ||
           (
             request.resource.data.teamId is string &&
-            canManageTeamById(request.resource.data.teamId)
+            hasTeamOperatorCapability(request.resource.data.teamId)
           )
         );
       allow update: if
@@ -653,16 +676,16 @@ service cloud.firestore {
 
     match /supportNeedApprovals/{approvalId} {
       allow read: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId) ||
-        canManageTeamById(resource.data.teamId) ||
+        canReadLeagueById(resource.data.leagueId) ||
+        canReadTeamById(resource.data.teamId) ||
         canManageAthleteById(resource.data.athleteId);
       allow write: if false;
     }
 
     match /supportNeedCompletions/{completionId} {
       allow read: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId) ||
-        canManageTeamById(resource.data.teamId) ||
+        canReadLeagueById(resource.data.leagueId) ||
+        canReadTeamById(resource.data.teamId) ||
         canManageAthleteById(resource.data.athleteId);
       allow write: if false;
     }
@@ -683,7 +706,9 @@ service cloud.firestore {
         request.resource.data.status == 'pending';
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.userId == request.auth.uid);
-      allow update: if isPlatformAdmin();
+      // Reviewed through the audited platform command, which carries the capability, the
+      // reason and the audit entry. A browser role check carries none of those.
+      allow update: if false;
       allow delete: if false;
     }
 
@@ -743,7 +768,7 @@ service cloud.firestore {
     // which named individual was excluded from it and why. Restricted to the League that
     // governs the fixture and to Platform; the safe half now lives above.
     match /officialMatchReconciliation/{reconciliationId} {
-      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
+      allow read: if isPlatformAdmin() || canReadLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 
@@ -759,7 +784,7 @@ service cloud.firestore {
 
     match /sponsorReports/{reportId} {
       allow read: if isPlatformAdmin() ||
-        canManageLeagueById(resource.data.leagueId);
+        canReadLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 
@@ -792,11 +817,11 @@ service cloud.firestore {
           isPlatformAdmin() ||
           (
             request.resource.data.relatedTeamId is string &&
-            canManageTeamById(request.resource.data.relatedTeamId)
+            hasTeamOperatorCapability(request.resource.data.relatedTeamId)
           ) ||
           (
             request.resource.data.relatedLeagueId is string &&
-            canManageLeagueById(request.resource.data.relatedLeagueId)
+            hasLeagueOperatorCapability(request.resource.data.relatedLeagueId)
           ) ||
           (
             request.resource.data.relatedAthleteId is string &&
@@ -1094,9 +1119,9 @@ service cloud.firestore {
     }
 
     match /verifications/{verificationId} {
-      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
-      allow create: if canManageLeagueById(request.resource.data.leagueId) || isPlatformAdmin();
-      allow update: if canManageLeagueById(resource.data.leagueId) || isPlatformAdmin();
+      allow read: if isPlatformAdmin() || canReadLeagueById(resource.data.leagueId);
+      allow create: if hasLeagueOperatorCapability(request.resource.data.leagueId);
+      allow update: if hasLeagueOperatorCapability(resource.data.leagueId);
       allow delete: if false;
     }
 

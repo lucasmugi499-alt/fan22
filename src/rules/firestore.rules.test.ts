@@ -818,6 +818,66 @@ describe('profile and assignment integrity', () => {
     await assertSucceeds(getDoc(doc(asUser(LEAGUE_ADMIN), 'officialMatchReconciliation/match_001_v1')));
   });
 
+  it('gives a Platform Admin browser no write path on any command-owned surface', async () => {
+    /**
+     * B2, and the reason the earlier version of this test was not enough.
+     *
+     * The previous test listed a few collections and proved those were closed. It could not
+     * prove the general rule, and the bypass had moved somewhere a collection list would
+     * never look: `canManageLeagueById` and `canManageTeamById` both began with
+     * `isPlatformAdmin() ||`, so every write rule built on them still carried a role-only
+     * path — result adjudication included. A Platform Admin could alter a corrected score
+     * directly, skipping platform.trust.decide, its reason and its audit entry, and the
+     * finalizer would consume that as sporting truth.
+     *
+     * This enumerates the surfaces named in the audit rather than a sample.
+     */
+    const platform = asUserWithClaims('user_platform_writes', { role: 'platform_admin' });
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'resultSubmissions/match_adjudicate'), {
+        matchId: 'match_adjudicate', leagueId: 'league_001',
+        submittedByTeamId: 'team_a', opponentTeamId: 'team_b',
+        status: 'pending_confirmation', homeScore: 1, awayScore: 0,
+      });
+      await setDoc(doc(ctx.firestore(), 'rosters/roster_1'), { teamId: 'team_a', leagueId: 'league_001' });
+      await setDoc(doc(ctx.firestore(), 'leagueNotices/notice_1'), { leagueId: 'league_001', audience: 'public' });
+      await setDoc(doc(ctx.firestore(), 'leagueAdminApplications/application_1'), { userId: 'someone', status: 'pending' });
+      await setDoc(doc(ctx.firestore(), 'verifications/verification_1'), { leagueId: 'league_001' });
+    });
+
+    // Adjudicating a result — the one that reaches sporting truth.
+    await assertFails(updateDoc(doc(platform, 'resultSubmissions/match_adjudicate'), {
+      correctedHomeScore: 9, status: 'resolved',
+    }));
+    // Creating a club.
+    await assertFails(setDoc(doc(platform, 'teams/team_from_browser'), {
+      name: 'Browser Team', leagueId: 'league_001', adminUserIds: [], verified: false,
+    }));
+    // Approving a roster.
+    await assertFails(updateDoc(doc(platform, 'rosters/roster_1'), { status: 'approved' }));
+    // Publishing a league notice.
+    await assertFails(updateDoc(doc(platform, 'leagueNotices/notice_1'), { body: 'Published from a browser' }));
+    // Reviewing an application.
+    await assertFails(updateDoc(doc(platform, 'leagueAdminApplications/application_1'), { status: 'approved' }));
+    // Creating and updating a verification record.
+    await assertFails(setDoc(doc(platform, 'verifications/verification_new'), { leagueId: 'league_001' }));
+    await assertFails(updateDoc(doc(platform, 'verifications/verification_1'), { status: 'verified' }));
+  });
+
+  it('still lets a Platform Admin read what they operate', async () => {
+    // The split has to keep reads working, or the console goes blind and the fix reads as
+    // breakage rather than hardening.
+    const platform = asUserWithClaims('user_platform_reads', { role: 'platform_admin' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'resultSubmissions/match_readable'), {
+        matchId: 'match_readable', leagueId: 'league_001',
+        submittedByTeamId: 'team_a', opponentTeamId: 'team_b', status: 'confirmed',
+      });
+    });
+    await assertSucceeds(getDoc(doc(platform, 'resultSubmissions/match_readable')));
+  });
+
   it('publishes site settings to everyone and lets nobody write them', async () => {
     // Public because the site renders from it; unwritable because every change belongs to
     // the audited settings command, which is also what keeps governed switches off it.

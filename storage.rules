@@ -31,7 +31,7 @@ service firebase.storage {
     // A compromised account could park arbitrary large objects in the bucket, and a delete
     // could orphan a Firestore media record that still pointed at the file.
     //
-    // Verified before closing: no client code calls uploadBytes or ref(storage, ...) at all —
+    // Verified before closing: no client code calls uploadBytes, ref(storage, ...) or delete at all —
     // every upload already goes through a signed session URL issued by the server. These
     // grants were reachable capability, not used capability.
     match /users/{userId}/{allPaths=**} {
@@ -43,22 +43,30 @@ service firebase.storage {
     // Browser rules deliberately cannot grant arbitrary entity writes because this app uses
     // the fg256 Firestore database and Storage Rules can only read the default database.
 
+    // Match evidence is provenance. Deletion is a write, and it is closed to browsers too.
+    //
+    // Uploads were closed and deletes were not, which left a compromised Platform Admin
+    // session able to destroy the photographs and documents that explain a disputed result —
+    // bypassing the media command, its reason and its audit trail, and potentially leaving
+    // Firestore metadata pointing at an object that no longer exists. Several builds were
+    // spent removing browser deletion of immutable sporting history from Firestore; the
+    // evidence behind that history has to meet the same standard.
+    //
+    // Lawful removal (privacy, legal order) belongs in a server command that records the
+    // reason, preserves the hash as a tombstone, and deletes through the Admin SDK.
     match /matchEvidence/{matchId}/{teamId}/{userId}/{fileName} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow create: if false;
-      allow update: if false;
-      allow delete: if isAdmin();
-      allow write: if resource != null && request.resource == null && isAdmin();
+      allow write: if false;
     }
 
     match /publishedMedia/{ownerType}/{ownerId}/{userId}/{fileName} {
       allow read: if true;
       allow create: if false;
       allow update: if false;
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow write: if resource != null &&
-        request.resource == null &&
-        (isAdmin() || (signedIn() && request.auth.uid == userId));
+      // Deleting the object without the record leaves metadata pointing at nothing, which
+      // is exactly what the governed media lifecycle exists to prevent. Removal runs as a
+      // command that retires both together.
+      allow write: if false;
     }
 
     // Published media. Public to read; written only by the trusted publication pipeline.
@@ -76,16 +84,15 @@ service firebase.storage {
       allow read: if true;
       allow create: if false;
       allow update: if false;
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow write: if resource != null &&
-        request.resource == null &&
-        (isAdmin() || (signedIn() && request.auth.uid == userId));
+      // Deleting the object without the record leaves metadata pointing at nothing, which
+      // is exactly what the governed media lifecycle exists to prevent. Removal runs as a
+      // command that retires both together.
+      allow write: if false;
     }
 
     match /public/{allPaths=**} {
       allow read: if true;
-      allow create, update: if false;
-      allow delete: if isAdmin();
+      allow write: if false;
     }
 
     // Moderation queue. Admins read it; nobody writes it from a browser, because a

@@ -151,13 +151,39 @@ describe('match evidence boundary', () => {
     );
   });
 
-  it('lets platform admins remove match evidence', async () => {
+  it('lets nobody delete match evidence from a browser, platform admins included', async () => {
+    /**
+     * B3. This test asserted the opposite until 2026-08-24, and inverting it is the point.
+     *
+     * Match evidence is the provenance behind a disputed result. Uploads were closed and
+     * deletes were not, so a compromised Platform Admin session could destroy the
+     * photographs explaining a decision — bypassing the media command, its reason and its
+     * audit trail, and leaving Firestore metadata pointing at an object that no longer
+     * exists. Several builds were spent removing browser deletion of immutable sporting
+     * history from Firestore; the evidence behind that history meets the same standard.
+     *
+     * Lawful removal runs as a server command that records a reason and preserves a hash.
+     */
     const path = 'matchEvidence/match_1/team_a/team_admin/evidence-admin.jpg';
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.storage(BUCKET_URL).ref(path).put(bytes(128), metadata('image/jpeg'));
     });
 
-    await assertSucceeds(ref('platform_admin', path, { role: 'platform_admin' }).delete());
+    await assertFails(ref('platform_admin', path, { role: 'platform_admin' }).delete());
+    await assertFails(ref('team_admin', path).delete());
+    // Reading it is still how a dispute gets reviewed.
+    await assertSucceeds(ref('platform_admin', path, { role: 'platform_admin' }).getMetadata());
+  });
+
+  it('lets nobody delete published or public media from a browser', async () => {
+    // Deleting the object without retiring the record leaves metadata pointing at nothing —
+    // the desynchronisation the governed media lifecycle exists to prevent.
+    const published = 'publishedMedia/team/team_1/user_a/photo.jpg';
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage(BUCKET_URL).ref(published).put(bytes(128), metadata('image/jpeg'));
+    });
+    await assertFails(ref('user_a', published).delete());
+    await assertFails(ref('platform_admin', published, { role: 'platform_admin' }).delete());
   });
 
   it('keeps match evidence reads scoped to the uploader and platform admins', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendDueConfirmationReminders } from './finalize';
+import { retryStalledFinalizations, sendDueConfirmationReminders, sweepOverdueConfirmations } from './finalize';
 
 /**
  * A Firestore stand-in covering only what the reminder sweep uses: an ordered, cursored
@@ -154,5 +154,84 @@ describe('result confirmation reminders', () => {
     // reached is what proves the cursor advanced past the first page.
     const reached = new Set(written.map((n) => n.id.replace(/^result_/, '').replace(/_\d+h_.*$/, '')));
     expect(reached.size).toBeGreaterThan(200);
+  });
+});
+
+describe('every scheduled sweep pages deterministically', () => {
+  /**
+   * H11 was only half fixed: the reminder sweep was paginated while
+   * `sweepOverdueConfirmations` and `retryStalledFinalizations` still used a bare
+   * `.limit(200)`. With no ordering, "the first 200 matching" is whatever Firestore returns,
+   * and it can return the same 200 every run — so records past them starve and the work
+   * never happens for them. The symptom is not an error; it is a subset of the platform
+   * quietly never being processed.
+   */
+  function pagingDb(count: number, seed: (index: number) => Record<string, unknown>) {
+    const rows: Record<string, unknown>[] = Array.from({ length: count }, (_, index) => ({
+      id: `doc_${String(index).padStart(4, '0')}`,
+      ...seed(index),
+    }));
+    const seen = new Set<string>();
+    const query = (clauses: [string, string, unknown][] = [], order?: string, after?: string, cap = 200) => ({
+      where: (f: string, o: string, v: unknown) => query([...clauses, [f, o, v]], order, after, cap),
+      orderBy: (field: string) => query(clauses, field, after, cap),
+      limit: (n: number) => query(clauses, order, after, n),
+      startAfter: (cursor: { id: string }) => query(clauses, order, cursor.id, cap),
+      get: async () => {
+        let matching = rows.filter((row) => clauses.every(([field, op, value]) =>
+          op === '==' ? row[field] === value : op === '<=' ? String(row[field]) <= String(value) : String(row[field]) >= String(value)));
+        matching = [...matching].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        if (after) matching = matching.slice(matching.findIndex((row) => row.id === after) + 1);
+        const page = matching.slice(0, cap);
+        for (const row of page) seen.add(String(row.id));
+        return {
+          empty: page.length === 0,
+          size: page.length,
+          docs: page.map((row) => ({
+            id: String(row.id),
+            ref: {
+              id: String(row.id),
+              update: vi.fn(async () => undefined),
+              set: vi.fn(async () => undefined),
+              collection: () => ({ doc: () => ({ set: vi.fn(async () => undefined), create: vi.fn(async () => undefined) }) }),
+            },
+            data: () => row,
+          })),
+        };
+      },
+    });
+    const db = {
+      collection: () => Object.assign(query(), {
+        doc: (id: string) => ({ id, update: vi.fn(async () => undefined), set: vi.fn(async () => undefined) }),
+        add: vi.fn(async () => ({ id: 'added' })),
+      }),
+      runTransaction: async (handler: (tx: unknown) => Promise<unknown>) => handler({
+        get: async (ref: { id: string }) => {
+          const row = rows.find((item) => item.id === ref.id);
+          return { exists: Boolean(row), id: ref.id, data: () => row };
+        },
+        set: vi.fn(), update: vi.fn(),
+      }),
+    };
+    return { db, seen };
+  }
+
+  it('reaches overdue confirmations past the first page', async () => {
+    const past = new Date(Date.now() - 3_600_000).toISOString();
+    const { db, seen } = pagingDb(205, () => ({
+      status: 'pending_confirmation', confirmationDeadline: past, leagueId: 'league_a',
+    }));
+
+    await sweepOverdueConfirmations(db as never);
+
+    expect(seen.size).toBeGreaterThan(200);
+  });
+
+  it('reaches stalled finalizations past the first page', async () => {
+    const { db, seen } = pagingDb(205, () => ({ status: 'confirmed' }));
+
+    await retryStalledFinalizations(db as never, { mode: 'off', canaryAllowlist: [] } as never);
+
+    expect(seen.size).toBeGreaterThan(200);
   });
 });

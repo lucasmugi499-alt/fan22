@@ -22,6 +22,37 @@ const NOTIFICATIONS = 'notifications';
  * notification document id include the reminder hour.
  */
 /**
+ * Reads every record a sweep should touch, in a deterministic order, one page at a time.
+ *
+ * A bare `.limit(200)` with no ordering means "the first 200 matching" is whatever Firestore
+ * chooses to return, and it can choose the same 200 on every run — so records past them
+ * starve indefinitely and the work the sweep exists to do never happens for them. The
+ * symptom is not an error; it is a subset of the platform quietly never being processed.
+ *
+ * Ordering by a field the query already filters on keeps the index requirement the same.
+ * `MAX_PAGES` bounds a single invocation so a runaway backlog cannot turn one scheduled run
+ * into an unbounded job.
+ */
+async function readAllPaged(
+  build: () => FirebaseFirestore.Query,
+  orderField: string,
+  { page = 200, maxPages = 25 }: { page?: number; maxPages?: number } = {},
+): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  for (let index = 0; index < maxPages; index += 1) {
+    let query = build().orderBy(orderField).limit(page);
+    if (cursor) query = query.startAfter(cursor);
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+    docs.push(...snapshot.docs);
+    if (snapshot.size < page) break;
+    cursor = snapshot.docs[snapshot.size - 1];
+  }
+  return docs;
+}
+
+/**
  * Who is actually responsible for confirming this team's results, right now.
  *
  * Resolved from the canonical access projection rather than `team.adminUserIds`. That array
@@ -61,32 +92,13 @@ export async function sendDueConfirmationReminders(db: Firestore): Promise<strin
   const now = new Date().toISOString();
   const earliest = new Date(Date.now() - 72 * 3_600_000).toISOString();
 
-  /**
-   * Ordered, cursored traversal rather than a bare `.limit(200)`.
-   *
-   * Without an order, "the first 200 matching records" is whatever Firestore returns, and
-   * the same 200 can occupy the window on every run — so records beyond them starve
-   * indefinitely and their reminders never fire. Ordering by the range field and paging with
-   * a cursor means every pending submission is reached exactly once per sweep.
-   */
-  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-  const PAGE = 200;
-  const MAX_PAGES = 25;
-  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    let query = db
+  const docs = await readAllPaged(
+    () => db
       .collection(SUBMISSIONS)
       .where('status', '==', 'pending_confirmation')
-      .where('submittedAt', '>=', earliest)
-      .orderBy('submittedAt')
-      .limit(PAGE);
-    if (cursor) query = query.startAfter(cursor);
-    const page_ = await query.get();
-    if (page_.empty) break;
-    docs.push(...page_.docs);
-    if (page_.size < PAGE) break;
-    cursor = page_.docs[page_.size - 1];
-  }
+      .where('submittedAt', '>=', earliest),
+    'submittedAt',
+  );
 
   const sent: string[] = [];
 
@@ -147,16 +159,17 @@ export async function sendDueConfirmationReminders(db: Firestore): Promise<strin
  */
 export async function sweepOverdueConfirmations(db: Firestore): Promise<string[]> {
   const now = new Date().toISOString();
-  const snap = await db
-    .collection(SUBMISSIONS)
-    .where('status', '==', 'pending_confirmation')
-    .where('confirmationDeadline', '<=', now)
-    .limit(200)
-    .get();
+  const docs = await readAllPaged(
+    () => db
+      .collection(SUBMISSIONS)
+      .where('status', '==', 'pending_confirmation')
+      .where('confirmationDeadline', '<=', now),
+    'confirmationDeadline',
+  );
 
   const escalated: string[] = [];
 
-  for (const doc of snap.docs) {
+  for (const doc of docs) {
     const submission = { id: doc.id, ...doc.data() } as ResultSubmission;
     if (!isConfirmationOverdue(submission, now)) continue;
 
@@ -194,15 +207,16 @@ export async function retryStalledFinalizations(
   db: Firestore,
   activation: FinalizerActivation,
 ): Promise<string[]> {
-  const snap = await db
-    .collection(SUBMISSIONS)
-    .where('status', '==', 'confirmed')
-    .limit(200)
-    .get();
+  // Ordered by document id: this query has no range filter to order by, and any stable
+  // order is enough to guarantee the cursor advances instead of re-reading one page.
+  const docs = await readAllPaged(
+    () => db.collection(SUBMISSIONS).where('status', '==', 'confirmed'),
+    '__name__',
+  );
 
   const retried: string[] = [];
 
-  for (const doc of snap.docs) {
+  for (const doc of docs) {
     const outcome = await finalizeSubmission(db, doc.id, activation);
     if (outcome.action === 'finalized') {
       logger.warn('Sweep finalized a submission the trigger missed', { matchId: doc.id });

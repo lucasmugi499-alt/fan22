@@ -7,7 +7,13 @@ import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
 import type { OfficialSportEvent } from '../kernel/types';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
-import { submissionLimitBreaches, type SubmissionShape } from '@/lib/sport/submissionLimits';
+import {
+  MAX_FINALIZATION_WRITES,
+  finalizationWriteBudgetExceeded,
+  projectedFinalizationWrites,
+  submissionLimitBreaches,
+  type SubmissionShape,
+} from '@/lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 
 /** Bound to the kernel rather than hardcoded, so a definition change is traceable. */
@@ -714,6 +720,28 @@ export async function finalizeSubmission(
      * doing the work, not to discover the size after building it.
      */
     const oversizeBreaches = submissionLimitBreaches(submissionData as SubmissionShape);
+
+    /**
+     * The work-budget check, which previously existed and was never called.
+     *
+     * `finalizationWriteBudgetExceeded` and `MAX_FINALIZATION_WRITES` were written alongside
+     * the size caps and then not wired in, so the comment above promised a protection the
+     * code did not apply. That is worse than having no guard: the structure and the prose
+     * both read as if oversized finalizations were being caught.
+     *
+     * Counted from the claim rather than from a constructed event array, because building
+     * the array to find out how big it is *is* the failure being prevented.
+     */
+    const projectedSport = (submissionData.sport === 'basketball' || submissionData.sport === 'rugby')
+      ? submissionData.sport
+      : 'football';
+    const plannedWrites = projectedFinalizationWrites(submissionData as SubmissionShape, projectedSport);
+    if (finalizationWriteBudgetExceeded(plannedWrites)) {
+      oversizeBreaches.push(
+        `finalizing this submission would plan roughly ${plannedWrites} writes, above the safe budget of ${MAX_FINALIZATION_WRITES}.`,
+      );
+    }
+
     if (oversizeBreaches.length) {
       const exceptionId = reconciliationExceptionId(matchId, Number(submissionData.resultVersion ?? 1));
       const blockedAt = new Date().toISOString();
