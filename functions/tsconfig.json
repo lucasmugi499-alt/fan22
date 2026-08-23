@@ -25,6 +25,7 @@
   "include": [
     "src/**/*.ts",
     "../src/lib/resultSubmission.ts",
+    "../src/lib/sport/submissionLimits.ts",
     "../src/lib/auth/access.ts",
     "../src/lib/auth/accessProjection.ts",
     "../src/server/resultFinalizer.ts",

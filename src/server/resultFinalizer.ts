@@ -7,13 +7,16 @@ import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
 import type { OfficialSportEvent } from '../kernel/types';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
+// Relative, not `@/`. This module compiles into the Cloud Functions bundle, where a path
+// alias survives into the emitted CommonJS and fails at require time — tsc resolves the
+// alias, it does not rewrite it. Every other import here is relative for the same reason.
 import {
   MAX_FINALIZATION_WRITES,
   finalizationWriteBudgetExceeded,
   projectedFinalizationWrites,
   submissionLimitBreaches,
   type SubmissionShape,
-} from '@/lib/sport/submissionLimits';
+} from '../lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 
 /** Bound to the kernel rather than hardcoded, so a definition change is traceable. */

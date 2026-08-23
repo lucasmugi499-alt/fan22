@@ -6,10 +6,11 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run verify:bundle",
     "typecheck": "tsc --noEmit",
     "serve": "npm run build && firebase emulators:start --only functions,firestore",
-    "deploy": "npm run build && firebase deploy --only functions"
+    "deploy": "npm run build && firebase deploy --only functions",
+    "verify:bundle": "node scripts/verify-bundle.mjs"
   },
   "dependencies": {
     "firebase-admin": "^14.3.0",
