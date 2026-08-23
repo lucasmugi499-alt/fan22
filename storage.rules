@@ -14,15 +14,14 @@ service firebase.storage {
       return role() == 'platform_admin' || role() == 'super_admin';
     }
 
-    function validMedia() {
-      return request.resource != null &&
-        request.resource.size < 50 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/.*|video/.*');
-    }
-
-    function validPublicOwner(ownerType) {
-      return ownerType in ['athletes', 'teams', 'leagues', 'feed'];
-    }
+    // `validMedia`, `validPublicOwner` and `validEvidence` were removed on 2026-08-23, and
+    // their absence is the point.
+    //
+    // Each existed to validate a browser write — a size cap, a MIME check, an owner-type
+    // allowlist. With every browser write path closed, they had no callers: uploads are
+    // authorized by a signed session that already enforces quota, content type and a hash,
+    // and the Admin SDK that performs them is not subject to these rules at all. Keeping
+    // dead validators would suggest a browser upload path still exists to validate.
 
     // Private user assets. Readable by their owner, written by nobody from a browser.
     //
@@ -43,11 +42,6 @@ service firebase.storage {
     // Match evidence and entity media are written through trusted signed-upload sessions.
     // Browser rules deliberately cannot grant arbitrary entity writes because this app uses
     // the fg256 Firestore database and Storage Rules can only read the default database.
-    function validEvidence() {
-      return request.resource != null &&
-        request.resource.size < 15 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/.*|video/.*');
-    }
 
     match /matchEvidence/{matchId}/{teamId}/{userId}/{fileName} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
