@@ -13,6 +13,7 @@ import {
 } from './finalize';
 import { applySearchIndexChange } from './searchIndex';
 import { currentFinalizerActivation } from './finalizerMode';
+import { expireLapsedAssignments, runProjectionRepairs } from './lifecycle';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 
 /**
@@ -185,6 +186,43 @@ export const reconcileResultSubmissions = onSchedule(
       escalated: escalated.length,
       reminders: reminders.length,
       retried: retried.length,
+    });
+  }
+);
+
+/**
+ * Time-based convergence: lapsed assignments and stalled projections.
+ *
+ * Neither of these is a security control — expired projections are already refused at read
+ * time, and a failed search projection never blocked the write behind it. What this adds is
+ * the system returning to a correct steady state without a human, which is the difference
+ * between "fails closed" and "works".
+ */
+export const convergeLifecycle = onSchedule(
+  {
+    schedule: 'every 30 minutes',
+    region: REGION,
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const expiry = await expireLapsedAssignments(db);
+    const repairs = await runProjectionRepairs(db, async (entityType, entityId) => {
+      const snapshot = await db.collection(`${entityType}s`).doc(entityId).get();
+      // The same projector the trigger uses; a repair that re-derived the projection
+      // differently would be a second implementation of the thing that already drifted.
+      await applySearchIndexChange(
+        db,
+        entityType as SearchEntityType,
+        entityId,
+        snapshot.exists ? snapshot.data() : undefined,
+      );
+    });
+    logger.info('Lifecycle convergence complete', {
+      assignmentsExpired: expiry.expired,
+      projectionsRebuilt: expiry.rebuiltUsers.length,
+      searchRepaired: repairs.repaired,
+      searchDeadLettered: repairs.deadLettered,
+      searchStillFailing: repairs.failed,
     });
   }
 );

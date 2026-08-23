@@ -113,6 +113,20 @@ function canAdministerLeague(
  * Firestore's `in` operator takes at most 30 values, so the ids are chunked. An empty list
  * short-circuits rather than issuing a query that would match nothing.
  */
+/** Reads specific leagues by id, chunked to Firestore's 30-value `in` limit. */
+async function readLeaguesByIds(leagueIds: string[]) {
+  if (!leagueIds.length) return [];
+  const CHUNK = 30;
+  const chunks: string[][] = [];
+  for (let index = 0; index < leagueIds.length; index += CHUNK) {
+    chunks.push(leagueIds.slice(index, index + CHUNK));
+  }
+  const snapshots = await Promise.all(chunks.map((chunk) =>
+    adminDb.collection('leagues').where('__name__', 'in', chunk).get()));
+  return snapshots.flatMap((snapshot) =>
+    snapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data())));
+}
+
 async function readByCompetition(collection: string, competitionIds: string[]) {
   if (!competitionIds.length) return [];
   const CHUNK = 30;
@@ -136,29 +150,35 @@ export async function GET(request: Request) {
     return Response.json({ error: 'League or platform administration access required.' }, { status: 403 });
   }
 
+  // Resolved first: the scoped ids decide which leagues are even read below.
+  const scopedLeagueIds = role === 'league_admin'
+    ? await scopedLeagueIdsForActor(actor.uid)
+    : new Set<string>();
+
   const [
     leaguesSnapshot,
     seasonsSnapshot,
     competitionsSnapshot,
     profilesSnapshot,
     rulesSnapshot,
-    scopedLeagueIds,
   ] = await Promise.all([
-    adminDb.collection('leagues').get(),
+    // A League Admin is asked for their own leagues by id rather than handed every league on
+    // the platform to filter down. At 600 leagues that download is the difference between a
+    // page and an incident, and every row it discards was one they were never allowed to see.
+    role === 'league_admin'
+      ? readLeaguesByIds([...scopedLeagueIds])
+      : adminDb.collection('leagues').get().then((snapshot) =>
+        snapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()))),
     adminDb.collection('seasons').get(),
     adminDb.collection('fantasyCompetitions').get(),
     // Definition collections: one document per scoring profile and squad rule set, shared
     // across competitions. These stay whole reads because they are bounded by design.
     adminDb.collection('fantasyScoringProfiles').get(),
     adminDb.collection('fantasySquadRules').get(),
-    role === 'league_admin' ? scopedLeagueIdsForActor(actor.uid) : Promise.resolve(new Set<string>()),
   ]);
-  const allLeagues = leaguesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
   const visibleLeagues = role === 'league_admin'
-    ? allLeagues.filter((league) =>
-      canAdministerLeague(role, String(league.id), scopedLeagueIds),
-    )
-    : allLeagues;
+    ? leaguesSnapshot.filter((league) => canAdministerLeague(role, String(league.id), scopedLeagueIds))
+    : leaguesSnapshot;
   const visibleLeagueIds = new Set(visibleLeagues.map((league) => String(league.id)));
   const competitions = competitionsSnapshot.docs
     .map((item) => normalizeFirestoreValue(item.id, item.data()))

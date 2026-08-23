@@ -141,7 +141,11 @@ async function requestTrustedFinalization(matchId: string) {
       method: 'POST',
       headers: {
         authorization: `Bearer ${await currentUser.getIdToken()}`,
+        'content-type': 'application/json',
       },
+      // Empty by design — the match is in the path. Sent so the request travels through the
+      // shared authenticated-mutation boundary rather than a bespoke auth path.
+      body: '{}',
     }
   );
   const body = (await response.json().catch(() => ({}))) as {

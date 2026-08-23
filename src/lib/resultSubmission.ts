@@ -237,15 +237,25 @@ export function canAcceptNewSubmission(existing?: Pick<ResultSubmission, 'status
 }
 
 /** Who may ask trusted compute to apply an already-settled submission. */
+/**
+ * Whether this actor is the person who settled the result.
+ *
+ * Deliberately says nothing about platform operators. The role clauses that used to sit here
+ * — `role === 'platform_admin' || role === 'super_admin'` — were the same role-as-capability
+ * shape being removed everywhere else: a role string standing in for an authority decision,
+ * in a pure function that cannot check a capability projection.
+ *
+ * Platform authority over another league's finalization is a real need and is resolved by
+ * the route, against `league.result.resolve` for that league's scope, where a capability can
+ * actually be looked up.
+ */
 export function canRequestTrustedFinalization(
   submission: Pick<ResultSubmission, 'respondedByUserId' | 'resolvedByUserId'>,
-  actor: { uid: string; role?: string }
+  actor: { uid: string }
 ): boolean {
   return (
     submission.respondedByUserId === actor.uid ||
-    submission.resolvedByUserId === actor.uid ||
-    actor.role === 'platform_admin' ||
-    actor.role === 'super_admin'
+    submission.resolvedByUserId === actor.uid
   );
 }
 

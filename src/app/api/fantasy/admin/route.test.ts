@@ -12,6 +12,9 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
+/** Records which league ids were requested by id rather than scanned. */
+const requestedLeagueIds: string[] = [];
+
 /** Records which competition ids a per-competition query asked for. */
 const requestedCompetitionIds: Record<string, string[]> = {};
 
@@ -250,6 +253,19 @@ describe('fantasy admin activation route', () => {
         }),
       },
       leagues: {
+        // A League Admin now asks for their own leagues by id rather than downloading every
+        // league to filter down, so the stub records which ids were requested.
+        where: (_field: string, _op: string, ids: string[]) => {
+          requestedLeagueIds.push(...ids);
+          return {
+            get: vi.fn().mockResolvedValue(querySnapshot(
+              [
+                doc('league_allowed', { id: 'league_allowed', name: 'Allowed League', adminUserIds: [] }),
+                doc('league_blocked', { id: 'league_blocked', name: 'Blocked League', adminUserIds: [] }),
+              ].filter((entry) => ids.includes(entry.id)),
+            )),
+          };
+        },
         get: vi.fn().mockResolvedValue(querySnapshot([
           doc('league_allowed', { id: 'league_allowed', name: 'Allowed League', adminUserIds: [] }),
           doc('league_blocked', { id: 'league_blocked', name: 'Blocked League', adminUserIds: [] }),
@@ -312,6 +328,8 @@ describe('fantasy admin activation route', () => {
     // H13: the per-competition collections must be asked only for competitions this
     // operator can see. Scanning them whole would pull every league's fantasy dataset,
     // including the ones scoping just excluded.
+    // H13's first layer: a League Admin never downloads every league on the platform.
+    expect(requestedLeagueIds).toEqual(['league_allowed']);
     expect(requestedCompetitionIds.fantasyPlayers).toEqual(['competition_allowed']);
     expect(requestedCompetitionIds.fantasyPlayerPrices).toEqual(['competition_allowed']);
     expect(requestedCompetitionIds.fantasyRounds).toEqual(['competition_allowed']);

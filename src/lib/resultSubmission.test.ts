@@ -193,13 +193,17 @@ describe('trusted finalization requests', () => {
     ).toBe(true);
   });
 
-  it('accepts platform admins and rejects unrelated users', () => {
-    expect(
-      canRequestTrustedFinalization(settled, {
-        uid: 'platform',
-        role: 'platform_admin',
-      })
-    ).toBe(true);
+  it('answers only whether the actor settled the result', () => {
+    /**
+     * This asserted that a `platform_admin` role string was sufficient, which made a pure
+     * function the place a role stood in for an authority decision — in a function that
+     * cannot consult a capability projection to check.
+     *
+     * Platform authority over another league's finalization is real, and is now resolved by
+     * the route against `league.result.resolve` for that league's scope, where a capability
+     * can actually be looked up.
+     */
+    expect(canRequestTrustedFinalization(settled, { uid: 'platform' })).toBe(false);
     expect(canRequestTrustedFinalization(settled, { uid: 'outsider' })).toBe(false);
   });
 });
