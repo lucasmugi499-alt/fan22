@@ -411,3 +411,67 @@ describe('trusted result finalizer', () => {
     expect(performances).toContain('officialAthleteMatchStats/match_1_v1_athlete_1');
   });
 });
+
+describe('one sports truth: the athlete projection follows the canonical events', () => {
+  /**
+   * H5. `officialAthleteMatchStats` is what fantasy scores from and what the Career Passport
+   * shows, and it used to be computed independently of `officialSportEvents` — same inputs,
+   * two code paths, both stamped official, nothing forcing them to agree.
+   *
+   * The failure that matters is not a wrong number today; it is a future fix to how the
+   * kernel interprets participation rebuilding the events correctly while the bespoke
+   * projection carries on with the old assumptions. The public profile says one thing,
+   * fantasy says another, and both look internally plausible.
+   */
+  it('takes the scoring stat from the events that were written, and publishes both', async () => {
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': submission,
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    const performance = writes.find((write) =>
+      write.path.startsWith('officialAthleteMatchStats/') && String(write.path).includes('athlete_1'));
+    expect(performance).toBeDefined();
+
+    // The canonical scoring events for this athlete, summed the way the projection does.
+    const scoringEvents = writes
+      .filter((write) => write.path.startsWith('officialSportEvents/'))
+      .map((write) => write.data as Record<string, unknown>)
+      .filter((event) => event.eventType === 'rugby.try' && event.primaryAthleteId === 'athlete_1');
+    const fromEvents = scoringEvents.reduce(
+      (total, event) => total + Number((event.payload as { value?: number })?.value ?? 0),
+      0,
+    );
+
+    const stats = (performance?.data as { stats?: Record<string, number> })?.stats ?? {};
+    expect(fromEvents).toBeGreaterThan(0);
+    expect(stats.try).toBe(fromEvents);
+  });
+
+  it('publishes provenance without the eligibility detail', async () => {
+    // H4, from the finalizer's side: both records are written, and only one carries names.
+    const { db, writes } = fakeDb({
+      'resultSubmissions/match_1': submission,
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    const publicRecord = writes.find((write) => write.path === 'publicResultProvenance/match_1_v1');
+    const internalRecord = writes.find((write) => write.path === 'officialMatchReconciliation/match_1_v1');
+
+    expect(publicRecord).toBeDefined();
+    expect(internalRecord).toBeDefined();
+    expect(publicRecord?.data).not.toHaveProperty('eligibilityIssues');
+    expect(publicRecord?.data).toHaveProperty('eligibilityIssueCount');
+    expect(internalRecord?.data).toHaveProperty('eligibilityIssues');
+  });
+});

@@ -1169,7 +1169,45 @@ export async function finalizeSubmission(
           ? 'try'
           : 'points_scored';
       const kernelEvents = officialEvents as unknown as OfficialSportEvent[];
+
+      /**
+       * The athlete projection derives its scoring from the canonical events, not from a
+       * second reading of the submission.
+       *
+       * `officialAthleteMatchStats` is what fantasy scores from and what the Career Passport
+       * displays, and it used to be computed independently of `officialSportEvents` — same
+       * inputs, two code paths, both stamped official. Nothing forced them to agree. Fix the
+       * kernel's interpretation of participation and rebuild the events correctly, and the
+       * bespoke projection would carry on with the old assumptions: the public profile saying
+       * one thing, fantasy another, both internally plausible.
+       *
+       * Summing `payload.value` handles both shapes the finalizer emits — one event per goal
+       * or try carrying 1, and a single basketball event carrying the point total.
+       */
+      const scoredFromEvents = new Map<string, number>();
+      const scoringEventType = scorerEventType(fantasySport);
+      for (const event of officialEvents) {
+        if (event.eventType !== scoringEventType || !event.primaryAthleteId) continue;
+        const value = Number((event.payload as { value?: unknown })?.value ?? 0);
+        if (!Number.isFinite(value)) continue;
+        scoredFromEvents.set(
+          event.primaryAthleteId,
+          (scoredFromEvents.get(event.primaryAthleteId) ?? 0) + value,
+        );
+      }
+
       for (const { athlete, count, teamId, activeSquadEventId, scoringSourceEventId, statLine } of officialPerformances) {
+        // Derived from the events that were actually written. `count` is retained only to
+        // detect the two paths disagreeing, which is the defect this guards against.
+        const scoredFromCanonicalEvents = scoredFromEvents.get(athlete.id) ?? 0;
+        if (scoredFromCanonicalEvents !== count) {
+          // console rather than a logger: this module is shared by App Hosting and the
+          // Cloud Functions runtime, which have different logging surfaces.
+          console.warn(
+            `[finalizer] athlete projection disagreed with canonical events for `
+            + `${athlete.id} in ${match.id}: events=${scoredFromCanonicalEvents}, submission=${count}`,
+          );
+        }
         const positionGroup = officialPositionGroup(fantasySport, athlete.position);
         const teamWon =
           (teamId === match.homeTeamId && plan.match.score.home > plan.match.score.away)
@@ -1220,7 +1258,7 @@ export async function finalizeSubmission(
             // them from selection manufactured career records and fantasy points for
             // athletes who may never have left the bench.
             appearance: participation.didPlay ? 1 : 0,
-            [statKey]: count,
+            [statKey]: scoredFromCanonicalEvents,
             win_participation: teamWon && participation.didPlay ? 1 : 0,
             ...richStats,
           },
