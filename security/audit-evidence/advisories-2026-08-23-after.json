@@ -1,0 +1,61 @@
+[
+  {
+    "advisoryId": "GHSA-src-1120821",
+    "title": "OpenTelemetry Core: Unbounded memory allocation in W3C Baggage propagation",
+    "url": "https://github.com/advisories/GHSA-8988-4f7v-96qf",
+    "package": "@opentelemetry/core",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "firebase-tools",
+      "@google-cloud/pubsub",
+      "@opentelemetry/core"
+    ],
+    "affectedVersions": "<2.8.0",
+    "fix": "major-change",
+    "fixDetail": "firebase-tools@14.23.0 (major)",
+    "nodes": [
+      "node_modules/@opentelemetry/core"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1119441",
+    "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+    "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+    "package": "uuid",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "firebase-tools",
+      "gaxios",
+      "uuid"
+    ],
+    "affectedVersions": "<11.1.1",
+    "fix": "major-change",
+    "fixDetail": "firebase-tools@14.23.0 (major)",
+    "nodes": [
+      "node_modules/uuid"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1119441",
+    "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+    "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+    "package": "uuid",
+    "severity": "moderate",
+    "tree": "functions",
+    "direct": false,
+    "dependencyPath": [
+      "gaxios",
+      "uuid"
+    ],
+    "affectedVersions": "<11.1.1",
+    "fix": "major-change",
+    "fixDetail": "firebase-admin@10.3.0 (major)",
+    "nodes": [
+      "node_modules/uuid"
+    ]
+  }
+]

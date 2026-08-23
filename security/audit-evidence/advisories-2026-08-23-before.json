@@ -1,0 +1,286 @@
+[
+  {
+    "advisoryId": "GHSA-src-1130720",
+    "title": "fast-uri vulnerable to host confusion via backslash authority introducer",
+    "url": "https://github.com/advisories/GHSA-7p8r-x3mc-p8w7",
+    "package": "fast-uri",
+    "severity": "high",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "fast-uri"
+    ],
+    "affectedVersions": ">=3.0.0 <3.1.5",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/fast-uri"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1130722",
+    "title": "ip-address: Address4 decodes leading-zero octets as decimal while resolvers decode them as octal, allowing SSRF and trust-boundary bypass",
+    "url": "https://github.com/advisories/GHSA-mwp4-54f8-5fhr",
+    "package": "ip-address",
+    "severity": "high",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "ip-address"
+    ],
+    "affectedVersions": "<=10.3.0",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/ip-address"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1138115",
+    "title": "JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported",
+    "url": "https://github.com/advisories/GHSA-5p4m-2wfm-xmqj",
+    "package": "js-yaml",
+    "severity": "high",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "js-yaml"
+    ],
+    "affectedVersions": ">=4.0.0 <4.3.1",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/js-yaml"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1124252",
+    "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+    "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q",
+    "package": "postcss",
+    "severity": "high",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "next",
+      "postcss"
+    ],
+    "affectedVersions": "<=8.5.11",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/next/node_modules/postcss"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1139510",
+    "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+    "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849",
+    "package": "postcss",
+    "severity": "high",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "next",
+      "postcss"
+    ],
+    "affectedVersions": "<=8.5.17",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/next/node_modules/postcss"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1120821",
+    "title": "OpenTelemetry Core: Unbounded memory allocation in W3C Baggage propagation",
+    "url": "https://github.com/advisories/GHSA-8988-4f7v-96qf",
+    "package": "@opentelemetry/core",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "firebase-tools",
+      "@google-cloud/pubsub",
+      "@opentelemetry/core"
+    ],
+    "affectedVersions": "<2.8.0",
+    "fix": "major-change",
+    "fixDetail": "firebase-tools@14.23.0 (major)",
+    "nodes": [
+      "node_modules/@opentelemetry/core"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1130733",
+    "title": "Hono: ReDoS in CORS middleware via Access-Control-Request-Headers",
+    "url": "https://github.com/advisories/GHSA-8j4g-w8fx-2239",
+    "package": "hono",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "hono"
+    ],
+    "affectedVersions": "<4.12.34",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/hono"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1138771",
+    "title": "Hono: `memo()` retains SSR output across requests, leading to cross-user data disclosure",
+    "url": "https://github.com/advisories/GHSA-f23p-vx2j-j53r",
+    "package": "hono",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "hono"
+    ],
+    "affectedVersions": ">=3.8.0 <4.12.34",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/hono"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1138773",
+    "title": "Hono: Algorithmic Complexity DoS in Language Middleware",
+    "url": "https://github.com/advisories/GHSA-54fx-42gc-7vw4",
+    "package": "hono",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "hono"
+    ],
+    "affectedVersions": ">=4.12.0 <4.12.34",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/hono"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1130723",
+    "title": "ip-address: a CIDR suffix on the parsed address suppresses special-use classification and can bypass SSRF and trust-boundary checks",
+    "url": "https://github.com/advisories/GHSA-4xrf-jv44-h6hh",
+    "package": "ip-address",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "ip-address"
+    ],
+    "affectedVersions": ">=10.1.1 <=10.2.1",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/ip-address"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1130724",
+    "title": "ip-address: misclassification of IPv4-mapped/NAT64 IPv6 addresses can bypass SSRF and trust-boundary checks",
+    "url": "https://github.com/advisories/GHSA-22jq-vg5j-6vgg",
+    "package": "ip-address",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "ip-address"
+    ],
+    "affectedVersions": ">=10.1.1 <=10.2.0",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/ip-address"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1117015",
+    "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+    "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
+    "package": "postcss",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "next",
+      "postcss"
+    ],
+    "affectedVersions": "<8.5.10",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/next/node_modules/postcss"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1130709",
+    "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+    "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp",
+    "package": "postcss",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "next",
+      "postcss"
+    ],
+    "affectedVersions": "<=8.5.22",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/next/node_modules/postcss"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1119441",
+    "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+    "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+    "package": "uuid",
+    "severity": "moderate",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "firebase-tools",
+      "gaxios",
+      "uuid"
+    ],
+    "affectedVersions": "<11.1.1",
+    "fix": "major-change",
+    "fixDetail": "firebase-tools@14.23.0 (major)",
+    "nodes": [
+      "node_modules/uuid"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1138772",
+    "title": "Hono: Proxy Helper does not remove response headers listed in the `Connection` header",
+    "url": "https://github.com/advisories/GHSA-79qm-7rj5-m7r9",
+    "package": "hono",
+    "severity": "low",
+    "tree": "root",
+    "direct": false,
+    "dependencyPath": [
+      "hono"
+    ],
+    "affectedVersions": ">=4.7.0 <4.12.34",
+    "fix": "in-range",
+    "nodes": [
+      "node_modules/hono"
+    ]
+  },
+  {
+    "advisoryId": "GHSA-src-1119441",
+    "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+    "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+    "package": "uuid",
+    "severity": "moderate",
+    "tree": "functions",
+    "direct": false,
+    "dependencyPath": [
+      "gaxios",
+      "uuid"
+    ],
+    "affectedVersions": "<11.1.1",
+    "fix": "major-change",
+    "fixDetail": "firebase-admin@10.3.0 (major)",
+    "nodes": [
+      "node_modules/uuid"
+    ]
+  }
+]
