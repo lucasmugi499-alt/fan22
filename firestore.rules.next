@@ -31,9 +31,13 @@ service cloud.firestore {
       return role() == 'platform_admin' || role() == 'super_admin';
     }
 
-    function isSuperAdmin() {
-      return role() == 'super_admin';
-    }
+    // `isSuperAdmin()` was removed on 2026-08-23, and its absence is the point.
+    //
+    // Its only remaining use was authorizing browser deletes. Now that provenance cannot be
+    // deleted from a client at all, super_admin has no rules-level privilege whatsoever —
+    // which is the correct model: super_admin is enormous COMMAND authority, exercised
+    // through audited server commands, not a browser credential that can reach past them.
+    // A future rule needing it should be treated as a design smell, not a missing helper.
 
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
