@@ -65,3 +65,4 @@ backups/
 auth-backup*.json
 *-sa.json
 service-account*.json
+firebase-debug.log
