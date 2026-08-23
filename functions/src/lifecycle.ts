@@ -9,17 +9,24 @@ import {
 } from '../../src/lib/auth/accessProjection';
 
 /**
- * Time-based lifecycle work: assignments that have lapsed, and projections that fell behind.
+ * Time-based convergence: assignments that have lapsed, and projections that fell behind.
  *
- * Both of these are convergence rather than security. The security properties already hold
- * without this file running — an expired projection is refused at read time, and a failed
- * search projection never blocked the write that caused it. What is missing without a worker
- * is the system returning to a correct steady state on its own.
+ * Neither is a security control. An expired projection is already refused at read time, and
+ * a failed search projection never blocked the write behind it. What this adds is the system
+ * returning to a correct steady state without a human — the difference between "fails closed"
+ * and "works".
+ *
+ * Two properties matter throughout, because a scheduler is the one caller guaranteed to run
+ * concurrently with itself: every transition is idempotent and guarded inside a transaction,
+ * and one bad record can never abort the sweep for the rest.
  */
 
-/** Bounded per run so one invocation cannot become an unbounded job. */
 const PAGE = 200;
 const MAX_PAGES = 25;
+/** Long enough to be useful, short enough not to accumulate stack traces forever. */
+const MAX_ERROR_LENGTH = 300;
+
+export type RepairJobStatus = 'pending' | 'processing' | 'retry_wait' | 'completed' | 'dead_letter';
 
 async function pagedDocs(
   build: () => FirebaseFirestore.Query,
@@ -39,16 +46,24 @@ async function pagedDocs(
   return docs;
 }
 
+function truncate(value: unknown): string {
+  const text = value instanceof Error ? value.message : String(value);
+  return text.length > MAX_ERROR_LENGTH ? `${text.slice(0, MAX_ERROR_LENGTH)}…` : text;
+}
+
 /**
  * Rebuilds one user's access projections from their assignments.
  *
  * The Next server owns the same operation. This is not a second implementation of the
  * DECISION — the projection logic lives in framework-free `accessProjection` and both
  * runtimes call it — only a second copy of the Firestore plumbing, which is unavoidable
- * because the two runtimes hold different Firestore handles. Reimplementing
- * `projectScopeIndex` here is exactly the divergence this codebase keeps removing.
+ * because the two runtimes hold different handles.
  */
-export async function rebuildUserProjectionsIn(db: Firestore, userId: string): Promise<number> {
+export async function rebuildUserProjectionsIn(
+  db: Firestore,
+  userId: string,
+  { dryRun = false }: { dryRun?: boolean } = {},
+): Promise<number> {
   const now = new Date();
   const nowIso = now.toISOString();
 
@@ -99,7 +114,7 @@ export async function rebuildUserProjectionsIn(db: Firestore, userId: string): P
     changed += 1;
   }
 
-  if (changed) {
+  if (changed && !dryRun) {
     batch.set(db.collection('users').doc(userId), {
       accessVersion: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
@@ -109,114 +124,245 @@ export async function rebuildUserProjectionsIn(db: Firestore, userId: string): P
   return changed;
 }
 
+export type ExpiryReport = {
+  lapsedFound: number;
+  transitioned: number;
+  skippedAlreadyHandled: number;
+  usersRebuilt: number;
+  projectionsChanged: number;
+  errors: string[];
+};
+
 /**
  * Retires assignments whose `validUntil` has passed, and rebuilds the projections behind them.
  *
  * The security half of expiry is already closed: the projection carries its earliest expiry
- * and every reader refuses a lapsed one. What that leaves is an availability problem, and it
- * is a real one. A scope held through two assignments — a permanent Team Admin grant and a
- * temporary result-reporter grant expiring tonight — projects the EARLIEST expiry, correctly.
- * Tomorrow the whole projection is refused, including the permanent grant, until something
- * unrelated happens to rewrite it.
+ * and every reader refuses a lapsed one. What remains is an availability problem, and a real
+ * one. A scope held through a permanent Team Admin grant AND a temporary reporter grant
+ * expiring tonight projects the EARLIEST expiry, correctly. Tomorrow the whole projection is
+ * refused — permanent grant included — until something unrelated rewrites it.
  *
- * So the user is denied authority they still hold. That fails closed, which is the right
- * direction to fail, but it is not correct — and "it will fix itself the next time someone
- * touches this user" is not a lifecycle.
- *
- * Marking the assignment expired and rebuilding makes the projection re-derive from what
- * genuinely remains: the permanent grant, with no expiry.
+ * Only assignments carrying `validUntil` are touched, and only after a transactional re-read
+ * confirms they are still active and still lapsed. A permanent grant has no `validUntil` and
+ * is never matched by the query, so it cannot be swept up alongside a temporary one; the
+ * rebuild afterwards re-derives the scope from whatever legitimately remains.
  */
 export async function expireLapsedAssignments(
   db: Firestore,
-  rebuildUserProjections: (userId: string) => Promise<unknown> = (userId) => rebuildUserProjectionsIn(db, userId),
-): Promise<{ expired: number; rebuiltUsers: string[] }> {
+  {
+    dryRun = false,
+    rebuild = (userId: string, options: { dryRun?: boolean }) => rebuildUserProjectionsIn(db, userId, options),
+  }: {
+    dryRun?: boolean;
+    rebuild?: (userId: string, options: { dryRun?: boolean }) => Promise<number>;
+  } = {},
+): Promise<ExpiryReport> {
   const now = new Date().toISOString();
+  const report: ExpiryReport = {
+    lapsedFound: 0, transitioned: 0, skippedAlreadyHandled: 0,
+    usersRebuilt: 0, projectionsChanged: 0, errors: [],
+  };
+
   const lapsed = await pagedDocs(
     () => db.collection('accessAssignments')
       .where('status', '==', 'active')
       .where('validUntil', '<=', now),
     'validUntil',
   );
+  report.lapsedFound = lapsed.length;
 
   const affectedUsers = new Set<string>();
   for (const assignment of lapsed) {
-    const userId = String(assignment.data()?.userId ?? '');
-    if (!userId) continue;
-    await assignment.ref.update({
-      status: 'expired',
-      expiredAt: now,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    affectedUsers.add(userId);
+    try {
+      const userId = String(assignment.data()?.userId ?? '');
+      if (!userId) continue;
+
+      if (dryRun) {
+        report.transitioned += 1;
+        affectedUsers.add(userId);
+        continue;
+      }
+
+      /**
+       * Re-read inside the transaction before writing.
+       *
+       * A scheduler overlaps with itself: a retry, a slow invocation, two regions. Two runs
+       * finding the same lapsed assignment must not both transition it and both bump the
+       * access version. The guard makes the second run a no-op rather than a duplicate.
+       */
+      const applied = await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(assignment.ref);
+        const data = current.data();
+        if (!current.exists || data?.status !== 'active') return false;
+        if (!data?.validUntil || String(data.validUntil) > now) return false;
+        transaction.update(assignment.ref, {
+          status: 'expired',
+          expiredAt: now,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+
+      if (applied) {
+        report.transitioned += 1;
+        affectedUsers.add(userId);
+      } else {
+        report.skippedAlreadyHandled += 1;
+      }
+    } catch (error) {
+      // One malformed assignment must not stop the sweep for everyone else.
+      report.errors.push(`assignment ${assignment.id}: ${truncate(error)}`);
+    }
   }
 
-  // Rebuilt per user rather than per assignment: one user may hold several lapsed grants,
-  // and the projector recomputes every scope for them in one pass either way.
+  // Rebuilt once per user, not once per assignment: the projector recomputes every scope for
+  // a user in one pass either way, and a user may hold several lapsed grants.
   for (const userId of affectedUsers) {
-    await rebuildUserProjections(userId);
+    try {
+      report.projectionsChanged += await rebuild(userId, { dryRun });
+      report.usersRebuilt += 1;
+    } catch (error) {
+      report.errors.push(`rebuild ${userId}: ${truncate(error)}`);
+    }
   }
 
-  return { expired: lapsed.length, rebuiltUsers: [...affectedUsers] };
+  return report;
+}
+
+export type RepairReport = {
+  claimed: number;
+  completed: number;
+  retryScheduled: number;
+  deadLettered: number;
+  verificationFailed: number;
+  errors: string[];
+};
+
+/** Exponential backoff, capped, so a persistently failing job stops hammering the projector. */
+function backoffMinutes(attempt: number) {
+  return Math.min(2 ** attempt, 120);
 }
 
 /**
- * Retries projections that fell behind their source.
+ * Works the projection repair backlog.
  *
- * The repair queue made drift visible; visible drift that only a human can clear is still
- * permanent drift with a dashboard in front of it. This closes the loop: retry with a
- * bounded attempt count, and dead-letter what keeps failing so the queue cannot fill with
- * work that will never succeed and hide the entries that would.
+ * The queue made drift visible; visible drift only a human can clear is still permanent drift
+ * with a dashboard in front of it. This closes the loop.
+ *
+ * A completed repair is one whose RESULT was verified, not one where the projector returned
+ * without throwing. Those are different claims: a projector can complete happily and still
+ * leave the projection disagreeing with its source, which is the exact failure the queue
+ * exists to catch.
  */
 export async function runProjectionRepairs(
   db: Firestore,
   repair: (entityType: string, entityId: string) => Promise<unknown>,
-  { maxAttempts = 5 }: { maxAttempts?: number } = {},
-): Promise<{ repaired: number; deadLettered: number; failed: number }> {
-  const pending = await pagedDocs(
-    () => db.collection('projectionRepairJobs').where('status', '==', 'pending'),
+  verify: (entityType: string, entityId: string) => Promise<boolean>,
+  { maxAttempts = 5, dryRun = false }: { maxAttempts?: number; dryRun?: boolean } = {},
+): Promise<RepairReport> {
+  const nowIso = new Date().toISOString();
+  const report: RepairReport = {
+    claimed: 0, completed: 0, retryScheduled: 0,
+    deadLettered: 0, verificationFailed: 0, errors: [],
+  };
+
+  const due = await pagedDocs(
+    () => db.collection('projectionRepairJobs').where('status', 'in', ['pending', 'retry_wait']),
     'entityId',
   );
 
-  let repaired = 0;
-  let deadLettered = 0;
-  let failed = 0;
-
-  for (const job of pending) {
+  for (const job of due) {
     const data = job.data() ?? {};
-    const attempts = Number(data.attempts ?? 0);
+    const attemptCount = Number(data.attemptCount ?? data.attempts ?? 0);
+    const entityType = String(data.entityType ?? '');
+    const entityId = String(data.entityId ?? '');
 
-    if (attempts >= maxAttempts) {
-      // Dead-lettered rather than retried forever. A job failing five times is not going to
-      // succeed on the sixth for the same reason, and leaving it pending buries the ones
-      // that would.
-      await job.ref.update({
-        status: 'dead_letter',
-        deadLetteredAt: new Date().toISOString(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      deadLettered += 1;
+    // Not yet due for another attempt.
+    if (data.nextAttemptAt && String(data.nextAttemptAt) > nowIso) continue;
+
+    if (attemptCount >= maxAttempts) {
+      // A job that has failed its budget will not succeed on the next attempt for the same
+      // reason, and leaving it queued buries the jobs that would.
+      if (!dryRun) {
+        await job.ref.update({
+          status: 'dead_letter' satisfies RepairJobStatus,
+          deadLetteredAt: nowIso,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      report.deadLettered += 1;
       continue;
     }
 
+    if (dryRun) {
+      report.claimed += 1;
+      continue;
+    }
+
+    /**
+     * Claim the job before working it.
+     *
+     * Two overlapping invocations must not repair the same entity twice and both count it.
+     * The transaction is the claim: whoever moves it to `processing` owns it.
+     */
+    const claimed = await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(job.ref);
+      const status = current.data()?.status;
+      if (!current.exists || (status !== 'pending' && status !== 'retry_wait')) return false;
+      transaction.update(job.ref, {
+        status: 'processing' satisfies RepairJobStatus,
+        lastAttemptAt: nowIso,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
+    }).catch(() => false);
+
+    if (!claimed) continue;
+    report.claimed += 1;
+
     try {
-      await repair(String(data.entityType ?? ''), String(data.entityId ?? ''));
+      await repair(entityType, entityId);
+      const converged = await verify(entityType, entityId);
+
+      if (!converged) {
+        // The projector finished and the projection still disagrees. Treated as a failure,
+        // because "it did not throw" is not the property anyone wanted.
+        report.verificationFailed += 1;
+        await job.ref.update({
+          status: 'retry_wait' satisfies RepairJobStatus,
+          attemptCount: attemptCount + 1,
+          nextAttemptAt: new Date(Date.now() + backoffMinutes(attemptCount + 1) * 60_000).toISOString(),
+          lastErrorCode: 'verification_failed',
+          lastAttemptAt: nowIso,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        report.retryScheduled += 1;
+        continue;
+      }
+
       await job.ref.update({
-        status: 'repaired',
-        repairedAt: new Date().toISOString(),
-        lastError: FieldValue.delete(),
+        status: 'completed' satisfies RepairJobStatus,
+        completedAt: nowIso,
+        attemptCount: attemptCount + 1,
+        lastErrorCode: FieldValue.delete(),
+        nextAttemptAt: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      repaired += 1;
+      report.completed += 1;
     } catch (error) {
+      const nextAttempt = attemptCount + 1;
       await job.ref.update({
-        attempts: FieldValue.increment(1),
-        lastError: error instanceof Error ? error.message : String(error),
-        lastFailedAt: new Date().toISOString(),
+        status: 'retry_wait' satisfies RepairJobStatus,
+        attemptCount: nextAttempt,
+        nextAttemptAt: new Date(Date.now() + backoffMinutes(nextAttempt) * 60_000).toISOString(),
+        lastErrorCode: truncate(error),
+        lastAttemptAt: nowIso,
         updatedAt: FieldValue.serverTimestamp(),
-      });
-      failed += 1;
+      }).catch(() => undefined);
+      report.retryScheduled += 1;
+      report.errors.push(`${entityType}/${entityId}: ${truncate(error)}`);
     }
   }
 
-  return { repaired, deadLettered, failed };
+  return report;
 }

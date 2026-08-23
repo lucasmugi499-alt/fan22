@@ -200,29 +200,52 @@ export const reconcileResultSubmissions = onSchedule(
  */
 export const convergeLifecycle = onSchedule(
   {
-    schedule: 'every 30 minutes',
+    // Hourly. Expiry is a lifecycle boundary measured in days; running it every minute would
+    // be cost without meaning.
+    schedule: 'every 60 minutes',
     region: REGION,
     timeoutSeconds: 300,
   },
   async () => {
     const expiry = await expireLapsedAssignments(db);
-    const repairs = await runProjectionRepairs(db, async (entityType, entityId) => {
-      const snapshot = await db.collection(`${entityType}s`).doc(entityId).get();
-      // The same projector the trigger uses; a repair that re-derived the projection
-      // differently would be a second implementation of the thing that already drifted.
-      await applySearchIndexChange(
-        db,
-        entityType as SearchEntityType,
-        entityId,
-        snapshot.exists ? snapshot.data() : undefined,
-      );
-    });
+    const repairs = await runProjectionRepairs(
+      db,
+      async (entityType, entityId) => {
+        const snapshot = await db.collection(`${entityType}s`).doc(entityId).get();
+        // The same projector the trigger uses; a repair that re-derived the projection
+        // differently would be a second implementation of the thing that already drifted.
+        await applySearchIndexChange(
+          db,
+          entityType as SearchEntityType,
+          entityId,
+          snapshot.exists ? snapshot.data() : undefined,
+        );
+      },
+      /**
+       * Verification, not optimism. Confirms the projection now agrees with its source —
+       * present when the entity exists, absent when it does not. A projector that returns
+       * without throwing has not proven convergence, and convergence is the whole job.
+       */
+      async (entityType, entityId) => {
+        const [entity, projection] = await Promise.all([
+          db.collection(`${entityType}s`).doc(entityId).get(),
+          db.collection('searchIndex').doc(`${entityType}_${entityId}`).get(),
+        ]);
+        return entity.exists === projection.exists;
+      },
+    );
     logger.info('Lifecycle convergence complete', {
-      assignmentsExpired: expiry.expired,
-      projectionsRebuilt: expiry.rebuiltUsers.length,
-      searchRepaired: repairs.repaired,
-      searchDeadLettered: repairs.deadLettered,
-      searchStillFailing: repairs.failed,
+      lapsedFound: expiry.lapsedFound,
+      assignmentsExpired: expiry.transitioned,
+      alreadyHandled: expiry.skippedAlreadyHandled,
+      usersRebuilt: expiry.usersRebuilt,
+      projectionsChanged: expiry.projectionsChanged,
+      expiryErrors: expiry.errors.length,
+      repairsClaimed: repairs.claimed,
+      repairsCompleted: repairs.completed,
+      repairsRetryScheduled: repairs.retryScheduled,
+      repairsVerificationFailed: repairs.verificationFailed,
+      repairsDeadLettered: repairs.deadLettered,
     });
   }
 );
@@ -328,16 +351,22 @@ function searchIndexTrigger(collection: string, type: SearchEntityType) {
          */
         try {
           const repairId = `search_${type}_${entityId}`;
+          const message = error instanceof Error ? error.message : String(error);
           await db.collection('projectionRepairJobs').doc(repairId).set({
             id: repairId,
-            projection: 'searchIndex',
+            projectionType: 'searchIndex',
             entityType: type,
             entityId,
+            // Reset to pending on a fresh failure even if a previous attempt had backed off:
+            // the entity changed again, so the old backoff window is about stale information.
             status: 'pending',
-            lastError: error instanceof Error ? error.message : String(error),
-            attempts: FieldValue.increment(1),
-            firstFailedAt: FieldValue.serverTimestamp(),
-            lastFailedAt: FieldValue.serverTimestamp(),
+            // Truncated. A queue is not a place to accumulate stack traces forever.
+            lastErrorCode: message.length > 300 ? `${message.slice(0, 300)}…` : message,
+            lastAttemptAt: new Date().toISOString(),
+            attemptCount: FieldValue.increment(0),
+            nextAttemptAt: FieldValue.delete(),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
         } catch (queueError) {
           // If even the repair queue is unwritable the incident is larger than search, and
