@@ -41,7 +41,12 @@ export function reconstructMatchScore({
     let points = 0;
 
     if (definition) {
-      points = definition.points;
+      // A variable-value event carries its own points, so reconstruction reads the record
+      // rather than a fixed weight. A malformed or missing value scores zero and is reported
+      // as an issue below rather than silently guessed at.
+      points = definition.variableValue
+        ? Math.max(0, Math.trunc(Number((event.payload as { value?: unknown })?.value ?? 0)) || 0)
+        : definition.points;
       if (event.eventType === 'football.own_goal') {
         appliedTo = opponentSide(event.teamId, teams) ?? 'ignored';
       } else {
@@ -50,6 +55,9 @@ export function reconstructMatchScore({
       if (appliedTo === 'home') home += points;
       if (appliedTo === 'away') away += points;
       if (appliedTo === 'ignored') issues.push(`Event ${event.id} has no participating team attribution.`);
+      if (definition.variableValue && points === 0) {
+        issues.push(`Event ${event.id} is a variable-value scoring event with no usable value.`);
+      }
     }
 
     return {

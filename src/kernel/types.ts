@@ -38,8 +38,24 @@ export type VersionedKernelRecord = {
 
 export type ScoreContribution = {
   eventType: string;
+  /** Fixed points for this event. Ignored when `variableValue` is set. */
   points: number;
   description: string;
+  /**
+   * The event carries its own point value in `payload.value` rather than scoring a fixed
+   * amount.
+   *
+   * Basketball needs this. A submission reports that an athlete scored N points without
+   * saying how — the breakdown into free throws, two-pointers and three-pointers is simply
+   * not collected at grassroots level. Before this existed, the finalizer expanded one
+   * N-point event into N synthetic `basketball.free_throw_made` events so that fixed weights
+   * would sum correctly. The arithmetic came out right and the sporting history was false: a
+   * three-pointer was recorded as three made free throws.
+   *
+   * A canonical event record has to describe what actually happened. "Scored 3 points,
+   * breakdown not collected" is true; "made three free throws" is not.
+   */
+  variableValue?: boolean;
 };
 
 export type SportDefinition = VersionedKernelRecord & {

@@ -176,7 +176,15 @@ describe('match evidence boundary', () => {
 describe('private and approved media boundaries', () => {
   it('keeps user media private to its owner and platform admins', async () => {
     const path = 'users/user_a/avatar.jpg';
-    await assertSucceeds(ref('user_a', path).put(bytes(128), metadata('image/jpeg')));
+    // Direct browser upload is closed as of 2026-08-23: every upload goes through a signed
+    // session so it carries a quota, a one-time authorization, a hash and a media record.
+    await assertFails(ref('user_a', path).put(bytes(128), metadata('image/jpeg')));
+
+    // Seeded the way the governed pipeline writes it — through the Admin SDK, which these
+    // rules do not apply to — so the read boundary is still exercised on a real object.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage(BUCKET_URL).ref(path).put(bytes(128), metadata('image/jpeg'));
+    });
 
     await assertSucceeds(ref('user_a', path).getMetadata());
     await assertSucceeds(ref('platform_admin', path, { role: 'platform_admin' }).getMetadata());
@@ -193,11 +201,11 @@ describe('private and approved media boundaries', () => {
     await assertSucceeds(ref(undefined, path).getMetadata());
     await assertFails(ref('user_a', 'publishedMedia/team/team_1/user_a/other.jpg').put(bytes(128), metadata('image/jpeg')));
     await assertFails(ref('user_a', 'approvedMedia/leagues/league_1/other.jpg').put(bytes(128), metadata('image/jpeg')));
-    await assertSucceeds(
-      ref('platform_admin', 'approvedMedia/leagues/league_1/other.jpg', { role: 'platform_admin' }).put(
-        bytes(128),
-        metadata('image/jpeg'),
-      ),
+    // Admin browser writes are closed: publishing without a moderation command record is a
+    // decision nobody can review. The Admin SDK is not subject to these rules, so the
+    // governed pipeline still publishes.
+    await assertFails(
+      ref('platform_admin', path, { role: 'platform_admin' }).put(bytes(128), metadata('image/jpeg')),
     );
   });
 });
@@ -209,7 +217,9 @@ describe('storage catch-all boundary', () => {
       await ctx.storage(BUCKET_URL).ref(path).put(bytes(128), metadata('text/csv'));
     });
 
-    await assertSucceeds(ref('super_admin', path, { role: 'super_admin' }).getMetadata());
+    // Read is denied now too. Storage holds match evidence and identity documents, and a
+    // role-shaped blanket read is a hole no specific rule can close.
+    await assertFails(ref('super_admin', path, { role: 'super_admin' }).getMetadata());
     await assertFails(
       ref('super_admin', 'serverOnlyExports/forged.csv', { role: 'super_admin' }).put(
         bytes(128),

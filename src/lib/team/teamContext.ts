@@ -5,7 +5,12 @@ import type { AccessContext } from '@/lib/auth/access';
 import { scopedIdsForAccess } from '@/lib/auth/clientAccess';
 
 /**
- * Resolves which team the current admin operates, by `adminUserIds`.
+ * Resolves which team the current admin operates, from canonical access scopes.
+ *
+ * The legacy `adminUserIds` fallback was removed on 2026-08-23. It made the console disagree
+ * with the server: a revoked operator still saw and could select a team whose every action
+ * the server would then refuse with a 403. Technically secure, operationally broken — and
+ * indistinguishable, from the operator's side, from the product being broken.
  *
  * The demo team-admin profile is not wired to a specific team, so in demo mode only it
  * falls back to the most active team to give the console something real to show. That
@@ -26,9 +31,7 @@ export function resolveMyTeam(
   const scopedTeamIds = scopedIdsForAccess(accessContext, 'team');
   if (profile) {
     const ownedTeams = teams.filter((t) =>
-      scopedTeamIds.has(t.id) ||
-      t.adminUserIds?.includes(profile.uid) ||
-      t.adminUserIds?.includes(profile.id)
+      scopedTeamIds.has(t.id)
     );
     const selectedId = selectedAssignmentId('team');
     const owned = ownedTeams.find((team) => team.id === selectedId) ?? ownedTeams[0];

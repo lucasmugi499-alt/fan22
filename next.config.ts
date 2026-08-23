@@ -3,25 +3,66 @@ import { assertSafeProductionEnvironment } from "./src/lib/environment";
 
 assertSafeProductionEnvironment();
 
+/**
+ * Content Security Policy, in two headers with different jobs.
+ *
+ * This was a single `Content-Security-Policy-Report-Only` header, which enforces nothing —
+ * it collects violations and allows the request. It also permitted `'unsafe-eval'`, so even
+ * once enforced it would have given away most of the XSS containment it exists to provide.
+ *
+ * The split below is deliberate:
+ *
+ *   - The ENFORCED policy is what the browser actually applies. `'unsafe-eval'` is gone from
+ *     it in production, which is the single biggest containment win available without
+ *     restructuring how scripts load.
+ *
+ *   - The REPORT-ONLY policy is the stricter one we intend to enforce next: no
+ *     `'unsafe-inline'` for scripts. It cannot be enforced yet because Next injects inline
+ *     bootstrap and hydration scripts, and blocking those breaks the app rather than
+ *     hardening it. Getting there needs per-request nonces threaded through middleware and
+ *     the document; running it report-only first is how you find out what breaks before
+ *     users do, instead of after.
+ *
+ * Development keeps the permissive policy unenforced: Turbopack's dev runtime genuinely
+ * needs `eval`, and a dev-only enforcement failure teaches nothing about production.
+ */
+const isProduction = process.env.NODE_ENV === "production";
+
+const SHARED_DIRECTIVES = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "img-src 'self' data: blob: https://images.unsplash.com https://*.googleusercontent.com https://*.firebasestorage.app https://firebasestorage.googleapis.com",
+  "media-src 'self' blob: https://*.firebasestorage.app https://firebasestorage.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com https://*.cloudfunctions.net",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "frame-src 'self' https://*.firebaseapp.com",
+];
+
+/** Applied by the browser. `unsafe-eval` is dropped in production. */
+const enforcedPolicy = [
+  ...SHARED_DIRECTIVES,
+  isProduction
+    ? "script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googletagmanager.com",
+].join("; ");
+
+/** The next step, collected as violations before it is ever enforced. */
+const proposedPolicy = [
+  ...SHARED_DIRECTIVES,
+  "script-src 'self' https://www.gstatic.com https://www.googletagmanager.com",
+].join("; ");
+
 const securityHeaders = [
-  {
-    key: "Content-Security-Policy-Report-Only",
-    value: [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-      "object-src 'none'",
-      "form-action 'self'",
-      "img-src 'self' data: blob: https://images.unsplash.com https://*.googleusercontent.com https://*.firebasestorage.app https://firebasestorage.googleapis.com",
-      "media-src 'self' blob: https://*.firebasestorage.app https://firebasestorage.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googletagmanager.com",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com https://*.cloudfunctions.net",
-      "worker-src 'self' blob:",
-      "manifest-src 'self'",
-    ].join("; "),
-  },
+  // Enforced only in production: the dev runtime needs eval, and a dev-only enforcement
+  // failure would teach nothing about what production actually does.
+  ...(isProduction ? [{ key: "Content-Security-Policy", value: enforcedPolicy }] : []),
+  { key: "Content-Security-Policy-Report-Only", value: proposedPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },

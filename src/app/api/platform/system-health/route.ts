@@ -53,6 +53,7 @@ export async function GET(request: Request): Promise<Response> {
         pendingMedia,
         rejectedUploads,
         accessDivergences,
+        projectionRepairsPending,
       ] = await Promise.all([
         countWhere('finalizations', { status: 'failed' }),
         countWhere('matches', { status: 'completed', verificationStatus: 'pending' }),
@@ -61,6 +62,10 @@ export async function GET(request: Request): Promise<Response> {
         // Legacy and canonical authority disagreeing. This must reach zero before the
         // legacy authorization path is removed.
         countWhere('securityEvents', { type: 'access_authority_divergence' }),
+        // Projections that fell behind their source. A search-index failure must not block
+        // a roster edit, so the trigger swallows it — this is what stops "swallowed" from
+        // meaning "silently stale forever".
+        countWhere('projectionRepairJobs', { status: 'pending' }),
       ]);
 
       return Response.json({
@@ -88,6 +93,7 @@ export async function GET(request: Request): Promise<Response> {
           pendingMediaModeration: pendingMedia,
           rejectedUploads,
           accessAuthorityDivergences: accessDivergences,
+          projectionRepairsPending,
         },
       }, { headers: { 'cache-control': 'no-store' } });
     },

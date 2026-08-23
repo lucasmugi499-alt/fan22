@@ -60,7 +60,16 @@ type OfficialSportEventRecord = {
     remaining?: boolean;
   };
   teamId: string;
-  primaryAthleteId: string;
+  /**
+   * The athlete this event is about, or null when it is a team-only event.
+   *
+   * Null rather than `''`. An empty string is not "no athlete" — it is an athlete id that
+   * happens to be empty, and it behaves like one everywhere downstream: it groups, it
+   * indexes, it joins, and it quietly forms a bucket in career-stat rebuilds and search
+   * projections that belongs to nobody. Team-only events (an unattributed score adjustment)
+   * are a real category and are modelled as one.
+   */
+  primaryAthleteId: string | null;
   payload: Record<string, unknown>;
   sourceClaimId: string;
   submittedByUserId: string;
@@ -478,7 +487,7 @@ function reconcileOfficialScore({
       sportDefinition: definition,
       // Basketball scoring events carry their point value in the payload rather than a
       // fixed per-event weight, so they are expanded before reconstruction.
-      events: expandForScoring(events, sport) as unknown as OfficialSportEvent[],
+      events: events as unknown as OfficialSportEvent[],
       teams,
       claimedScore: score,
     })
@@ -522,7 +531,7 @@ function reconcileOfficialScore({
       sequence,
       teamId,
       // Not attributable to any athlete: that is the entire point of the record.
-      primaryAthleteId: '',
+      primaryAthleteId: null,
       payload: {
         value: points,
         source: 'score_reconciliation',
@@ -550,23 +559,18 @@ function reconcileOfficialScore({
   };
 }
 
-/**
- * Basketball point events carry a variable value, which `reconstructMatchScore` cannot
- * express through fixed per-event weights. Expanding one event per point keeps a single
- * reconstruction path for every sport rather than a second scoring implementation.
+/*
+ * `expandForScoring` was removed on 2026-08-23.
+ *
+ * It turned one `basketball.points` event worth N into N synthetic
+ * `basketball.free_throw_made` events, so that the kernel's fixed per-event weights would
+ * sum to the right total. The arithmetic was correct and the sporting history was false — a
+ * three-pointer was recorded, permanently and officially, as three made free throws.
+ *
+ * The kernel now understands variable-value scoring events, so `basketball.points` is
+ * reconstructed from the value it actually carries. The canonical record says "scored N
+ * points, breakdown not collected", which is what the submission actually claims.
  */
-function expandForScoring(events: OfficialSportEventRecord[], sport: 'football' | 'basketball' | 'rugby') {
-  if (sport !== 'basketball') return events;
-  return events.flatMap((event) => {
-    if (event.eventType !== 'basketball.points') return [event];
-    const value = typeof event.payload.value === 'number' ? event.payload.value : 0;
-    return Array.from({ length: Math.max(0, Math.trunc(value)) }, (_unused, index) => ({
-      ...event,
-      id: `${event.id}_p${index}`,
-      eventType: 'basketball.free_throw_made',
-    }));
-  });
-}
 
 function officialScorerEvents({
   match,
@@ -831,10 +835,15 @@ export async function finalizeSubmission(
       })
       : [];
     const activeSquadEventByAthlete = new Map(
-      activeSquadEvents.map((event) => [event.primaryAthleteId, event.id]),
+      activeSquadEvents
+        .filter((event) => Boolean(event.primaryAthleteId))
+        .map((event) => [event.primaryAthleteId as string, event.id]),
     );
+    // Team-only events carry no athlete, so they are skipped rather than collected under a
+    // key that belongs to nobody. This is what the empty-string id used to hide.
     const scoringSourceEventByAthlete = new Map<string, string>();
     for (const event of scorerEvents) {
+      if (!event.primaryAthleteId) continue;
       if (!scoringSourceEventByAthlete.has(event.primaryAthleteId)) {
         scoringSourceEventByAthlete.set(event.primaryAthleteId, event.id);
       }
@@ -842,7 +851,7 @@ export async function finalizeSubmission(
     const statSourceEventsByAthlete = new Map<string, Record<string, string>>();
     for (const event of statLineEvents) {
       const statKey = String(event.payload.statKey ?? '');
-      if (!statKey) continue;
+      if (!statKey || !event.primaryAthleteId) continue;
       const current = statSourceEventsByAthlete.get(event.primaryAthleteId) ?? {};
       if (!current[statKey]) current[statKey] = event.id;
       statSourceEventsByAthlete.set(event.primaryAthleteId, current);

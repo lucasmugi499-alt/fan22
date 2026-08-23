@@ -298,7 +298,9 @@ describe('trusted result finalizer', () => {
       .find((value) => value.eventType === 'rugby.unattributed_team_score');
     expect(unattributed).toMatchObject({
       teamId: 'team_home',
-      primaryAthleteId: '',
+      // null, not '': a team-only event has no athlete, and an empty string is an athlete id
+      // that happens to be empty — it groups and joins like a real one downstream.
+      primaryAthleteId: null,
       payload: expect.objectContaining({ value: 17, source: 'score_reconciliation' }),
     });
   });

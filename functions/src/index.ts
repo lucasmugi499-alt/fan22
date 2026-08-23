@@ -3,7 +3,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 import {
   finalizeSubmission,
@@ -273,6 +273,39 @@ function searchIndexTrigger(collection: string, type: SearchEntityType) {
         // Never fail the originating write because a discovery projection could not be
         // updated. A repair pass can rebuild it; a blocked roster edit cannot be undone.
         logger.error('Search index update failed', { type, entityId, error });
+
+        /**
+         * A durable record of the failure, not just a log line.
+         *
+         * Swallowing the error is right — a search outage must not block a roster edit. But
+         * swallowing it into a log only means the entity silently stays stale forever: the
+         * write succeeded, the projection did not, the log scrolls away, and nothing brings
+         * the two back together until somebody happens to run a repair. Availability was
+         * preserved by accepting silent divergence, which is the trade this codebase
+         * refuses everywhere else.
+         *
+         * The repair queue makes the divergence a thing that exists and can be retried,
+         * counted and alerted on. A deterministic id means repeated failures for the same
+         * entity update one row rather than growing an unbounded backlog of duplicates.
+         */
+        try {
+          const repairId = `search_${type}_${entityId}`;
+          await db.collection('projectionRepairJobs').doc(repairId).set({
+            id: repairId,
+            projection: 'searchIndex',
+            entityType: type,
+            entityId,
+            status: 'pending',
+            lastError: error instanceof Error ? error.message : String(error),
+            attempts: FieldValue.increment(1),
+            firstFailedAt: FieldValue.serverTimestamp(),
+            lastFailedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        } catch (queueError) {
+          // If even the repair queue is unwritable the incident is larger than search, and
+          // there is nothing useful left to do here except say so loudly.
+          logger.error('Search repair job could not be queued', { type, entityId, queueError });
+        }
       }
     },
   );

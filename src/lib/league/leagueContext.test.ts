@@ -35,3 +35,23 @@ describe('resolveMyLeague', () => {
     expect(resolveMyLeague(profile, leagues, [], false, accessContext('league_missing'))).toBeNull();
   });
 });
+
+describe('legacy admin arrays no longer grant console membership', () => {
+  /**
+   * The console used to fall back to `adminUserIds`, which meant it disagreed with the
+   * server: a revoked operator still saw and could select a league whose every action the
+   * server would then refuse with a 403. Technically secure, operationally broken — and from
+   * the operator's side, indistinguishable from the product being broken.
+   */
+  it('ignores a stale adminUserIds entry with no canonical scope', () => {
+    const staleLeagues = [
+      { id: 'league_stale', name: 'Stale', adminUserIds: ['user_1'] },
+    ] as League[];
+
+    expect(resolveMyLeague(profile, staleLeagues, [], false, undefined)).toBeNull();
+  });
+
+  it('still resolves a league the operator canonically holds', () => {
+    expect(resolveMyLeague(profile, leagues, [], false, accessContext('league_b'))?.id).toBe('league_b');
+  });
+});

@@ -5,7 +5,7 @@ import type { AccessContext } from '@/lib/auth/access';
 import { scopedIdsForAccess } from '@/lib/auth/clientAccess';
 
 /**
- * Resolves which league the current admin runs, by `adminUserIds`.
+ * Resolves which league the current admin runs, from canonical access scopes.
  *
  * In demo mode only, an unassigned profile falls back to the busiest league so the desk has
  * content. A real unassigned admin returns `null` instead, because dropping someone into
@@ -23,9 +23,7 @@ export function resolveMyLeague(
   if (profile) {
     const ownedLeagues = leagues.filter(
       (l) =>
-        scopedLeagueIds.has(l.id) ||
-        l.adminUserIds?.includes(profile.uid) ||
-        l.adminUserIds?.includes(profile.id)
+        scopedLeagueIds.has(l.id)
     );
     const selectedId = selectedAssignmentId('league');
     const owned = ownedLeagues.find((league) => league.id === selectedId) ?? ownedLeagues[0];

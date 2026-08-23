@@ -12,6 +12,16 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
+/** Records which competition ids a per-competition query asked for. */
+const requestedCompetitionIds: Record<string, string[]> = {};
+
+function perCompetitionWhere(collection: string) {
+  return (_field: string, _op: string, ids: string[]) => {
+    requestedCompetitionIds[collection] = [...(requestedCompetitionIds[collection] ?? []), ...ids];
+    return { get: vi.fn().mockResolvedValue(querySnapshot([])) };
+  };
+}
+
 function doc(id: string, data: Record<string, unknown> | null) {
   return {
     id,
@@ -287,9 +297,11 @@ describe('fantasy admin activation route', () => {
       },
       fantasyScoringProfiles: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
       fantasySquadRules: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
-      fantasyPlayers: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
-      fantasyPlayerPrices: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
-      fantasyRounds: { get: vi.fn().mockResolvedValue(querySnapshot([])) },
+      // Per-competition collections are now queried by competitionId rather than scanned
+      // whole, so the stub records which ids were actually asked for.
+      fantasyPlayers: { where: perCompetitionWhere('fantasyPlayers') },
+      fantasyPlayerPrices: { where: perCompetitionWhere('fantasyPlayerPrices') },
+      fantasyRounds: { where: perCompetitionWhere('fantasyRounds') },
     };
     vi.mocked(adminDb.collection).mockImplementation((name: string) => collections[name] as never);
 
@@ -297,6 +309,12 @@ describe('fantasy admin activation route', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    // H13: the per-competition collections must be asked only for competitions this
+    // operator can see. Scanning them whole would pull every league's fantasy dataset,
+    // including the ones scoping just excluded.
+    expect(requestedCompetitionIds.fantasyPlayers).toEqual(['competition_allowed']);
+    expect(requestedCompetitionIds.fantasyPlayerPrices).toEqual(['competition_allowed']);
+    expect(requestedCompetitionIds.fantasyRounds).toEqual(['competition_allowed']);
     expect(body.leagues.map((league: { id: string }) => league.id)).toEqual(['league_allowed']);
     expect(body.seasons.map((season: { id: string }) => season.id)).toEqual(['season_allowed']);
     expect(body.competitions.map((competition: { id: string }) => competition.id)).toEqual(['competition_allowed']);

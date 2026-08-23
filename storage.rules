@@ -24,13 +24,20 @@ service firebase.storage {
       return ownerType in ['athletes', 'teams', 'leagues', 'feed'];
     }
 
+    // Private user assets. Readable by their owner, written by nobody from a browser.
+    //
+    // This used to allow a signed-in user to upload up to 50MB of any image or video here
+    // directly, which bypassed the entire governed media pipeline: no upload-session quota,
+    // no one-time authorization, no content hash, no moderation, no canonical media record.
+    // A compromised account could park arbitrary large objects in the bucket, and a delete
+    // could orphan a Firestore media record that still pointed at the file.
+    //
+    // Verified before closing: no client code calls uploadBytes or ref(storage, ...) at all —
+    // every upload already goes through a signed session URL issued by the server. These
+    // grants were reachable capability, not used capability.
     match /users/{userId}/{allPaths=**} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if signedIn() && request.auth.uid == userId && validMedia();
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow write: if resource != null &&
-        request.resource == null &&
-        (isAdmin() || (signedIn() && request.auth.uid == userId));
+      allow write: if false;
     }
 
     // Match evidence and entity media are written through trusted signed-upload sessions.
@@ -60,11 +67,15 @@ service firebase.storage {
         (isAdmin() || (signedIn() && request.auth.uid == userId));
     }
 
+    // Published media. Public to read; written only by the trusted publication pipeline.
+    //
+    // Admin browser writes here bypassed the moderation command trail entirely — an
+    // administrator could publish or replace a public asset with no moderation record
+    // explaining it. The Admin SDK is not subject to these rules, so the governed pipeline
+    // is unaffected by closing the browser path.
     match /approvedMedia/{allPaths=**} {
       allow read: if true;
-      allow create, update: if isAdmin() && validMedia();
-      allow delete: if isAdmin();
-      allow write: if isAdmin() && (request.resource == null || validMedia());
+      allow write: if false;
     }
 
     match /public/{ownerType}/{ownerId}/{userId}/{fileName} {
@@ -83,13 +94,18 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Moderation queue. Admins read it; nobody writes it from a browser, because a
+    // moderation decision that leaves no command record is a decision nobody can review.
     match /moderation/{allPaths=**} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
+    // Deny by default, super_admin included — the same rule the Firestore catch-all now
+    // follows. A blanket role-based read of anything unmodelled is a hole no specific rule
+    // can close, and Storage holds match evidence and identity documents.
     match /{allPaths=**} {
-      allow read: if role() == 'super_admin';
-      allow write: if false;
+      allow read, write: if false;
     }
   }
 }

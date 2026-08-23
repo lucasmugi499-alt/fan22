@@ -107,6 +107,25 @@ function canAdministerLeague(
   return scopedLeagueIds.has(leagueId);
 }
 
+/**
+ * Reads a per-competition collection for exactly the competitions asked for.
+ *
+ * Firestore's `in` operator takes at most 30 values, so the ids are chunked. An empty list
+ * short-circuits rather than issuing a query that would match nothing.
+ */
+async function readByCompetition(collection: string, competitionIds: string[]) {
+  if (!competitionIds.length) return [];
+  const CHUNK = 30;
+  const chunks: string[][] = [];
+  for (let index = 0; index < competitionIds.length; index += CHUNK) {
+    chunks.push(competitionIds.slice(index, index + CHUNK));
+  }
+  const snapshots = await Promise.all(chunks.map((chunk) =>
+    adminDb.collection(collection).where('competitionId', 'in', chunk).get()));
+  return snapshots.flatMap((snapshot) =>
+    snapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data())));
+}
+
 export async function GET(request: Request) {
   const auth = await requireAuthenticatedUser(request);
   if ('response' in auth) return auth.response;
@@ -123,19 +142,15 @@ export async function GET(request: Request) {
     competitionsSnapshot,
     profilesSnapshot,
     rulesSnapshot,
-    playersSnapshot,
-    pricesSnapshot,
-    roundsSnapshot,
     scopedLeagueIds,
   ] = await Promise.all([
     adminDb.collection('leagues').get(),
     adminDb.collection('seasons').get(),
     adminDb.collection('fantasyCompetitions').get(),
+    // Definition collections: one document per scoring profile and squad rule set, shared
+    // across competitions. These stay whole reads because they are bounded by design.
     adminDb.collection('fantasyScoringProfiles').get(),
     adminDb.collection('fantasySquadRules').get(),
-    adminDb.collection('fantasyPlayers').get(),
-    adminDb.collection('fantasyPlayerPrices').get(),
-    adminDb.collection('fantasyRounds').get(),
     role === 'league_admin' ? scopedLeagueIdsForActor(actor.uid) : Promise.resolve(new Set<string>()),
   ]);
   const allLeagues = leaguesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
@@ -150,9 +165,24 @@ export async function GET(request: Request) {
     .filter((competition) => visibleLeagueIds.has(String(competition.leagueId)));
   const scoringProfiles = profilesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
   const squadRules = rulesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
-  const players = playersSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
-  const prices = pricesSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
-  const rounds = roundsSnapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()));
+
+  /**
+   * Per-competition collections are queried by the competitions actually being shown, not
+   * loaded whole.
+   *
+   * `fantasyPlayers`, `fantasyPlayerPrices` and `fantasyRounds` carry one document per
+   * athlete, per price point and per fixture date — the collections that grow fastest as the
+   * platform does. Reading all three in full and filtering in application memory is fine at
+   * demo scale and becomes a six-figure document read the moment it is not: one administrator
+   * opening this page would pull the entire fantasy dataset across every league, including
+   * the ones they cannot see.
+   */
+  const competitionIds = competitions.map((competition) => String(competition.id));
+  const [players, prices, rounds] = await Promise.all([
+    readByCompetition('fantasyPlayers', competitionIds),
+    readByCompetition('fantasyPlayerPrices', competitionIds),
+    readByCompetition('fantasyRounds', competitionIds),
+  ]);
   const readinessByCompetition = Object.fromEntries(
     competitions.map((competition) => [
       String(competition.id),

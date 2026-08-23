@@ -44,6 +44,7 @@ type SystemHealthPayload = {
     pendingMediaModeration: number;
     rejectedUploads: number;
     accessAuthorityDivergences: number;
+    projectionRepairsPending: number;
   };
 };
 
@@ -187,6 +188,12 @@ export function SystemHealth() {
               meta="Scopes where legacy and canonical authority disagree. Must reach zero before legacy authorization is removed."
               status={`${backlogs.accessAuthorityDivergences}`}
               statusTone={backlogs.accessAuthorityDivergences ? 'bad' : 'good'}
+            />
+            <DirectoryRow
+              title="Projection repairs pending"
+              meta="Projections that fell behind their source. A search-index failure never blocks the write that caused it, so this queue is what stops 'swallowed' meaning 'silently stale'."
+              status={`${backlogs.projectionRepairsPending ?? 0}`}
+              statusTone={backlogs.projectionRepairsPending ? 'warn' : 'good'}
             />
           </div>
         </Card>

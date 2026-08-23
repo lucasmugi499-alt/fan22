@@ -1111,6 +1111,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Projection repair backlog. Written only by the trusted runtime when a projection
+    // fails to keep up with its source, and read by Platform so the divergence is a visible
+    // queue rather than a log line that scrolled away.
+    match /projectionRepairJobs/{jobId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     // Public site copy and feature visibility. Readable by anyone because the public site
     // renders from it; writable by nobody through this path. Every change goes through the
     // audited settings command, which is also what keeps governed switches — traffic

@@ -123,6 +123,12 @@ export const SPORT_DEFINITIONS: SportDefinition[] = [
       { eventType: 'basketball.free_throw_made', points: 1, description: 'Made free throw.' },
       { eventType: 'basketball.two_point_made', points: 2, description: 'Made two point field goal.' },
       { eventType: 'basketball.three_point_made', points: 3, description: 'Made three point field goal.' },
+      {
+        eventType: 'basketball.points',
+        points: 0,
+        variableValue: true,
+        description: 'Points scored, breakdown not collected. Value carried on the event.',
+      },
     ],
   },
   {
