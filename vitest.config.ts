@@ -6,7 +6,9 @@ export default defineConfig({
     environment: 'node',
     // Cleanup-script guards live outside src but are safety-critical, so they run with the
     // normal suite rather than needing a separate command.
-    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    // functions/** was absent, so the trusted runtime that writes official results and sends
+    // operator notifications had no unit coverage at all.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'functions/src/**/*.test.ts'],
     // Rules tests need the Firestore emulator; run them with `npm run test:rules`.
     exclude: ['src/rules/**'],
   },

@@ -728,8 +728,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /officialMatchReconciliation/{reconciliationId} {
+    // Public provenance: what makes a verified result meaningful rather than an assertion.
+    // Formula version, reconciliation status, the official score and counts — no names.
+    match /publicResultProvenance/{provenanceId} {
       allow read: if true;
+      allow write: if false;
+    }
+
+    // Internal reconciliation: the same event, with the operational detail of how it failed.
+    //
+    // This was `allow read: if true`, which published athlete ids, their claimed versus
+    // registered teams, and reasons like `not_registered_to_claimed_team` to any anonymous
+    // reader. Publishing an incomplete sporting record honestly does not require publishing
+    // which named individual was excluded from it and why. Restricted to the League that
+    // governs the fixture and to Platform; the safe half now lives above.
+    match /officialMatchReconciliation/{reconciliationId} {
+      allow read: if isPlatformAdmin() || canManageLeagueById(resource.data.leagueId);
       allow write: if false;
     }
 

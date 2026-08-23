@@ -791,6 +791,33 @@ describe('profile and assignment integrity', () => {
     await assertFails(deleteDoc(doc(superAdmin, 'teams/team_a')));
   });
 
+  it('publishes result provenance without naming who was excluded', async () => {
+    /**
+     * H4. `officialMatchReconciliation` was world-readable and carries eligibility issues:
+     * athlete ids, claimed versus registered teams, and reasons like
+     * `not_registered_to_claimed_team`. Publishing an incomplete sporting record honestly
+     * does not require publishing which named individual was excluded from it and why.
+     */
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'publicResultProvenance/match_001_v1'), {
+        matchId: 'match_001', formulaVersion: 'v1', status: 'balanced', eligibilityIssueCount: 2,
+      });
+      await setDoc(doc(ctx.firestore(), 'officialMatchReconciliation/match_001_v1'), {
+        matchId: 'match_001', leagueId: 'league_001',
+        eligibilityIssues: [{ athleteId: 'athlete_a_1', reason: 'not_registered_to_claimed_team' }],
+      });
+    });
+
+    // The safe half stays public: a verified result still explains itself.
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'publicResultProvenance/match_001_v1')));
+
+    // The operational half is not for anonymous readers.
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'officialMatchReconciliation/match_001_v1')));
+
+    // The governing League still sees it, because they are who acts on it.
+    await assertSucceeds(getDoc(doc(asUser(LEAGUE_ADMIN), 'officialMatchReconciliation/match_001_v1')));
+  });
+
   it('publishes site settings to everyone and lets nobody write them', async () => {
     // Public because the site renders from it; unwritable because every change belongs to
     // the audited settings command, which is also what keeps governed switches off it.

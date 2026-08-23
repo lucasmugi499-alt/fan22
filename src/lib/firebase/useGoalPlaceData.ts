@@ -312,6 +312,80 @@ export async function loadGoalPlaceData(
   };
 }
 
+/**
+ * Which entities a data view is allowed to show.
+ *
+ * Demo mode merges an in-memory store of synthetic matches, teams, leagues and athletes into
+ * provider results, plus per-entity overrides that move visible support totals. That merge
+ * used to run unconditionally, on the assumption the demo arrays would simply be empty
+ * outside demo mode.
+ *
+ * "Usually empty" is not a boundary. A layer that decides what the app believes must not be
+ * capable of accepting synthetic state merely because an in-memory store happened to hold
+ * some — the same one-truth-source rule this codebase applies to sporting data, applied to
+ * the layer that displays it.
+ *
+ * Extracted from the hook so the boundary is a pure function with a test, rather than a
+ * branch buried in a useMemo that nothing can exercise.
+ */
+export function composeEntityViews(input: {
+  isDemoMode: boolean;
+  items: {
+    athletes: Athlete[];
+    teams: Team[];
+    leagues: League[];
+    matches: Match[];
+    challenges: Challenge[];
+  };
+  demo: {
+    demoAthletes: Athlete[];
+    demoTeams: Team[];
+    demoLeagues: League[];
+    demoMatches: Match[];
+    demoChallenges: Challenge[];
+    demoMatchOverrides: Record<string, Partial<Match>>;
+    demoChallengeOverrides: Record<string, Partial<Challenge>>;
+    demoAthleteOverrides: Record<string, Partial<Athlete>>;
+  };
+}) {
+  const { items, demo } = input;
+
+  if (!input.isDemoMode) {
+    return {
+      athletes: items.athletes,
+      teams: items.teams,
+      leagues: items.leagues,
+      matches: items.matches,
+      challenges: items.challenges,
+    };
+  }
+
+  const matchesWithOverrides = items.matches.map((match) => {
+    const override = demo.demoMatchOverrides[match.id];
+    return override ? ({ ...match, ...override } as Match) : match;
+  });
+  const challengesWithOverrides = items.challenges.map((challenge) => {
+    const override = demo.demoChallengeOverrides[challenge.id];
+    return override ? ({ ...challenge, ...override } as Challenge) : challenge;
+  });
+  // Same override pattern for athletes, so demo support pledges move visible totals.
+  const athletesWithOverrides = items.athletes.map((athlete) => {
+    const override = demo.demoAthleteOverrides[athlete.id];
+    return override ? ({ ...athlete, ...override } as Athlete) : athlete;
+  });
+
+  const dedupe = <T extends { id: string }>(rows: T[]) =>
+    Array.from(new Map(rows.map((row) => [row.id, row])).values());
+
+  return {
+    athletes: [...demo.demoAthletes, ...athletesWithOverrides],
+    teams: [...demo.demoTeams, ...items.teams],
+    leagues: [...demo.demoLeagues, ...items.leagues],
+    matches: dedupe([...demo.demoMatches, ...matchesWithOverrides]),
+    challenges: dedupe([...demo.demoChallenges, ...challengesWithOverrides]),
+  };
+}
+
 export function useGoalPlaceData({
   collections = ALL_GOALPLACE_COLLECTIONS,
   athleteRanking,
@@ -423,37 +497,42 @@ export function useGoalPlaceData({
 
   const store = useAppStore();
 
+  /**
+   * The demo slice, pinned to its individual fields.
+   *
+   * Depending on the whole store object would recompute the view on any unrelated store
+   * change; naming the fields keeps the memo as narrow as it was before the composer was
+   * extracted.
+   */
+  const demo = useMemo(() => ({
+    demoAthletes: store.demoAthletes,
+    demoTeams: store.demoTeams,
+    demoLeagues: store.demoLeagues,
+    demoMatches: store.demoMatches,
+    demoChallenges: store.demoChallenges,
+    demoMatchOverrides: store.demoMatchOverrides,
+    demoChallengeOverrides: store.demoChallengeOverrides,
+    demoAthleteOverrides: store.demoAthleteOverrides,
+  }), [
+    store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches,
+    store.demoChallenges, store.demoMatchOverrides, store.demoChallengeOverrides,
+    store.demoAthleteOverrides,
+  ]);
+
   return useMemo(() => {
-    // Merge standard mock data with any local demo session overrides
-    const providerMatchesWithOverrides = items.matches.map(m => {
-      const override = store.demoMatchOverrides[m.id];
-      return override ? { ...m, ...override } as Match : m;
-    });
-
-    const providerChallengesWithOverrides = items.challenges.map(c => {
-      const override = store.demoChallengeOverrides[c.id];
-      return override ? { ...c, ...override } as Challenge : c;
-    });
-
-    const mergedMatches = [...store.demoMatches, ...providerMatchesWithOverrides];
-    const uniqueMatches = Array.from(new Map(mergedMatches.map(m => [m.id, m])).values());
-
-    const mergedChallenges = [...store.demoChallenges, ...providerChallengesWithOverrides];
-    const uniqueChallenges = Array.from(new Map(mergedChallenges.map(c => [c.id, c])).values());
-
-    // Same override pattern for athletes, so demo support pledges move visible totals.
-    const providerAthletesWithOverrides = items.athletes.map(a => {
-      const override = store.demoAthleteOverrides[a.id];
-      return override ? { ...a, ...override } as Athlete : a;
+    const { athletes, teams, leagues, matches, challenges } = composeEntityViews({
+      isDemoMode,
+      items,
+      demo,
     });
 
     return {
-      athletes: [...store.demoAthletes, ...providerAthletesWithOverrides],
-      teams: [...store.demoTeams, ...items.teams],
-      leagues: [...store.demoLeagues, ...items.leagues],
+      athletes,
+      teams,
+      leagues,
       seasons: items.seasons,
-      matches: uniqueMatches,
-      challenges: uniqueChallenges,
+      matches,
+      challenges,
       feedPosts: items.feedPosts,
       reports: items.reports,
       verifications: items.verifications,
@@ -476,7 +555,7 @@ export function useGoalPlaceData({
       offline,
       cachedAt,
     };
-  }, [items, loading, error, retry, offline, cachedAt, store.demoAthletes, store.demoTeams, store.demoLeagues, store.demoMatches, store.demoMatchOverrides, store.demoChallenges, store.demoChallengeOverrides, store.demoAthleteOverrides]);
+  }, [items, loading, error, retry, offline, cachedAt, isDemoMode, demo]);
 }
 
 export function useUserNotifications(userId?: string | null) {

@@ -1106,9 +1106,40 @@ export async function finalizeSubmission(
         tx.create(db.collection(OFFICIAL_SPORT_EVENTS).doc(event.id), event);
       }
 
-      tx.set(db.collection('officialMatchReconciliation').doc(`${match.id}_v${plan.resultVersion}`), {
-        id: `${match.id}_v${plan.resultVersion}`,
+      /**
+       * Provenance is split in two, because it has two audiences.
+       *
+       * A fan looking at a result is owed the fact that it was reconciled, against which
+       * formula version, and whether it balanced. That is what makes a verified result
+       * meaningful rather than an assertion, and it is safe for anyone to read.
+       *
+       * What they are NOT owed is the operational detail of how it failed: athlete ids,
+       * their claimed versus registered teams, and reasons like
+       * `not_registered_to_claimed_team`. That is an internal data-quality record about
+       * named individuals, and it used to sit in a collection any anonymous reader could
+       * fetch. Publishing an incomplete record honestly does not require publishing which
+       * child was excluded and why.
+       */
+      const reconciliationId = `${match.id}_v${plan.resultVersion}`;
+
+      tx.set(db.collection('publicResultProvenance').doc(reconciliationId), {
+        id: reconciliationId,
         matchId: match.id,
+        officialResultVersion: plan.resultVersion,
+        sport: fantasySport,
+        formulaVersion: reconciliation.trace.formulaVersion,
+        status: reconciliation.trace.status,
+        officialScore: plan.match.score,
+        // Counts only: enough to say the record is incomplete, without naming anyone.
+        unattributedTotal: reconciliation.unattributed,
+        eligibilityIssueCount: eligibilityIssues.length,
+        finalizedAt,
+      });
+
+      tx.set(db.collection('officialMatchReconciliation').doc(reconciliationId), {
+        id: reconciliationId,
+        matchId: match.id,
+        leagueId: match.leagueId,
         officialResultVersion: plan.resultVersion,
         sport: fantasySport,
         formulaVersion: reconciliation.trace.formulaVersion,
@@ -1117,9 +1148,8 @@ export async function finalizeSubmission(
         officialScore: plan.match.score,
         unattributed: reconciliation.unattributed,
         issues: reconciliation.trace.issues,
-        // Athletes excluded from official records, with the reason. Publishing this
-        // alongside the result is what keeps an incomplete record honest instead of
-        // silently short.
+        // Athletes excluded from official records, with the reason. Restricted to the
+        // League that governs the fixture and to Platform.
         eligibilityIssues,
         finalizedAt,
       });
