@@ -1995,3 +1995,70 @@ describe('reconciliation exceptions', () => {
     );
   });
 });
+
+describe('team affiliations grant nothing and are readable by nobody', () => {
+  async function seedAffiliation() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'teamAffiliations/affiliation_1'), {
+        id: 'affiliation_1',
+        userId: LEAGUE_ADMIN,
+        teamId: 'team_001',
+        leagueId: 'league_001',
+        relationship: 'coach',
+        basis: 'declared',
+        status: 'active',
+        effectiveFrom: '2026-01-01T00:00:00.000Z',
+      });
+    });
+  }
+
+  /**
+   * ADR-005, invariant 23: `teamAffiliations` is never read by an authorization decision.
+   *
+   * Enforced here by the collection being unreadable to every client, including the person
+   * the record is about and the league that recorded it. The only consumer is
+   * resolveConflictContext() under the Admin SDK. If a rule ever needed to read this to
+   * decide access, an affiliation would become a permission anybody could award themselves
+   * by declaring one.
+   */
+  it('denies read to the league that recorded it', async () => {
+    await seedAffiliation();
+
+    await assertFails(getDoc(doc(asUser(LEAGUE_ADMIN), 'teamAffiliations/affiliation_1')));
+  });
+
+  it('denies read to an unrelated user', async () => {
+    await seedAffiliation();
+
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'teamAffiliations/affiliation_1')));
+  });
+
+  it('denies a client declaring an affiliation directly', async () => {
+    // Declarations are server-authored so that `declaredByUserId` and `basis` mean something.
+    // A client-written record could claim to be league_recorded when nobody recorded it.
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'teamAffiliations/affiliation_self'), {
+        userId: LEAGUE_ADMIN,
+        teamId: 'team_001',
+        leagueId: 'league_001',
+        relationship: 'coach',
+        basis: 'league_recorded',
+        status: 'active',
+      }),
+    );
+  });
+
+  it('denies ending one from the client', async () => {
+    await seedAffiliation();
+
+    // Ending an affiliation the moment before adjudicating your own club's match is exactly
+    // the move this collection exists to make visible.
+    await assertFails(
+      setDoc(
+        doc(asUser(LEAGUE_ADMIN), 'teamAffiliations/affiliation_1'),
+        { status: 'ended' },
+        { merge: true },
+      ),
+    );
+  });
+});

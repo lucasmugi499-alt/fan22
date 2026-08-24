@@ -26,6 +26,11 @@ export type LeagueStatus =
   | "community"
   | "verified"
   | "partner"
+  // Platform is running this league directly. One of the two states in which a league is
+  // permitted to have no accountable League Admin, the other being `suspended`; both are
+  // decisions somebody recorded rather than states a league drifts into by losing its last
+  // operator. See src/server/access/lastAdmin.ts.
+  | "platform_managed"
   | "suspended";
 
 export type PlanType = "free" | "pro" | "partner";
@@ -678,6 +683,48 @@ export interface RosterMembership {
   eligibilityRulePackVersion: string;
   verifiedByUserId?: string;
   verifiedAt?: string;
+}
+
+/**
+ * A person's sporting relationship with a club. Grants nothing.
+ *
+ * The self-confirmation guard detected conflict by asking whether the actor held a
+ * team-scoped assignment. That was sound while system authority over a team was a reliable
+ * proxy for sporting affiliation with it. ADR-004 broke the proxy: a League Admin who also
+ * coaches Kampala United holds no team-scoped authority at all, because team contacts are
+ * person records now, and is still exactly the person who should not adjudicate a Kampala
+ * United dispute alone.
+ *
+ * Read only by conflict policy, never by an authorization decision. That separation is
+ * invariant 23 and is the reason this is its own collection rather than a field on the team:
+ * `Team.adminUserIds` is membership metadata carrying zero authority, and it has already
+ * caused one access-divergence incident by acquiring a second job.
+ */
+export type TeamRelationship =
+  | 'coach'
+  | 'manager'
+  | 'officer'
+  | 'official'
+  | 'player'
+  | 'owner'
+  | 'family';
+
+export interface TeamAffiliation {
+  id: string;
+  userId: string;
+  teamId: string;
+  leagueId: string;
+  seasonId?: string;
+  relationship: TeamRelationship;
+  /** How this was learned: the person said so, or the league recorded it. */
+  basis: 'declared' | 'league_recorded';
+  declaredAt: string;
+  declaredByUserId: string;
+  recordedByUserId?: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  status: 'active' | 'ended' | 'disputed';
+  note?: string;
 }
 
 export interface AthleteClaim {

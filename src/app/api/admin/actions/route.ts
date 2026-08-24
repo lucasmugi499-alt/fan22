@@ -10,6 +10,7 @@ import type {
   PermissionCapability,
 } from '@/lib/auth/access';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import { assertLeagueKeepsAnAdmin } from '@/server/access/lastAdmin';
 import { normalizeAccessAssignment, readScopeProjection, rebuildUserProjections } from '@/server/access/projector';
 
 export const runtime = 'nodejs';
@@ -828,6 +829,19 @@ export async function POST(request: Request) {
             const assignmentSnapshot = await transaction.get(assignmentRef);
             if (!assignmentSnapshot.exists) throw new Error('Access assignment not found.');
             const current = normalizeAccessAssignment(assignmentSnapshot.id, assignmentSnapshot.data()!, nowIso);
+            /**
+             * Read before any write in this transaction, so the count cannot go stale between
+             * the check and the transition. Two concurrent revocations would otherwise each
+             * see the other still active and both succeed.
+             */
+            const keepsAnAdmin = await assertLeagueKeepsAnAdmin(adminDb, transaction, {
+              assignmentId,
+              scopeType: current.scopeType,
+              scopeId: current.scopeId,
+              roleKey: current.roleKey,
+              nextStatus: status,
+            });
+            if (!keepsAnAdmin.ok) throw new Error(keepsAnAdmin.reason);
             const nextAssignment: AccessAssignment = {
               ...current,
               status,

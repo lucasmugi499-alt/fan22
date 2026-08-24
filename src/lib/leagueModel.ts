@@ -59,6 +59,14 @@ export const leagueStatusMeta: Record<
     badgeClass: 'border-[var(--goal-gold)]/35 bg-[var(--goal-gold)]/14 text-[var(--goal-gold)]',
     panelClass: 'border-[var(--goal-gold)]/24 bg-[var(--goal-gold)]/9',
   },
+  platform_managed: {
+    label: 'Platform managed',
+    shortLabel: 'Platform',
+    description: 'GoalPlace is running this league directly while it has no accountable League Admin.',
+    capabilities: ['Platform operations', 'Ownership recovery', 'Admin reinstatement'],
+    badgeClass: 'border-amber-300/30 bg-amber-500/12 text-amber-200',
+    panelClass: 'border-amber-300/20 bg-amber-500/8',
+  },
   suspended: {
     label: 'Suspended',
     shortLabel: 'Suspended',
