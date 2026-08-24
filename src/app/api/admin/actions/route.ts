@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { effectiveCapturePolicy } from '@/lib/capturePolicy';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -616,6 +617,13 @@ export async function POST(request: Request) {
         requiredCapability: 'league.season.manage',
         handler: async ({ requestId, reason }) => {
           const seasonRef = adminDb.collection('seasons').doc(seasonId);
+          /**
+           * The platform floor, read once outside the transaction because it is a global
+           * setting rather than a per-fixture fact and does not need to be transactionally
+           * consistent with the fixtures being written.
+           */
+          const platformSettings = await adminDb.collection('platformSettings').doc('global').get();
+          const platformMinimum = platformSettings.data()?.capturePolicyFloor;
           await adminDb.runTransaction(async (transaction) => {
             const season = await transaction.get(seasonRef);
             if (!season.exists || season.data()?.leagueId !== leagueId) {
@@ -641,9 +649,25 @@ export async function POST(request: Request) {
               }
             });
 
+            /**
+             * Bound at fixture creation, not resolved at result time.
+             *
+             * Rule-pack versions bind to a match for the same reason: without it, tightening
+             * a competition's policy mid-season retroactively invalidates matches that were
+             * legitimately captured under the old one. A fixture created today carries the
+             * policy that was in force today, and re-binding it is an explicit, audited
+             * operation rather than a side effect of editing a setting.
+             */
+            const boundCapturePolicy = effectiveCapturePolicy(
+              season.data()?.capturePolicy,
+              platformMinimum,
+            );
+
             body.fixtures.forEach((fixture, index) => {
               transaction.set(fixtureRefs[index], {
                 ...fixture,
+                effectiveCapturePolicy: boundCapturePolicy,
+                capturePolicyBoundAt: new Date().toISOString(),
                 score: { home: null, away: null },
                 verificationStatus: 'pending',
                 supportersCount: fixture.supportersCount ?? 0,

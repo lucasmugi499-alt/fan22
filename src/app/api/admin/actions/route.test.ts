@@ -491,6 +491,69 @@ describe('trusted admin actions route hardening', () => {
     expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
   });
 
+  it('binds the stronger of the league policy and the platform floor onto each fixture', async () => {
+    const transaction = {
+      get: vi.fn(async (ref: { collectionName: string; id: string }) => {
+        if (ref.collectionName === 'seasons') {
+          // The league asked for the weakest policy.
+          return snapshot(ref.id, {
+            id: ref.id,
+            leagueId: 'league_1',
+            status: 'active',
+            capturePolicy: 'POST_MATCH_ALLOWED',
+          });
+        }
+        if (ref.collectionName === 'teams') return snapshot(ref.id, { id: ref.id, leagueId: 'league_1' });
+        return snapshot(ref.id, undefined);
+      }),
+      set: vi.fn(),
+      update: vi.fn(),
+    };
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
+    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
+    installFirestoreMock({
+      'users/league_admin_1': {
+        id: 'league_admin_1',
+        role: 'league_admin',
+        accountClass: 'organization_operator',
+        accountStatus: 'active',
+      },
+      'leagues/league_1': { id: 'league_1', adminUserIds: [] },
+      // Platform requires field capture across the network.
+      'platformSettings/global': { capturePolicyFloor: 'FIELD_REQUIRED' },
+      'accessIndex/league_league_1_league_admin_1': {
+        userId: 'league_admin_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.season.manage'],
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'create_fixtures',
+      fixtures: [{
+        id: 'match_2',
+        sport: 'football',
+        leagueId: 'league_1',
+        seasonId: 'season_1',
+        homeTeamId: 'team_home',
+        awayTeamId: 'team_away',
+        venue: 'Kampala Ground',
+        city: 'Kampala',
+        scheduledAt: '2027-01-16T15:00:00.000Z',
+        status: 'scheduled',
+        score: { home: null, away: null },
+        verificationStatus: 'pending',
+      }],
+    })));
+
+    expect(response.status).toBe(200);
+    expect(transaction.set).toHaveBeenCalledWith(
+      expect.objectContaining({ collectionName: 'matches', id: 'match_2' }),
+      expect.objectContaining({ effectiveCapturePolicy: 'FIELD_REQUIRED' }),
+    );
+  });
+
   it('creates fixtures through a scoped trusted command with pending result state', async () => {
     const transaction = {
       get: vi.fn(async (ref: { collectionName: string; id: string }) => {
@@ -543,6 +606,10 @@ describe('trusted admin actions route hardening', () => {
       collectionName: 'matches',
       id: 'match_1',
     }), expect.objectContaining({
+      // Invariant 17: every fixture carries a policy from the moment it exists, so a policy
+      // change later in the season cannot retroactively invalidate it.
+      effectiveCapturePolicy: 'POST_MATCH_ALLOWED',
+      capturePolicyBoundAt: expect.any(String),
       leagueId: 'league_1',
       seasonId: 'season_1',
       score: { home: null, away: null },

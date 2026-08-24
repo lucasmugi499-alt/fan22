@@ -21,6 +21,12 @@ export type ProfileStatus = "active" | "pending" | "suspended";
 
 export type SportType = "Football" | "Basketball" | "Rugby";
 
+// Relative, not aliased. This file compiles into the Cloud Functions bundle, where a path
+// alias survives into the emitted CommonJS and fails at require time. It happens to erase
+// today because the import is type-only, which is exactly the kind of accident that stops
+// being true the moment somebody needs a value from here.
+import type { CapturePolicy } from '../lib/capturePolicy';
+
 export type LeagueStatus =
   | "draft"
   | "community"
@@ -81,6 +87,13 @@ export interface Season {
   endDate?: string;
   competitionFormat: CompetitionFormat;
   scoring: SeasonScoringRules;
+  /**
+   * What the league asks for. Not what applies: Platform can impose a floor, and the
+   * resolved value is bound onto each fixture at creation. See src/lib/capturePolicy.ts.
+   */
+  capturePolicy?: CapturePolicy;
+  /** Refuse to assign a Field Manager who has declared an affiliation with either club. */
+  neutralFieldManagerRequired?: boolean;
   createdAt: string;
 }
 
@@ -804,6 +817,17 @@ export interface Match {
   teamAScore?: number;
   teamBScore?: number;
   events: MatchEvent[];
+  /**
+   * The capture policy in force when this fixture was created, resolved as
+   * max(leagueRequested, platformMinimum) and frozen here.
+   *
+   * Bound at creation rather than read at result time, exactly as rule-pack versions bind to
+   * a match. Without that, tightening a competition's policy mid-season retroactively
+   * invalidates matches that were legitimately captured under the old one. Absent on
+   * fixtures created before the field existed, which resolve to the permissive default.
+   */
+  effectiveCapturePolicy?: CapturePolicy;
+  capturePolicyBoundAt?: string;
   createdAt: string;
 }
 
