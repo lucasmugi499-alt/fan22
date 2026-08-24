@@ -8,6 +8,7 @@ import { AuthProvider } from '@/context/AuthProvider';
 import { AuthModalProvider } from '@/components/auth/AuthRequiredModal';
 import { DemoRoleSwitcher } from '@/components/auth/DemoRoleSwitcher';
 import { EnvironmentBoundary } from '@/components/layout/EnvironmentBoundary';
+import { ServiceWorkerRegistrar } from '@/components/layout/ServiceWorkerRegistrar';
 import { EnvironmentBanner } from '@/components/layout/EnvironmentBanner';
 
 const displayFont = Bricolage_Grotesque({
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body
         className={`min-h-full ${displayFont.variable} ${sansFont.variable} ${monoFont.variable} font-sans`}
       >
+        <ServiceWorkerRegistrar />
         <EnvironmentBoundary>
           <EnvironmentBanner />
           <AuthProvider>

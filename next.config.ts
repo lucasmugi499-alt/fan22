@@ -106,6 +106,23 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      {
+        /**
+         * The service worker is never cached.
+         *
+         * A cached `sw.js` is how a device ends up running an offline shell from a build that
+         * no longer matches the application, and the failure is invisible: the page loads, it
+         * is simply the wrong page. On a Field Manager's phone that means a capture surface
+         * that disagrees with the server about what a match package contains.
+         */
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          // The worker has no business loading anything but its own origin's scripts.
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
     ];
   },
 };
