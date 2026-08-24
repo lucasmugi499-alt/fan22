@@ -6,6 +6,10 @@ import { SPORT_DEFINITIONS } from '../kernel/definitions/sportCatalogues';
 import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
 import type { OfficialSportEvent } from '../kernel/types';
+// Relative, like every other import in this file: it compiles into the Cloud Functions
+// bundle, where a path alias survives into the emitted CommonJS and fails at require time.
+import { userPrincipal, provenanceQuad, type Principal } from '../kernel/principal';
+import { validateOfficialEventShape } from '../kernel/validators/officialEventGuard';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
 // Relative, not `@/`. This module compiles into the Cloud Functions bundle, where a path
 // alias survives into the emitted CommonJS and fails at require time — tsc resolves the
@@ -19,8 +23,15 @@ import {
 } from '../lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 
-/** Bound to the kernel rather than hardcoded, so a definition change is traceable. */
-const EVENT_SCHEMA_VERSION = '1.0.0';
+/**
+ * Bound to the kernel rather than hardcoded, so a definition change is traceable.
+ *
+ * 2.0.0 since the actor became a union: `sourcePrincipal` replaces `submittedByUserId` as
+ * the required record of who acted, because a field-capture event has no Firebase user.
+ * Events already stored at 1.0.0 keep their shape and are never rewritten; readers handle
+ * both via `principalFromEvent()`.
+ */
+const EVENT_SCHEMA_VERSION = '2.0.0';
 
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';
@@ -81,7 +92,15 @@ type OfficialSportEventRecord = {
   primaryAthleteId: string | null;
   payload: Record<string, unknown>;
   sourceClaimId: string;
-  submittedByUserId: string;
+  /**
+   * Required at emission, unlike on the stored-event type in the kernel, which has to model
+   * both schema versions. Requiring it here is the compile-time gate: a new event builder
+   * that forgets to name its author does not typecheck, rather than failing the shape guard
+   * at run time on a real match.
+   */
+  sourcePrincipal: Principal;
+  /** Still written for events a user produced. No longer the only way an event names one. */
+  submittedByUserId?: string;
   submittedByTeamId: string;
   evidenceRefs: string[];
   officialResultVersion: number;
@@ -91,6 +110,28 @@ type OfficialSportEventRecord = {
   createdAt: string;
   finalizedAt: string;
 };
+
+/**
+ * The sport definition's own version.
+ *
+ * `sportDefinitionVersion` answers "which sport definition produced this event".
+ * `eventSchemaVersion` answers "what shape is this document". They are different questions
+ * that happened to have the same answer while both were '1.0.0', which is how one site came
+ * to use the event schema constant as a fallback for the other. They diverged at A0, so the
+ * coincidence is now a defect: a missing definition would have stamped an event as having
+ * been produced by sport definition 2.0.0, which does not exist.
+ *
+ * Throws rather than guessing. Every sport reaching this point is one of the three in the
+ * catalogue, so a miss means the kernel is misconfigured, and inventing a version number for
+ * an official record is worse than refusing to write one.
+ */
+function sportDefinitionVersionFor(sport: 'football' | 'basketball' | 'rugby') {
+  const definition = SPORT_DEFINITIONS.find((entry) => entry.sportId === sport);
+  if (!definition) {
+    throw new Error(`No sport definition for ${sport}; refusing to stamp an official event.`);
+  }
+  return definition.version;
+}
 
 function officialPositionGroup(
   sport: 'football' | 'basketball' | 'rugby',
@@ -332,8 +373,8 @@ function officialStatLineEvents({
         events.push({
           id: eventId,
           eventType: eventTypes[statKey],
-          eventSchemaVersion: '1.0.0',
-          sportDefinitionVersion: '1.0.0',
+          eventSchemaVersion: EVENT_SCHEMA_VERSION,
+          sportDefinitionVersion: sportDefinitionVersionFor(sport),
           sportId: sport,
           competitionId: match.leagueId,
           seasonId: match.seasonId,
@@ -347,6 +388,10 @@ function officialStatLineEvents({
             source: 'result_submission_stat_line',
           },
           sourceClaimId: submission.id,
+          // The claim's author is the event's author. The caller (trigger, sweeper, route)
+          // is who ran the finalization, which is a different question and is recorded on
+          // the ledger entry as provenance rather than on each event.
+          sourcePrincipal: userPrincipal(submission.submittedByUserId),
           submittedByUserId: submission.submittedByUserId,
           submittedByTeamId: submission.submittedByTeamId,
           evidenceRefs: submission.evidenceRefs,
@@ -365,8 +410,8 @@ function officialStatLineEvents({
       events.push({
         id: eventId,
         eventType: `${sport}.player_of_match`,
-        eventSchemaVersion: '1.0.0',
-        sportDefinitionVersion: '1.0.0',
+        eventSchemaVersion: EVENT_SCHEMA_VERSION,
+        sportDefinitionVersion: sportDefinitionVersionFor(sport),
         sportId: sport,
         competitionId: match.leagueId,
         seasonId: match.seasonId,
@@ -380,6 +425,10 @@ function officialStatLineEvents({
           source: 'result_submission_stat_line',
         },
         sourceClaimId: submission.id,
+        // The claim's author is the event's author. The caller (trigger, sweeper, route)
+        // is who ran the finalization, which is a different question and is recorded on
+        // the ledger entry as provenance rather than on each event.
+        sourcePrincipal: userPrincipal(submission.submittedByUserId),
         submittedByUserId: submission.submittedByUserId,
         submittedByTeamId: submission.submittedByTeamId,
         evidenceRefs: submission.evidenceRefs,
@@ -427,8 +476,8 @@ function officialActiveSquadEvents({
     events.push({
       id: eventId,
       eventType,
-      eventSchemaVersion: '1.0.0',
-      sportDefinitionVersion: '1.0.0',
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+      sportDefinitionVersion: sportDefinitionVersionFor(sport),
       sportId: sport,
       competitionId: match.leagueId,
       seasonId: match.seasonId,
@@ -441,6 +490,10 @@ function officialActiveSquadEvents({
         source: 'result_submission_active_squad',
       },
       sourceClaimId: submission.id,
+      // The claim's author is the event's author. The caller (trigger, sweeper, route)
+      // is who ran the finalization, which is a different question and is recorded on
+      // the ledger entry as provenance rather than on each event.
+      sourcePrincipal: userPrincipal(submission.submittedByUserId),
       submittedByUserId: submission.submittedByUserId,
       submittedByTeamId: submission.submittedByTeamId,
       evidenceRefs: submission.evidenceRefs,
@@ -532,7 +585,7 @@ function reconcileOfficialScore({
       id: eventId,
       eventType: `${sport}.unattributed_team_score`,
       eventSchemaVersion: EVENT_SCHEMA_VERSION,
-      sportDefinitionVersion: definition?.version ?? EVENT_SCHEMA_VERSION,
+      sportDefinitionVersion: sportDefinitionVersionFor(sport),
       sportId: sport,
       competitionId: match.leagueId,
       seasonId: match.seasonId,
@@ -547,6 +600,10 @@ function reconcileOfficialScore({
         reason: 'Official score exceeds the points attributable to recorded events.',
       },
       sourceClaimId: submission.id,
+      // The claim's author is the event's author. The caller (trigger, sweeper, route)
+      // is who ran the finalization, which is a different question and is recorded on
+      // the ledger entry as provenance rather than on each event.
+      sourcePrincipal: userPrincipal(submission.submittedByUserId),
       submittedByUserId: submission.submittedByUserId,
       submittedByTeamId: submission.submittedByTeamId,
       evidenceRefs: submission.evidenceRefs,
@@ -607,8 +664,8 @@ function officialScorerEvents({
       events.push({
         id: eventId,
         eventType,
-        eventSchemaVersion: '1.0.0',
-        sportDefinitionVersion: '1.0.0',
+        eventSchemaVersion: EVENT_SCHEMA_VERSION,
+        sportDefinitionVersion: sportDefinitionVersionFor(sport),
         sportId: sport,
         competitionId: match.leagueId,
         seasonId: match.seasonId,
@@ -627,6 +684,10 @@ function officialScorerEvents({
           source: 'result_submission_scorer',
         },
         sourceClaimId: submission.id,
+        // The claim's author is the event's author. The caller (trigger, sweeper, route)
+        // is who ran the finalization, which is a different question and is recorded on
+        // the ledger entry as provenance rather than on each event.
+        sourcePrincipal: userPrincipal(submission.submittedByUserId),
         submittedByUserId: submission.submittedByUserId,
         submittedByTeamId: submission.submittedByTeamId,
         evidenceRefs: submission.evidenceRefs,
@@ -1127,10 +1188,26 @@ export async function finalizeSubmission(
       createdAt: plan.submission.finalizedAt,
     });
 
+    /**
+     * The idempotency ledger is the one record that exists exactly once per finalized
+     * result version, so it is where the provenance quad belongs: it answers "how did this
+     * become official?" without depending on anyone's memory, and it cannot drift, because
+     * the entry is written once and never updated.
+     *
+     * Provenance is recorded separately from status. `legacy_team_submission` here is a
+     * statement about what kind of record produced this version, not about how much it
+     * should be trusted; the quality tier that reads it is computed at finalization in a
+     * later phase and is never settable by hand.
+     */
     tx.create(ledgerRef, {
       matchId: submission.matchId,
       submissionId: submission.id,
       resultVersion: submission.resultVersion,
+      ...provenanceQuad({
+        sourceType: 'legacy_team_submission',
+        sourceRecordId: submission.id,
+        principal: userPrincipal(submission.submittedByUserId),
+      }),
       finalizedAt,
     });
 
@@ -1141,6 +1218,29 @@ export async function finalizeSubmission(
       // decided. Recomputing here would risk the gate and the published record disagreeing.
       const reconciliation = surplusGate!;
       officialEvents.push(...reconciliation.adjustmentEvents);
+
+      /**
+       * Shape check before anything is written, against the schema version each event
+       * declares.
+       *
+       * Every event here is constructed in this file and is already typechecked, so in A0
+       * this is defence in depth. It earns its place at the moment field capture starts
+       * supplying events from outside this module: a malformed official record is not
+       * recoverable by a later correction, because corrections version a record that has to
+       * have been readable in the first place.
+       *
+       * It throws rather than opening a reconciliation exception because it can only fire on
+       * a code defect, not on bad match data, and an exception queue is for decisions a human
+       * can make. A human cannot adjudicate a missing required field.
+       */
+      for (const event of officialEvents) {
+        const verdict = validateOfficialEventShape(event);
+        if (verdict.status === 'blocked') {
+          throw new Error(
+            `Refusing to write a malformed official event ${event.id}: ${verdict.issues.join(' ')}`,
+          );
+        }
+      }
 
       for (const event of officialEvents) {
         tx.create(db.collection(OFFICIAL_SPORT_EVENTS).doc(event.id), event);

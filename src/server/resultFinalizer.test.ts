@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { validateOfficialEventShape } from '@/kernel/validators/officialEventGuard';
 import { finalizeSubmission } from './resultFinalizer';
 
 /** Every test that expects work to happen runs with the gate open. */
@@ -265,6 +266,42 @@ describe('trusted result finalizer', () => {
         unattributed: { home: 0, away: 0 },
       }),
     }));
+  });
+
+  /**
+   * Four of the five event builders in this file hardcoded `eventSchemaVersion: '1.0.0'`
+   * rather than reading the constant, so the A0 version bump initially took effect on one of
+   * them and the rest kept stamping a version they no longer matched. Nothing failed: the
+   * shape guard passes a 1.0.0 event, and every assertion in this suite was written with
+   * `toMatchObject`, which ignores fields it is not asked about.
+   *
+   * This asserts across every emitted event rather than a named one, because the defect was
+   * that one builder disagreed with the others.
+   */
+  it('stamps every emitted event with the current schema version and a real author', async () => {
+    const { db, records, writes } = fakeDb({
+      'resultSubmissions/match_1': submission,
+      'matches/match_1': match,
+      'athletes/athlete_1': { id: 'athlete_1', name: 'Amina Trymaker', position: 'Fly-half' },
+      'athletes/athlete_2': { id: 'athlete_2', name: 'Noah Non Scorer', position: 'Lock' },
+      'athletes/athlete_3': { id: 'athlete_3', name: 'Grace Defender', position: 'Back Row' },
+    });
+
+    await finalizeSubmission(db as never, 'match_1', ENABLED);
+
+    const events = writes
+      .filter((write) => write.path.startsWith('officialSportEvents/'))
+      .map((write) => records.get(write.path) as Record<string, unknown>);
+
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      expect(event.eventSchemaVersion).toBe('2.0.0');
+      // The sport definition's version, which is a different question and must not be
+      // answered with the event schema constant.
+      expect(event.sportDefinitionVersion).toBe('1.0.0');
+      expect(event.sourcePrincipal).toEqual({ principalType: 'user', userId: 'team_admin_1' });
+      expect(validateOfficialEventShape(event)).toEqual({ status: 'valid', issues: [] });
+    }
   });
 
   it('records an unattributed score event when the events fall short of the official result', async () => {

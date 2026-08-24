@@ -1,4 +1,5 @@
 import type { SportSlug } from '@/types';
+import type { Principal } from './principal';
 
 export type KernelRecordStatus =
   | 'draft'
@@ -226,7 +227,19 @@ export type OfficialSportEvent<TPayload = unknown> = {
   payload: TPayload;
   qualifiers?: Record<string, string | number | boolean>;
   sourceClaimId: string;
-  submittedByUserId: string;
+  /**
+   * Optional since schema 2.0.0. A field-capture event is produced by a match ops session
+   * that has no Firebase user, so the uid stopped being the universal way an event names
+   * its author. Still written for events a user produced.
+   *
+   * This type models any STORED event, at either schema version, which is why both this and
+   * `sourcePrincipal` are optional here. Emission is where the requirement is enforced:
+   * `validateOfficialEventShape()` refuses an event that carries neither, and the finalizer's
+   * own record type requires `sourcePrincipal` so a missed event builder fails to compile.
+   */
+  submittedByUserId?: string;
+  /** Who acted. Required at schema 2.0.0. Absent on 1.0.0 events, which are never rewritten. */
+  sourcePrincipal?: Principal;
   submittedByTeamId?: string;
   evidenceRefs?: string[];
   officialResultVersion: number;
