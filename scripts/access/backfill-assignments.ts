@@ -86,6 +86,17 @@ export function planBackfill(input: {
 
   const planned = new Map<string, PlannedAssignment>();
   const add = (userId: string, scopeType: 'league' | 'team', scopeId: string, source: PlannedAssignment['source']) => {
+    /**
+     * Team scope is never backfilled since ADR-004.
+     *
+     * `covered()` asks whether a canonical assignment already grants something, and every
+     * team bundle was versioned to zero capabilities, so no team assignment can ever answer
+     * yes. Without this guard the tool would propose one migrated assignment per legacy
+     * `adminUserIds` entry, each granting nothing and each reading to whoever holds it as a
+     * role they still have. A legacy team entry is residue to be cleared, not a gap to be
+     * filled.
+     */
+    if (scopeType === 'team') return;
     if (!userId || !scopeId || covered(userId, scopeType, scopeId)) return;
     const id = backfillAssignmentId(scopeType, scopeId, userId);
     if (planned.has(id)) return;

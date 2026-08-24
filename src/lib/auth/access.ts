@@ -59,11 +59,33 @@ export type PermissionCapability =
   | 'platform.payee.verify'
   | 'league.profile.manage'
   | 'league.season.manage'
+  // Normalizes `league.team.create`, which named one verb where the League governs the
+  // whole lifecycle. The old name is retained below as deprecated so historical
+  // assignments stay interpretable.
+  | 'league.team.manage'
+  // Added 2026-08-24 with ADR-003. These are League-NATIVE, deliberately not the `team.*`
+  // capabilities re-pointed at a league scope. Granting a League Admin `team.roster.manage`
+  // would encode "League Admin is pretending to be every Team Admin"; the architecture is
+  // "the League governs its teams, including their rosters". In five years the names are
+  // the only surviving explanation of which one was meant.
+  | 'league.roster.manage'
+  | 'league.athlete.manage'
+  | 'league.fixture.manage'
+  | 'league.field_manager.manage'
+  // Held apart from `result.resolve` because entering a result and adjudicating one are
+  // different acts. Gated by the fixture's bound capture policy as well as by this
+  // capability: holding it does not mean a FIELD_REQUIRED competition will accept a typed score.
+  | 'league.result.enter'
+  | 'league.result.resolve'
+  // Seizing a live match from a Field Manager whose device has failed. Condition-gated:
+  // it does nothing unless a session is actually in progress.
+  | 'league.match.takeover'
+  | 'league.notice.publish'
+  // Deprecated 2026-08-24. Never issued again; still resolvable so historical assignments
+  // and audit records keep their meaning.
   | 'league.team.create'
   | 'league.team_admin.invite'
   | 'league.roster.verify'
-  | 'league.result.resolve'
-  | 'league.notice.publish'
   | 'team.profile.manage'
   | 'team.staff.invite'
   | 'team.roster.manage'
@@ -154,6 +176,69 @@ export type AccessContext = {
   athleteTeamIds?: Record<string, string>;
 };
 
+/**
+ * What a League Admin can do, in one list, because both league bundles hold it.
+ *
+ * Deliberately contains no `team.*` capability, and that is an invariant rather than an
+ * oversight. `team.roster.manage` on a league bundle would work today and would encode into
+ * the access model the statement "League Admin is pretending to be every Team Admin". The
+ * architecture is "the League inherently governs league resources, including its
+ * participating teams", and the capability names are the only part of that distinction that
+ * survives into a future where nobody remembers this decision.
+ */
+export const LEAGUE_ADMIN_CAPABILITIES: PermissionCapability[] = [
+  'league.profile.manage',
+  'league.season.manage',
+  'league.team.manage',
+  'league.roster.manage',
+  'league.athlete.manage',
+  'league.fixture.manage',
+  'league.field_manager.manage',
+  'league.result.enter',
+  'league.result.resolve',
+  'league.match.takeover',
+  'league.notice.publish',
+];
+
+/**
+ * Capabilities that may never be granted again, and why.
+ *
+ * Deprecation rather than removal. Existing assignments still resolve, historical records
+ * still interpret, and migration tooling can still inspect them. What changes is that no new
+ * assignment or invitation may request one: `issuableCapabilities()` is the single list any
+ * granting surface must filter through, so a UI cannot offer one by forgetting to.
+ */
+export const DEPRECATED_CAPABILITIES: Record<string, string> = {
+  'team.profile.manage': 'ADR-004: Team Admin retired as an account class.',
+  'team.staff.invite': 'ADR-004: Team Admin retired as an account class.',
+  'team.roster.manage': 'ADR-004: superseded by league.roster.manage.',
+  'team.athlete.create': 'ADR-004: superseded by league.athlete.manage.',
+  'team.athlete.invite': 'ADR-004: superseded by league.athlete.manage.',
+  'team.result.submit': 'ADR-004: superseded by field capture and league.result.enter.',
+  'team.result.confirm': 'ADR-004: Result Workflow V1 is frozen.',
+  'team.update.publish': 'ADR-004: Team Admin retired as an account class.',
+  'league.team_admin.invite': 'ADR-004: there is no Team Admin to invite.',
+  'league.team.create': 'ADR-003: normalized into league.team.manage.',
+  'league.roster.verify': 'ADR-003: normalized into league.roster.manage.',
+};
+
+export function isIssuableCapability(capability: PermissionCapability) {
+  return !(capability in DEPRECATED_CAPABILITIES);
+}
+
+/** The capabilities a new assignment or invitation is permitted to request. */
+export function issuableCapabilities(capabilities: PermissionCapability[]) {
+  return capabilities.filter(isIssuableCapability);
+}
+
+/**
+ * Bundles that may still be issued. A zeroed bundle is not merely empty: offering it would
+ * create an assignment that grants nothing and reads, to whoever accepts it, as a role.
+ */
+export function isIssuableBundle(bundle: PermissionBundle) {
+  return bundle.capabilities.length > 0;
+}
+
 export const PERMISSION_BUNDLES: PermissionBundle[] = [
   {
     id: 'super_admin_governance',
@@ -212,80 +297,74 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
       'platform.athlete.manage',
       'platform.site.manage',
       'platform.payee.verify',
+      // League-native since 2026-08-24. Platform previously held the `team.*` capabilities
+      // directly, which made it the last issuer of an authority class that ADR-004 retires.
+      // Platform's exceptional reach into a league's teams now runs through the same
+      // capabilities a League Admin uses, plus the platform-global grant that
+      // `hasCapabilityOrPlatformGrant` already consults.
       'league.profile.manage',
-      'league.team.create',
-      'league.team_admin.invite',
+      'league.season.manage',
+      'league.team.manage',
+      'league.roster.manage',
+      'league.athlete.manage',
+      'league.fixture.manage',
+      'league.field_manager.manage',
+      'league.result.enter',
       'league.result.resolve',
-      'team.profile.manage',
-      'team.staff.invite',
-      'team.roster.manage',
-      'team.athlete.create',
-      'team.athlete.invite',
-      'team.result.submit',
-      'team.result.confirm',
+      'league.match.takeover',
       'ownership.transfer',
     ],
   },
   {
     id: 'league_owner',
-    version: '1.0.0',
+    // 2.0.0 alongside league_admin. ADR-003 specifies one league product role and names
+    // only `league_admin`, but two league bundles exist. Left at 1.0.0 this one would have
+    // become the stale privileged role: still carrying `league.team_admin.invite` after
+    // Team Admin is retired, and never gaining `result.enter` or `match.takeover`, so an
+    // owner would end up less able to run their league than an admin of it.
+    version: '2.0.0',
     roleKey: 'league_owner',
     label: 'League Owner',
     capabilities: [
-      'league.profile.manage',
-      'league.season.manage',
-      'league.team.create',
-      'league.team_admin.invite',
-      'league.roster.verify',
-      'league.result.resolve',
-      'league.notice.publish',
+      ...LEAGUE_ADMIN_CAPABILITIES,
       'ownership.transfer',
     ],
   },
   {
     id: 'league_admin',
-    version: '1.0.0',
+    // 2.0.0: absorbs what Team Admin used to do, as League-native authority rather than
+    // by inheriting `team.*`. See LEAGUE_ADMIN_CAPABILITIES.
+    version: '2.0.0',
     roleKey: 'league_admin',
     label: 'League Admin',
-    capabilities: [
-      'league.profile.manage',
-      'league.season.manage',
-      'league.team.create',
-      'league.team_admin.invite',
-      'league.roster.verify',
-      'league.result.resolve',
-      'league.notice.publish',
-    ],
+    capabilities: [...LEAGUE_ADMIN_CAPABILITIES],
   },
   {
     id: 'full_team_admin',
-    version: '1.0.0',
+    // 3.0.0, zero capabilities. ADR-004 retires Team Admin as an account class without
+    // deleting anything: the projector derives capabilities from the bundle, so authority
+    // drops on the next projection rebuild while every assignment record survives as the
+    // historical fact that this person held this authority during this period. Deleting
+    // them would make hundreds of submissions, confirmations and audit events
+    // uninterpretable.
+    version: '3.0.0',
     roleKey: 'team_admin',
-    label: 'Full Team Admin',
-    capabilities: [
-      'team.profile.manage',
-      'team.staff.invite',
-      'team.roster.manage',
-      'team.athlete.create',
-      'team.athlete.invite',
-      'team.result.submit',
-      'team.result.confirm',
-      'team.update.publish',
-    ],
+    label: 'Full Team Admin (retired)',
+    capabilities: [],
   },
   {
     id: 'results_only',
-    version: '1.0.0',
+    version: '3.0.0',
     roleKey: 'result_reporter',
-    label: 'Results Only',
-    capabilities: ['team.result.submit', 'team.result.confirm'],
+    label: 'Results Only (retired)',
+    capabilities: [],
   },
   {
     id: 'roster_only',
-    version: '1.0.0',
+    version: '3.0.0',
     roleKey: 'roster_manager',
-    label: 'Roster Only',
-    capabilities: ['team.roster.manage', 'team.athlete.create', 'team.athlete.invite'],
+    label: 'Roster Only (retired)',
+    capabilities: [],
   },
   {
     id: 'athlete_self',
@@ -457,20 +536,32 @@ function hasLeagueCapabilityForTeam(
   return Boolean(leagueId && hasScopeCapability(context, 'league', leagueId, capability));
 }
 
-function hasTeamCapabilityForAthlete(
+/**
+ * Athlete to league, through the team they are registered with.
+ *
+ * Two hops rather than a stored athlete-to-league map, so there is one place that decides
+ * which league governs a team and no second copy of it to drift. Replaces
+ * `hasTeamCapabilityForAthlete`, which resolved to a team scope that no longer carries
+ * capabilities.
+ */
+function hasLeagueCapabilityForAthlete(
   context: AccessContext | undefined,
   athleteId: string,
   capability: PermissionCapability,
 ) {
   const teamId = context?.athleteTeamIds?.[athleteId];
-  return Boolean(teamId && hasScopeCapability(context, 'team', teamId, capability));
+  return Boolean(teamId && hasLeagueCapabilityForTeam(context, teamId, capability));
 }
 
+/**
+ * League-first since ADR-004. The team-scoped arm is gone rather than left in place:
+ * `team.profile.manage` resolves to nothing now that the bundles are zeroed, so keeping it
+ * would be a branch that reads like an authority path and can never be one.
+ */
 export function canManageTeamInScope(context: AccessContext | undefined, teamId: string) {
   return (
-    hasPlatformCapability(context, 'team.profile.manage')
-    || hasLeagueCapabilityForTeam(context, teamId, 'league.team.create')
-    || hasScopeCapability(context, 'team', teamId, 'team.profile.manage')
+    hasPlatformCapability(context, 'league.team.manage')
+    || hasLeagueCapabilityForTeam(context, teamId, 'league.team.manage')
   );
 }
 
@@ -481,36 +572,27 @@ export function canManageLeagueInScope(context: AccessContext | undefined, leagu
   );
 }
 
-export function canInviteTeamAdminInScope(context: AccessContext | undefined, teamId: string) {
-  return (
-    hasPlatformCapability(context, 'team.staff.invite')
-    || hasLeagueCapabilityForTeam(context, teamId, 'league.team_admin.invite')
-    || hasScopeCapability(context, 'team', teamId, 'team.staff.invite')
-  );
-}
-
 export function canCreateAthleteInScope(context: AccessContext | undefined, teamId: string) {
   return (
-    hasPlatformCapability(context, 'team.athlete.create')
-    || hasLeagueCapabilityForTeam(context, teamId, 'league.roster.verify')
-    || hasScopeCapability(context, 'team', teamId, 'team.athlete.create')
+    hasPlatformCapability(context, 'league.athlete.manage')
+    || hasLeagueCapabilityForTeam(context, teamId, 'league.athlete.manage')
   );
 }
 
 /**
  * Who may write an athlete's public sporting record.
  *
- * Not the athlete. An athlete profile is a managed record held by the team that knows them,
- * so the authority runs team-first: the club that put them on the roster is the party that
- * can say what their position is. The athlete-scoped self grant that used to appear here
- * went with `athlete.profile.manage` — an athlete no longer needs an account to exist in the
- * record, and what they keep is their payee identity, which this function has no say over.
+ * Not the athlete. An athlete profile is a managed record, and since ADR-004 the party that
+ * holds it is the League: it registers the athlete, it decides eligibility, and it is the
+ * one accountable for the roster being true. The athlete-scoped self grant that used to
+ * appear here went with `athlete.profile.manage`; what an athlete keeps is their persona and
+ * their payee identity, neither of which this function has any say over.
  */
 export function canManageAthleteInScope(context: AccessContext | undefined, athleteId: string) {
   return (
     hasPlatformCapability(context, 'platform.athlete.manage')
-    || hasTeamCapabilityForAthlete(context, athleteId, 'team.roster.manage')
-    || hasTeamCapabilityForAthlete(context, athleteId, 'team.athlete.create')
+    || hasLeagueCapabilityForAthlete(context, athleteId, 'league.athlete.manage')
+    || hasLeagueCapabilityForAthlete(context, athleteId, 'league.roster.manage')
   );
 }
 

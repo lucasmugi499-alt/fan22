@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LEAGUE_ADMIN_CAPABILITIES } from '../../src/lib/auth/access';
 import { buildMigrationPlan, findLegacyCoverageGaps } from './projection-migration';
 
 const NOW = new Date('2026-08-03T12:00:00.000Z');
@@ -23,6 +24,34 @@ function assignment(overrides: Record<string, unknown> = {}) {
 describe('access projection migration plan', () => {
   it('reports no drift when the stored index already matches the assignments', () => {
     const plan = buildMigrationPlan({
+      assignments: [assignment({
+        roleKey: 'league_admin',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        permissionBundleId: 'league_admin',
+      })],
+      indexes: [{
+        id: 'league_league_1_user_1',
+        userId: 'user_1',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        activeRoles: ['league_admin'],
+        capabilities: [...LEAGUE_ADMIN_CAPABILITIES].sort(),
+        assignmentIds: ['assignment_1'],
+      }],
+      now: NOW,
+    });
+
+    expect(plan.drift).toHaveLength(0);
+  });
+
+  /**
+   * The population ADR-004 creates on the day the bundles are versioned to zero: an index
+   * that was correct when it was written and is now broader than its assignment justifies.
+   * The plan has to see them, because rebuilding these projections IS the sunset.
+   */
+  it('flags every stored team index as stale once the bundles are zeroed', () => {
+    const plan = buildMigrationPlan({
       assignments: [assignment()],
       indexes: [{
         id: 'team_team_1_user_1',
@@ -30,22 +59,14 @@ describe('access projection migration plan', () => {
         scopeType: 'team',
         scopeId: 'team_1',
         activeRoles: ['team_admin'],
-        capabilities: [
-          'team.athlete.create',
-          'team.athlete.invite',
-          'team.profile.manage',
-          'team.result.confirm',
-          'team.result.submit',
-          'team.roster.manage',
-          'team.staff.invite',
-          'team.update.publish',
-        ],
+        capabilities: ['team.roster.manage', 'team.result.submit'],
         assignmentIds: ['assignment_1'],
       }],
       now: NOW,
     });
 
-    expect(plan.drift).toHaveLength(0);
+    expect(plan.drift[0].reason).toBe('stale_index');
+    expect(plan.drift[0].desired?.capabilities).toEqual([]);
   });
 
   it('flags an index that outlived its revoked assignment', () => {
@@ -99,7 +120,8 @@ describe('access projection migration plan', () => {
     });
 
     expect(plan.drift[0].reason).toBe('stale_index');
-    expect(plan.drift[0].desired?.capabilities).toEqual(['team.result.confirm', 'team.result.submit']);
+    // results_only was versioned to zero, so what the assignment now justifies is nothing.
+    expect(plan.drift[0].desired?.capabilities).toEqual([]);
   });
 
   it('does not attribute one user\'s assignment to another user in the same scope', () => {
@@ -145,15 +167,44 @@ describe('legacy coverage gaps', () => {
   });
 
   it('does not flag an entry that a canonical assignment already covers', () => {
+    const covered = buildMigrationPlan({
+      assignments: [assignment({
+        id: 'a_1',
+        userId: 'user_1',
+        roleKey: 'league_admin',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        permissionBundleId: 'league_admin',
+      })],
+      indexes: [],
+      now: NOW,
+    }).assignments;
+
     const gaps = findLegacyCoverageGaps({
-      assignments,
+      assignments: covered,
+      leagues: [{ id: 'league_1', adminUserIds: ['user_1'] }],
+      teams: [],
+      teamAssignments: [],
+      now: NOW,
+    });
+
+    expect(gaps).toHaveLength(0);
+  });
+
+  /**
+   * Team authority is gone, so a legacy team entry is residue rather than a gap. Reporting
+   * it would produce a permanently unclosable row for every club on the platform.
+   */
+  it('does not report legacy team entries as coverage gaps at all', () => {
+    const gaps = findLegacyCoverageGaps({
+      assignments: [],
       leagues: [],
       teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
       teamAssignments: [],
       now: NOW,
     });
 
-    expect(gaps).toHaveLength(0);
+    expect(gaps.filter((gap) => gap.scopeType === 'team')).toEqual([]);
   });
 
   it('flags an active legacy teamAssignment with no canonical equivalent', () => {
@@ -182,15 +233,23 @@ describe('legacy coverage gaps', () => {
 
   it('treats a revoked canonical assignment as no coverage', () => {
     const revoked = buildMigrationPlan({
-      assignments: [assignment({ id: 'a_1', userId: 'user_1', scopeId: 'team_1', status: 'revoked' })],
+      assignments: [assignment({
+        id: 'a_1',
+        userId: 'user_1',
+        roleKey: 'league_admin',
+        scopeType: 'league',
+        scopeId: 'league_1',
+        permissionBundleId: 'league_admin',
+        status: 'revoked',
+      })],
       indexes: [],
       now: NOW,
     }).assignments;
 
     const gaps = findLegacyCoverageGaps({
       assignments: revoked,
-      leagues: [],
-      teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
+      leagues: [{ id: 'league_1', adminUserIds: ['user_1'] }],
+      teams: [],
       teamAssignments: [],
       now: NOW,
     });

@@ -259,15 +259,15 @@ describe('trusted access route hardening', () => {
     expect(adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 
-  it('lets an Organization Operator accept a scoped invitation without changing account class', async () => {
+  it('lets an Organization Operator accept a league invitation without changing account class', async () => {
     const token = 'operator_invitation_token';
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const invitationData = {
-      id: 'invite_team_admin_1',
-      roleKey: 'team_admin',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      permissionBundleId: 'full_team_admin',
+      id: 'invite_league_admin_1',
+      roleKey: 'league_admin',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      permissionBundleId: 'league_admin',
       invitedByUserId: 'league_admin_1',
       invitedEmail: 'operator@example.com',
       tokenHash,
@@ -288,13 +288,13 @@ describe('trusted access route hardening', () => {
 
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
       uid: 'operator_1',
-      role: 'team_admin',
+      role: 'league_admin',
       email: 'operator@example.com',
       email_verified: true,
     });
     vi.mocked(adminAuth.getUser).mockResolvedValue({
       uid: 'operator_1',
-      customClaims: { role: 'team_admin', accountClass: 'organization_operator' },
+      customClaims: { role: 'league_admin', accountClass: 'organization_operator' },
     } as never);
     vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
     vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
@@ -307,7 +307,7 @@ describe('trusted access route hardening', () => {
             data: () => collectionName === 'users'
               ? {
                   uid: 'operator_1',
-                  role: 'team_admin',
+                  role: 'league_admin',
                   accountClass: 'organization_operator',
                   accountStatus: 'invited',
                 }
@@ -324,49 +324,53 @@ describe('trusted access route hardening', () => {
 
     const response = await POST(request(JSON.stringify({
       action: 'accept_invitation',
-      invitationId: 'invite_team_admin_1',
+      invitationId: 'invite_league_admin_1',
       token,
     })));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       ok: true,
-      role: 'team_admin',
-      scopeId: 'team_1',
+      role: 'league_admin',
+      scopeId: 'league_1',
     });
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'users',
       id: 'operator_1',
     }), expect.objectContaining({
       accountClass: 'organization_operator',
-      primaryPersona: 'team_admin',
-      role: 'team_admin',
+      primaryPersona: 'league_admin',
+      role: 'league_admin',
       accountStatus: 'active',
     }), { merge: true });
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessAssignments',
-      id: 'assignment_invite_team_admin_1',
+      id: 'assignment_invite_league_admin_1',
     }), expect.objectContaining({
       userId: 'operator_1',
-      roleKey: 'team_admin',
-      scopeType: 'team',
-      scopeId: 'team_1',
+      roleKey: 'league_admin',
+      scopeType: 'league',
+      scopeId: 'league_1',
       status: 'active',
     }));
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessIndex',
-      id: 'team_team_1_operator_1',
+      id: 'league_league_1_operator_1',
     }), expect.objectContaining({
       userId: 'operator_1',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      activeRoles: ['team_admin'],
-      assignmentIds: ['assignment_invite_team_admin_1'],
-      capabilities: expect.arrayContaining(['team.athlete.create', 'team.result.submit']),
+      scopeType: 'league',
+      scopeId: 'league_1',
+      activeRoles: ['league_admin'],
+      assignmentIds: ['assignment_invite_league_admin_1'],
+      capabilities: expect.arrayContaining(['league.athlete.manage', 'league.result.enter']),
     }), { merge: false });
   });
 
-  it('rebuilds access projections when an operator accepts another assignment in the same scope', async () => {
+  /**
+   * ADR-004. A retired bundle is refused by name rather than accepted into an assignment
+   * that grants nothing, which the invitee would have no way to distinguish from a bug.
+   */
+  it('refuses an invitation to a retired Team Admin bundle', async () => {
     const token = 'operator_invitation_token';
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const invitationData = {
@@ -381,13 +385,57 @@ describe('trusted access route hardening', () => {
       status: 'sent',
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
     };
+
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
+      uid: 'operator_1',
+      role: 'team_admin',
+      email: 'operator@example.com',
+      email_verified: true,
+    });
+    vi.mocked(adminAuth.getUser).mockResolvedValue({
+      uid: 'operator_1',
+      customClaims: { role: 'team_admin', accountClass: 'organization_operator' },
+    } as never);
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
+      doc: vi.fn((id = `${collectionName}_generated`) => ({
+        id,
+        collectionName,
+        get: vi.fn(async () => ({ exists: true, id, data: () => invitationData })),
+      })),
+    }) as never);
+
+    const response = await POST(request(JSON.stringify({
+      action: 'accept_invitation',
+      invitationId: 'invite_team_admin_1',
+      token,
+    })));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('League Operations');
+  });
+
+  it('rebuilds access projections when an operator accepts another assignment in the same scope', async () => {
+    const token = 'operator_invitation_token';
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const invitationData = {
+      id: 'invite_league_admin_2',
+      roleKey: 'league_admin',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      permissionBundleId: 'league_admin',
+      invitedByUserId: 'league_admin_1',
+      invitedEmail: 'operator@example.com',
+      tokenHash,
+      status: 'sent',
+      expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    };
     const existingAssignment = {
       id: 'assignment_result_reporter_1',
       userId: 'operator_1',
-      roleKey: 'result_reporter',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      permissionBundleId: 'results_only',
+      roleKey: 'league_owner',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      permissionBundleId: 'league_owner',
       status: 'active',
       grantedByUserId: 'league_admin_1',
       validFrom: '2026-07-30T00:00:00.000Z',
@@ -412,13 +460,13 @@ describe('trusted access route hardening', () => {
 
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
       uid: 'operator_1',
-      role: 'team_admin',
+      role: 'league_admin',
       email: 'operator@example.com',
       email_verified: true,
     });
     vi.mocked(adminAuth.getUser).mockResolvedValue({
       uid: 'operator_1',
-      customClaims: { role: 'team_admin', accountClass: 'organization_operator' },
+      customClaims: { role: 'league_admin', accountClass: 'organization_operator' },
     } as never);
     vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
     vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
@@ -431,7 +479,7 @@ describe('trusted access route hardening', () => {
             data: () => collectionName === 'users'
               ? {
                   uid: 'operator_1',
-                  role: 'team_admin',
+                  role: 'league_admin',
                   accountClass: 'organization_operator',
                   accountStatus: 'active',
                 }
@@ -448,24 +496,24 @@ describe('trusted access route hardening', () => {
 
     const response = await POST(request(JSON.stringify({
       action: 'accept_invitation',
-      invitationId: 'invite_team_admin_1',
+      invitationId: 'invite_league_admin_2',
       token,
     })));
 
     expect(response.status).toBe(200);
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessIndex',
-      id: 'team_team_1_operator_1',
+      id: 'league_league_1_operator_1',
     }), expect.objectContaining({
       userId: 'operator_1',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      activeRoles: ['result_reporter', 'team_admin'],
-      assignmentIds: ['assignment_invite_team_admin_1', 'assignment_result_reporter_1'],
+      scopeType: 'league',
+      scopeId: 'league_1',
+      activeRoles: ['league_admin', 'league_owner'],
+      assignmentIds: ['assignment_invite_league_admin_2', 'assignment_result_reporter_1'],
       capabilities: expect.arrayContaining([
-        'team.athlete.create',
-        'team.result.confirm',
-        'team.result.submit',
+        'league.athlete.manage',
+        'ownership.transfer',
+        'league.result.enter',
       ]),
     }), { merge: false });
   });

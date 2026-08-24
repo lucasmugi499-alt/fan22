@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation, requireRole } from '@/server/api/security';
-import { PERMISSION_BUNDLES } from '@/lib/auth/access';
+import { PERMISSION_BUNDLES, isIssuableBundle } from '@/lib/auth/access';
 import { normalizeAccessAssignment, readScopeProjection } from '@/server/access/projector';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
 import type { AccountClass } from '@/types';
@@ -202,70 +202,15 @@ export async function POST(request: Request) {
       // canonical assignment plus projection that the modern invitation produces. There is
       // one path by which authority becomes real; this is now a second door onto it, not a
       // second mechanism.
-      const canonicalAssignmentId = `assignment_team_${data.teamId}_${actor.uid}`;
-      const canonicalAssignment = assignmentRecord({
-        id: canonicalAssignmentId,
-        userId: actor.uid,
-        roleKey: 'team_admin',
-        scopeType: 'team',
-        scopeId: data.teamId,
-        permissionBundleId: 'full_team_admin',
-        grantedByUserId: String(data.invitedByUserId ?? data.createdByUserId ?? actor.uid),
-        invitationId: assignment.id,
-      });
-      const legacyNow = new Date();
-      const projectedLegacyAssignment = normalizeAccessAssignment(
-        canonicalAssignmentId,
-        canonicalAssignment,
-        legacyNow.toISOString(),
-      );
+      /**
+       * The legacy team invitation door, closed by the same rule. It used to flow into the
+       * canonical assignment path so old links did not strand their invitee; there is now
+       * nothing on the other side of that path for a team scope to receive.
+       */
+      return Response.json({
+        error: 'Team administration has moved to League Operations. Ask your league for access.',
+      }, { status: 409 });
 
-      await adminDb.runTransaction(async (transaction) => {
-        const current = await transaction.get(assignmentRef);
-        if (!current.exists || current.data()?.status !== 'invited') {
-          throw new Error('Invitation is no longer active.');
-        }
-        const projection = await readScopeProjection(
-          transaction,
-          { userId: actor.uid, scopeType: 'team', scopeId: data.teamId },
-          { now: legacyNow, pending: [{ operation: 'upsert', assignment: projectedLegacyAssignment }] },
-        );
-        transaction.update(assignmentRef, {
-          userId: actor.uid,
-          status: 'active',
-          acceptedAt: FieldValue.serverTimestamp(),
-          // Recorded so a migration sweep can tell which legacy rows already have a canonical
-          // equivalent and retire the collection without guessing.
-          canonicalAssignmentId,
-        });
-        transaction.set(adminDb.collection('accessAssignments').doc(canonicalAssignmentId), canonicalAssignment);
-        projection.apply(transaction);
-        transaction.update(adminDb.collection('teams').doc(data.teamId), {
-          // Still written, and no longer authority. Rules and capability checks read the
-          // projection above; this array survives only because result-reminder notifications
-          // still resolve recipients from it. Removing it belongs with that fix, not here.
-          adminUserIds: FieldValue.arrayUnion(actor.uid),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('users').doc(actor.uid), {
-          accountClass: 'organization_operator',
-          primaryPersona: 'team_admin',
-          role: 'team_admin',
-          accountStatus: 'active',
-          accessVersion: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), {
-          actorUserId: actor.uid,
-          action: 'accepted_legacy_migrated',
-          targetCollection: 'teamAssignments',
-          targetId: assignment.id,
-          afterSummary: { canonicalAssignmentId, scopeType: 'team', scopeId: data.teamId },
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      });
-      const role = await synchronizeRoleClaim(actor.uid, 'team_admin');
-      return Response.json({ ok: true, role });
     }
 
     if (body.action === 'approve_league_admin') {
@@ -464,6 +409,20 @@ export async function POST(request: Request) {
       const bundle = PERMISSION_BUNDLES.find((item) => item.id === String(data.permissionBundleId))
         ?? PERMISSION_BUNDLES.find((item) => item.roleKey === data.roleKey);
       if (!bundle) return Response.json({ error: 'Invitation permission bundle is not supported.' }, { status: 409 });
+      /**
+       * A retired bundle is refused here rather than allowed to resolve to nothing.
+       *
+       * ADR-004 versioned the Team Admin bundles to zero capabilities, so accepting one
+       * would succeed, write an assignment, and hand the invitee a role that grants nothing.
+       * They would have no way to tell that from a permissions bug. Refusing names the
+       * reason, which is also the point of the sunset: the account class is offered a
+       * destination, never silently transformed into an empty one.
+       */
+      if (!isIssuableBundle(bundle)) {
+        return Response.json({
+          error: 'Team administration has moved to League Operations. This invitation can no longer be accepted.',
+        }, { status: 409 });
+      }
       const assignment = assignmentRecord({
         id: assignmentId,
         userId: actor.uid,

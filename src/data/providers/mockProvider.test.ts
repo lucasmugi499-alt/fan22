@@ -31,13 +31,17 @@ describe('mock provider league applications', () => {
       scopeType: 'league',
       scopeId: 'league_football_kampala',
       activeRoles: ['league_admin'],
-      capabilities: expect.arrayContaining(['league.team.create']),
+      capabilities: expect.arrayContaining(['league.team.manage']),
     }));
+    // The seeded Team Admin still projects, and projects nothing. ADR-004 retired the
+    // account class by versioning its bundle to zero, so the assignment survives as history
+    // while granting no authority. An empty array beside a populated assignmentIds is the
+    // difference between retiring a role and deleting the record that it existed.
     await expect(mockProvider.getAccessIndexByUser('user_team_admin_01_01')).resolves.toContainEqual(expect.objectContaining({
       scopeType: 'team',
       scopeId: 'team_football_01_01',
       activeRoles: ['team_admin'],
-      capabilities: expect.arrayContaining(['team.athlete.create']),
+      capabilities: [],
     }));
     await expect(mockProvider.getAccessIndexByUser('user_ath_football_01_01_01')).resolves.toContainEqual(expect.objectContaining({
       scopeType: 'athlete',

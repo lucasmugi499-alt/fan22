@@ -9,10 +9,10 @@ function assignment(overrides: Record<string, unknown> = {}) {
   return normalizeAccessAssignment('assignment_1', {
     id: 'assignment_1',
     userId: 'user_1',
-    roleKey: 'team_admin',
-    scopeType: 'team',
-    scopeId: 'team_1',
-    permissionBundleId: 'full_team_admin',
+    roleKey: 'league_admin',
+    scopeType: 'league',
+    scopeId: 'league_1',
+    permissionBundleId: 'league_admin',
     status: 'active',
     grantedByUserId: 'admin_1',
     validFrom: '2026-01-01T00:00:00.000Z',
@@ -44,26 +44,41 @@ describe('access backfill plan', () => {
     const plan = planBackfill({
       ...empty,
       assignments: [assignment()],
-      teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
+      leagues: [{ id: 'league_1', adminUserIds: ['user_1'] }],
     });
 
     expect(plan.assignments).toHaveLength(0);
   });
 
+  /**
+   * ADR-004 retired team authority, so there is no canonical team assignment left to
+   * migrate a legacy entry into. Proposing one would create an assignment granting nothing
+   * that still reads to its holder as a role.
+   */
+  it('never proposes a team assignment, however the legacy grant arrives', () => {
+    const plan = planBackfill({
+      ...empty,
+      teams: [{ id: 'team_1', adminUserIds: ['user_9'] }],
+      teamAssignments: [{ id: 'ta_1', userId: 'user_8', teamId: 'team_1', status: 'active' }],
+    });
+
+    expect(plan.assignments).toEqual([]);
+  });
+
   it('is idempotent: assignment ids are deterministic', () => {
-    const input = { ...empty, teams: [{ id: 'team_1', adminUserIds: ['user_9'] }] };
+    const input = { ...empty, leagues: [{ id: 'league_1', adminUserIds: ['user_9'] }] };
     const first = planBackfill(input);
     const second = planBackfill(input);
 
     expect(first.assignments[0].id).toBe(second.assignments[0].id);
-    expect(first.assignments[0].id).toBe('assignment_migrated_team_team_1_user_9');
+    expect(first.assignments[0].id).toBe('assignment_migrated_league_league_1_user_9');
   });
 
   it('re-grants a scope whose only assignment was revoked', () => {
     const plan = planBackfill({
       ...empty,
       assignments: [assignment({ status: 'revoked' })],
-      teams: [{ id: 'team_1', adminUserIds: ['user_1'] }],
+      leagues: [{ id: 'league_1', adminUserIds: ['user_1'] }],
     });
 
     // The legacy array still grants access, so the migration must surface it rather than
@@ -72,11 +87,10 @@ describe('access backfill plan', () => {
     expect(plan.assignments).toHaveLength(1);
   });
 
-  it('does not duplicate when the same user is granted by both legacy surfaces', () => {
+  it('does not duplicate when the same user is granted twice at league scope', () => {
     const plan = planBackfill({
       ...empty,
-      teams: [{ id: 'team_1', adminUserIds: ['user_9'] }],
-      teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_1', status: 'active' }],
+      leagues: [{ id: 'league_1', adminUserIds: ['user_9', 'user_9'] }],
     });
 
     expect(plan.assignments).toHaveLength(1);

@@ -5,7 +5,6 @@ import {
   buildAccessIndexDocuments,
   canConfirmSubmissionInScope,
   canCreateAthleteInScope,
-  canInviteTeamAdminInScope,
   canManageLeagueInScope,
   canManageTeamInScope,
   canSubmitResultInScope,
@@ -53,7 +52,16 @@ describe('access assignments and scope-aware authorization', () => {
       accessVersion: 4,
     });
     expect(indexes[0].assignmentIds).toEqual(['assignment_1', 'assignment_2']);
-    expect(indexes[0].capabilities).toContain('team.result.submit');
+    /**
+     * Both assignments still project, and they project to nothing.
+     *
+     * That pair is the whole of ADR-004's sunset mechanism: the bundles were versioned to
+     * zero capabilities and no assignment record was touched, so authority dropped on the
+     * next rebuild while the historical fact that these people held this authority during
+     * this period survives intact. An empty array here with a populated `assignmentIds` is
+     * the difference between retiring a role and deleting the evidence of it.
+     */
+    expect(indexes[0].capabilities).toEqual([]);
     expect(accessIndexId('team', 'team_a', 'user_1')).toBe('team_team_a_user_1');
   });
 
@@ -77,7 +85,13 @@ describe('access assignments and scope-aware authorization', () => {
     expect(indexes[0].activeRoles).toEqual(['team_admin']);
   });
 
-  it('does not let a Team Admin manage another team merely by role label', () => {
+  /**
+   * This used to assert that a Team Admin could act on their own team and no other. Since
+   * ADR-004 the first half is gone: a retired assignment grants nothing anywhere, including
+   * in its own scope. The second half is what still matters and is asserted unchanged, since
+   * scope isolation is the property that must not regress while the rest is dismantled.
+   */
+  it('grants a retired Team Admin nothing, in its own scope or any other', () => {
     const context = createAccessContext({
       userId: 'user_1',
       assignments: [assignment({})],
@@ -85,11 +99,35 @@ describe('access assignments and scope-aware authorization', () => {
       teamLeagueIds: { team_a: 'league_1', team_b: 'league_2' },
     });
 
-    expect(canManageTeamInScope(context, 'team_a')).toBe(true);
-    expect(canSubmitResultInScope(context, 'match_1', 'team_a')).toBe(true);
-    expect(canConfirmSubmissionInScope(context, 'submission_1', 'team_a')).toBe(true);
+    expect(canManageTeamInScope(context, 'team_a')).toBe(false);
+    expect(canSubmitResultInScope(context, 'match_1', 'team_a')).toBe(false);
+    expect(canConfirmSubmissionInScope(context, 'submission_1', 'team_a')).toBe(false);
     expect(canManageTeamInScope(context, 'team_b')).toBe(false);
     expect(canSubmitResultInScope(context, 'match_2', 'team_b')).toBe(false);
+  });
+
+  it('gives a League Admin what the Team Admin used to hold, over their own league only', () => {
+    const context = createAccessContext({
+      userId: 'user_1',
+      assignments: [
+        assignment({
+          id: 'league_assignment',
+          roleKey: 'league_admin',
+          scopeType: 'league',
+          scopeId: 'league_1',
+          permissionBundleId: 'league_admin',
+        }),
+      ],
+      updatedAt: now,
+      teamLeagueIds: { team_a: 'league_1', team_b: 'league_2' },
+    });
+
+    expect(canManageTeamInScope(context, 'team_a')).toBe(true);
+    expect(canCreateAthleteInScope(context, 'team_a')).toBe(true);
+    // The league that does not own the club gets nothing, which is the same isolation the
+    // team-scoped model had and the reason this is not simply a global grant.
+    expect(canManageTeamInScope(context, 'team_b')).toBe(false);
+    expect(canCreateAthleteInScope(context, 'team_b')).toBe(false);
   });
 
   it('lets a League Admin act only through the league that owns the team', () => {
@@ -110,8 +148,8 @@ describe('access assignments and scope-aware authorization', () => {
 
     expect(canManageLeagueInScope(context, 'league_1')).toBe(true);
     expect(canManageLeagueInScope(context, 'league_2')).toBe(false);
-    expect(canInviteTeamAdminInScope(context, 'team_a')).toBe(true);
-    expect(canInviteTeamAdminInScope(context, 'team_b')).toBe(false);
+    // `canInviteTeamAdminInScope` is gone entirely: there is no Team Admin to invite, and
+    // it had no production callers left to keep a refusal stub honest for.
     expect(canCreateAthleteInScope(context, 'team_a')).toBe(true);
   });
 
@@ -205,14 +243,20 @@ describe('time-limited authority actually expires', () => {
   const expiry = '2026-08-24T23:59:00.000Z';
   const tuesday = new Date('2026-08-25T09:00:00.000Z');
 
+  /**
+   * A league assignment rather than the team one this used to use. Expiry is a property of
+   * the projection, so proving it needs a bundle that still grants something: a zeroed
+   * bundle projects an empty capability array whether it has expired or not, which would
+   * make this pass for the wrong reason.
+   */
   function temporaryAssignment(): AccessAssignment {
     return assignment({
       id: 'assignment_temp',
       userId: 'user_temp',
-      roleKey: 'team_admin',
-      scopeType: 'team',
-      scopeId: 'team_x',
-      permissionBundleId: 'full_team_admin',
+      roleKey: 'league_admin',
+      scopeType: 'league',
+      scopeId: 'league_x',
+      permissionBundleId: 'league_admin',
       status: 'active',
       validFrom: '2026-08-20T00:00:00.000Z',
       validUntil: expiry,
@@ -225,7 +269,7 @@ describe('time-limited authority actually expires', () => {
       accessVersion: 1,
       updatedAt: monday,
     });
-    expect(index.capabilities).toContain('team.roster.manage');
+    expect(index.capabilities).toContain('league.roster.manage');
     expect(index.expiresAt).toBe(expiry);
     expect(index.expiresAtMillis).toBe(Date.parse(expiry));
   });

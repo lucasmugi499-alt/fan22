@@ -227,7 +227,17 @@ export function findLegacyCoverageGaps(input: {
 
   const gaps: LegacyCoverageRow[] = [];
 
-  for (const [scopeType, records] of [['league', input.leagues], ['team', input.teams]] as const) {
+  /**
+   * League scope only since ADR-004.
+   *
+   * A coverage gap means "a legacy field grants something the canonical model does not yet
+   * cover", which presumes the canonical model can cover it. Team authority was retired:
+   * every team bundle grants nothing, so every legacy team entry would report as a
+   * permanent, unclosable gap and drown the signal this report exists to give. Legacy team
+   * entries are residue for the sunset to clear, and `adminUserIds` remains what it always
+   * was on a team, membership metadata carrying zero authority.
+   */
+  for (const [scopeType, records] of [['league', input.leagues]] as const) {
     for (const record of records) {
       const ids = record.adminUserIds;
       if (!Array.isArray(ids)) continue;

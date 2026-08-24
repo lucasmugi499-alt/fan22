@@ -2,7 +2,6 @@ import { AppRole, UserProfile } from '@/types';
 import { resolveAccountClass } from './accountClass';
 import type { AccessContext } from './access';
 import {
-  canInviteTeamAdminInScope,
   canCreateAthleteInScope,
   canManageAthleteInScope,
   canManageLeagueInScope,
@@ -103,10 +102,6 @@ export function canApproveTeamSubmission(auth: AuthState): boolean {
 export function canManageLeague(auth: AuthState, leagueId?: string): boolean {
   if (leagueId) return canManageLeagueInScope(auth.accessContext, leagueId);
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
-}
-
-export function canInviteTeamAdmin(auth: AuthState, teamId: string): boolean {
-  return canInviteTeamAdminInScope(auth.accessContext, teamId);
 }
 
 export function canCreateAthlete(auth: AuthState, teamId: string): boolean {

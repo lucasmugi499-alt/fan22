@@ -62,8 +62,41 @@ describe('projectScopeIndex', () => {
 
     expect(projected?.activeRoles).toEqual(['result_reporter', 'roster_manager']);
     expect(projected?.assignmentIds).toEqual(['a_results', 'a_roster']);
-    expect(projected?.capabilities).toContain('team.roster.manage');
-    expect(projected?.capabilities).toContain('team.result.submit');
+    // Roles and assignment ids still union. Capabilities do not, because both bundles were
+    // versioned to zero by ADR-004. The projection is the mechanism that retires them.
+    expect(projected?.capabilities).toEqual([]);
+  });
+
+  it('still unions capabilities where the bundles grant any', () => {
+    const projected = projectScopeIndex({
+      scope: { userId: 'user_1', scopeType: 'league', scopeId: 'league_1' },
+      assignments: [
+        assignment({
+          id: 'a_admin',
+          roleKey: 'league_admin',
+          scopeType: 'league',
+          scopeId: 'league_1',
+          permissionBundleId: 'league_admin',
+        }),
+        assignment({
+          id: 'a_owner',
+          roleKey: 'league_owner',
+          scopeType: 'league',
+          scopeId: 'league_1',
+          permissionBundleId: 'league_owner',
+        }),
+      ],
+      updatedAt: NOW_ISO,
+      now: NOW,
+    });
+
+    expect(projected?.activeRoles).toEqual(['league_admin', 'league_owner']);
+    expect(projected?.capabilities).toContain('league.roster.manage');
+    // Held by the owner bundle alone, so its presence is the proof that the union happened
+    // rather than one bundle being read and the other ignored.
+    expect(projected?.capabilities).toContain('ownership.transfer');
+    // And the union never invents a team capability, which is invariant 15.
+    expect(projected?.capabilities.filter((c) => c.startsWith('team.'))).toEqual([]);
   });
 
   it.each([

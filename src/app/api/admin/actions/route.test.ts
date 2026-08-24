@@ -633,10 +633,10 @@ describe('trusted admin actions route hardening', () => {
     const assignmentA = {
       id: 'assignment_a',
       userId: 'operator_1',
-      roleKey: 'team_admin',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      permissionBundleId: 'full_team_admin',
+      roleKey: 'league_admin',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      permissionBundleId: 'league_admin',
       status: 'active',
       grantedByUserId: 'league_admin_1',
       validFrom: '2026-07-30T00:00:00.000Z',
@@ -646,8 +646,8 @@ describe('trusted admin actions route hardening', () => {
     const assignmentB = {
       ...assignmentA,
       id: 'assignment_b',
-      roleKey: 'result_reporter',
-      permissionBundleId: 'results_only',
+      roleKey: 'league_owner',
+      permissionBundleId: 'league_owner',
     };
     const scopedQuery = { kind: 'scopedAssignments' };
     const collectionMock = (collectionName: string) => ({
@@ -718,14 +718,14 @@ describe('trusted admin actions route hardening', () => {
     }));
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'accessIndex',
-      id: 'team_team_1_operator_1',
+      id: 'league_league_1_operator_1',
     }), expect.objectContaining({
       userId: 'operator_1',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      activeRoles: ['result_reporter'],
+      scopeType: 'league',
+      scopeId: 'league_1',
+      activeRoles: ['league_owner'],
       assignmentIds: ['assignment_b'],
-      capabilities: expect.arrayContaining(['team.result.submit']),
+      capabilities: expect.arrayContaining(['ownership.transfer']),
     }), { merge: false });
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
       collectionName: 'adminAuditEvents',
