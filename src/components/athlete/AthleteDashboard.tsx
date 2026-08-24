@@ -55,7 +55,7 @@ export function AthleteDashboard() {
   if (loading) return <AthleteDashboardSkeleton />;
   if (!athlete) return <AthleteClaiming athletes={athletes} onChanged={retry} />;
 
-  const cover = athlete.coverUrl || athlete.coverURL || bannerImage(athlete.teamId || athlete.id, athlete.position);
+  const cover = athlete.coverUrl || athlete.coverURL || bannerImage(athlete.teamId || athlete.id, athlete.registeredPosition);
   const avatar = athletePhoto(athlete);
   const vs = normalizeVerificationStatus(athlete.verificationStatus);
 
@@ -70,14 +70,14 @@ export function AthleteDashboard() {
         </div>
         <div className="relative px-4 pb-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={avatar} alt={athlete.name} className="-mt-9 h-18 w-18 rounded-[var(--radius-lg)] border-2 border-surface-1 object-cover" style={{ height: 72, width: 72 }} loading="lazy" />
+          <img src={avatar} alt={athlete.legalName} className="-mt-9 h-18 w-18 rounded-[var(--radius-lg)] border-2 border-surface-1 object-cover" style={{ height: 72, width: 72 }} loading="lazy" />
           <div className="mt-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-xl font-semibold text-text-strong">{athlete.name}</h1>
+                <h1 className="truncate text-xl font-semibold text-text-strong">{athlete.legalName}</h1>
                 {athlete.verified ? <SealCheck className="h-5 w-5 shrink-0 text-[var(--state-verified)]" weight="fill" /> : null}
               </div>
-              <p className="truncate text-sm text-muted">{athlete.position} · {team?.name ?? athlete.city}</p>
+              <p className="truncate text-sm text-muted">{athlete.registeredPosition} · {team?.name ?? athlete.city}</p>
               <div className="mt-2"><VerificationBadge status={vs} size="sm" /></div>
             </div>
             <Link

@@ -23,7 +23,7 @@ export function pendingApprovals(leagues: League[], athletes: Athlete[]): Approv
   }
   for (const a of athletes) {
     if (normalizeVerificationStatus(a.verificationStatus) === 'pending') {
-      items.push({ id: a.id, kind: 'athlete', title: a.name, subtitle: `${a.position} · athlete verification` });
+      items.push({ id: a.id, kind: 'athlete', title: a.legalName, subtitle: `${a.registeredPosition} · athlete verification` });
     }
   }
   return items;

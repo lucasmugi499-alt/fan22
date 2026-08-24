@@ -34,13 +34,13 @@ function initials(name: string): string {
  * deliberate design choice rather than a broken image.
  */
 export function athletePhoto(
-  athlete: Pick<Athlete, 'id' | 'name' | 'avatarUrl' | 'avatarURL' | 'teamId'>
+  athlete: Pick<Athlete, 'id' | 'legalName' | 'avatarUrl' | 'avatarURL' | 'teamId'>
 ): string {
   const real = athlete.avatarUrl || athlete.avatarURL;
   if (real) return real;
   const { primary, dark } = clubColor(athlete.teamId || athlete.id);
   return svg(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${primary}"/><stop offset="1" stop-color="${dark}"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><text x="100" y="100" fill="rgba(255,255,255,0.92)" font-family="system-ui,sans-serif" font-size="76" font-weight="700" text-anchor="middle" dominant-baseline="central">${initials(athlete.name)}</text></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${primary}"/><stop offset="1" stop-color="${dark}"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><text x="100" y="100" fill="rgba(255,255,255,0.92)" font-family="system-ui,sans-serif" font-size="76" font-weight="700" text-anchor="middle" dominant-baseline="central">${initials(athlete.legalName)}</text></svg>`
   );
 }
 

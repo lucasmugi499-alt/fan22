@@ -80,7 +80,7 @@ export function DiscoverHub() {
       const athlete = athletes.find((candidate) => candidate.id === item.athleteId);
       return (sport === 'all' || String(item.sport).toLowerCase() === sport) &&
         (city === 'all' || athlete?.city === city) &&
-        (!query || `${item.description} ${athlete?.name ?? ''}`.toLowerCase().includes(query.toLowerCase())) &&
+        (!query || `${item.description} ${athlete?.legalName ?? ''}`.toLowerCase().includes(query.toLowerCase())) &&
         (!verifiedOnly || item.verificationStatus === 'verified');
     })
     .sort((a, b) => b.totalPledged - a.totalPledged), [athletes, challenges, city, query, sport, verifiedOnly]);
@@ -277,7 +277,7 @@ function ChallengeGrid({ items, athletes, leagueById }: { items: Challenge[]; at
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-subtle text-brand"><Target className="h-5 w-5" weight="bold" /></span>
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-text-strong">{item.description}</span>
-                <span className="mt-1 block text-xs text-muted">{athlete?.name ?? 'Athlete'} / {leagueById.get(item.leagueId)?.name ?? 'League'}</span>
+                <span className="mt-1 block text-xs text-muted">{athlete?.legalName ?? 'Athlete'} / {leagueById.get(item.leagueId)?.name ?? 'League'}</span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-2">
                   <TrendUp className="h-3.5 w-3.5" />
                   {item.fundingModel === 'non_cash'

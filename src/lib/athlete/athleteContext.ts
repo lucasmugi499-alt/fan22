@@ -1,3 +1,4 @@
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import type { Athlete, UserProfile } from '@/types';
 
 /**
@@ -18,7 +19,7 @@ export function resolveMyAthlete(
     if (mine) return mine;
     const profileName = (profile.displayName ?? profile.name ?? '').trim().toLowerCase();
     if (profileName) {
-      const byName = athletes.find((a) => a.name.trim().toLowerCase() === profileName);
+      const byName = athletes.find((a) => athleteLegalName(a).trim().toLowerCase() === profileName);
       if (byName) return byName;
     }
   }

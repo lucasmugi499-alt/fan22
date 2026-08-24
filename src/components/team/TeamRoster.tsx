@@ -156,11 +156,11 @@ export function TeamRoster() {
               <li key={a.id}>
                 <Card className="flex items-center gap-3 p-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-3 text-xs font-bold text-muted">
-                    {a.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                    {a.legalName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-strong">{a.name}</p>
-                    <p className="truncate text-xs text-muted">{a.position}</p>
+                    <p className="truncate text-sm font-medium text-text-strong">{a.legalName}</p>
+                    <p className="truncate text-xs text-muted">{a.registeredPosition}</p>
                   </div>
                   <VerificationBadge status={vs} size="sm" />
                 </Card>
@@ -228,8 +228,8 @@ export function TeamRoster() {
                     className="h-4 w-4 accent-[var(--brand)]"
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-text-strong">{athlete.name}</span>
-                    <span className="block text-xs text-muted">{athlete.position}</span>
+                    <span className="block truncate text-sm font-medium text-text-strong">{athlete.legalName}</span>
+                    <span className="block text-xs text-muted">{athlete.registeredPosition}</span>
                   </span>
                 </label>
               );

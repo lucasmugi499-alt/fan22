@@ -461,7 +461,7 @@ export function ResultSubmissionSheet({
               <div className="max-h-[48dvh] space-y-2 overflow-y-auto">
                 {eligibleScorers.map((athlete) => (
                   <div key={athlete.id} className="flex min-h-12 items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface-2 px-3">
-                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-text-strong">{athlete.name}</span><span className="block text-xs text-muted">{athlete.position}</span></span>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-text-strong">{athlete.legalName}</span><span className="block text-xs text-muted">{athlete.registeredPosition}</span></span>
                     <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-surface-3 text-lg" onClick={() => setScorerCounts((items) => ({ ...items, [athlete.id]: Math.max(0, (items[athlete.id] ?? 0) - 1) }))}>-</button>
                     <span data-numeric className="w-5 text-center font-bold">{scorerCounts[athlete.id] ?? 0}</span>
                     <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-brand text-lg text-on-brand" onClick={() => setScorerCounts((items) => ({ ...items, [athlete.id]: (items[athlete.id] ?? 0) + 1 }))}>+</button>
@@ -739,7 +739,7 @@ function SquadSelector({
   onToggle,
 }: {
   title: string;
-  athletes: Array<{ id: string; name: string; position: string }>;
+  athletes: Array<{ id: string; legalName: string; registeredPosition: string }>;
   selectedIds: string[];
   onToggle: (athleteId: string) => void;
 }) {
@@ -764,8 +764,8 @@ function SquadSelector({
                 className="h-4 w-4 accent-[var(--brand)]"
               />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-text-strong">{athlete.name}</span>
-                <span className="block truncate text-xs text-muted">{athlete.position}</span>
+                <span className="block truncate text-sm font-medium text-text-strong">{athlete.legalName}</span>
+                <span className="block truncate text-xs text-muted">{athlete.registeredPosition}</span>
               </span>
             </label>
           );
@@ -787,7 +787,7 @@ function StatLineEditor({
   onChange,
 }: {
   title: string;
-  athletes: Array<{ id: string; name: string; position: string }>;
+  athletes: Array<{ id: string; legalName: string; registeredPosition: string }>;
   metrics: StatMetric[];
   values: Record<string, Record<string, string>>;
   onChange: (athleteId: string, statKey: string, value: string) => void;
@@ -802,8 +802,8 @@ function StatLineEditor({
         {athletes.length ? athletes.map((athlete) => (
           <div key={athlete.id} className="rounded-[var(--radius-sm)] border border-border bg-surface-1 p-2">
             <div className="mb-2 min-w-0">
-              <p className="truncate text-sm font-medium text-text-strong">{athlete.name}</p>
-              <p className="truncate text-xs text-muted">{athlete.position}</p>
+              <p className="truncate text-sm font-medium text-text-strong">{athlete.legalName}</p>
+              <p className="truncate text-xs text-muted">{athlete.registeredPosition}</p>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {metrics.map((metric) => (
@@ -816,7 +816,7 @@ function StatLineEditor({
                     value={values[athlete.id]?.[metric.key] ?? ''}
                     onChange={(event) => onChange(athlete.id, metric.key, event.target.value)}
                     className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border-strong bg-surface-2 px-2 text-center text-sm font-bold tabular-nums text-text-strong outline-none focus:border-brand"
-                    aria-label={`${athlete.name} ${metric.label}`}
+                    aria-label={`${athlete.legalName} ${metric.label}`}
                   />
                 </label>
               ))}

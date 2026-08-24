@@ -290,7 +290,7 @@ describe('mock provider league applications', () => {
     await mockProvider.reviewAthleteClaim(claim.id, MOCK_PROFILES.league_admin.uid, 'league_verify');
 
     expect(await mockProvider.getAthleteById(created.id)).toMatchObject({
-      name: 'Stored Browser Athlete',
+      legalName: 'Stored Browser Athlete',
       teamId,
       userId: requesterUserId,
     });

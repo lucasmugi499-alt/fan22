@@ -69,6 +69,7 @@ import {
 } from '@/types';
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
 import { buildLeagueStandings } from '@/lib/leagueModel';
+import { normalizeAthleteIdentities, normalizeAthleteIdentity } from '@/lib/athleteIdentity';
 import {
   canAcceptNewSubmission,
   checkTransition,
@@ -275,11 +276,17 @@ export const firebaseProvider: GoalPlaceDataProvider = {
   async getTeamById(id) {
     return isFirebaseConfigured ? readDoc('teams', id) : mockProvider.getTeamById(id);
   },
+  /**
+   * Athlete identity is normalized at this boundary, so nothing downstream needs to know that
+   * ADR-001 renamed `name` to `legalName` and `position` to `registeredPosition`. Documents
+   * written before the rename still carry the old keys, and until the migration script has
+   * run against every environment both shapes are in the collection at once.
+   */
   async getAthletes(options) {
     if (!isFirebaseConfigured) return mockProvider.getAthletes(options);
     if (options?.athleteId) {
       const athlete = await readDoc<Athlete>('athletes', options.athleteId);
-      return athlete ? [athlete] : [];
+      return athlete ? [normalizeAthleteIdentity(athlete)] : [];
     }
     const constraints: QueryConstraint[] = [];
     if (options?.teamId) constraints.push(where('teamId', '==', options.teamId));
@@ -287,10 +294,12 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     constraints.push(orderBy(documentId()));
     if (options?.afterId) constraints.push(startAfter(options.afterId));
     constraints.push(limitQuery(options?.limit ?? 100));
-    return readCollection('athletes', constraints);
+    return normalizeAthleteIdentities(await readCollection<Athlete>('athletes', constraints));
   },
   async getAthleteById(id) {
-    return isFirebaseConfigured ? readDoc('athletes', id) : mockProvider.getAthleteById(id);
+    if (!isFirebaseConfigured) return mockProvider.getAthleteById(id);
+    const athlete = await readDoc<Athlete>('athletes', id);
+    return athlete ? normalizeAthleteIdentity(athlete) : undefined;
   },
   async getAthleteClaims(options) {
     if (!isFirebaseConfigured) return mockProvider.getAthleteClaims(options);

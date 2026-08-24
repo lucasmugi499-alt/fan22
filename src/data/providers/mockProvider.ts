@@ -1032,9 +1032,9 @@ export const mockProvider: GoalPlaceDataProvider = {
     const invitedEmail = normalizeEmail(data.invitedEmail);
     const athlete: Athlete = {
       id: athleteId,
-      name: data.name,
+      legalName: data.name,
       sport: team.sport,
-      position: data.position,
+      registeredPosition: data.position,
       teamId: team.id,
       leagueId: team.leagueId,
       city: team.city,

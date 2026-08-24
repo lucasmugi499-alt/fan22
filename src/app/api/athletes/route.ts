@@ -105,9 +105,13 @@ export async function POST(request: Request) {
   await adminDb.runTransaction(async (transaction) => {
     transaction.set(athleteRef, {
       id: athleteRef.id,
-      name,
+      // Canonical names only. ADR-001 forbids a bare `name` or `position` on this document,
+      // and new records are the one place where nothing has to be written twice: the
+      // fallback in athleteIdentity exists for documents that predate the rename, and
+      // writing the old keys here would keep manufacturing more of them.
+      legalName: name,
       sport: teamData.sport,
-      position,
+      registeredPosition: position,
       teamId: team.id,
       leagueId: teamData.leagueId,
       city: teamData.city,

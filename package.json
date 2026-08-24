@@ -68,7 +68,8 @@
     "rules:smoke": "tsx --env-file=.env.local scripts/staging/deployed-rules-smoke.ts",
     "canary:finalizer": "tsx --env-file=.env.local scripts/security/finalizer-canary.ts",
     "lifecycle:report": "tsx --env-file=.env.local scripts/security/lifecycle-report.ts",
-    "access:v1-drain": "tsx scripts/access/v1-drain-report.ts"
+    "access:v1-drain": "tsx scripts/access/v1-drain-report.ts",
+    "data:migrate-athlete-identity": "tsx scripts/data/migrate-athlete-identity.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

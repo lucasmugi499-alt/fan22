@@ -1,5 +1,7 @@
 'use client';
 
+import { athleteLegalName, athleteRegisteredPosition } from '@/lib/athleteIdentity';
+
 import { useEffect, useMemo, useState } from 'react';
 import { Basketball, Check, FlagCheckered, SoccerBall } from '@phosphor-icons/react';
 import { toast } from 'sonner';
@@ -181,7 +183,7 @@ export function FanOnboarding({
     <ChoiceGrid
       key="athletes"
       description="Add athletes to your personal career and support feed."
-      items={visibleAthletes.map((item) => ({ id: item.id, title: item.name, meta: item.position }))}
+      items={visibleAthletes.map((item) => ({ id: item.id, title: athleteLegalName(item), meta: athleteRegisteredPosition(item) }))}
       selected={athleteIds}
       onToggle={(id) => setAthleteIds((items) => toggle(items, id))}
     />,

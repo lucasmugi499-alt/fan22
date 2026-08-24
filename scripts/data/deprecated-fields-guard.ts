@@ -30,6 +30,18 @@ const DEPRECATED_FIELD_READS = [
   // count that advertised eight clubs in leagues holding four. It is repaired and now
   // agrees with the documents, but a stored count drifts the moment a club is added.
   /\.teamsCount\b/,
+  /**
+   * ADR-001, invariant 08: no document field is named bare `position` or bare `name` on an
+   * athlete.
+   *
+   * An athlete has two names, the one the League registered and the one they call
+   * themselves, and they belong to different owners. `athlete.name` is exactly how those two
+   * domains leak into each other six months from now, when somebody reaches for the obvious
+   * field. Read `legalName` and `registeredPosition`, or the helpers in
+   * src/lib/athleteIdentity.ts where a pre-rename document is still possible.
+   */
+  /\bathlete\??\.name\b/,
+  /\bathlete\??\.position\b/,
 ];
 
 /** Writes and schema declarations are not reads; the repair script must set these. */
@@ -58,6 +70,11 @@ const KNOWN: Budget[] = [
   { file: 'src/components/discover/LeaguesDiscover.tsx', reads: 1, why: 'already prefers the actual team records; count is the fallback' },
   { file: 'src/components/marketing/Landing.tsx', reads: 1, why: 'marketing figure, not a sporting record' },
   { file: 'src/components/platform/PlatformReports.tsx', reads: 1, why: 'platform rollup, not a sporting record' },
+  {
+    file: 'src/lib/athleteIdentity.ts',
+    reads: 2,
+    why: 'the ADR-001 migration bridge itself: the one place permitted to read the pre-rename fields, so the fallback disappears in one edit',
+  },
 ];
 
 const SCAN_ROOTS = ['src/components', 'src/app', 'src/lib'];
@@ -107,7 +124,7 @@ export async function runDeprecatedFieldsGuard(argv = process.argv.slice(2)) {
   const stale: string[] = [];
   for (const [file, count] of [...actual].sort()) {
     const budget = budgets.get(file);
-    if (!budget) problems.push(`NEW read of a deprecated team sports field in ${file} (${count}). Use the standings projection — see src/lib/team/useTeamStanding.ts.`);
+    if (!budget) problems.push(`NEW read of a deprecated team sports field in ${file} (${count}). Read the projection for a sporting number, or legalName/registeredPosition for an athlete.`);
     else if (count > budget.reads) problems.push(`${file} grew from ${budget.reads} to ${count}.`);
     else if (count < budget.reads) stale.push(`${file} is down to ${count} (budget ${budget.reads}) — lower it.`);
   }

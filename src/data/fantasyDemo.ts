@@ -104,7 +104,7 @@ export const fantasyPlayers: FantasyPlayer[] = fantasyCompetitions.flatMap((comp
   return investorDemo.athletes
     .filter((athlete) => athlete.leagueId === competition.leagueId)
     .flatMap((athlete, index): FantasyPlayer[] => {
-      const positionGroup = positionGroupFor(rules, athlete.position);
+      const positionGroup = positionGroupFor(rules, athlete.registeredPosition);
       if (!positionGroup) return [];
       return [{
         id: `${competition.id}_${athlete.id}`,
@@ -112,7 +112,7 @@ export const fantasyPlayers: FantasyPlayer[] = fantasyCompetitions.flatMap((comp
         athleteId: athlete.id,
         realTeamId: athlete.teamId,
         sport: competition.sport,
-        position: athlete.position,
+        position: athlete.registeredPosition,
         positionGroup,
         availability: index % 29 === 0 ? 'doubtful' : 'available',
         verifiedRecentForm: [
@@ -389,7 +389,7 @@ export function fantasyPlayerCards(competitionId: string) {
       const team = investorDemo.teams.find((item) => item.id === player.realTeamId);
       return {
         ...player,
-        name: athlete.name,
+        name: athlete.legalName,
         avatarUrl: athlete.avatarUrl ?? '/demo/assets/avatars/avatar_01.svg',
         teamName: team?.name ?? 'Independent',
         credits: priceByAthlete.get(player.athleteId)?.credits ?? 0,

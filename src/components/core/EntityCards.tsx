@@ -36,7 +36,7 @@ export function AthleteCard({ athlete, className }: { athlete: Athlete; classNam
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photo}
-          alt={athlete.name}
+          alt={athlete.legalName}
           className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-fluid)] group-hover:scale-105"
           loading="lazy"
         />
@@ -46,10 +46,10 @@ export function AthleteCard({ athlete, className }: { athlete: Athlete; classNam
       </div>
       <div className="flex flex-1 flex-col p-3">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-text-strong">{athlete.name}</span>
+          <span className="truncate text-sm font-semibold text-text-strong">{athlete.legalName}</span>
           {athlete.verified ? <SealCheck className="h-4 w-4 shrink-0 text-[var(--state-verified)]" weight="fill" /> : null}
         </div>
-        <span className="truncate text-xs text-muted">{athlete.position} · {athlete.city}</span>
+        <span className="truncate text-xs text-muted">{athlete.registeredPosition} · {athlete.city}</span>
         <div className="mt-2 flex items-center gap-1.5 text-xs text-[var(--brand-2)]">
           <TrendUp className="h-3.5 w-3.5" weight="bold" />
           <span className="tabular tabular-nums font-semibold">UGX {ugx(athlete.totalSupport)}</span>

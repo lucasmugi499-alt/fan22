@@ -1,4 +1,5 @@
 import databaseJson from '../../data/investor-demo/database.json';
+import { normalizeAthleteIdentities } from '@/lib/athleteIdentity';
 import type {
   AdminAuditEvent,
   Athlete,
@@ -78,7 +79,22 @@ type InvestorDemoDatabase = {
 // JSON is the canonical demonstration package. The cast lives at this one boundary so the
 // rest of the app consumes normal domain types instead of maintaining a second generated
 // demo database that can drift from staging.
-export const investorDemo = databaseJson as unknown as InvestorDemoDatabase;
+const rawInvestorDemo = databaseJson as unknown as InvestorDemoDatabase;
+
+/**
+ * Athlete identity is normalized here rather than by rewriting the thousand records in the
+ * JSON.
+ *
+ * The demonstration package was generated before ADR-001 renamed `name` to `legalName` and
+ * `position` to `registeredPosition`. Regenerating it would work, and it would also be the
+ * beginning of maintaining a second copy of the migration: the same normalization has to
+ * exist anyway for the Firestore documents written before the rename, so this uses that one
+ * instead of adding a second path that can disagree with it.
+ */
+export const investorDemo: InvestorDemoDatabase = {
+  ...rawInvestorDemo,
+  athletes: normalizeAthleteIdentities(rawInvestorDemo.athletes ?? []),
+};
 
 export const investorDemoRuntime = {
   adminAuditEvents: [] as AdminAuditEvent[],

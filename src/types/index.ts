@@ -622,9 +622,25 @@ export interface StoredStanding {
 export interface Athlete {
   id: string;
   userId?: string;
-  name: string;
+  /**
+   * The name the League registered. Rendered on every surface showing a verified statistic.
+   *
+   * Not `name`. ADR-001 splits the athlete into a league-authored sporting record and a
+   * self-authored persona, and an unqualified `name` is exactly how those two leak into each
+   * other when somebody reaches for the obvious field. The nickname lives on
+   * `athletePersonas.displayName` and never appears beside a career record.
+   */
+  legalName: string;
   sport: SportSlug | SportType;
-  position: string;
+  /**
+   * What the League registered them as. Eligibility, standings and fantasy read this and
+   * only this. A preferred position is the athlete's to state and lives on their persona.
+   */
+  registeredPosition: string;
+  /** @deprecated Pre-ADR-001 documents. Read through `athleteLegalName()`. */
+  name?: string;
+  /** @deprecated Pre-ADR-001 documents. Read through `athleteRegisteredPosition()`. */
+  position?: string;
   teamId: string;
   leagueId: string;
   city: string;

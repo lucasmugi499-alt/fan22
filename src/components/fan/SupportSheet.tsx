@@ -45,7 +45,7 @@ export function SupportSheet({
   const userId = currentUser?.uid ?? userProfile?.uid ?? userProfile?.id ?? 'guest';
   const chosen = custom !== '' ? Number(custom) : amount;
   const quote = Number.isSafeInteger(chosen) && chosen > 0 ? contributionQuote(chosen) : null;
-  const firstName = athlete.name.split(' ')[0];
+  const firstName = athlete.legalName.split(' ')[0];
 
   const valid = Number.isFinite(chosen) && chosen >= 1_000;
   const paymentsAvailable = isDemoMode || process.env.NEXT_PUBLIC_PAYMENTS_MODE === 'psp';
@@ -127,7 +127,7 @@ export function SupportSheet({
       open={open}
       onClose={onClose}
       title={need ? need.title : `Back ${firstName}`}
-      description={need ? `${athlete.name} · verified need` : `${athlete.name} · ${athlete.position}`}
+      description={need ? `${athlete.legalName} · verified need` : `${athlete.legalName} · ${athlete.registeredPosition}`}
       footer={
         <div className="space-y-2">
           {disabledReason ? <p className="text-center text-xs text-[var(--state-pending)]">{disabledReason}</p> : null}

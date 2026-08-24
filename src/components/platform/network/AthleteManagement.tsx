@@ -83,8 +83,8 @@ export function AthleteManagement() {
         lifecycle: lifecycleOf(athlete),
       }))
       .filter((row) => !needle
-        || `${row.athlete.name} ${row.teamName} ${row.leagueName} ${row.athlete.position}`.toLowerCase().includes(needle))
-      .sort((a, b) => a.athlete.name.localeCompare(b.athlete.name));
+        || `${row.athlete.legalName} ${row.teamName} ${row.leagueName} ${row.athlete.registeredPosition}`.toLowerCase().includes(needle))
+      .sort((a, b) => a.athlete.legalName.localeCompare(b.athlete.legalName));
   }, [data.athletes, data.teams, data.leagues, query]);
 
   const teamOptions = useMemo(
@@ -104,11 +104,11 @@ export function AthleteManagement() {
       primary: true,
       cell: (row) => (
         <Link href={`/athletes/${row.athlete.id}`} className="font-semibold text-text-strong hover:text-brand">
-          {row.athlete.name}
+          {row.athlete.legalName}
         </Link>
       ),
     },
-    { header: 'Position', cell: (row) => <span className="text-muted">{row.athlete.position || '—'}</span> },
+    { header: 'Position', cell: (row) => <span className="text-muted">{row.athlete.registeredPosition || '—'}</span> },
     { header: 'Team', cell: (row) => <span className="text-muted">{row.teamName}</span> },
     { header: 'League', cell: (row) => <span className="text-muted">{row.leagueName}</span> },
     {
@@ -124,15 +124,15 @@ export function AthleteManagement() {
         <div className="flex flex-wrap justify-end gap-1.5">
           <CommandButton label="Edit" onClick={() => setPending({ kind: 'edit', athlete: row.athlete })} />
           {row.lifecycle === 'archived' ? (
-            <CommandButton label="Restore" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.name, action: 'restore' })} />
+            <CommandButton label="Restore" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.legalName, action: 'restore' })} />
           ) : (
             <>
               {row.lifecycle !== 'active' ? (
-                <CommandButton label="Activate" tone="primary" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.name, action: 'activate' })} />
+                <CommandButton label="Activate" tone="primary" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.legalName, action: 'activate' })} />
               ) : (
-                <CommandButton label="Suspend" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.name, action: 'suspend' })} />
+                <CommandButton label="Suspend" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.legalName, action: 'suspend' })} />
               )}
-              <CommandButton label="Archive" tone="destructive" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.name, action: 'archive' })} />
+              <CommandButton label="Archive" tone="destructive" onClick={() => setLifecycle({ kind: 'athlete', id: row.athlete.id, name: row.athlete.legalName, action: 'archive' })} />
             </>
           )}
         </div>
@@ -216,14 +216,14 @@ export function AthleteManagement() {
 
       <CommandDialog
         open={pending?.kind === 'edit'}
-        title={`Edit ${pending?.kind === 'edit' ? pending.athlete.name : 'athlete'}`}
+        title={`Edit ${pending?.kind === 'edit' ? pending.athlete.legalName : 'athlete'}`}
         description="Only the fields you change are written, and only those appear in the audit trail."
         submitLabel="Save changes"
         running={command.running}
         error={command.error}
         fields={pending?.kind === 'edit' ? ([
-          { name: 'name', label: 'Full name', kind: 'text', required: true, maxLength: 120, defaultValue: pending.athlete.name },
-          { name: 'position', label: 'Position', kind: 'text', required: true, maxLength: 60, defaultValue: pending.athlete.position },
+          { name: 'name', label: 'Full name', kind: 'text', required: true, maxLength: 120, defaultValue: pending.athlete.legalName },
+          { name: 'position', label: 'Position', kind: 'text', required: true, maxLength: 60, defaultValue: pending.athlete.registeredPosition },
           { name: 'ageGroup', label: 'Age group', kind: 'select', required: true, options: AGE_GROUPS, defaultValue: pending.athlete.ageGroup },
           { name: 'bio', label: 'Bio', kind: 'textarea', maxLength: 1500, defaultValue: pending.athlete.bio },
         ] satisfies CommandField[]) : []}

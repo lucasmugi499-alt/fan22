@@ -143,7 +143,7 @@ export function ChallengeWorkflow({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-text-strong">{challenge.description}</p>
               <p className="mt-1 text-xs text-muted">
-                {athlete?.name ?? 'Athlete'} · {challengeLifecycleLabel(challenge.fundingModel, challenge.status)} · {challenge.fundingModel === 'sponsor_grant' ? 'Sponsor grant' : 'Non-cash'}
+                {athlete?.legalName ?? 'Athlete'} · {challengeLifecycleLabel(challenge.fundingModel, challenge.status)} · {challenge.fundingModel === 'sponsor_grant' ? 'Sponsor grant' : 'Non-cash'}
               </p>
             </div>
             <Button size="sm" variant="secondary" icon={Target} onClick={() => setActive(challenge)}>

@@ -135,7 +135,10 @@ describe('athlete creation route hardening', () => {
       emailMessageId: 'email_athlete_1',
     });
     expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'athletes_generated' }), expect.objectContaining({
-      name: 'New Athlete',
+      // Canonical names only on a newly created record. ADR-001 forbids a bare `name`, and
+      // a new document is the one place nothing has to be written twice.
+      legalName: 'New Athlete',
+      registeredPosition: 'Forward',
       teamId: 'team_1',
       leagueId: 'league_1',
       invitedEmail: 'new.athlete@example.com',

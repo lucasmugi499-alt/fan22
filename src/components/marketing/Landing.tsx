@@ -593,7 +593,7 @@ export function Landing({ initialData }: { initialData: LandingInitialData }) {
                 <div className="relative flex aspect-[5/3] items-end overflow-hidden bg-surface-2 p-5">
                   <Image
                     src={athlete.coverUrl || athlete.coverURL || '/images/goalplace256-hero.png'}
-                    alt={`${athlete.name}, a featured grassroots athlete`}
+                    alt={`${athlete.legalName}, a featured grassroots athlete`}
                     fill
                     sizes="(min-width: 1024px) 33vw, 100vw"
                     className="object-cover transition duration-700 group-hover:scale-105"
@@ -603,7 +603,7 @@ export function Landing({ initialData }: { initialData: LandingInitialData }) {
                   <span
                     className={`relative grid h-14 w-14 place-items-center rounded-md ${meta.athleteColor} font-mono text-sm font-black text-surface-0 shadow-xl`}
                   >
-                    {initials(athlete.name)}
+                    {initials(athlete.legalName)}
                   </span>
                   <span className="relative ml-auto flex items-center gap-1 rounded-sm bg-black/65 px-2.5 py-1.5 text-xs font-semibold text-verified backdrop-blur-md">
                     <SealCheck className="h-3.5 w-3.5" weight="fill" />
@@ -613,9 +613,9 @@ export function Landing({ initialData }: { initialData: LandingInitialData }) {
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-semibold text-text-strong">{athlete.name}</h3>
+                      <h3 className="text-xl font-semibold text-text-strong">{athlete.legalName}</h3>
                       <p className="mt-1 text-sm text-muted">
-                        {athlete.position} / {team?.name ?? athlete.city}
+                        {athlete.registeredPosition} / {team?.name ?? athlete.city}
                       </p>
                     </div>
                     <span className="font-mono text-sm font-bold text-brand">

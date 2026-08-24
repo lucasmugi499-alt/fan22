@@ -1,5 +1,7 @@
 'use client';
 
+import { athleteLegalName } from '@/lib/athleteIdentity';
+
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, MagnifyingGlass, UserCirclePlus, XCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
@@ -64,7 +66,7 @@ export function AthleteClaiming({
       queueMicrotask(() => {
         setInviteToken(token);
         setInvitedAthleteId(invited.id);
-        setQuery(invited.name);
+        setQuery(athleteLegalName(invited));
       });
     }
     if (!token && userProfile?.name && !query) {
@@ -73,7 +75,7 @@ export function AthleteClaiming({
   }, [athletes, query, scope, userProfile?.name]);
 
   const candidates = useMemo(() => athletes
-    .filter((athlete) => !query.trim() || `${athlete.name} ${athlete.position} ${athlete.city}`.toLowerCase().includes(query.toLowerCase()))
+    .filter((athlete) => !query.trim() || `${athlete.legalName} ${athlete.registeredPosition} ${athlete.city}`.toLowerCase().includes(query.toLowerCase()))
     .sort((left, right) => Number(right.id === invitedAthleteId) - Number(left.id === invitedAthleteId))
     .slice(0, 12), [athletes, invitedAthleteId, query]);
   const visibleClaims = claims.filter((claim) =>
@@ -125,8 +127,8 @@ export function AthleteClaiming({
           return (
             <Card key={claim.id} className="flex items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-text-strong">{athlete?.name ?? claim.athleteId}</p>
-                <p className="text-xs text-muted">{athlete?.position} / {claim.status.replaceAll('_', ' ')}</p>
+                <p className="truncate text-sm font-semibold text-text-strong">{athlete?.legalName ?? claim.athleteId}</p>
+                <p className="text-xs text-muted">{athlete?.registeredPosition} / {claim.status.replaceAll('_', ' ')}</p>
               </div>
               <div className="flex gap-2">
                 <Button size="icon" variant="secondary" icon={XCircle} aria-label="Reject claim" disabled={saving === claim.id} onClick={() => void review(claim, 'reject')} />
@@ -172,8 +174,8 @@ export function AthleteClaiming({
         {(inviteToken ? candidates.filter((athlete) => athlete.id === invitedAthleteId) : candidates).map((athlete) => (
           <Card key={athlete.id} className="flex items-center justify-between gap-3 p-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-text-strong">{athlete.name}</p>
-              <p className="truncate text-xs text-muted">{athlete.position} / {athlete.city}{athlete.userId ? ' / linked profile' : ''}</p>
+              <p className="truncate text-sm font-semibold text-text-strong">{athlete.legalName}</p>
+              <p className="truncate text-xs text-muted">{athlete.registeredPosition} / {athlete.city}{athlete.userId ? ' / linked profile' : ''}</p>
             </div>
             <Button size="sm" variant="secondary" disabled={saving === athlete.id || Boolean(athlete.userId) || !inviteToken} onClick={() => void requestClaim(athlete.id)}>
               {athlete.userId ? 'Linked' : inviteToken ? 'Accept invite' : 'Invite only'}

@@ -50,7 +50,7 @@ export function SupportHub() {
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-brand"><ShieldCheck className="h-3.5 w-3.5" weight="fill" /> Team verified · League approved</p>
                     <h2 className="mt-1 text-lg font-semibold text-text-strong">{need.title}</h2>
-                    <p className="text-sm text-muted">{athlete?.name ?? team?.name ?? 'League development need'}</p>
+                    <p className="text-sm text-muted">{athlete?.legalName ?? team?.name ?? 'League development need'}</p>
                   </div>
                   {need.status === 'funded' || need.status === 'completed' ? <CheckCircle className="h-6 w-6 shrink-0 text-verified" weight="fill" /> : null}
                 </div>

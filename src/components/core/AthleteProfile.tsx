@@ -84,16 +84,16 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
         gradient={team ? clubColor(team.name).gradient : sportGradient(String(athlete.sport))}
         media={
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt={athlete.name} className="h-20 w-20 rounded-[var(--radius-lg)] border-2 border-white/40 object-cover" loading="lazy" />
+          <img src={photo} alt={athlete.legalName} className="h-20 w-20 rounded-[var(--radius-lg)] border-2 border-white/40 object-cover" loading="lazy" />
         }
-        watermark={<span className="font-display font-black text-white">{athlete.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>}
+        watermark={<span className="font-display font-black text-white">{athlete.legalName.split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>}
         eyebrow={team?.name}
-        title={athlete.name}
+        title={athlete.legalName}
         verified={athlete.verified}
         action={<FollowButton targetType="athlete" targetId={athlete.id} label="Follow" />}
         meta={
           <>
-            <span>{athlete.position}</span>
+            <span>{athlete.registeredPosition}</span>
             <span className="opacity-50">|</span>
             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {athlete.city}</span>
           </>
@@ -144,7 +144,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
 
       <div className="sticky bottom-[calc(var(--nav-h)+var(--safe-bottom)+8px)] md:static">
         <Button block icon={HandHeart} onClick={() => requireAuth(() => setSupporting(true), 'Sign in to back this athlete.')}>
-          Back {athlete.name.split(' ')[0]}
+          Back {athlete.legalName.split(' ')[0]}
         </Button>
       </div>
 

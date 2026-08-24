@@ -117,7 +117,7 @@ export function AthleteManageSheet({
           : undefined;
         await provider.createFeedPost({
           authorId: actorUserId,
-          authorName: athlete.name,
+          authorName: athlete.legalName,
           authorRole: 'athlete',
           authorType: 'Athlete',
           sport: athlete.sport,

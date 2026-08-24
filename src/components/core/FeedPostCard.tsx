@@ -66,7 +66,7 @@ export function FeedPostCard({ post, context }: { post: FeedPost; context?: Feed
   const [saving, setSaving] = useState(false);
   const media = post.mediaUrl || post.mediaURL;
   const role = ROLE_LABEL[post.authorRole] ?? ROLE_LABEL[post.authorType?.toLowerCase() ?? ''] ?? 'Member';
-  const avatar = athletePhoto({ id: post.authorId, name: post.authorName, teamId: post.relatedTeamId ?? post.authorId });
+  const avatar = athletePhoto({ id: post.authorId, legalName: post.authorName, teamId: post.relatedTeamId ?? post.authorId });
   const userId = currentUser?.uid ?? userProfile?.uid;
   const reacted = Boolean(userId) && liked;
 

@@ -207,10 +207,10 @@ function ShareAthleteCard({
     context.fillText('GOALPLACE256 / VERIFIED CAREER', 96, 135);
     context.fillStyle = '#ffffff';
     context.font = '700 82px sans-serif';
-    wrapText(context, athlete.name, 96, 280, 850, 92);
+    wrapText(context, athlete.legalName, 96, 280, 850, 92);
     context.font = '500 38px sans-serif';
     context.fillStyle = '#dbe3ec';
-    context.fillText(`${athlete.position} / ${team?.name ?? athlete.city}`, 96, 470);
+    context.fillText(`${athlete.registeredPosition} / ${team?.name ?? athlete.city}`, 96, 470);
     context.font = '700 54px monospace';
     context.fillStyle = '#ffffff';
     context.fillText(`${athlete.stats.appearances ?? 0} APPS`, 96, 650);
@@ -227,7 +227,7 @@ function ShareAthleteCard({
     context.fillText('Official statistics only. Support never changes rank.', 96, 1175);
 
     const link = document.createElement('a');
-    link.download = `${athlete.name.toLowerCase().replace(/\s+/g, '-')}-goalplace256.png`;
+    link.download = `${athlete.legalName.toLowerCase().replace(/\s+/g, '-')}-goalplace256.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     const userId = currentUser?.uid ?? userProfile?.uid;
@@ -251,8 +251,8 @@ function ShareAthleteCard({
     >
       <div className="rounded-[var(--radius-lg)] bg-[var(--grad-pitch)] p-5 text-white">
         <p className="text-xs font-semibold text-white/75">GOALPLACE256 / VERIFIED CAREER</p>
-        <h3 className="mt-8 text-3xl font-bold text-white">{athlete.name}</h3>
-        <p className="mt-2 text-sm text-white/80">{athlete.position} / {team?.name}</p>
+        <h3 className="mt-8 text-3xl font-bold text-white">{athlete.legalName}</h3>
+        <p className="mt-2 text-sm text-white/80">{athlete.registeredPosition} / {team?.name}</p>
         <div className="mt-8 grid grid-cols-2 gap-3">
           <div><p className="text-2xl font-bold">{athlete.stats.appearances ?? 0}</p><p className="text-xs text-white/70">Official apps</p></div>
           <div><p className="text-2xl font-bold">{athlete.goalPlacePoints}</p><p className="text-xs text-white/70">GoalPlace Points</p></div>

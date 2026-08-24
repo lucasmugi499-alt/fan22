@@ -9,6 +9,7 @@ import type { OfficialSportEvent } from '../kernel/types';
 // Relative, like every other import in this file: it compiles into the Cloud Functions
 // bundle, where a path alias survives into the emitted CommonJS and fails at require time.
 import { userPrincipal, provenanceQuad, type Principal } from '../kernel/principal';
+import { athleteRegisteredPosition } from '../lib/athleteIdentity';
 import { validateOfficialEventShape } from '../kernel/validators/officialEventGuard';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
 // Relative, not `@/`. This module compiles into the Cloud Functions bundle, where a path
@@ -1339,7 +1340,7 @@ export async function finalizeSubmission(
             + `${athlete.id} in ${match.id}: events=${scoredFromCanonicalEvents}, submission=${count}`,
           );
         }
-        const positionGroup = officialPositionGroup(fantasySport, athlete.position);
+        const positionGroup = officialPositionGroup(fantasySport, athleteRegisteredPosition(athlete));
         const teamWon =
           (teamId === match.homeTeamId && plan.match.score.home > plan.match.score.away)
           || (teamId === match.awayTeamId && plan.match.score.away > plan.match.score.home);
@@ -1371,7 +1372,15 @@ export async function finalizeSubmission(
           athleteId: athlete.id,
           realTeamId: teamId,
           sport: fantasySport,
-          position: athlete.position,
+          /**
+           * Stays `position`, and stays denormalized.
+           *
+           * ADR-001 renamed the field on the live athlete record, not here. This is a
+           * verified, versioned historical record: an athlete registered as a forward in
+           * 2026 who moves to midfield in 2027 must not retroactively change what their 2026
+           * match record says. Invariant 08 and invariant 04 meet at this line and 04 wins.
+           */
+          position: athleteRegisteredPosition(athlete),
           positionGroup,
           officialResultVersion: plan.resultVersion,
           verificationStatus: 'verified',

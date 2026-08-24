@@ -163,7 +163,7 @@ export async function getFantasyPlayerCards(competitionId: string) {
       if (!athlete) return [];
       return [{
         ...player,
-        name: athlete.name,
+        name: athlete.legalName,
         avatarUrl: athlete.avatarUrl ?? '/demo/assets/avatars/avatar_01.svg',
         teamName: teamById.get(player.realTeamId)?.name ?? 'Independent',
         credits: priceByAthlete.get(player.athleteId) ?? 0,

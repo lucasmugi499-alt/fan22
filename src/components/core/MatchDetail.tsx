@@ -360,7 +360,7 @@ function Lineup({
 }: {
   title: string;
   athleteIds: string[];
-  athleteById: Map<string, { id: string; name: string; position: string }>;
+  athleteById: Map<string, { id: string; legalName: string; registeredPosition: string }>;
   sport: string;
 }) {
   const starterLimit = lineupStarterLimit(sport);
@@ -408,10 +408,10 @@ function Lineup({
                 {index + 1}
               </span>
               <span className="mt-1 block truncate text-[10px] font-bold leading-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.65)]">
-                {shortName(athlete?.name)}
+                {shortName(athlete?.legalName)}
               </span>
               <span className="block truncate text-[9px] font-medium text-white/65">
-                {shortPosition(athlete?.position)}
+                {shortPosition(athlete?.registeredPosition)}
               </span>
             </Link>
           );
@@ -436,8 +436,8 @@ function Lineup({
                 <Link key={id} href={`/athletes/${id}`} className="flex min-h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2 transition-colors hover:bg-surface-1">
                   <span data-numeric className="w-5 text-xs font-bold tabular-nums text-muted">{starterLimit + index + 1}</span>
                   <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-text-strong">{athlete?.name ?? 'Squad member'}</span>
-                    <span className="block truncate text-[10px] text-muted">{athlete?.position}</span>
+                    <span className="block truncate text-xs font-semibold text-text-strong">{athlete?.legalName ?? 'Squad member'}</span>
+                    <span className="block truncate text-[10px] text-muted">{athlete?.registeredPosition}</span>
                   </span>
                 </Link>
               );
