@@ -8,6 +8,7 @@ import {
   type ChallengeAction,
 } from '@/lib/challenge';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, Challenge } from '@/types';
 
@@ -98,8 +99,14 @@ export async function POST(
     // challenge belongs to, not from membership arrays. Both checks are strictly narrower
     // than the legacy reads they replace, and every current league- and team-admin entry
     // already holds the corresponding capability, so no operator loses a transition.
+    /**
+     * The team arm resolves through the league that owns the club, since ADR-004 left
+     * `team.profile.manage` granting nothing. A League Admin therefore satisfies both, which
+     * is the intended shape: the League absorbed what the Team Admin used to do, so a
+     * transition that required a club officer is now theirs to make.
+     */
     const [isTeamAdmin, isLeagueAdmin] = await Promise.all([
-      hasCapability(actor.uid, { scopeType: 'team', scopeId: String(athlete.teamId) }, 'team.profile.manage'),
+      hasLeagueCapabilityForTeam(actor.uid, String(athlete.teamId), 'league.team.manage'),
       hasCapability(actor.uid, { scopeType: 'league', scopeId: challenge.leagueId }, 'league.profile.manage'),
     ]);
     const effectiveRole: AppRole = isPlatform

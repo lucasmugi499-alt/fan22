@@ -85,11 +85,15 @@ describe('trusted upload session route', () => {
     expect(adminStorage.bucket).not.toHaveBeenCalled();
   });
 
-  it('creates a signed upload URL for a team operator with profile capability', async () => {
-    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'operator_1', role: 'team_admin' });
+  it('creates a signed upload URL for a league operator managing the club', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'operator_1', role: 'league_admin' });
     installFirestore({
-      'accessIndex/team_team_1_operator_1': {
-        capabilities: ['team.profile.manage'],
+      // The team document is now part of the authority decision: club media authority is
+      // resolved through the league that owns the club, since ADR-004 left the team scope
+      // granting nothing.
+      'teams/team_1': { id: 'team_1', leagueId: 'league_1' },
+      'accessIndex/league_league_1_operator_1': {
+        capabilities: ['league.team.manage'],
       },
     });
     const { getSignedUrl } = installStorage();
@@ -121,15 +125,16 @@ describe('trusted upload session route', () => {
     }));
   });
 
-  it('requires match evidence uploaders to manage an involved team', async () => {
-    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'operator_1', role: 'team_admin' });
+  it('requires match evidence uploaders to govern an involved team', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'operator_1', role: 'league_admin' });
     installFirestore({
       'matches/match_1': {
         homeTeamId: 'team_1',
         awayTeamId: 'team_2',
       },
-      'accessIndex/team_team_1_operator_1': {
-        capabilities: ['team.result.submit'],
+      'teams/team_1': { id: 'team_1', leagueId: 'league_1' },
+      'accessIndex/league_league_1_operator_1': {
+        capabilities: ['league.result.enter'],
       },
     });
     installStorage();

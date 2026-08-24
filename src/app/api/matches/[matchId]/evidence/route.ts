@@ -1,4 +1,5 @@
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 import { jsonError, requireAuthenticatedUser } from '@/server/api/security';
 
@@ -29,16 +30,21 @@ async function canReadMatchEvidence(userId: string, role: unknown, matchId: stri
   const data = match.data() ?? {};
   const teamIds = [data.homeTeamId, data.awayTeamId].filter((id): id is string => typeof id === 'string');
 
-  // Either team in the fixture may inspect the evidence, not only the one that filed it.
+  /**
+   * Either team in the fixture, resolved through the league that governs them.
+   *
+   * This used to ask each team scope for `team.result.submit` or `team.result.confirm`.
+   * ADR-004 zeroed both, so the loop became an expensive way to return false. Evidence for a
+   * fixture is visible to whoever can enter or adjudicate its result, which is the League.
+   */
   for (const teamId of teamIds) {
-    const scope = { scopeType: 'team' as const, scopeId: teamId };
-    if (await hasCapability(userId, scope, 'team.result.submit')) return true;
-    if (await hasCapability(userId, scope, 'team.result.confirm')) return true;
+    if (await hasLeagueCapabilityForTeam(userId, teamId, 'league.result.enter')) return true;
   }
 
   if (typeof data.leagueId === 'string') {
     const scope = { scopeType: 'league' as const, scopeId: data.leagueId };
     if (await hasCapability(userId, scope, 'league.result.resolve')) return true;
+    if (await hasCapability(userId, scope, 'league.result.enter')) return true;
   }
 
   return false;

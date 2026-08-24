@@ -32,8 +32,11 @@ async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leag
     adminDb.collection('accessIndex').doc(accessIndexId('league', leagueId, userId)).get(),
     adminDb.collection('accessIndex').doc(accessIndexId('platform', 'global', userId)).get(),
   ]);
-  return indexHasCapability(teamAccess, 'team.athlete.create')
-    || indexHasCapability(leagueAccess, 'league.roster.verify')
+  // The team arm is gone with ADR-004: `team.athlete.create` resolves to nothing now that
+  // the bundles are zeroed, so leaving it would be a branch that reads like an authority
+  // path and can never be one. Registering an athlete is League work.
+  return indexHasCapability(leagueAccess, 'league.athlete.manage')
+    || indexHasCapability(leagueAccess, 'league.roster.manage')
     // `platform.athlete.manage` rather than the team capability repeated at platform scope:
     // super_admin is governance and holds no `team.*` capabilities at all, so asking for the
     // team one here would lock super_admins out the moment the role bypass was removed.

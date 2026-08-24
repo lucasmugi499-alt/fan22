@@ -6,6 +6,7 @@ import { paymentProviderFromEnvironment, providerCallbackUrl, PaymentProviderCon
 import { recordProviderAttempt } from '@/server/payments/providerAttempts';
 import { checkoutRequestMatches, paymentIntentIdFor } from '@/server/payments/intentIdentity';
 import { requireAuthenticatedMutation, requireFanAccountPrincipal } from '@/server/api/security';
+import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 
 export const runtime = 'nodejs';
@@ -51,11 +52,12 @@ async function isLinkedRecipient(
   if (recipientType !== 'team' && recipientType !== 'league') return false;
   const legacyMember = Array.isArray(recipient.adminUserIds) && recipient.adminUserIds.includes(uid);
   if (legacyMember) return true;
-  return hasCapability(
-    uid,
-    { scopeType: recipientType, scopeId: recipientId },
-    recipientType === 'team' ? 'team.profile.manage' : 'league.profile.manage',
-  );
+  // A team recipient is governed by its league since ADR-004; `team.profile.manage` grants
+  // nothing, so asking the team scope would refuse every legitimate operator.
+  if (recipientType === 'team') {
+    return hasLeagueCapabilityForTeam(uid, recipientId, 'league.team.manage');
+  }
+  return hasCapability(uid, { scopeType: 'league', scopeId: recipientId }, 'league.profile.manage');
 }
 
 export async function POST(request: Request) {

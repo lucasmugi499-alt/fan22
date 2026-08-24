@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
 import type { AccessAssignment } from '@/lib/auth/access';
 import { readScopeProjection } from '@/server/access/projector';
@@ -25,12 +26,19 @@ const schema = z.discriminatedUnion('action', [
  * after the Stage C cutover would have authorized from a field Firestore Rules no longer
  * honour — a server path granting what the client path denies.
  */
+/**
+ * The League verifies claims, and since ADR-004 it is the only party that can.
+ *
+ * `athleteClaims` modelled a two-hop review, team_pending then league_pending. With Team
+ * Admin retired the first hop has nobody to perform it, so this resolves team authority
+ * through the league that owns the team rather than refusing every claim silently.
+ */
 function managesTeam(uid: string, teamId: string) {
-  return hasCapabilityOrPlatformGrant(uid, { scopeType: 'team', scopeId: teamId }, 'team.roster.manage');
+  return hasLeagueCapabilityForTeam(uid, teamId, 'league.athlete.manage');
 }
 
 function managesLeague(uid: string, leagueId: string) {
-  return hasCapabilityOrPlatformGrant(uid, { scopeType: 'league', scopeId: leagueId }, 'league.roster.verify');
+  return hasCapabilityOrPlatformGrant(uid, { scopeType: 'league', scopeId: leagueId }, 'league.athlete.manage');
 }
 
 async function synchronizeAthleteRole(uid: string) {

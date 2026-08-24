@@ -680,131 +680,20 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'create_team_invitation') {
-      const forbidden = requireRole(actor, ['league_admin', 'platform_admin', 'super_admin'], 'League Admin access required.');
-      if (forbidden) return forbidden;
-      const { teamId, leagueId, seasonId, invitedEmail } = body;
-      const league = await adminDb.collection('leagues').doc(leagueId).get();
-      const leagueData = league.data();
-      // Capability only. The `!hasRole(...)` arm that sat here let a platform role invite a
-      // team admin to any league with no capability anywhere; platform operators now pass
-      // through the platform-global grant inside hasScopedLeagueCapability.
-      if (!(await hasScopedLeagueCapability(actor.uid, leagueId, 'league.team_admin.invite'))) {
-        return Response.json({ error: 'You do not manage this league.' }, { status: 403 });
-      }
-      const team = await adminDb.collection('teams').doc(teamId).get();
-      const teamData = team.data();
-      if (!team.exists || teamData?.leagueId !== leagueId) {
-        return Response.json({ error: 'The selected team does not belong to this league.' }, { status: 409 });
-      }
-      const season = await adminDb.collection('seasons').doc(seasonId).get();
-      const seasonData = season.data();
-
-      const invitationKey = createHash('sha256')
-        .update(`${leagueId}:${seasonId}:${teamId}:${invitedEmail}`)
-        .digest('hex')
-        .slice(0, 32);
-      const invitationId = `invite_${invitationKey}`;
-      const legacyAssignmentRef = adminDb.collection('teamAssignments').doc(invitationId);
-      const invitationRef = adminDb.collection('invitations').doc(invitationId);
-      const token = randomBytes(32).toString('base64url');
-      const tokenHash = createHash('sha256').update(token).digest('hex');
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const actionUrl = `/invitations/access/${invitationId}?token=${encodeURIComponent(token)}`;
-      await adminDb.runTransaction(async (transaction) => {
-        const existing = await transaction.get(invitationRef);
-        if (
-          existing.exists
-          && ['queued', 'sent', 'delivered', 'viewed', 'accepted'].includes(String(existing.data()?.status))
-          && (!existing.data()?.expiresAt || Date.parse(existing.data()!.expiresAt) > Date.now())
-        ) {
-          throw new Error('An active invitation already exists for this email, team, and season.');
-        }
-        transaction.set(invitationRef, {
-          id: invitationId,
-          type: 'team_admin',
-          invitedEmail,
-          roleKey: 'team_admin',
-          scopeType: 'team',
-          scopeId: teamId,
-          permissionBundleId: 'full_team_admin',
-          tokenHash,
-          tokenVersion: 1,
-          status: 'sent',
-          invitedByUserId: actor.uid,
-          leagueId,
-          teamId,
-          seasonId,
-          legacyTeamAssignmentId: invitationId,
-          actionUrl,
-          expiresAt,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(legacyAssignmentRef, {
-          id: invitationId,
-          userId: '',
-          teamId,
-          leagueId,
-          seasonId,
-          role: 'team_admin',
-          status: 'invited',
-          invitedByUserId: actor.uid,
-          invitedEmail,
-          tokenHash,
-          expiresAt,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.set(adminDb.collection('adminAuditEvents').doc(), audit(
-          actor.uid,
-          'invited',
-          'invitations',
-          invitationId,
-          `Invitation expires ${expiresAt}.`,
-        ));
-      });
-      const email = await sendTeamInvitationEmail({
-        to: invitedEmail,
-        inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
-        assignmentId: invitationId,
-        teamName: String(teamData?.name ?? teamId),
-        leagueName: String(leagueData?.name ?? leagueId),
-        seasonName: String(seasonData?.name ?? seasonId),
-        inviterName: String(actor.name ?? actor.email ?? 'your League Admin'),
-        expiresAt,
-      });
-      await Promise.all([
-        invitationRef.set({
-          emailProvider: 'resend',
-          emailDelivery: email.status,
-          ...(email.id ? {
-            emailMessageId: email.id,
-            emailSentAt: FieldValue.serverTimestamp(),
-          } : {}),
-          ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true }),
-        legacyAssignmentRef.set({
-        emailProvider: 'resend',
-        emailDelivery: email.status,
-        ...(email.id ? {
-          emailMessageId: email.id,
-          emailSentAt: FieldValue.serverTimestamp(),
-        } : {}),
-        ...(email.error ? { emailError: email.error.slice(0, 500) } : {}),
-        updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true }),
-      ]);
+      /**
+       * Closed by ADR-004, Stage B of the migration: no new Team Admin assignment or
+       * invitation is issued.
+       *
+       * Refused here rather than removed, because the action name is part of a shipped API
+       * and a caller that still sends it deserves to be told why instead of receiving an
+       * unknown-action error. `league.team_admin.invite`, which used to gate this, is
+       * deprecated and no bundle grants it any more, so the check below would refuse
+       * everyone regardless; saying so plainly is better than a 403 that reads like a
+       * permissions problem.
+       */
       return Response.json({
-        ok: true,
-        id: invitationId,
-        token,
-        expiresAt,
-        actionUrl,
-        emailDelivery: email.status,
-        emailMessageId: email.id,
-        emailError: email.error,
-      });
+        error: 'Team administration has moved to League Operations. Athletes and rosters are managed from the league.',
+      }, { status: 410 });
     }
 
     if (body.action === 'create_teams') {

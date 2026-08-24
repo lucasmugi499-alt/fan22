@@ -61,7 +61,7 @@ const KNOWN_LEGACY_AUTHORITY: Budget[] = [
   { file: 'src/app/api/payments/intents/route.ts', reads: 1, owedCapability: 'none — self-dealing deny, must not be removed' },
   // Remaining lines are schema fields and record initialisers (adminUserIds: [] on
   // creation, z.array in the request schema), not authorization decisions.
-  { file: 'src/app/api/admin/actions/route.ts', reads: 2, owedCapability: 'none — schema and record initialisation' },
+  { file: 'src/app/api/admin/actions/route.ts', reads: 1, owedCapability: 'none — schema and record initialisation' },
   // Not authorization: these maintain the legacy record so an operator can still revoke a
   // pre-migration teamAssignment. They are counted because the field should eventually go,
   // not because they decide anything.

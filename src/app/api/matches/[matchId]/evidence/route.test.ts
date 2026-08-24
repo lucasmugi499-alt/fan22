@@ -67,15 +67,32 @@ describe('match evidence access', () => {
     expect(response.status).toBe(401);
   });
 
-  it('allows the opposing team admin to review evidence they did not upload', async () => {
+  /**
+   * This used to assert that the opposing Team Admin could open the evidence, because the
+   * bilateral workflow asked them to confirm or dispute the result and Storage Rules alone
+   * left them unable to look at it.
+   *
+   * ADR-004 froze that workflow and zeroed the capability it turned on, so the account this
+   * described no longer exists. What replaces the assertion is its inverse: a stored team
+   * assignment is not a way back in. The league case below is now the one that carries the
+   * "somebody who did not upload it can still review it" property.
+   */
+  it('does not let a retired team assignment open match evidence', async () => {
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'away_admin', role: 'team_admin' } as never);
     install({ team_team_away_away_admin: ['team.result.confirm'] });
 
     const response = await GET(request(), context);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('allows a league operator who can enter the result to review evidence they did not upload', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_ops', role: 'league_admin' } as never);
+    install({ league_league_1_league_ops: ['league.result.enter'] });
+
+    const response = await GET(request(), context);
     const body = await response.json();
 
-    // The whole verification workflow asks this account to confirm or dispute the
-    // result; Storage Rules alone left them unable to open the evidence.
     expect(response.status).toBe(200);
     expect(body.evidence).toHaveLength(1);
     expect(body.evidence[0].readUrl).toContain('https://storage.example/read');

@@ -162,8 +162,13 @@ describe('trusted admin actions route hardening', () => {
     expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
-  it('requires League Admin access before creating an invitation', async () => {
-    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'fan_1', role: 'fan' });
+  /**
+   * ADR-004, Stage B. The action is refused before authorization is even considered, because
+   * there is no longer anything on the other side of it to authorize. A 410 rather than a
+   * 403 so a caller can tell "this is gone" from "you may not".
+   */
+  it('refuses to create a Team Admin invitation at all', async () => {
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'league_admin_1', role: 'league_admin' });
 
     const response = await POST(request(JSON.stringify({
       action: 'create_team_invitation',
@@ -173,8 +178,8 @@ describe('trusted admin actions route hardening', () => {
       invitedEmail: 'team-admin@example.com',
     })));
 
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'League Admin access required.' });
+    expect(response.status).toBe(410);
+    expect((await response.json()).error).toContain('League Operations');
     expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
@@ -230,66 +235,6 @@ describe('trusted admin actions route hardening', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'You do not manage league league_1.' });
     expectNoDomainTransaction(vi.mocked(adminDb.runTransaction));
-  });
-
-  it('allows scoped League Admins to invite a Team Admin for their league', async () => {
-    const transaction = {
-      get: vi.fn(async () => snapshot('invite_1', undefined)),
-      set: vi.fn(),
-    };
-    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
-      uid: 'league_admin_1',
-      role: 'league_admin',
-      email: 'league@example.com',
-      name: 'League Admin',
-    });
-    vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
-    vi.mocked(sendTeamInvitationEmail).mockResolvedValue({ status: 'sent', id: 'email_1' });
-    installFirestoreMock({
-      'leagues/league_1': { id: 'league_1', name: 'Kampala League', adminUserIds: [] },
-      'teams/team_1': { id: 'team_1', name: 'Kampala Testers', leagueId: 'league_1' },
-      'seasons/season_1': { id: 'season_1', name: '2027 Season' },
-      'accessIndex/league_league_1_league_admin_1': {
-        userId: 'league_admin_1',
-        scopeType: 'league',
-        scopeId: 'league_1',
-        capabilities: ['league.team_admin.invite'],
-      },
-    });
-
-    const response = await POST(request(JSON.stringify({
-      action: 'create_team_invitation',
-      teamId: 'team_1',
-      leagueId: 'league_1',
-      seasonId: 'season_1',
-      invitedEmail: 'teamadmin@example.com',
-    })));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      ok: true,
-      emailDelivery: 'sent',
-      emailMessageId: 'email_1',
-    });
-    expect(body.actionUrl).toContain('/invitations/access/invite_');
-    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
-      collectionName: 'invitations',
-    }), expect.objectContaining({
-      type: 'team_admin',
-      roleKey: 'team_admin',
-      scopeType: 'team',
-      scopeId: 'team_1',
-      permissionBundleId: 'full_team_admin',
-      invitedByUserId: 'league_admin_1',
-      invitedEmail: 'teamadmin@example.com',
-    }));
-    expect(sendTeamInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'teamadmin@example.com',
-      teamName: 'Kampala Testers',
-      leagueName: 'Kampala League',
-      seasonName: '2027 Season',
-    }));
   });
 
   it('records audited team moderation through the trusted admin route', async () => {

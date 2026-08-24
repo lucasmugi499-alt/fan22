@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
+import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, SupportNeed } from '@/types';
 
@@ -46,15 +47,20 @@ export async function POST(
     // Canonical assignments on the exact scopes this need belongs to. A need with no
     // resolvable team cannot grant team authority to anyone, which the legacy read
     // expressed accidentally through a null snapshot and this states directly.
+    /**
+     * Team verification is League work since ADR-004. `team.profile.manage` grants nothing,
+     * so without this the `team_verify` and `team_reject` actions below would have become
+     * unreachable for everyone except Platform, and a support need would sit unverifiable.
+     */
     const [isTeamAdmin, isLeagueAdmin] = await Promise.all([
       teamId
-        ? hasCapability(actor.uid, { scopeType: 'team', scopeId: String(teamId) }, 'team.profile.manage')
+        ? hasLeagueCapabilityForTeam(actor.uid, String(teamId), 'league.team.manage')
         : Promise.resolve(false),
       hasCapability(actor.uid, { scopeType: 'league', scopeId: need.leagueId }, 'league.profile.manage'),
     ]);
     const teamAction = input.action === 'team_verify' || input.action === 'team_reject';
     if (teamAction && !isTeamAdmin && !isPlatform) {
-      return Response.json({ error: 'Only the recipient’s Team Admin can verify this need.' }, { status: 403 });
+      return Response.json({ error: 'Only the recipient’s league can verify this need.' }, { status: 403 });
     }
     if (!teamAction && !isLeagueAdmin && !isPlatform) {
       return Response.json({ error: 'Only the owning League Admin can approve publication.' }, { status: 403 });

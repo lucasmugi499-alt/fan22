@@ -59,14 +59,22 @@ export async function POST(
         // Canonical authority on the exact league, or on either team in the fixture. A
         // correction is requested by someone party to the result, so the team side asks
         // for the capability that lets them report one at all.
-        const [managesLeague, ...teamGrants] = await Promise.all([
-          hasCapability(actor.uid, { scopeType: 'league', scopeId: submission.leagueId }, 'league.result.resolve'),
-          hasCapability(actor.uid, { scopeType: 'team', scopeId: submission.submittedByTeamId }, 'team.result.submit'),
-          hasCapability(actor.uid, { scopeType: 'team', scopeId: submission.opponentTeamId }, 'team.result.submit'),
-        ]);
-        const managesTeam = teamGrants.some(Boolean);
-        if (!isPlatform && !managesLeague && !managesTeam) {
-          throw new Error('Only an assigned Team, League, or Platform Admin can request a correction.');
+        /**
+         * League or Platform only since ADR-004. The two team arms asked for
+         * `team.result.submit` on either side of the fixture, which grants nothing now, so
+         * they could only ever have contributed false.
+         *
+         * This is a real narrowing rather than a rewrite of the same rule: a club officer
+         * can no longer request a correction directly. What replaces it is the League, who
+         * they ask, and for an athlete the stat-issue route that opens a correction case.
+         */
+        const managesLeague = await hasCapability(
+          actor.uid,
+          { scopeType: 'league', scopeId: submission.leagueId },
+          'league.result.resolve',
+        );
+        if (!isPlatform && !managesLeague) {
+          throw new Error('Only the league or Platform can request a correction.');
         }
         transaction.update(submissionRef, {
           correctionReason: input.reason,
@@ -77,7 +85,8 @@ export async function POST(
           submissionId: matchId,
           from: 'official',
           to: 'official',
-          actor: isPlatform ? 'platform_admin' : managesLeague ? 'league_admin' : 'team_admin',
+          // No `team_admin` arm: the refusal above means neither remaining branch can be one.
+          actor: isPlatform ? 'platform_admin' : 'league_admin',
           actorUserId: actor.uid,
           note: `Correction requested: ${input.reason}`,
           createdAt: FieldValue.serverTimestamp(),

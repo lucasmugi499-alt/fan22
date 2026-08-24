@@ -94,9 +94,9 @@ describe('athlete creation route hardening', () => {
     expectNoDomainCollectionAccess(vi.mocked(adminDb.collection));
   });
 
-  it('allows a Team Admin with scoped athlete creation access even without legacy team arrays', async () => {
+  it('allows a League Admin with scoped athlete access even without legacy team arrays', async () => {
     const transaction = { set: vi.fn() };
-    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'team_admin_1', role: 'team_admin' });
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'team_admin_1', role: 'league_admin' });
     vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
     installFirestoreMock({
       'teams/team_1': {
@@ -108,11 +108,13 @@ describe('athlete creation route hardening', () => {
         adminUserIds: [],
       },
       'leagues/league_1': { id: 'league_1', adminUserIds: [] },
-      'accessIndex/team_team_1_team_admin_1': {
+      // League-scoped since ADR-004. Registering an athlete is League work, and the team
+      // scope this used to hold grants nothing.
+      'accessIndex/league_league_1_team_admin_1': {
         userId: 'team_admin_1',
-        scopeType: 'team',
-        scopeId: 'team_1',
-        capabilities: ['team.athlete.create'],
+        scopeType: 'league',
+        scopeId: 'league_1',
+        capabilities: ['league.athlete.manage'],
       },
     });
 

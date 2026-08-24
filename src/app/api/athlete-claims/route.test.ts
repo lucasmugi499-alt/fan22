@@ -69,7 +69,7 @@ describe('athlete claim access projection', () => {
     vi.clearAllMocks();
     accessIndex = {
       // The league admin's canonical grant. Authority no longer comes from adminUserIds.
-      league_league_1_league_admin_1: { capabilities: ['league.roster.verify'] },
+      league_league_1_league_admin_1: { capabilities: ['league.athlete.manage'] },
     };
     vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => ({
       doc: (id?: string) => ref(collectionName, id),

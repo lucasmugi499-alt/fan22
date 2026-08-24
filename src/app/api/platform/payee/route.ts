@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { hasLeagueCapabilityForAthlete } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 import {
   jsonError,
@@ -94,12 +95,15 @@ async function resolveAuthority(
     return athlete.userId === actor.uid ? 'athlete' : 'guardian';
   }
 
-  if (typeof athlete.teamId === 'string' && athlete.teamId
-    && await hasCapability(actor.uid, { scopeType: 'team', scopeId: athlete.teamId }, 'team.roster.manage')) {
-    return 'team';
-  }
-  if (typeof athlete.leagueId === 'string' && athlete.leagueId
-    && await hasCapability(actor.uid, { scopeType: 'league', scopeId: athlete.leagueId }, 'league.roster.verify')) {
+  /**
+   * One club-side answer since ADR-004, and it is the League.
+   *
+   * There used to be two: `team` for the club that held the roster and `league` above it.
+   * The team arm resolved through `team.roster.manage`, which now grants nothing, so it
+   * would have quietly stopped returning and left every athlete's payee visible only to
+   * Platform. Both arms collapse into the league that governs the athlete.
+   */
+  if (await hasLeagueCapabilityForAthlete(actor.uid, athlete.id, 'league.roster.manage')) {
     return 'league';
   }
   return null;

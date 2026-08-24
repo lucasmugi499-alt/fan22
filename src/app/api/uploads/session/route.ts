@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import { hasLeagueCapabilityForAthlete, hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapability } from '@/server/access/capabilities';
 import { jsonError, requireAuthenticatedMutation, type AuthenticatedActor } from '@/server/api/security';
 
@@ -48,7 +49,7 @@ async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'us
   // the photo, because the athlete is a managed record rather than an account holder. The
   // athlete-scoped `athlete.media.manage` grant this used to check no longer exists.
   if (ownerType === 'athlete') return canManageAthleteMedia(actor, ownerId);
-  if (ownerType === 'team') return hasCapability(actor.uid, { scopeType: 'team', scopeId: ownerId }, 'team.profile.manage');
+  if (ownerType === 'team') return hasLeagueCapabilityForTeam(actor.uid, ownerId, 'league.team.manage');
   return hasCapability(actor.uid, { scopeType: 'league', scopeId: ownerId }, 'league.profile.manage');
 }
 
@@ -58,10 +59,7 @@ async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'us
  * of their profile, so a photo cannot be changed by someone who could not change the name.
  */
 async function canManageAthleteMedia(actor: AuthenticatedActor, athleteId: string) {
-  const athlete = await adminDb.collection('athletes').doc(athleteId).get();
-  const teamId = athlete.data()?.teamId;
-  if (typeof teamId !== 'string' || !teamId) return false;
-  return hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.roster.manage');
+  return hasLeagueCapabilityForAthlete(actor.uid, athleteId, 'league.roster.manage');
 }
 
 async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string, teamId: string) {
@@ -73,8 +71,10 @@ async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string
   if (!match.exists) return false;
   const data = match.data() ?? {};
   if (data.homeTeamId !== teamId && data.awayTeamId !== teamId) return false;
-  return await hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.result.submit')
-    || await hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.result.confirm');
+  // Evidence for a result is League work now: the two team capabilities this used to accept
+  // grant nothing, and field capture attaches its own evidence through the match ops routes.
+  return await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.enter')
+    || await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.resolve');
 }
 
 async function signedWriteUrl(path: string, contentType: string) {
