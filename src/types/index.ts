@@ -673,6 +673,76 @@ export interface Athlete {
   createdAt: string;
 }
 
+/**
+ * What an athlete says about themselves. Self-authored, and the only client-writable
+ * collection on the platform.
+ *
+ * ADR-001 splits the athlete in two because one document with one owner cannot serve both
+ * purposes. The League needs a registered name and a registered position that govern
+ * eligibility, standings and fantasy; the athlete needs a public identity they control. The
+ * previous model resolved that tension by giving the athlete nothing, which made an Athlete
+ * account not worth opening twice a season.
+ *
+ * No field here influences a projection, a statistic or an eligibility decision. That is the
+ * whole safety property: an athlete can write everything on this document and still cannot
+ * author a single measurement of themselves.
+ *
+ * Note the field names. There is no bare `name` and no bare `position` here either, for the
+ * same reason there is none on `Athlete`: the moment both documents have a `name`, the
+ * question "which one does this surface render" stops having an obvious answer.
+ */
+export interface AthletePersona {
+  /** Same id as the athlete it belongs to. One persona per athlete, atomically. */
+  id: string;
+  athleteId: string;
+  /** The nickname. Leads the profile header; never appears beside a verified statistic. */
+  displayName?: string;
+  bio?: string;
+  avatarUrl?: string;
+  coverUrl?: string;
+  /** What they would like to play. Eligibility and fantasy read registeredPosition instead. */
+  preferredPosition?: string;
+  secondaryPreferredPosition?: string;
+  heightCm?: number;
+  preferredFoot?: 'left' | 'right' | 'both';
+  hometown?: string;
+  socialLinks?: { label: string; url: string }[];
+  contactPreference?: 'none' | 'league' | 'public';
+  highlights?: { title: string; url: string; addedAt: string }[];
+  /** The account that claimed this athlete. Written by the server on claim verification. */
+  claimedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * An athlete's report that their verified record is wrong.
+ *
+ * The one route an athlete has toward the sporting record, and it is deliberately a request
+ * rather than an edit. An athlete who believes they scored a goal that was not recorded opens
+ * one of these; they do not get a field to type a goal into. A correction produces a new
+ * official result version through the same pipeline as any other, with evidence and a
+ * reviewer attached.
+ */
+export interface AthleteStatIssue {
+  id: string;
+  athleteId: string;
+  matchId?: string;
+  seasonId?: string;
+  leagueId: string;
+  raisedByUserId: string;
+  category: 'missing_event' | 'wrong_attribution' | 'wrong_score' | 'not_me' | 'other';
+  detail: string;
+  status: 'open' | 'under_review' | 'accepted' | 'rejected' | 'superseded';
+  reviewedByUserId?: string;
+  reviewedAt?: string;
+  resolutionNote?: string;
+  /** The correction version this produced, when it produced one. */
+  officialResultVersion?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Person {
   id: string;
   legalName?: string;

@@ -838,6 +838,66 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /**
+     * The one client-writable collection on the platform, and the reason it can be one.
+     *
+     * ADR-001 gives the athlete a public identity they control. Nothing on this document is
+     * read by a projection, a statistic or an eligibility decision, so an athlete can write
+     * every field here and still cannot author a single measurement of themselves. That is
+     * what makes a direct client write safe where it would not be anywhere else.
+     *
+     * Three things are enforced rather than assumed. The writer must hold athlete-self
+     * authority in this athlete's own scope, so one athlete cannot edit another's identity.
+     * The document must already exist and already name them, so a persona is created by the
+     * server on claim verification rather than minted by whoever asks first. And
+     * `claimedByUserId` and `athleteId` are outside the writable set, so an athlete cannot
+     * reassign their persona to somebody else or point it at a different athlete.
+     *
+     * Public read: this is a public profile, and the whole point is that people can see it.
+     */
+    function claimsAthletePersona(athleteId) {
+      return hasScopeCapability('athlete', athleteId, ['athlete.persona.manage']) &&
+        resource.data.claimedByUserId == request.auth.uid;
+    }
+
+    match /athletePersonas/{athleteId} {
+      allow read: if true;
+      // Server-authored, on claim verification. An athlete does not create their own persona,
+      // because creating one is what links an account to a registered athlete.
+      allow create, delete: if false;
+      allow update: if claimsAthletePersona(athleteId) &&
+        request.resource.data.athleteId == resource.data.athleteId &&
+        request.resource.data.claimedByUserId == resource.data.claimedByUserId &&
+        changedKeysWithin([
+          'displayName',
+          'bio',
+          'avatarUrl',
+          'coverUrl',
+          'preferredPosition',
+          'secondaryPreferredPosition',
+          'heightCm',
+          'preferredFoot',
+          'hometown',
+          'socialLinks',
+          'contactPreference',
+          'highlights',
+          'updatedAt',
+          'updatedAtServer',
+        ]);
+    }
+
+    /**
+     * An athlete's report that their verified record is wrong.
+     *
+     * Server-authored through /api/athletes/{id}/stat-issue. Denied to clients on both sides:
+     * a case that could be written directly could claim to have been raised by somebody else,
+     * and a case that could be read by anyone would expose one athlete's dispute about their
+     * record to every other. The league sees these through its review queue.
+     */
+    match /athleteStatIssues/{issueId} {
+      allow read, write: if false;
+    }
+
     match /feedPosts/{postId} {
       allow read: if true;
       allow create: if signedIn() &&

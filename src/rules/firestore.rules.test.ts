@@ -82,7 +82,7 @@ const LEAGUE_CAPABILITIES = [
  */
 function accessIndexDoc(
   userId: string,
-  scopeType: 'league' | 'team',
+  scopeType: 'league' | 'team' | 'athlete',
   scopeId: string,
   capabilities: string[],
 ) {
@@ -2060,5 +2060,145 @@ describe('team affiliations grant nothing and are readable by nobody', () => {
         { merge: true },
       ),
     );
+  });
+});
+
+describe('the athlete persona is the one thing an athlete owns', () => {
+  const ATHLETE_USER = 'user_athlete_self';
+  const OTHER_ATHLETE_USER = 'user_athlete_other';
+
+  async function seedPersona() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'athletePersonas/athlete_001'), {
+        id: 'athlete_001',
+        athleteId: 'athlete_001',
+        displayName: 'Emma',
+        claimedByUserId: ATHLETE_USER,
+        createdAt: '2026-08-01T00:00:00.000Z',
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      });
+      await setDoc(
+        doc(db, `accessIndex/athlete_athlete_001_${ATHLETE_USER}`),
+        accessIndexDoc(ATHLETE_USER, 'athlete', 'athlete_001', ['athlete.persona.manage']),
+      );
+      await setDoc(
+        doc(db, `accessIndex/athlete_athlete_001_${OTHER_ATHLETE_USER}`),
+        accessIndexDoc(OTHER_ATHLETE_USER, 'athlete', 'athlete_001', ['athlete.persona.manage']),
+      );
+    });
+  }
+
+  it('lets the claiming athlete change their nickname', async () => {
+    await seedPersona();
+
+    await assertSucceeds(
+      setDoc(
+        doc(asUser(ATHLETE_USER), 'athletePersonas/athlete_001'),
+        { displayName: 'Emma O', updatedAt: '2026-08-24T00:00:00.000Z' },
+        { merge: true },
+      ),
+    );
+  });
+
+  /**
+   * ADR-001's completion test, and the reason it is asserted here rather than by the absence
+   * of a button. The whole athlete experience is built on the claim that giving an athlete a
+   * public identity does not give them authority over their sporting record. That claim is
+   * only true if the database says so.
+   */
+  it('does not let a claimed athlete change their registered name', async () => {
+    await seedPersona();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'athletes/athlete_001'), {
+        id: 'athlete_001',
+        legalName: 'Emmanuel Okello',
+        registeredPosition: 'Forward',
+        teamId: 'team_a',
+        leagueId: 'league_001',
+      });
+    });
+
+    await assertFails(
+      setDoc(
+        doc(asUser(ATHLETE_USER), 'athletes/athlete_001'),
+        { legalName: 'Emma Okello' },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('does not let one athlete edit another athlete persona', async () => {
+    await seedPersona();
+
+    // Holding athlete-self capability in this scope is not enough: the document has to name
+    // them. A projection bug that granted the wrong scope must not become one athlete
+    // rewriting another's public identity.
+    await assertFails(
+      setDoc(
+        doc(asUser(OTHER_ATHLETE_USER), 'athletePersonas/athlete_001'),
+        { displayName: 'Hijacked' },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('does not let an athlete reassign their persona to another account', async () => {
+    await seedPersona();
+
+    await assertFails(
+      setDoc(
+        doc(asUser(ATHLETE_USER), 'athletePersonas/athlete_001'),
+        { claimedByUserId: OUTSIDER },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('does not let an athlete point their persona at a different athlete', async () => {
+    await seedPersona();
+
+    await assertFails(
+      setDoc(
+        doc(asUser(ATHLETE_USER), 'athletePersonas/athlete_001'),
+        { athleteId: 'athlete_999' },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('does not let anyone create or delete a persona from the client', async () => {
+    await seedPersona();
+
+    // Creating one is what links an account to a registered athlete, so it belongs to claim
+    // verification rather than to whoever asks first.
+    await assertFails(
+      setDoc(doc(asUser(ATHLETE_USER), 'athletePersonas/athlete_002'), {
+        athleteId: 'athlete_002',
+        claimedByUserId: ATHLETE_USER,
+      }),
+    );
+    await assertFails(deleteDoc(doc(asUser(ATHLETE_USER), 'athletePersonas/athlete_001')));
+  });
+
+  it('is publicly readable, because it is a public profile', async () => {
+    await seedPersona();
+
+    await assertSucceeds(getDoc(doc(asUser(OUTSIDER), 'athletePersonas/athlete_001')));
+  });
+
+  it('keeps stat issues off the client entirely', async () => {
+    // One athlete's dispute about their own record is not other athletes' business, and a
+    // client-written case could claim to have been raised by somebody else.
+    await assertFails(
+      setDoc(doc(asUser(ATHLETE_USER), 'athleteStatIssues/issue_1'), {
+        athleteId: 'athlete_001',
+        raisedByUserId: OUTSIDER,
+        category: 'missing_event',
+        detail: 'I scored in the second half.',
+        status: 'accepted',
+      }),
+    );
+    await assertFails(getDoc(doc(asUser(ATHLETE_USER), 'athleteStatIssues/issue_1')));
   });
 });

@@ -3,7 +3,6 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
-import { hasLeagueCapabilityForTeam } from '@/server/access/leagueScope';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
 import type { AccessAssignment } from '@/lib/auth/access';
 import { readScopeProjection } from '@/server/access/projector';
@@ -30,13 +29,9 @@ const schema = z.discriminatedUnion('action', [
  * The League verifies claims, and since ADR-004 it is the only party that can.
  *
  * `athleteClaims` modelled a two-hop review, team_pending then league_pending. With Team
- * Admin retired the first hop has nobody to perform it, so this resolves team authority
- * through the league that owns the team rather than refusing every claim silently.
+ * Admin retired there is nobody to perform the first hop, so `managesTeam` went with it and
+ * this is the whole authority check.
  */
-function managesTeam(uid: string, teamId: string) {
-  return hasLeagueCapabilityForTeam(uid, teamId, 'league.athlete.manage');
-}
-
 function managesLeague(uid: string, leagueId: string) {
   return hasCapabilityOrPlatformGrant(uid, { scopeType: 'league', scopeId: leagueId }, 'league.athlete.manage');
 }
@@ -181,14 +176,16 @@ export async function POST(request: Request) {
       const platform = ['platform_admin', 'super_admin'].includes(String(actor.role ?? ''));
 
       if (input.action === 'team_confirm') {
-        if (claim.status !== 'team_pending') throw new Error('This claim is no longer waiting for Team confirmation.');
-        if (!platform && !await managesTeam(actor.uid, claim.teamId)) throw new Error('Only an assigned Team Admin can confirm this claim.');
-        transaction.update(claimRef, {
-          status: 'league_pending',
-          teamReviewedByUserId: actor.uid,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        return { id: claimRef.id, status: 'league_pending' };
+        /**
+         * Retired with ADR-004. `athleteClaims` modelled a two-hop review, team_pending then
+         * league_pending, and there is no longer anybody to perform the first hop.
+         *
+         * The action is refused rather than removed so a client that still sends it is told
+         * why. Claims already sitting in `team_pending` are not stranded: `league_verify`
+         * below accepts them directly, because the League absorbed what the Team Admin used
+         * to do rather than the hop simply disappearing under an in-flight claim.
+         */
+        throw new Error('Team confirmation has been retired. The league verifies claims directly.');
       }
 
       if (input.action === 'league_verify') {
@@ -228,7 +225,12 @@ export async function POST(request: Request) {
             requesterUserId,
           };
         }
-        if (claim.status !== 'league_pending') throw new Error('Team confirmation is required first.');
+        // `team_pending` is accepted alongside `league_pending`: those claims were created
+        // before ADR-004 retired the first hop, and refusing them would strand every athlete
+        // whose claim was in flight on the day the migration landed.
+        if (claim.status !== 'league_pending' && claim.status !== 'team_pending') {
+          throw new Error('This claim is not awaiting verification.');
+        }
         if (!platform && !await managesLeague(actor.uid, claim.leagueId)) throw new Error('Only an assigned League Admin can verify this claim.');
         const athleteRef = adminDb.collection('athletes').doc(claim.athleteId);
         // Both remaining reads must precede every write in this transaction.
@@ -245,6 +247,26 @@ export async function POST(request: Request) {
           leagueReviewedByUserId: actor.uid,
           updatedAt: FieldValue.serverTimestamp(),
         });
+        /**
+         * The persona is created here and only here.
+         *
+         * Rules deny `create` on `athletePersonas` to every client, so this is the single
+         * point at which one comes into existence, and it is the same moment the account is
+         * linked to the athlete. That is deliberate: creating the document is what establishes
+         * who owns it, and letting a client mint one would mean whoever asked first became its
+         * owner.
+         *
+         * Created empty apart from ownership. A default nickname taken from the registered
+         * name would put the League's name on a document the athlete owns and start the two
+         * identities converging on day one.
+         */
+        transaction.set(adminDb.collection('athletePersonas').doc(claim.athleteId), {
+          id: claim.athleteId,
+          athleteId: claim.athleteId,
+          claimedByUserId: requesterUserId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
         transaction.set(adminDb.collection('athleteVerificationRecords').doc(), {
           athleteId: claim.athleteId,
           type: 'team_affiliation',
@@ -266,9 +288,12 @@ export async function POST(request: Request) {
         };
       }
 
+      // The league rejects, at either status. `managesTeam` now resolves through the league
+      // that owns the club, so a pre-ADR-004 claim in `team_pending` is rejectable by the
+      // same person who could verify it.
       const mayReject = platform ||
-        (claim.status === 'team_pending' && await managesTeam(actor.uid, claim.teamId)) ||
-        (claim.status === 'league_pending' && await managesLeague(actor.uid, claim.leagueId));
+        ((claim.status === 'team_pending' || claim.status === 'league_pending')
+          && await managesLeague(actor.uid, claim.leagueId));
       if (!mayReject) throw new Error('You cannot reject this athlete claim.');
       transaction.update(claimRef, {
         status: 'rejected',

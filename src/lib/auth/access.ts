@@ -101,6 +101,15 @@ export type PermissionCapability =
   // identity is not a thing this platform wants to offer.
   //
   // What an athlete keeps is what is genuinely theirs: proposing, and their money.
+  // Added 2026-08-24 with ADR-001. Named for what they actually govern: the persona is the
+  // athlete's own public identity, and none of these can write `athletes/{athleteId}`.
+  // `athlete.profile.manage` and `athlete.media.manage` stay permanently retired, because
+  // those names imply authority over the sporting entity rather than over a self-description.
+  | 'athlete.persona.manage'
+  | 'athlete.persona.media.manage'
+  | 'athlete.posts.publish'
+  | 'athlete.posts.manage'
+  | 'athlete.backings.view'
   | 'athlete.support_need.propose'
   | 'athlete.challenge.propose'
   // The athlete or guardian's own payout identity, submitted through their portal. Never
@@ -368,13 +377,28 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
   },
   {
     id: 'athlete_self',
-    // 2.0.0: profile and media authority removed. Claiming an athlete profile no longer
-    // makes the athlete an editor of their own public sporting record — it gives them their
-    // payee portal and the ability to propose. The team remains the author of the record.
-    version: '2.0.0',
+    /**
+     * 3.0.0: the athlete gets a persona, posts and a view of their backings.
+     *
+     * 2.0.0 removed profile and media authority and gave nothing back, which left an account
+     * worth opening about twice a season. ADR-001 restores a first-class consumer experience
+     * without reopening the sporting record: everything here writes `athletePersonas` or
+     * `feedPosts`, and nothing writes `athletes/{athleteId}`. That is invariant 06, and it is
+     * the reason the capabilities are named for the persona rather than for the profile.
+     */
+    version: '3.0.0',
     roleKey: 'athlete_self',
     label: 'Athlete Self',
-    capabilities: ['athlete.support_need.propose', 'athlete.challenge.propose', 'athlete.payee.submit'],
+    capabilities: [
+      'athlete.persona.manage',
+      'athlete.persona.media.manage',
+      'athlete.posts.publish',
+      'athlete.posts.manage',
+      'athlete.backings.view',
+      'athlete.support_need.propose',
+      'athlete.challenge.propose',
+      'athlete.payee.submit',
+    ],
   },
   {
     id: 'athlete_guardian',
