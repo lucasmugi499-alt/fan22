@@ -27,8 +27,9 @@ function indexHasCapability(
 }
 
 async function hasScopedAthleteCreateAccess(userId: string, teamId: string, leagueId: string) {
-  const [teamAccess, leagueAccess, platformAccess] = await Promise.all([
-    adminDb.collection('accessIndex').doc(accessIndexId('team', teamId, userId)).get(),
+  // The team index is no longer read at all: ADR-004 left it granting nothing, so fetching
+  // it was a document read whose result could not change the answer.
+  const [leagueAccess, platformAccess] = await Promise.all([
     adminDb.collection('accessIndex').doc(accessIndexId('league', leagueId, userId)).get(),
     adminDb.collection('accessIndex').doc(accessIndexId('platform', 'global', userId)).get(),
   ]);

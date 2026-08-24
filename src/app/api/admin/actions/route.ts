@@ -1,9 +1,8 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
-import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { platformAuditEvent, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import type {
   AccessAssignment,
@@ -77,11 +76,6 @@ async function hasScopedLeagueCapability(userId: string, leagueId: string, capab
   return hasCapabilityOrPlatformGrant(userId, { scopeType: 'league', scopeId: leagueId }, capability);
 }
 
-function publicBaseUrl(request: Request) {
-  return process.env.GOALPLACE_APP_BASE_URL
-    ?? process.env.NEXT_PUBLIC_APP_URL
-    ?? new URL(request.url).origin;
-}
 
 function slugPart(value: string) {
   return value

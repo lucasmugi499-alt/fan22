@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { sendTeamInvitationEmail } from '@/server/email/teamInvitation';
 import { POST } from './route';
 import { expectNoDomainCollectionAccess, expectNoDomainTransaction } from '@/test/firestoreAssertions';
 
@@ -25,7 +24,6 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 vi.mock('@/server/email/teamInvitation', () => ({
-  sendTeamInvitationEmail: vi.fn(),
 }));
 
 function request(body: string, token = 'token') {
