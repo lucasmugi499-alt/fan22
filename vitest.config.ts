@@ -9,8 +9,13 @@ export default defineConfig({
     // functions/** was absent, so the trusted runtime that writes official results and sends
     // operator notifications had no unit coverage at all.
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'functions/src/**/*.test.ts'],
-    // Rules tests need the Firestore emulator; run them with `npm run test:rules`.
-    exclude: ['src/rules/**'],
+    /*
+     * Both excluded suites need the Firestore emulator, and both are run by `deploy:ready`
+     * through their own commands: `npm run test:rules` and `npm run test:integration`. Leaving
+     * them here would make the fast suite fail on a machine with no emulator running, which
+     * teaches people to ignore it.
+     */
+    exclude: ['src/rules/**', 'src/server/finalization/integration/**'],
   },
   resolve: {
     alias: {

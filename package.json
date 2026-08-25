@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "security:audit": "tsx scripts/release/advisory-gate.ts",
-    "deploy:ready": "npm run lint && npm test && npm run test:rules && npm run functions:typecheck && npm run functions:build && npm run demo:validate && npm run access:compat && npm run access:guard && npm run data:guard && npm run security:audit && npm run build",
+    "deploy:ready": "npm run lint && npm test && npm run test:rules && npm run test:integration && npm run functions:typecheck && npm run functions:build && npm run demo:validate && npm run access:compat && npm run access:guard && npm run data:guard && npm run security:audit && npm run build",
     "deploy:ready:production": "npm run deploy:ready && npm run prod:assert-clean",
     "seed:mock": "tsx --env-file=.env.local scripts/seed-mock-data.ts",
     "seed:firebase": "tsx scripts/seed-firestore.ts",
@@ -69,7 +69,8 @@
     "canary:finalizer": "tsx --env-file=.env.local scripts/security/finalizer-canary.ts",
     "lifecycle:report": "tsx --env-file=.env.local scripts/security/lifecycle-report.ts",
     "access:v1-drain": "tsx scripts/access/v1-drain-report.ts",
-    "data:migrate-athlete-identity": "tsx scripts/data/migrate-athlete-identity.ts"
+    "data:migrate-athlete-identity": "tsx scripts/data/migrate-athlete-identity.ts",
+    "test:integration": "firebase emulators:exec --only firestore --project goalplace256-integration \"vitest run --config vitest.integration.config.ts\""
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

@@ -165,10 +165,29 @@ export type ResultSubmissionStatus =
  * A league admin confirming after silence does NOT carry the provenance of mutual
  * confirmation. The public result may still read "Official"; the audit trail must not.
  */
+/**
+ * How a result came to be official, in the words its own audit trail should use.
+ *
+ * Separate from `sourceType`, which says what kind of record produced it. The two answer
+ * different questions and folding them into one field is the "two facts in one field" defect
+ * this codebase has migrated away from twice: a result can be `field_capture` by source and
+ * `field_capture_league_reviewed` by how it settled, and a reader is owed both.
+ *
+ * The first three values are the bilateral workflow's, and they are kept because hundreds of
+ * historical records carry them. A result confirmed by the opposing club and one confirmed
+ * after that club said nothing are not the same evidence, and the quality tier reads the
+ * difference.
+ */
 export type FinalizationSource =
   | "mutual_confirmation"
   | "league_admin_dispute_resolution"
   | "league_admin_nonresponse_confirmation"
+  // Added 2026-08-25 with the candidate-based finalizer, when the bilateral workflow stopped
+  // being the only way a result could become official.
+  | "live_field_capture"
+  | "field_capture_league_reviewed"
+  | "league_post_match"
+  | "platform_exception_resolution"
   | "correction";
 
 export type ResultSubmissionActor =

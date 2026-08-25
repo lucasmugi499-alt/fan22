@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  candidateFromMatchReport,
-  candidateFromPostMatchEntry,
-  candidateFromResultSubmission,
+  buildCandidateFromFieldReport,
+  buildCandidateFromLeagueReport,
+  buildCandidateFromLegacySubmission,
   candidateFinalizationKey,
 } from './candidate';
 
 describe('three sources, one candidate', () => {
   it('adapts a legacy bilateral submission', () => {
-    const candidate = candidateFromResultSubmission({
+    const candidate = buildCandidateFromLegacySubmission({
       id: 'match_1',
       matchId: 'match_1',
       leagueId: 'league_1',
@@ -35,7 +35,7 @@ describe('three sources, one candidate', () => {
    * events are checked for completeness; it is not two opinions about the result.
    */
   it('adapts a field report using the reconstructed score', () => {
-    const candidate = candidateFromMatchReport({
+    const candidate = buildCandidateFromFieldReport({
       report: {
         id: 'match_1',
         matchId: 'match_1',
@@ -73,7 +73,7 @@ describe('three sources, one candidate', () => {
     // A corrected goal must not count twice. The original keeps its place in the record and
     // stops contributing to the result, which is the whole point of superseding rather than
     // deleting.
-    const candidate = candidateFromMatchReport({
+    const candidate = buildCandidateFromFieldReport({
       report: {
         id: 'match_1', matchId: 'match_1', leagueId: 'league_1',
         declaredHomeScore: 1, declaredAwayScore: 0,
@@ -90,7 +90,7 @@ describe('three sources, one candidate', () => {
   });
 
   it('reads a variable point value from the payload, for basketball', () => {
-    const candidate = candidateFromMatchReport({
+    const candidate = buildCandidateFromFieldReport({
       report: {
         id: 'm', matchId: 'm', leagueId: 'l', sport: 'basketball',
         declaredHomeScore: 3, declaredAwayScore: 0,
@@ -107,7 +107,7 @@ describe('three sources, one candidate', () => {
   });
 
   it('counts a team-only event toward the score but not toward any scorer', () => {
-    const candidate = candidateFromMatchReport({
+    const candidate = buildCandidateFromFieldReport({
       report: {
         id: 'm', matchId: 'm', leagueId: 'l',
         declaredHomeScore: 1, declaredAwayScore: 0,
@@ -122,7 +122,7 @@ describe('three sources, one candidate', () => {
   });
 
   it('falls back to a system principal when a report carries no session', () => {
-    const candidate = candidateFromMatchReport({
+    const candidate = buildCandidateFromFieldReport({
       report: {
         id: 'm', matchId: 'm', leagueId: 'l',
         declaredHomeScore: 0, declaredAwayScore: 0,
@@ -137,7 +137,7 @@ describe('three sources, one candidate', () => {
   });
 
   it('attributes a post-match entry to the person who entered it', () => {
-    const candidate = candidateFromPostMatchEntry({
+    const candidate = buildCandidateFromLeagueReport({
       matchId: 'match_1',
       leagueId: 'league_1',
       seasonId: 'season_1',
@@ -157,10 +157,10 @@ describe('three sources, one candidate', () => {
    * same version produce the SAME key and the ledger refuses the second.
    */
   it('produces a key that collides across sources for the same match and version', () => {
-    const legacy = candidateFromResultSubmission({
+    const legacy = buildCandidateFromLegacySubmission({
       id: 'match_1', matchId: 'match_1', leagueId: 'l', seasonId: 's', submittedByUserId: 'u',
     });
-    const field = candidateFromMatchReport({
+    const field = buildCandidateFromFieldReport({
       report: {
         id: 'match_1', matchId: 'match_1', leagueId: 'l',
         declaredHomeScore: 0, declaredAwayScore: 0,

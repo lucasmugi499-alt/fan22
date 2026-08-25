@@ -1,4 +1,5 @@
 import type { FinalizationSourceType, Principal } from '../../kernel/principal';
+import type { AthleteStatLine, FinalizationSource } from '../../types';
 // Relative, and deliberately the shared implementation: a second spelling of this format is a
 // second answer to "have we already finalized this", and the ledger can only hold one.
 import { finalizationKeyFor } from '../../lib/resultSubmission';
@@ -30,8 +31,16 @@ export type ScorerEntry = {
 };
 
 export type FinalizationCandidate = {
+  /**
+   * Identifies this attempt, distinctly from the record it came from.
+   *
+   * `sourceRecordId` says which document produced it; this says which candidate. They differ
+   * whenever one record produces more than one attempt, which is exactly what a correction is.
+   */
+  candidateId: string;
   matchId: string;
   leagueId: string;
+  competitionId?: string;
   seasonId: string;
   sport: 'football' | 'basketball' | 'rugby';
 
@@ -39,7 +48,8 @@ export type FinalizationCandidate = {
   homeScore: number;
   awayScore: number;
   scorers: ScorerEntry[];
-  athleteStatLines?: unknown[];
+  athleteStatLines?: AthleteStatLine[];
+  /** Who was available. Absent where the source did not record a squad. */
   activeSquads?: Record<string, string[]>;
 
   evidenceRefs: string[];
@@ -48,7 +58,19 @@ export type FinalizationCandidate = {
   sourceType: FinalizationSourceType;
   sourceRecordId: string;
   sourcePrincipal: Principal;
+  /**
+   * How this became final within its own source, where the source has such a notion.
+   *
+   * Legacy submissions do: confirmed by the opponent reads differently from confirmed after
+   * silence, and the quality tier is entitled to know which. Field capture does not, because
+   * there is no second party to have agreed.
+   */
+  confirmationProvenance?: FinalizationSource;
+  /** Legacy only. A field report is not submitted by a team. */
+  submittedByTeamId?: string;
+  submittedByUserId?: string;
 
+  submittedAt: string;
   resultVersion: number;
   /** Unchanged format. The idempotency ledger does not care which source produced this. */
   finalizationKey: string;
@@ -89,11 +111,14 @@ type LegacySubmissionShape = {
   homeScore?: number;
   awayScore?: number;
   submittedByUserId: string;
+  submittedByTeamId?: string;
   scorers?: ScorerEntry[];
-  athleteStatLines?: unknown[];
+  athleteStatLines?: AthleteStatLine[];
   activeSquads?: Record<string, string[]>;
   evidenceRefs?: string[];
   resultVersion?: number;
+  submittedAt?: string;
+  finalizationSource?: FinalizationSource;
 };
 
 function normalizeSport(sport: unknown): FinalizationCandidate['sport'] {
@@ -108,9 +133,14 @@ function normalizeSport(sport: unknown): FinalizationCandidate['sport'] {
  * the confirmation provenance, and folding the two into one field is how a result that was
  * confirmed by silence ends up indistinguishable from one an opponent actually agreed to.
  */
-export function candidateFromResultSubmission(submission: LegacySubmissionShape): FinalizationCandidate {
+export function buildCandidateFromLegacySubmission(submission: LegacySubmissionShape): FinalizationCandidate {
   const resultVersion = submission.resultVersion ?? 1;
   return {
+    candidateId: `${submission.matchId}:legacy:${resultVersion}`,
+    submittedAt: submission.submittedAt ?? '',
+    submittedByTeamId: submission.submittedByTeamId,
+    submittedByUserId: submission.submittedByUserId,
+    confirmationProvenance: submission.finalizationSource,
     matchId: submission.matchId,
     leagueId: submission.leagueId,
     seasonId: submission.seasonId,
@@ -144,6 +174,7 @@ type FieldReportShape = {
   assignmentId?: string;
   sessionId?: string;
   resultVersion?: number;
+  attestedAt?: string;
 };
 
 type FieldEventShape = {
@@ -163,7 +194,7 @@ type FieldEventShape = {
  * complete; it is not a second opinion about the result. Where they disagree the report never
  * reaches this function, because the mismatch is a blocking exception and a human looks first.
  */
-export function candidateFromMatchReport(input: {
+export function buildCandidateFromFieldReport(input: {
   report: FieldReportShape;
   events: FieldEventShape[];
   scoringEventTypes: string[];
@@ -192,6 +223,8 @@ export function candidateFromMatchReport(input: {
   }
 
   return {
+    candidateId: `${input.report.matchId}:field:${resultVersion}`,
+    submittedAt: input.report.attestedAt ?? '',
     matchId: input.report.matchId,
     leagueId: input.report.leagueId,
     seasonId: input.report.seasonId ?? '',
@@ -221,7 +254,7 @@ export function candidateFromMatchReport(input: {
  * it: nobody observed this match on the platform's behalf, and the provenance should say so
  * rather than borrowing the authority of a capture that did not happen.
  */
-export function candidateFromPostMatchEntry(input: {
+export function buildCandidateFromLeagueReport(input: {
   matchId: string;
   leagueId: string;
   seasonId: string;
@@ -233,9 +266,13 @@ export function candidateFromPostMatchEntry(input: {
   enteredByUserId: string;
   recordId: string;
   resultVersion?: number;
+  submittedAt?: string;
 }): FinalizationCandidate {
   const resultVersion = input.resultVersion ?? 1;
   return {
+    candidateId: `${input.matchId}:league:${resultVersion}`,
+    submittedAt: input.submittedAt ?? '',
+    submittedByUserId: input.enteredByUserId,
     matchId: input.matchId,
     leagueId: input.leagueId,
     seasonId: input.seasonId,

@@ -1,12 +1,14 @@
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
+import { gateMatchReport } from './matchReports';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 import {
   finalizeSubmission,
+  finalizeFieldReport,
   retryStalledFinalizations,
   sendDueConfirmationReminders,
   sweepOverdueConfirmations,
@@ -117,6 +119,65 @@ export const onResultSubmissionWritten = onDocumentWritten(
  * to Fantasy. If the App Hosting call fails, this trigger retries the same event and the
  * scoring service's idempotency keys make repeated delivery safe.
  */
+/**
+ * A field report reaching full time, and what happens next.
+ *
+ * Two stages in one trigger, deliberately. The gate decides whether anything blocks the
+ * report and writes that decision; only a report the gate cleared is handed to the finalizer.
+ * Separating them means the state a league sees in its queue is the state the finalizer acted
+ * on, rather than two evaluations that can disagree.
+ *
+ * A clean report becomes official here with no human involved. There is no confirmation step,
+ * and adding one would reintroduce the friction the redesign removes while adding no
+ * information: the League Admin was not at the match.
+ */
+export const onMatchReportWritten = onDocumentWritten(
+  {
+    document: 'matchReports/{matchId}',
+    database: DATABASE_ID,
+    region: REGION,
+  },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+
+    const matchId = event.params.matchId;
+    const report = after.data() as Record<string, unknown>;
+
+    const outcome = gateMatchReport({
+      status: String(report.status ?? ''),
+      exceptions: Array.isArray(report.exceptions) ? report.exceptions.map(String) : [],
+      declaredHomeScore: Number(report.declaredHomeScore ?? 0),
+      declaredAwayScore: Number(report.declaredAwayScore ?? 0),
+      reconstructedHomeScore: Number(report.reconstructedHomeScore ?? 0),
+      reconstructedAwayScore: Number(report.reconstructedAwayScore ?? 0),
+    });
+
+    if (outcome) {
+      // Written first, so the report's own state reflects the decision even if the
+      // finalization that follows fails or is suppressed by the activation mode.
+      await db.collection('matchReports').doc(matchId).update({
+        status: outcome.status,
+        updatedAt: new Date().toISOString(),
+      });
+      if (outcome.status === 'league_review') {
+        logger.info('Match report held for league review', { matchId, blocking: outcome.blocking });
+        return;
+      }
+    }
+
+    // Only a gated report proceeds. A report already `official` or under review returns null
+    // above and reaches here unchanged, where the loader refuses it.
+    const activation = currentFinalizerActivation();
+    const result = await finalizeFieldReport(db, matchId, activation);
+    if (result.action === 'finalized') {
+      logger.info('Field report finalized', { matchId, finalizationKey: result.finalizationKey });
+    } else if (result.action === 'skipped') {
+      logger.info('Field report not finalized', { matchId, reason: result.reason });
+    }
+  },
+);
+
 export const onOfficialResultFinalized = onDocumentCreated(
   {
     document: 'finalizations/{finalizationId}',

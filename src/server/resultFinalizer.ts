@@ -1,5 +1,5 @@
 import { Firestore, Transaction } from 'firebase-admin/firestore';
-import { planFinalization } from '../lib/resultSubmission';
+import { finalizationSourceFromResolution } from '../lib/resultSubmission';
 // Relative, not aliased: the Cloud Functions build compiles this file without the
 // application's path aliases.
 import { SPORT_DEFINITIONS } from '../kernel/definitions/sportCatalogues';
@@ -8,7 +8,7 @@ import { resolveAthleteParticipation } from '../kernel/projections/participation
 import type { OfficialSportEvent } from '../kernel/types';
 // Relative, like every other import in this file: it compiles into the Cloud Functions
 // bundle, where a path alias survives into the emitted CommonJS and fails at require time.
-import { userPrincipal, provenanceQuad, type Principal } from '../kernel/principal';
+import { provenanceQuad, type Principal } from '../kernel/principal';
 import { athleteRegisteredPosition } from '../lib/athleteIdentity';
 import { validateOfficialEventShape } from '../kernel/validators/officialEventGuard';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
@@ -23,6 +23,19 @@ import {
   type SubmissionShape,
 } from '../lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
+// Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
+import {
+  buildCandidateFromFieldReport,
+  buildCandidateFromLegacySubmission,
+  type FinalizationCandidate,
+} from './finalization/candidate';
+import { planCandidateFinalization } from './finalization/plan';
+import { computeDataQuality } from './finalization/quality';
+import {
+  fieldReportLifecycle,
+  legacySubmissionLifecycle,
+  type SourceLifecycleAdapter,
+} from './finalization/lifecycle';
 
 /**
  * Bound to the kernel rather than hardcoded, so a definition change is traceable.
@@ -320,7 +333,7 @@ function assessAthleteEligibility({
 }
 
 function sanitizedStatLines(
-  submission: ResultSubmission,
+  submission: Pick<OfficialEventSource, 'athleteStatLines'>,
   match: Match,
   sport: 'football' | 'basketball' | 'rugby',
 ) {
@@ -422,8 +435,8 @@ function officialStatLineEvents({
           // is who ran the finalization, which is a different question and is recorded on
           // the ledger entry as provenance rather than on each event.
           sourcePrincipal: submission.sourcePrincipal,
-          submittedByUserId: submission.submittedByUserId,
-          submittedByTeamId: submission.submittedByTeamId,
+          ...(submission.submittedByUserId ? { submittedByUserId: submission.submittedByUserId } : {}),
+          ...(submission.submittedByTeamId ? { submittedByTeamId: submission.submittedByTeamId } : {}),
           evidenceRefs: submission.evidenceRefs ?? [],
           officialResultVersion: resultVersion,
           officialEventVersion: 1,
@@ -459,8 +472,16 @@ function officialStatLineEvents({
         // is who ran the finalization, which is a different question and is recorded on
         // the ledger entry as provenance rather than on each event.
         sourcePrincipal: submission.sourcePrincipal,
-        submittedByUserId: submission.submittedByUserId,
-        submittedByTeamId: submission.submittedByTeamId,
+        /**
+         * Spread conditionally rather than assigned.
+         *
+         * A field capture event has no submitting user and no submitting team, and real
+         * Firestore rejects an explicit `undefined` rather than dropping it. The fake database
+         * the unit suite uses accepts it, so this failed only against the emulator, on every
+         * field capture write.
+         */
+        ...(submission.submittedByUserId ? { submittedByUserId: submission.submittedByUserId } : {}),
+        ...(submission.submittedByTeamId ? { submittedByTeamId: submission.submittedByTeamId } : {}),
         evidenceRefs: submission.evidenceRefs ?? [],
         officialResultVersion: resultVersion,
         officialEventVersion: 1,
@@ -524,8 +545,8 @@ function officialActiveSquadEvents({
       // is who ran the finalization, which is a different question and is recorded on
       // the ledger entry as provenance rather than on each event.
       sourcePrincipal: submission.sourcePrincipal,
-      submittedByUserId: submission.submittedByUserId,
-      submittedByTeamId: submission.submittedByTeamId,
+      ...(submission.submittedByUserId ? { submittedByUserId: submission.submittedByUserId } : {}),
+      ...(submission.submittedByTeamId ? { submittedByTeamId: submission.submittedByTeamId } : {}),
       evidenceRefs: submission.evidenceRefs ?? [],
       officialResultVersion: resultVersion,
       officialEventVersion: 1,
@@ -634,8 +655,8 @@ function reconcileOfficialScore({
       // is who ran the finalization, which is a different question and is recorded on
       // the ledger entry as provenance rather than on each event.
       sourcePrincipal: submission.sourcePrincipal,
-      submittedByUserId: submission.submittedByUserId,
-      submittedByTeamId: submission.submittedByTeamId,
+      ...(submission.submittedByUserId ? { submittedByUserId: submission.submittedByUserId } : {}),
+      ...(submission.submittedByTeamId ? { submittedByTeamId: submission.submittedByTeamId } : {}),
       evidenceRefs: submission.evidenceRefs ?? [],
       officialResultVersion: resultVersion,
       officialEventVersion: 1,
@@ -718,8 +739,16 @@ function officialScorerEvents({
         // is who ran the finalization, which is a different question and is recorded on
         // the ledger entry as provenance rather than on each event.
         sourcePrincipal: submission.sourcePrincipal,
-        submittedByUserId: submission.submittedByUserId,
-        submittedByTeamId: submission.submittedByTeamId,
+        /**
+         * Spread conditionally rather than assigned.
+         *
+         * A field capture event has no submitting user and no submitting team, and real
+         * Firestore rejects an explicit `undefined` rather than dropping it. The fake database
+         * the unit suite uses accepts it, so this failed only against the emulator, on every
+         * field capture write.
+         */
+        ...(submission.submittedByUserId ? { submittedByUserId: submission.submittedByUserId } : {}),
+        ...(submission.submittedByTeamId ? { submittedByTeamId: submission.submittedByTeamId } : {}),
         evidenceRefs: submission.evidenceRefs ?? [],
         officialResultVersion: resultVersion,
         officialEventVersion: 1,
@@ -754,82 +783,78 @@ export type FinalizeOutcome =
  * Promote a settled claim onto the official match record in one idempotent transaction.
  * This module is server-only and is shared by App Hosting and Cloud Functions.
  */
-export async function finalizeSubmission(
+/**
+ * Everything a source must provide before the truth engine will look at it.
+ *
+ * Reads only. A loader runs inside the transaction, before any write, and produces the
+ * candidate plus the adapter that will record the outcome on whatever produced it. That is the
+ * whole of the source-specific surface: after a loader returns, nothing downstream knows or
+ * cares whether this came from a bilateral submission, a touchline, or a league admin typing.
+ */
+export type CandidateLoadResult =
+  | {
+      candidate: FinalizationCandidate;
+      lifecycle: SourceLifecycleAdapter;
+      /**
+       * The raw record, for the write-amplification preflight. Checked against the stored shape
+       * rather than a computed plan, because the point is to refuse before doing the work.
+       */
+      oversizeShape: SubmissionShape;
+      /** True when the source record already believes it is final. */
+      alreadyFinalized: boolean;
+    }
+  | { skip: string };
+
+export type CandidateLoader = (tx: Transaction) => Promise<CandidateLoadResult>;
+
+/**
+ * Promote a settled claim onto the official match record in one idempotent transaction.
+ *
+ * Source-agnostic since 2026-08-25. It takes a loader rather than a match id because the three
+ * intake paths differ in exactly one respect: which record they read and what they write back
+ * to it. Everything between those two points is shared, and keeping it shared is what stops
+ * "the new architecture" from secretly depending on the old source type.
+ *
+ * This module is server-only and is compiled into both App Hosting and Cloud Functions.
+ */
+export async function finalizeCandidate(
   db: Firestore,
-  matchId: string,
+  loader: CandidateLoader,
   /**
    * Required, with no default. The activation gate binds to the finalization path itself
    * rather than to one caller: previously only the Firestore trigger consulted it, so the
    * scheduled sweeper, the correction route and the authenticated /finalize endpoint could
-   * each publish official records while the mode was `off` or `canary`. Making this
-   * mandatory means a new caller cannot forget the switch — it will not compile.
+   * each publish official records while the mode was `off` or `canary`.
    */
   activation: FinalizerActivation,
+  gateKey: string,
 ): Promise<FinalizeOutcome> {
-  const submissionRef = db.collection(SUBMISSIONS).doc(matchId);
-
-  // Checked before the transaction opens and before any read of the submission, so an
-  // `off` deployment cannot write an official record even if the rest of this regressed.
+  // Checked before the transaction opens and before any read, so an `off` deployment cannot
+  // write an official record even if the rest of this regressed.
   const gate = decideFinalization({
-    submissionId: matchId,
+    submissionId: gateKey,
     mode: activation.mode,
     canaryAllowlist: activation.canaryAllowlist,
   });
   if (!gate.proceed) return { action: 'skipped', reason: gate.reason };
 
   return db.runTransaction(async (tx: Transaction) => {
-    const submissionSnap = await tx.get(submissionRef);
-    if (!submissionSnap.exists) return { action: 'skipped', reason: 'no_submission' };
+    const loaded = await loader(tx);
+    if ('skip' in loaded) return { action: 'skipped', reason: loaded.skip };
 
-    const submission = { id: submissionSnap.id, ...submissionSnap.data() } as ResultSubmission;
-
-    /**
-     * Eligibility, in order of authority: an already-official result and a result blocked
-     * for League review both stop here, before any planning work.
-     *
-     * The blocked check has to come first because the submission still *looks* finalizable
-     * — it is confirmed, it has a score, nothing about its own status says otherwise. Any
-     * later write to it re-fires this trigger, so without this the finalizer would retry a
-     * contradictory result on every touch and reopen the same case indefinitely.
-     */
-    const submissionData = submissionSnap.data() ?? {};
-    if (submissionData.finalizationStatus === BLOCKED_RECONCILIATION) {
-      return { action: 'skipped', reason: BLOCKED_RECONCILIATION };
-    }
-    if (submissionData.finalizationStatus === BLOCKED_OVERSIZED) {
-      return { action: 'skipped', reason: BLOCKED_OVERSIZED };
-    }
+    const { candidate, lifecycle, oversizeShape } = loaded;
+    const matchId = candidate.matchId;
 
     /**
      * Write-amplification preflight, before any planning work.
      *
-     * Rules now cap these lists at write time, but a submission stored before those caps
-     * existed is still sitting in the collection, and any touch of it re-fires this trigger.
-     * Expanding one is how a single document becomes a transaction that exceeds Firestore's
-     * operation budget, fails, retries, and fails again — burning cost and log volume while
-     * the match stays stuck out of official state, with nothing surfacing to a human.
-     *
-     * Blocking converts that silent loop into a reviewable case. It is deliberately checked
-     * against the raw submission rather than a computed plan: the point is to refuse before
-     * doing the work, not to discover the size after building it.
+     * Expanding an oversized claim is how a single document becomes a transaction that exceeds
+     * Firestore's operation budget, fails, retries, and fails again, burning cost and log
+     * volume while the match stays stuck out of official state with nothing surfacing to a
+     * human. Blocking converts that silent loop into a reviewable case.
      */
-    const oversizeBreaches = submissionLimitBreaches(submissionData as SubmissionShape);
-
-    /**
-     * The work-budget check, which previously existed and was never called.
-     *
-     * `finalizationWriteBudgetExceeded` and `MAX_FINALIZATION_WRITES` were written alongside
-     * the size caps and then not wired in, so the comment above promised a protection the
-     * code did not apply. That is worse than having no guard: the structure and the prose
-     * both read as if oversized finalizations were being caught.
-     *
-     * Counted from the claim rather than from a constructed event array, because building
-     * the array to find out how big it is *is* the failure being prevented.
-     */
-    const projectedSport = (submissionData.sport === 'basketball' || submissionData.sport === 'rugby')
-      ? submissionData.sport
-      : 'football';
-    const plannedWrites = projectedFinalizationWrites(submissionData as SubmissionShape, projectedSport);
+    const oversizeBreaches = submissionLimitBreaches(oversizeShape);
+    const plannedWrites = projectedFinalizationWrites(oversizeShape, candidate.sport);
     if (finalizationWriteBudgetExceeded(plannedWrites)) {
       oversizeBreaches.push(
         `finalizing this submission would plan roughly ${plannedWrites} writes, above the safe budget of ${MAX_FINALIZATION_WRITES}.`,
@@ -837,7 +862,7 @@ export async function finalizeSubmission(
     }
 
     if (oversizeBreaches.length) {
-      const exceptionId = reconciliationExceptionId(matchId, Number(submissionData.resultVersion ?? 1));
+      const exceptionId = reconciliationExceptionId(matchId, candidate.resultVersion);
       const blockedAt = new Date().toISOString();
       const exceptionRef = db.collection(RECONCILIATION_EXCEPTIONS).doc(exceptionId);
       const existingException = await tx.get(exceptionRef);
@@ -846,10 +871,10 @@ export async function finalizeSubmission(
           id: exceptionId,
           exceptionId,
           matchId,
-          leagueId: submissionData.leagueId ?? '',
-          competitionId: submissionData.seasonId ?? submissionData.leagueId ?? '',
-          submissionId: matchId,
-          submissionVersion: Number(submissionData.resultVersion ?? 1),
+          leagueId: candidate.leagueId,
+          competitionId: candidate.competitionId ?? candidate.seasonId ?? candidate.leagueId,
+          submissionId: candidate.sourceRecordId,
+          submissionVersion: candidate.resultVersion,
           reasonCode: 'submission_exceeds_finalization_limits',
           // The breaches themselves, so a reviewer sees which limit and by how much rather
           // than a bare refusal.
@@ -862,24 +887,26 @@ export async function finalizeSubmission(
           updatedAt: blockedAt,
         });
       }
-      tx.update(submissionRef, {
-        finalizationStatus: BLOCKED_OVERSIZED,
-        reviewStatus: 'league_review_required',
-        reconciliationExceptionId: exceptionId,
-        updatedAt: blockedAt,
+      lifecycle.onBlocked(tx, {
+        db,
+        candidate,
+        reason: 'submission_too_large',
+        exceptionId,
+        at: blockedAt,
       });
       return { action: 'blocked', reason: 'submission_too_large', exceptionId };
     }
 
-    const matchRef = db.collection(MATCHES).doc(submission.matchId);
+    const matchRef = db.collection(MATCHES).doc(matchId);
     const matchSnap = await tx.get(matchRef);
     if (!matchSnap.exists) return { action: 'skipped', reason: 'no_match' };
 
     const match = { id: matchSnap.id, ...matchSnap.data() } as Match;
-    const decision = planFinalization({
-      submission,
+    const decision = planCandidateFinalization({
+      candidate,
       match,
       processedKeys: [],
+      alreadyFinalized: loaded.alreadyFinalized,
       now: new Date().toISOString(),
     });
     if (decision.action === 'noop') {
@@ -887,28 +914,26 @@ export async function finalizeSubmission(
     }
 
     const { plan } = decision;
-    const finalizedAt = plan.submission.finalizedAt;
+    const finalizedAt = plan.sourceLifecycle.finalizedAt;
     const ledgerRef = db.collection(FINALIZATIONS).doc(plan.finalizationKey);
     const ledgerSnap = await tx.get(ledgerRef);
     if (ledgerSnap.exists) {
       return { action: 'skipped', reason: 'already_finalized' };
     }
 
-    const archivedRef = typeof plan.supersedesVersion === 'number'
-      ? submissionRef.collection('versions').doc(String(plan.supersedesVersion))
-      : null;
-    const archivedSnapshot = archivedRef ? await tx.get(archivedRef) : null;
+    // The adapter's own reads, while reads are still permitted.
+    await lifecycle.prepare?.(tx, plan);
 
     const sport = String(match.sport).toLowerCase();
     const fantasySport = (
       sport === 'football' || sport === 'basketball' || sport === 'rugby'
     ) ? sport : undefined;
-    const activeSquads = sanitizedActiveSquads(submission, match);
+    const activeSquads = sanitizedActiveSquads(candidate, match);
     const statLines = fantasySport
-      ? sanitizedStatLines(submission, match, fantasySport)
+      ? sanitizedStatLines(candidate, match, fantasySport)
       : new Map<string, AthleteStatLine>();
     const scorerTotals = new Map<string, { count: number; teamId: string }>();
-    for (const scorer of submission.scorers ?? []) {
+    for (const scorer of candidate.scorers) {
       const current = scorerTotals.get(scorer.athleteId);
       scorerTotals.set(scorer.athleteId, {
         count: (current?.count ?? 0) + scorer.count,
@@ -935,8 +960,14 @@ export async function finalizeSubmission(
      * second pipeline.
      */
     const eventSource: OfficialEventSource = {
-      ...submission,
-      sourcePrincipal: userPrincipal(submission.submittedByUserId),
+      id: candidate.sourceRecordId,
+      sourcePrincipal: candidate.sourcePrincipal,
+      submittedByUserId: candidate.submittedByUserId,
+      submittedByTeamId: candidate.submittedByTeamId,
+      evidenceRefs: candidate.evidenceRefs,
+      scorers: candidate.scorers,
+      athleteStatLines: candidate.athleteStatLines,
+      activeSquads: candidate.activeSquads,
     };
 
     const activeSquadEvents = fantasySport
@@ -1093,7 +1124,7 @@ export async function finalizeSubmission(
       : undefined;
 
     if (surplusGate && (surplusGate.surplus.home > 0 || surplusGate.surplus.away > 0)) {
-      const exceptionId = reconciliationExceptionId(match.id, submission.resultVersion);
+      const exceptionId = reconciliationExceptionId(match.id, candidate.resultVersion);
       const exceptionRef = db.collection(RECONCILIATION_EXCEPTIONS).doc(exceptionId);
       const existing = await tx.get(exceptionRef);
 
@@ -1106,8 +1137,8 @@ export async function finalizeSubmission(
           matchId: match.id,
           leagueId: match.leagueId,
           competitionId: match.seasonId ?? match.leagueId,
-          submissionId: submission.id,
-          submissionVersion: submission.resultVersion,
+          submissionId: candidate.sourceRecordId,
+          submissionVersion: candidate.resultVersion,
           sport: fantasySport,
           officialHomeScore: plan.match.score.home,
           officialAwayScore: plan.match.score.away,
@@ -1118,7 +1149,7 @@ export async function finalizeSubmission(
           // The submitted events are preserved by reference, never rewritten. This is the
           // evidence a League needs to decide which side is wrong.
           eventIds: eligibleOfficialEvents.map((event) => event.id),
-          evidenceRefs: submission.evidenceRefs ?? [],
+          evidenceRefs: candidate.evidenceRefs,
           reasonCode: 'scoring_events_exceed_submitted_result',
           status: 'open',
           reconciliationStatus: 'surplus',
@@ -1151,8 +1182,8 @@ export async function finalizeSubmission(
           matchId: match.id,
           leagueId: match.leagueId,
           competitionId: match.seasonId ?? match.leagueId,
-          submissionId: submission.id,
-          submissionVersion: submission.resultVersion,
+          submissionId: candidate.sourceRecordId,
+          submissionVersion: candidate.resultVersion,
           // Enough for a consumer to route and summarise without re-reading the case.
           officialScore: { home: plan.match.score.home, away: plan.match.score.away },
           reconstructedScore: { home: surplusGate.trace.home, away: surplusGate.trace.away },
@@ -1164,43 +1195,27 @@ export async function finalizeSubmission(
         tx.set(exceptionRef, { updatedAt: finalizedAt }, { merge: true });
       }
 
-      // Marks the workflow so a later write to this submission does not re-enter
-      // finalization. The submission's own `status` is left alone: it is a claim-lifecycle
-      // field with its own state machine, and overloading it is what made `status:
-      // 'verified'` ambiguous elsewhere in this codebase.
-      tx.update(submissionRef, {
-        finalizationStatus: BLOCKED_RECONCILIATION,
-        reviewStatus: 'league_review_required',
-        reconciliationExceptionId: exceptionId,
-        updatedAt: finalizedAt,
+      /**
+       * Recorded on whatever produced this, so a later write to it does not re-enter
+       * finalization. The adapter knows which field means "stop looking finalizable" for its
+       * own record: for a legacy submission that is `finalizationStatus`, deliberately not
+       * `status`, because the claim lifecycle is a separate state machine and overloading it
+       * is what made `status: 'verified'` ambiguous elsewhere in this codebase.
+       */
+      lifecycle.onBlocked(tx, {
+        db,
+        candidate,
+        reason: 'reconciliation_surplus',
+        exceptionId,
+        at: finalizedAt,
+        alreadyRecorded: existing.exists,
+        note: `Finalization blocked: recorded events exceed the submitted score `
+          + `(events ${surplusGate.trace.home}-${surplusGate.trace.away}, `
+          + `submitted ${plan.match.score.home}-${plan.match.score.away}). `
+          + `League review required.`,
       });
-
-      if (!existing.exists) {
-        tx.create(submissionRef.collection('events').doc(), {
-          submissionId: submission.id,
-          from: submission.status,
-          to: submission.status,
-          actor: 'system',
-          actorUserId: 'system:finalizer',
-          note: `Finalization blocked: recorded events exceed the submitted score `
-            + `(events ${surplusGate.trace.home}-${surplusGate.trace.away}, `
-            + `submitted ${plan.match.score.home}-${plan.match.score.away}). `
-            + `League review required.`,
-          reconciliationExceptionId: exceptionId,
-          createdAt: finalizedAt,
-        });
-      }
 
       return { action: 'blocked', reason: 'reconciliation_surplus', exceptionId };
-    }
-
-    if (archivedRef && archivedSnapshot && !archivedSnapshot.exists) {
-      tx.create(archivedRef, {
-        ...submissionSnap.data(),
-        status: 'superseded',
-        supersededBySubmissionId: submission.id,
-        supersededAt: plan.submission.finalizedAt,
-      });
     }
 
     tx.update(matchRef, {
@@ -1211,25 +1226,17 @@ export async function finalizeSubmission(
       teamBScore: plan.match.score.away,
       officialResultVersion: plan.resultVersion,
       verifiedBy: 'system:finalizer',
-      updatedAt: plan.submission.finalizedAt,
+      updatedAt: plan.sourceLifecycle.finalizedAt,
     });
 
-    tx.update(submissionRef, {
-      status: plan.submission.status,
-      finalizationSource: plan.submission.finalizationSource,
-      finalizationKey: plan.finalizationKey,
-      finalizedAt: plan.submission.finalizedAt,
-    });
-
-    tx.create(submissionRef.collection('events').doc(), {
-      submissionId: submission.id,
-      from: submission.status,
-      to: plan.submission.status,
-      actor: 'system',
-      actorUserId: 'system:finalizer',
-      note: `Finalized via ${plan.submission.finalizationSource}`,
-      createdAt: plan.submission.finalizedAt,
-    });
+    /**
+     * The official writes have landed. Record that on whatever produced this.
+     *
+     * One line, and the core says nothing about which collection or which fields. A legacy
+     * submission archives its superseded version and advances its confirmation machine; a
+     * field report sets `official` and its result version. Both are the adapter's business.
+     */
+    lifecycle.onFinalized(tx, { db, plan, candidate });
 
     /**
      * The idempotency ledger is the one record that exists exactly once per finalized
@@ -1243,13 +1250,37 @@ export async function finalizeSubmission(
      * later phase and is never settable by hand.
      */
     tx.create(ledgerRef, {
-      matchId: submission.matchId,
-      submissionId: submission.id,
-      resultVersion: submission.resultVersion,
+      matchId: candidate.matchId,
+      submissionId: candidate.sourceRecordId,
+      resultVersion: candidate.resultVersion,
       ...provenanceQuad({
-        sourceType: 'legacy_team_submission',
-        sourceRecordId: submission.id,
-        principal: userPrincipal(submission.submittedByUserId),
+        // From the candidate, not hardcoded. This line said `legacy_team_submission` while
+        // there was only one source, and leaving it that way would have labelled every field
+        // capture as a team submission in the one record that exists to say how a result
+        // became official.
+        sourceType: candidate.sourceType,
+        sourceRecordId: candidate.sourceRecordId,
+        principal: candidate.sourcePrincipal,
+      }),
+      /**
+       * Computed here and stored on the version, which is immutable and written once.
+       *
+       * Nowhere in the platform can set this. That is the point: a tier a League Admin could
+       * choose would be chosen, and the fantasy engine and the scouts reading it would have no
+       * way to tell a careful capture from a confident assertion.
+       */
+      dataQuality: computeDataQuality({
+        sourceType: candidate.sourceType,
+        eventsFullySynced: true,
+        lineupKnown: Boolean(candidate.activeSquads && Object.keys(candidate.activeSquads).length),
+        noReconciliationIssues: surplusGate?.trace.status !== 'inconsistent',
+        allAthletesEligible: eligibilityIssues.length === 0,
+        clockProvenanceIntact: true,
+        neutralObserver: true,
+        takeoverOccurred: false,
+        legacyConfirmation: candidate.confirmationProvenance === 'mutual_confirmation'
+          ? 'mutual_confirmation'
+          : 'league_admin_nonresponse_confirmation',
       }),
       finalizedAt,
     });
@@ -1387,7 +1418,7 @@ export async function finalizeSubmission(
           (teamId === match.homeTeamId && plan.match.score.home > plan.match.score.away)
           || (teamId === match.awayTeamId && plan.match.score.away > plan.match.score.home);
         const performanceId = `${match.id}_v${plan.resultVersion}_${athlete.id}`;
-        const participationSourceEventId = activeSquadEventId ?? scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:participation`;
+        const participationSourceEventId = activeSquadEventId ?? scoringSourceEventId ?? `${candidate.sourceRecordId}:v${plan.resultVersion}:${athlete.id}:participation`;
         const statSources = statSourceEventsByAthlete.get(athlete.id) ?? {};
         const lineStats = statLine?.stats ?? {};
         // Participation is derived from the official events, never assumed from squad
@@ -1452,14 +1483,209 @@ export async function finalizeSubmission(
                 ...(teamWon ? { win_participation: participation.sourceEventIds[0] ?? participationSourceEventId } : {}),
               }
               : {}),
-            [statKey]: scoringSourceEventId ?? `${submission.id}:v${plan.resultVersion}:${athlete.id}:${statKey}`,
+            [statKey]: scoringSourceEventId ?? `${candidate.sourceRecordId}:v${plan.resultVersion}:${athlete.id}:${statKey}`,
             ...statSources,
           },
-          finalizedAt: plan.submission.finalizedAt,
+          finalizedAt: plan.sourceLifecycle.finalizedAt,
         });
       }
     }
 
     return { action: 'finalized', finalizationKey: plan.finalizationKey };
   });
+}
+
+/**
+ * The bilateral workflow's loader.
+ *
+ * Everything that used to be the first forty lines of `finalizeSubmission`: read the claim,
+ * refuse the ones already blocked for review, and produce a candidate. It is the only place in
+ * the finalization path that knows `resultSubmissions` exists.
+ */
+export function legacySubmissionLoader(db: Firestore, matchId: string): CandidateLoader {
+  return async (tx) => {
+    const submissionRef = db.collection(SUBMISSIONS).doc(matchId);
+    const submissionSnap = await tx.get(submissionRef);
+    if (!submissionSnap.exists) return { skip: 'no_submission' };
+
+    const submission = { id: submissionSnap.id, ...submissionSnap.data() } as ResultSubmission;
+    const data = submissionSnap.data() ?? {};
+
+    /**
+     * A result blocked for League review stops here, before any planning work.
+     *
+     * The check has to come first because the submission still LOOKS finalizable: it is
+     * confirmed, it has a score, and nothing about its own status says otherwise. Any later
+     * write to it re-fires the trigger, so without this the finalizer would retry a
+     * contradictory result on every touch and reopen the same case indefinitely.
+     */
+    if (data.finalizationStatus === BLOCKED_RECONCILIATION) return { skip: BLOCKED_RECONCILIATION };
+    if (data.finalizationStatus === BLOCKED_OVERSIZED) return { skip: BLOCKED_OVERSIZED };
+
+    // The bilateral workflow's own gate: only a confirmed claim is a candidate at all.
+    if (submission.status !== 'confirmed') return { skip: 'not_finalizable' };
+
+    return {
+      candidate: buildCandidateFromLegacySubmission({
+        ...submission,
+        homeScore: submission.correctedHomeScore ?? submission.homeScore,
+        awayScore: submission.correctedAwayScore ?? submission.awayScore,
+        finalizationSource: submission.finalizationSource
+          ?? finalizationSourceFromResolution(submission.resolution),
+      }),
+      lifecycle: legacySubmissionLifecycle({
+        submissionRef,
+        snapshotData: () => submissionSnap.data(),
+        previousStatus: submission.status,
+        sourceRecordId: submission.id,
+      }),
+      oversizeShape: data as SubmissionShape,
+      alreadyFinalized: Boolean(submission.finalizedAt),
+    };
+  };
+}
+
+/**
+ * The field capture loader.
+ *
+ * A report reaches here only once the gate has cleared it, so this refuses anything that is
+ * not `ready_for_finalization` rather than re-running the gates: two places deciding whether a
+ * report is clean is two places that can disagree.
+ */
+export function fieldReportLoader(db: Firestore, matchId: string): CandidateLoader {
+  return async (tx) => {
+    const reportRef = db.collection('matchReports').doc(matchId);
+    const reportSnap = await tx.get(reportRef);
+    if (!reportSnap.exists) return { skip: 'no_report' };
+
+    const report = { id: reportSnap.id, ...reportSnap.data() } as Record<string, unknown> & { id: string };
+    if (report.status === 'official') return { skip: 'already_finalized' };
+    if (report.status !== 'ready_for_finalization') return { skip: 'not_finalizable' };
+    if (report.source !== 'field_capture') return { skip: 'not_field_capture' };
+
+    /**
+     * The events are read here, inside the transaction, rather than trusted from the report.
+     *
+     * The report carries a reconstructed score, and it was right when it was written. A late
+     * sync or a correction between attestation and finalization would make it stale, and the
+     * events are the record: rebuilding the scorers from them means the official result can
+     * never disagree with the timeline it claims to summarise.
+     */
+    const eventsSnap = await tx.get(
+      db.collection('liveMatchEvents').where('matchId', '==', matchId),
+    );
+    const events = eventsSnap.docs.map((doc) => doc.data() as {
+      eventType: string;
+      teamId: string;
+      athleteId: string | null;
+      gameClockMs: number;
+      status: string;
+      payload?: Record<string, unknown>;
+    });
+
+    /**
+     * Which event types count toward the score, read from the kernel's sport definition.
+     *
+     * Not restated here. A second list is a second answer to "what is a scoring event", and
+     * the finalizer disagreeing with the kernel about that would produce an official result
+     * whose scorers do not add up to its own score.
+     */
+    const sport = String(report.sport ?? 'football');
+    const definition = SPORT_DEFINITIONS.find((entry) => entry.sportId === sport);
+    const scoringEventTypes = (definition?.legalScoringEvents ?? []).map((entry) => entry.eventType);
+
+    /**
+     * The score is recomputed here, not taken from the report.
+     *
+     * The report's reconstructed score was right when it was attested. A late sync from a
+     * quarantined session, or a correction between attestation and finalization, would make it
+     * stale, and taking it on trust while rebuilding the scorers from live events would
+     * produce an official result whose scorers do not add up to its own score. That is the
+     * exact class of internal contradiction the whole reconciliation gate exists to catch, and
+     * manufacturing one here would put it inside the record rather than in front of a human.
+     */
+    const matchSnapForScore = await tx.get(db.collection(MATCHES).doc(matchId));
+    // Checked here rather than left to the core, so a missing match is reported as a missing
+    // match. Without it the reconstruction runs against empty team ids, produces 0-0, and the
+    // caller is told the events changed since attestation, which is both wrong and confusing.
+    if (!matchSnapForScore.exists) return { skip: 'no_match' };
+    const matchForScore = matchSnapForScore.data() ?? {};
+    const activeEvents = events.filter((event) => event.status === 'active');
+    const trace = definition
+      ? reconstructMatchScore({
+        sportDefinition: definition,
+        events: activeEvents as unknown as OfficialSportEvent[],
+        teams: {
+          homeTeamId: String(matchForScore.homeTeamId ?? ''),
+          awayTeamId: String(matchForScore.awayTeamId ?? ''),
+        },
+      })
+      : { home: 0, away: 0 };
+
+    /**
+     * Attested, then recomputed, and they must still agree.
+     *
+     * The gate compared the declared score against the events at submission time. If the
+     * events have moved since, that comparison is no longer the one being finalized, and the
+     * honest response is to send it back for review rather than to officialise a number
+     * nobody attested to.
+     */
+    if (
+      trace.home !== Number(report.reconstructedHomeScore ?? 0)
+      || trace.away !== Number(report.reconstructedAwayScore ?? 0)
+    ) {
+      return { skip: 'events_changed_since_attestation' };
+    }
+
+    return {
+      candidate: buildCandidateFromFieldReport({
+        report: {
+          id: report.id,
+          matchId: String(report.matchId ?? report.id),
+          leagueId: String(report.leagueId ?? ''),
+          seasonId: typeof report.seasonId === 'string' ? report.seasonId : undefined,
+          sport,
+          declaredHomeScore: Number(report.declaredHomeScore ?? 0),
+          declaredAwayScore: Number(report.declaredAwayScore ?? 0),
+          reconstructedHomeScore: trace.home,
+          reconstructedAwayScore: trace.away,
+          assignmentId: typeof report.assignmentId === 'string' ? report.assignmentId : undefined,
+          sessionId: typeof report.sessionId === 'string' ? report.sessionId : undefined,
+          resultVersion: Number(report.resultVersion ?? 1),
+          attestedAt: typeof report.attestedAt === 'string' ? report.attestedAt : undefined,
+        },
+        events,
+        scoringEventTypes,
+      }),
+      lifecycle: fieldReportLifecycle({ reportRef }),
+      // A field report has no submitted lists to expand, so there is nothing for the
+      // write-amplification preflight to measure beyond the scorers the events produced.
+      oversizeShape: { scorers: [], athleteStatLines: [], activeSquads: {} },
+      alreadyFinalized: false,
+    };
+  };
+}
+
+/**
+ * The bilateral workflow's entry point, unchanged for every existing caller.
+ *
+ * Kept because four call sites use it and because the signature says what it does. What
+ * changed underneath is that it is now one loader among three rather than the only path
+ * through the engine.
+ */
+export async function finalizeSubmission(
+  db: Firestore,
+  matchId: string,
+  activation: FinalizerActivation,
+): Promise<FinalizeOutcome> {
+  return finalizeCandidate(db, legacySubmissionLoader(db, matchId), activation, matchId);
+}
+
+/** The field capture entry point. Same engine, same ledger, same official records. */
+export async function finalizeFieldReport(
+  db: Firestore,
+  matchId: string,
+  activation: FinalizerActivation,
+): Promise<FinalizeOutcome> {
+  return finalizeCandidate(db, fieldReportLoader(db, matchId), activation, matchId);
 }
