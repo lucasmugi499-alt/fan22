@@ -29,6 +29,7 @@
     "../src/lib/auth/access.ts",
     "../src/lib/auth/accessProjection.ts",
     "../src/server/resultFinalizer.ts",
+    "../src/server/finalization/**/*.ts",
     "../src/types/index.ts",
     "../src/kernel/**/*.ts",
     "../src/lib/search/**/*.ts"

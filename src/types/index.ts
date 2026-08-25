@@ -907,7 +907,15 @@ export interface MatchReport {
   attestedAt: string;
   attestationText: string;
   exceptions: string[];
-  status: 'submitted' | 'auto_finalized' | 'league_review' | 'official' | 'superseded';
+  /**
+   * `ready_for_finalization` is deliberately distinct from `auto_finalized`.
+   *
+   * It means every gate passed and nothing is waiting on a human. It does NOT mean an official
+   * record exists, and conflating the two would put a lie in the data: a report marked
+   * finalized with no official result version behind it is exactly the kind of second source
+   * of truth this architecture exists to prevent.
+   */
+  status: 'submitted' | 'ready_for_finalization' | 'auto_finalized' | 'league_review' | 'official' | 'superseded';
   resultVersion: number;
   finalizationKey?: string;
   createdAt: string;
