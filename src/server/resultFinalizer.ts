@@ -66,6 +66,31 @@ export const BLOCKED_RECONCILIATION = 'blocked_reconciliation';
 /** Distinct from a surplus block: the input is unsafe to expand, not contradictory. */
 export const BLOCKED_OVERSIZED = 'blocked_oversized_submission';
 
+/**
+ * What an event builder needs to know about where a result came from.
+ *
+ * Structural rather than `ResultSubmission`, so the same builders serve a legacy bilateral
+ * submission and a field capture report without either knowing the other exists. This is the
+ * extraction the finalization candidate is for: the compatibility boundary sits here, at the
+ * input, rather than inside the emission logic or in storage.
+ *
+ * `ResultSubmission` already satisfies this shape apart from `sourcePrincipal`, which the
+ * legacy call site supplies from its submitting user.
+ */
+type OfficialEventSource = {
+  /** The record this result was built from. Becomes `sourceClaimId` on every event. */
+  id: string;
+  sourcePrincipal: Principal;
+  /** Still written for a result a user produced. Absent for field capture. */
+  submittedByUserId?: string;
+  /** Legacy only: a field report is not submitted by a team. */
+  submittedByTeamId?: string;
+  evidenceRefs?: string[];
+  scorers?: ResultSubmission['scorers'];
+  athleteStatLines?: ResultSubmission['athleteStatLines'];
+  activeSquads?: ResultSubmission['activeSquads'];
+};
+
 type OfficialSportEventRecord = {
   id: string;
   eventType: string;
@@ -102,7 +127,11 @@ type OfficialSportEventRecord = {
   sourcePrincipal: Principal;
   /** Still written for events a user produced. No longer the only way an event names one. */
   submittedByUserId?: string;
-  submittedByTeamId: string;
+  /**
+   * Legacy only. A field capture event has no submitting team: one observer watched the
+   * match, and attributing it to a club would invent exactly the bias the model removes.
+   */
+  submittedByTeamId?: string;
   evidenceRefs: string[];
   officialResultVersion: number;
   officialEventVersion: number;
@@ -219,7 +248,7 @@ const ADVANCED_STAT_KEYS = new Set(['steal', 'block', 'turnover']);
  * A conflicting attribution is a data-quality fact and is surfaced rather than resolved
  * by ordering.
  */
-function sanitizedActiveSquads(submission: ResultSubmission, match: Match) {
+function sanitizedActiveSquads(submission: Pick<OfficialEventSource, 'activeSquads'>, match: Match) {
   const validTeams = new Set([match.homeTeamId, match.awayTeamId]);
   const result = new Map<string, { athleteId: string; teamId: string }>();
   const conflicting = new Set<string>();
@@ -353,7 +382,7 @@ function officialStatLineEvents({
   startSequence = 1,
 }: {
   match: Match;
-  submission: ResultSubmission;
+  submission: OfficialEventSource;
   sport: 'football' | 'basketball' | 'rugby';
   statLines: Map<string, AthleteStatLine>;
   finalizedAt: string;
@@ -392,10 +421,10 @@ function officialStatLineEvents({
           // The claim's author is the event's author. The caller (trigger, sweeper, route)
           // is who ran the finalization, which is a different question and is recorded on
           // the ledger entry as provenance rather than on each event.
-          sourcePrincipal: userPrincipal(submission.submittedByUserId),
+          sourcePrincipal: submission.sourcePrincipal,
           submittedByUserId: submission.submittedByUserId,
           submittedByTeamId: submission.submittedByTeamId,
-          evidenceRefs: submission.evidenceRefs,
+          evidenceRefs: submission.evidenceRefs ?? [],
           officialResultVersion: resultVersion,
           officialEventVersion: 1,
           verificationStatus: 'official',
@@ -429,10 +458,10 @@ function officialStatLineEvents({
         // The claim's author is the event's author. The caller (trigger, sweeper, route)
         // is who ran the finalization, which is a different question and is recorded on
         // the ledger entry as provenance rather than on each event.
-        sourcePrincipal: userPrincipal(submission.submittedByUserId),
+        sourcePrincipal: submission.sourcePrincipal,
         submittedByUserId: submission.submittedByUserId,
         submittedByTeamId: submission.submittedByTeamId,
-        evidenceRefs: submission.evidenceRefs,
+        evidenceRefs: submission.evidenceRefs ?? [],
         officialResultVersion: resultVersion,
         officialEventVersion: 1,
         verificationStatus: 'official',
@@ -463,7 +492,7 @@ function officialActiveSquadEvents({
   resultVersion,
 }: {
   match: Match;
-  submission: ResultSubmission;
+  submission: OfficialEventSource;
   sport: 'football' | 'basketball' | 'rugby';
   finalizedAt: string;
   resultVersion: number;
@@ -494,10 +523,10 @@ function officialActiveSquadEvents({
       // The claim's author is the event's author. The caller (trigger, sweeper, route)
       // is who ran the finalization, which is a different question and is recorded on
       // the ledger entry as provenance rather than on each event.
-      sourcePrincipal: userPrincipal(submission.submittedByUserId),
+      sourcePrincipal: submission.sourcePrincipal,
       submittedByUserId: submission.submittedByUserId,
       submittedByTeamId: submission.submittedByTeamId,
-      evidenceRefs: submission.evidenceRefs,
+      evidenceRefs: submission.evidenceRefs ?? [],
       officialResultVersion: resultVersion,
       officialEventVersion: 1,
       verificationStatus: 'official',
@@ -537,7 +566,7 @@ function reconcileOfficialScore({
   sport: 'football' | 'basketball' | 'rugby';
   events: OfficialSportEventRecord[];
   match: Match;
-  submission: ResultSubmission;
+  submission: OfficialEventSource;
   score: { home: number; away: number };
   resultVersion: number;
   finalizedAt: string;
@@ -604,10 +633,10 @@ function reconcileOfficialScore({
       // The claim's author is the event's author. The caller (trigger, sweeper, route)
       // is who ran the finalization, which is a different question and is recorded on
       // the ledger entry as provenance rather than on each event.
-      sourcePrincipal: userPrincipal(submission.submittedByUserId),
+      sourcePrincipal: submission.sourcePrincipal,
       submittedByUserId: submission.submittedByUserId,
       submittedByTeamId: submission.submittedByTeamId,
-      evidenceRefs: submission.evidenceRefs,
+      evidenceRefs: submission.evidenceRefs ?? [],
       officialResultVersion: resultVersion,
       officialEventVersion: 1,
       verificationStatus: 'official',
@@ -648,7 +677,7 @@ function officialScorerEvents({
   startSequence = 1,
 }: {
   match: Match;
-  submission: ResultSubmission;
+  submission: OfficialEventSource;
   sport: 'football' | 'basketball' | 'rugby';
   finalizedAt: string;
   resultVersion: number;
@@ -658,7 +687,7 @@ function officialScorerEvents({
   let sequence = startSequence;
   const eventType = scorerEventType(sport);
 
-  for (const scorer of submission.scorers) {
+  for (const scorer of submission.scorers ?? []) {
     const eventCount = sport === 'basketball' ? 1 : Math.max(0, Math.trunc(scorer.count));
     for (let index = 0; index < eventCount; index += 1) {
       const eventId = `${match.id}_v${resultVersion}_event_${String(sequence).padStart(4, '0')}`;
@@ -688,10 +717,10 @@ function officialScorerEvents({
         // The claim's author is the event's author. The caller (trigger, sweeper, route)
         // is who ran the finalization, which is a different question and is recorded on
         // the ledger entry as provenance rather than on each event.
-        sourcePrincipal: userPrincipal(submission.submittedByUserId),
+        sourcePrincipal: submission.sourcePrincipal,
         submittedByUserId: submission.submittedByUserId,
         submittedByTeamId: submission.submittedByTeamId,
-        evidenceRefs: submission.evidenceRefs,
+        evidenceRefs: submission.evidenceRefs ?? [],
         officialResultVersion: resultVersion,
         officialEventVersion: 1,
         verificationStatus: 'official',
@@ -879,7 +908,7 @@ export async function finalizeSubmission(
       ? sanitizedStatLines(submission, match, fantasySport)
       : new Map<string, AthleteStatLine>();
     const scorerTotals = new Map<string, { count: number; teamId: string }>();
-    for (const scorer of submission.scorers) {
+    for (const scorer of submission.scorers ?? []) {
       const current = scorerTotals.get(scorer.athleteId);
       scorerTotals.set(scorer.athleteId, {
         count: (current?.count ?? 0) + scorer.count,
@@ -897,10 +926,23 @@ export async function finalizeSubmission(
       scoringSourceEventId?: string;
       statLine?: AthleteStatLine;
     }[] = [];
+    /**
+     * The legacy submission, adapted to the source contract the builders now take.
+     *
+     * Everything below this line is source-agnostic: the same builders, the same emission,
+     * the same ledger. What differs between a bilateral submission and a field report is
+     * entirely upstream of here, which is what makes the candidate a boundary rather than a
+     * second pipeline.
+     */
+    const eventSource: OfficialEventSource = {
+      ...submission,
+      sourcePrincipal: userPrincipal(submission.submittedByUserId),
+    };
+
     const activeSquadEvents = fantasySport
       ? officialActiveSquadEvents({
         match,
-        submission,
+        submission: eventSource,
         sport: fantasySport,
         finalizedAt,
         resultVersion: plan.resultVersion,
@@ -909,7 +951,7 @@ export async function finalizeSubmission(
     const scorerEvents = fantasySport
       ? officialScorerEvents({
         match,
-        submission,
+        submission: eventSource,
         sport: fantasySport,
         finalizedAt,
         resultVersion: plan.resultVersion,
@@ -919,7 +961,7 @@ export async function finalizeSubmission(
     const statLineEvents = fantasySport
       ? officialStatLineEvents({
         match,
-        submission,
+        submission: eventSource,
         sport: fantasySport,
         statLines,
         finalizedAt,
@@ -1043,7 +1085,7 @@ export async function finalizeSubmission(
         sport: fantasySport,
         events: eligibleOfficialEvents,
         match,
-        submission,
+        submission: eventSource,
         score: plan.match.score,
         resultVersion: plan.resultVersion,
         finalizedAt,
