@@ -50,8 +50,9 @@ describe('access projection migration plan', () => {
    * that was correct when it was written and is now broader than its assignment justifies.
    * The plan has to see them, because rebuilding these projections IS the sunset.
    */
-  it('flags every stored team index as stale once the bundles are zeroed', () => {
+  it('flags every stored team index as stale once authority is retired', () => {
     const plan = buildMigrationPlan({
+      stage: 'retired',
       assignments: [assignment()],
       indexes: [{
         id: 'team_team_1_user_1',
@@ -106,6 +107,7 @@ describe('access projection migration plan', () => {
 
   it('flags an index granting more than its assignments justify', () => {
     const plan = buildMigrationPlan({
+      stage: 'retired',
       assignments: [assignment({ roleKey: 'result_reporter', permissionBundleId: 'results_only' })],
       indexes: [{
         id: 'team_team_1_user_1',
@@ -120,7 +122,8 @@ describe('access projection migration plan', () => {
     });
 
     expect(plan.drift[0].reason).toBe('stale_index');
-    // results_only was versioned to zero, so what the assignment now justifies is nothing.
+    // Retired, so what the assignment now justifies is nothing. Before retirement this same
+    // index would have matched, which is the point of staging it.
     expect(plan.drift[0].desired?.capabilities).toEqual([]);
   });
 

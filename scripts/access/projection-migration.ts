@@ -1,3 +1,4 @@
+import type { TeamAuthorityStage } from '../../src/lib/auth/teamAuthorityStage';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -96,6 +97,15 @@ export function buildMigrationPlan(input: {
   assignments: JsonRecord[];
   indexes: JsonRecord[];
   now?: Date;
+  /**
+   * Which migration stage to project under.
+   *
+   * Explicit, because this tool's whole job is to compare what is stored against what should
+   * be stored, and "should" depends on whether team authority has been retired yet. A rebuild
+   * run at the wrong stage would either strand live V1 workflows or leave retired capabilities
+   * in place, and neither failure announces itself.
+   */
+  stage?: TeamAuthorityStage;
 }) {
   const now = input.now ?? new Date();
   const nowIso = now.toISOString();
@@ -119,7 +129,7 @@ export function buildMigrationPlan(input: {
   const drift: DriftRow[] = [];
   for (const [signature, scope] of scopes) {
     const current = currentByScope.get(signature) ?? null;
-    const desired = projectScopeIndex({ scope, assignments, updatedAt: nowIso, now });
+    const desired = projectScopeIndex({ scope, assignments, updatedAt: nowIso, now, ...(input.stage ? { stage: input.stage } : {}) });
     if (authorityMatches(current, desired)) continue;
 
     drift.push({

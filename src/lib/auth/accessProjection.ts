@@ -1,3 +1,4 @@
+import type { TeamAuthorityStage } from './teamAuthorityStage';
 /**
  * The pure access projection: how active assignments become an `accessIndex` document.
  *
@@ -111,12 +112,15 @@ export function projectScopeIndex({
   accessVersion = 1,
   updatedAt,
   now = new Date(updatedAt),
+  stage,
 }: {
   scope: AccessScopeKey;
   assignments: AccessAssignment[];
   accessVersion?: number;
   updatedAt: string;
   now?: Date;
+  /** Which migration stage to project under. See src/lib/auth/teamAuthorityStage.ts. */
+  stage?: TeamAuthorityStage;
 }): AccessIndexDocument | null {
   const scoped = assignments.filter((assignment) =>
     assignment.userId === scope.userId
@@ -128,6 +132,7 @@ export function projectScopeIndex({
     accessVersion,
     updatedAt,
     now,
+    ...(stage ? { stage } : {}),
   });
   return projected ?? null;
 }

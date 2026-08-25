@@ -62,8 +62,22 @@ describe('projectScopeIndex', () => {
 
     expect(projected?.activeRoles).toEqual(['result_reporter', 'roster_manager']);
     expect(projected?.assignmentIds).toEqual(['a_results', 'a_roster']);
-    // Roles and assignment ids still union. Capabilities do not, because both bundles were
-    // versioned to zero by ADR-004. The projection is the mechanism that retires them.
+    // Still granting at the default stage, so a live V1 workflow can be finished by the people
+    // who started it. The projection is the mechanism that retires them, and it does that when
+    // somebody retires them.
+    expect(projected?.capabilities).toContain('team.result.submit');
+  });
+
+  it('projects a retired team assignment to nothing while keeping its record', () => {
+    const projected = projectScopeIndex({
+      scope: TEAM_SCOPE,
+      assignments: [assignment({ id: 'a_roster', roleKey: 'roster_manager', permissionBundleId: 'roster_only' })],
+      updatedAt: NOW_ISO,
+      now: NOW,
+      stage: 'retired',
+    });
+
+    expect(projected?.assignmentIds).toEqual(['a_roster']);
     expect(projected?.capabilities).toEqual([]);
   });
 

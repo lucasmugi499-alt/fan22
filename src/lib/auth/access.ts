@@ -1,3 +1,10 @@
+import {
+  currentTeamAuthorityStage,
+  teamAuthorityGrants,
+  teamAuthorityIssuable,
+  type TeamAuthorityStage,
+} from './teamAuthorityStage';
+
 export type AccessRoleKey =
   | 'super_admin'
   | 'platform_admin'
@@ -195,6 +202,28 @@ export type AccessContext = {
  * participating teams", and the capability names are the only part of that distinction that
  * survives into a future where nobody remembers this decision.
  */
+/**
+ * What the team bundles granted before ADR-004, kept so the retirement can be staged.
+ *
+ * Not a second source of truth about authority: it is the same list the bundles always held,
+ * and `capabilitiesForAssignment` returns it only while the migration stage says these
+ * assignments still stand. Once the stage is `retired` nothing reads it except history.
+ */
+export const RETIRING_TEAM_CAPABILITIES: Record<string, PermissionCapability[]> = {
+  full_team_admin: [
+    'team.profile.manage',
+    'team.staff.invite',
+    'team.roster.manage',
+    'team.athlete.create',
+    'team.athlete.invite',
+    'team.result.submit',
+    'team.result.confirm',
+    'team.update.publish',
+  ],
+  results_only: ['team.result.submit', 'team.result.confirm'],
+  roster_only: ['team.roster.manage', 'team.athlete.create', 'team.athlete.invite'],
+};
+
 export const LEAGUE_ADMIN_CAPABILITIES: PermissionCapability[] = [
   'league.profile.manage',
   'league.season.manage',
@@ -241,10 +270,21 @@ export function issuableCapabilities(capabilities: PermissionCapability[]) {
 }
 
 /**
- * Bundles that may still be issued. A zeroed bundle is not merely empty: offering it would
- * create an assignment that grants nothing and reads, to whoever accepts it, as a role.
+ * Bundles that may still be issued.
+ *
+ * Freezing issuance and retiring authority are separate decisions with separate timing, and
+ * inferring one from the other was a mistake. This used to return `bundle.capabilities.length
+ * > 0`, which meant a bundle could only stop being offered once it already granted nothing,
+ * so there was no way to express "stop handing this out, but let the people who have it finish
+ * what they started". That window is exactly what the drain needs.
+ *
+ * Freezing can ship immediately and strands nobody. Retiring waits for the drain to read zero.
  */
-export function isIssuableBundle(bundle: PermissionBundle) {
+export function isIssuableBundle(
+  bundle: PermissionBundle,
+  stage: TeamAuthorityStage = currentTeamAuthorityStage(),
+) {
+  if (bundle.id in RETIRING_TEAM_CAPABILITIES) return teamAuthorityIssuable(stage);
   return bundle.capabilities.length > 0;
 }
 
@@ -350,30 +390,39 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
   },
   {
     id: 'full_team_admin',
-    // 3.0.0, zero capabilities. ADR-004 retires Team Admin as an account class without
-    // deleting anything: the projector derives capabilities from the bundle, so authority
-    // drops on the next projection rebuild while every assignment record survives as the
-    // historical fact that this person held this authority during this period. Deleting
-    // them would make hundreds of submissions, confirmations and audit events
-    // uninterpretable.
+    /**
+     * 3.0.0, and what it grants depends on the migration stage rather than on this file.
+     *
+     * ADR-004 retires Team Admin without deleting anything: the projector derives capabilities
+     * from the bundle, so authority drops on the next projection rebuild while every
+     * assignment record survives as the historical fact that this person held this authority
+     * during this period.
+     *
+     * The capabilities are still listed because retiring them is an operation, not a deploy.
+     * Zeroing this array in code means any team scope that happens to rebuild loses its
+     * authority immediately, and the two-sided guard on `resultSubmissions` fails on both
+     * terms at once, so an open claim awaiting its opponent stops being answerable. The stage
+     * is what decides, and it will not move to `retired` until the drain reads zero. See
+     * src/lib/auth/teamAuthorityStage.ts.
+     */
     version: '3.0.0',
     roleKey: 'team_admin',
-    label: 'Full Team Admin (retired)',
-    capabilities: [],
+    label: 'Full Team Admin (retiring)',
+    capabilities: RETIRING_TEAM_CAPABILITIES.full_team_admin,
   },
   {
     id: 'results_only',
     version: '3.0.0',
     roleKey: 'result_reporter',
-    label: 'Results Only (retired)',
-    capabilities: [],
+    label: 'Results Only (retiring)',
+    capabilities: RETIRING_TEAM_CAPABILITIES.results_only,
   },
   {
     id: 'roster_only',
     version: '3.0.0',
     roleKey: 'roster_manager',
-    label: 'Roster Only (retired)',
-    capabilities: [],
+    label: 'Roster Only (retiring)',
+    capabilities: RETIRING_TEAM_CAPABILITIES.roster_only,
   },
   {
     id: 'athlete_self',
@@ -418,10 +467,28 @@ export function isActiveAccessAssignment(assignment: AccessAssignment, now: Date
   return true;
 }
 
-export function capabilitiesForAssignment(assignment: Pick<AccessAssignment, 'permissionBundleId' | 'roleKey'>) {
-  const bundle = bundleById.get(assignment.permissionBundleId);
-  if (bundle) return bundle.capabilities;
-  return PERMISSION_BUNDLES.find((candidate) => candidate.roleKey === assignment.roleKey)?.capabilities ?? [];
+/**
+ * What an assignment grants, now.
+ *
+ * The `stage` parameter is explicit rather than read from the environment inside, so the
+ * projector, the migration tooling and the tests all state which stage they mean. A function
+ * that silently consulted `process.env` here would make a projection's contents depend on
+ * where it happened to be rebuilt.
+ */
+export function capabilitiesForAssignment(
+  assignment: Pick<AccessAssignment, 'permissionBundleId' | 'roleKey'>,
+  stage: TeamAuthorityStage = currentTeamAuthorityStage(),
+) {
+  const bundle = bundleById.get(assignment.permissionBundleId)
+    ?? PERMISSION_BUNDLES.find((candidate) => candidate.roleKey === assignment.roleKey);
+  if (!bundle) return [];
+
+  // Team bundles grant nothing once the migration has retired them. Every other bundle is
+  // unaffected, which is why this checks the bundle rather than the stage alone.
+  const isRetiringTeamBundle = bundle.id in RETIRING_TEAM_CAPABILITIES;
+  if (isRetiringTeamBundle && !teamAuthorityGrants(stage)) return [];
+
+  return bundle.capabilities;
 }
 
 export function buildAccessIndexDocuments({
@@ -429,11 +496,14 @@ export function buildAccessIndexDocuments({
   accessVersion,
   updatedAt,
   now = new Date(updatedAt),
+  // Explicit, so a projection's contents never depend on where it happened to be rebuilt.
+  stage = currentTeamAuthorityStage(),
 }: {
   assignments: AccessAssignment[];
   accessVersion: number;
   updatedAt: string;
   now?: Date;
+  stage?: TeamAuthorityStage;
 }) {
   const grouped = new Map<string, AccessIndexDocument>();
   const activeAssignments = [...assignments]
@@ -457,7 +527,7 @@ export function buildAccessIndexDocuments({
       updatedAt,
     };
     existing.activeRoles = [...new Set([...existing.activeRoles, assignment.roleKey])].sort();
-    existing.capabilities = [...new Set([...existing.capabilities, ...capabilitiesForAssignment(assignment)])].sort();
+    existing.capabilities = [...new Set([...existing.capabilities, ...capabilitiesForAssignment(assignment, stage)])].sort();
     existing.assignmentIds = [...new Set([...existing.assignmentIds, assignment.id])].sort();
 
     // The EARLIEST expiry wins, not the latest.
@@ -508,6 +578,7 @@ export function createAccessContext({
   updatedAt,
   teamLeagueIds,
   athleteTeamIds,
+  stage,
 }: {
   userId: string;
   assignments: AccessAssignment[];
@@ -515,10 +586,12 @@ export function createAccessContext({
   updatedAt: string;
   teamLeagueIds?: Record<string, string>;
   athleteTeamIds?: Record<string, string>;
+  /** Which migration stage to project under. See src/lib/auth/teamAuthorityStage.ts. */
+  stage?: TeamAuthorityStage;
 }): AccessContext {
   return {
     userId,
-    indexes: buildAccessIndexDocuments({ assignments, accessVersion, updatedAt })
+    indexes: buildAccessIndexDocuments({ assignments, accessVersion, updatedAt, ...(stage ? { stage } : {}) })
       .filter((index) => index.userId === userId),
     accessVersion,
     teamLeagueIds,

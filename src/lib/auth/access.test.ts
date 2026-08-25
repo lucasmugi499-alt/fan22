@@ -53,15 +53,26 @@ describe('access assignments and scope-aware authorization', () => {
     });
     expect(indexes[0].assignmentIds).toEqual(['assignment_1', 'assignment_2']);
     /**
-     * Both assignments still project, and they project to nothing.
+     * Still granting, because the default stage is `frozen`.
      *
-     * That pair is the whole of ADR-004's sunset mechanism: the bundles were versioned to
-     * zero capabilities and no assignment record was touched, so authority dropped on the
-     * next rebuild while the historical fact that these people held this authority during
-     * this period survives intact. An empty array here with a populated `assignmentIds` is
-     * the difference between retiring a role and deleting the evidence of it.
+     * This is the safety property the stage exists for. A deploy that carried the zeroed
+     * bundles would strand every open V1 workflow the moment a team scope rebuilt, since the
+     * two-sided guard on `resultSubmissions` fails on both its terms at once. Authority drops
+     * when somebody retires it, having confirmed the drain, not when the code ships.
      */
-    expect(indexes[0].capabilities).toEqual([]);
+    expect(indexes[0].capabilities).toContain('team.result.submit');
+
+    const retired = buildAccessIndexDocuments({
+      assignments: [assignment({ id: 'assignment_1' })],
+      accessVersion: 4,
+      updatedAt: now,
+      stage: 'retired',
+    });
+    // And once retired: the assignment still projects, and it projects to nothing. That pair
+    // is the whole sunset mechanism, and the difference between retiring a role and deleting
+    // the evidence that somebody held it.
+    expect(retired[0].assignmentIds).toEqual(['assignment_1']);
+    expect(retired[0].capabilities).toEqual([]);
     expect(accessIndexId('team', 'team_a', 'user_1')).toBe('team_team_a_user_1');
   });
 
@@ -86,17 +97,37 @@ describe('access assignments and scope-aware authorization', () => {
   });
 
   /**
-   * This used to assert that a Team Admin could act on their own team and no other. Since
-   * ADR-004 the first half is gone: a retired assignment grants nothing anywhere, including
-   * in its own scope. The second half is what still matters and is asserted unchanged, since
-   * scope isolation is the property that must not regress while the rest is dismantled.
+   * What a Team Admin can still do depends on the migration stage, and that is the safety
+   * property rather than an inconsistency.
+   *
+   * During the drain their assignment still grants, so a live V1 workflow can be finished by
+   * the people who started it. Once retired it grants nothing anywhere, including in its own
+   * scope. The team-scoped helpers below were re-pointed at league-native capabilities in
+   * Phase A and refuse at either stage; what the stage governs is the result workflow, which
+   * reads the projection directly.
    */
+  it('lets a Team Admin finish an open V1 workflow while the migration is draining', () => {
+    const context = createAccessContext({
+      userId: 'user_1',
+      assignments: [assignment({})],
+      updatedAt: now,
+      teamLeagueIds: { team_a: 'league_1', team_b: 'league_2' },
+      stage: 'frozen',
+    });
+
+    expect(canSubmitResultInScope(context, 'match_1', 'team_a')).toBe(true);
+    expect(canConfirmSubmissionInScope(context, 'submission_1', 'team_a')).toBe(true);
+    // Scope isolation holds at every stage: their own club and no other.
+    expect(canSubmitResultInScope(context, 'match_2', 'team_b')).toBe(false);
+  });
+
   it('grants a retired Team Admin nothing, in its own scope or any other', () => {
     const context = createAccessContext({
       userId: 'user_1',
       assignments: [assignment({})],
       updatedAt: now,
       teamLeagueIds: { team_a: 'league_1', team_b: 'league_2' },
+      stage: 'retired',
     });
 
     expect(canManageTeamInScope(context, 'team_a')).toBe(false);

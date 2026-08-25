@@ -228,8 +228,8 @@ describe('trusted access resolver', () => {
     expect(context.indexes).toHaveLength(1);
     expect(context.indexes[0].assignmentIds).toEqual(['assignment_a', 'assignment_b']);
     expect(context.indexes[0].activeRoles).toEqual(['result_reporter', 'team_admin']);
-    // Zeroed by ADR-004: the assignments still resolve and still project, and they grant
-    // nothing. Roles and ids above are what carry the history.
-    expect(context.indexes[0].capabilities).toEqual([]);
+    // Still granting at the default stage. ADR-004 retires this authority, and retiring it is
+    // an operation that waits for the V1 drain rather than something a deploy does.
+    expect(context.indexes[0].capabilities).toContain('team.result.submit');
   });
 });

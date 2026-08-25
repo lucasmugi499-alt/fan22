@@ -70,7 +70,9 @@
     "lifecycle:report": "tsx --env-file=.env.local scripts/security/lifecycle-report.ts",
     "access:v1-drain": "tsx scripts/access/v1-drain-report.ts",
     "data:migrate-athlete-identity": "tsx scripts/data/migrate-athlete-identity.ts",
-    "test:integration": "firebase emulators:exec --only firestore --project goalplace256-integration \"vitest run --config vitest.integration.config.ts\""
+    "test:integration": "firebase emulators:exec --only firestore --project goalplace256-integration \"vitest run --config vitest.integration.config.ts\"",
+    "access:migrate-v1": "tsx scripts/access/migrate-v1-workflow.ts",
+    "access:sunset-invariants": "tsx scripts/access/team-sunset-invariants.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
