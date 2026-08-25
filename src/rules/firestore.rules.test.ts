@@ -2202,3 +2202,86 @@ describe('the athlete persona is the one thing an athlete owns', () => {
     await assertFails(getDoc(doc(asUser(ATHLETE_USER), 'athleteStatIssues/issue_1')));
   });
 });
+
+describe('field capture adds no client write surface', () => {
+  /**
+   * Every Match Ops write travels through an Admin SDK route, because a Match Ops principal
+   * holds a bearer token rather than a Firebase identity and never satisfies
+   * `request.auth != null`. These assertions are what keeps that true: a future rule added to
+   * one of these collections "to make the client work" would fail here first.
+   */
+  const SERVER_ONLY = [
+    'fieldManagers/fm_1',
+    'fieldManagerAssignments/assignment_1',
+    'matchAccessSessions/session_1',
+    'matchClockStates/match_001',
+    'matchLineupSnapshots/match_001',
+    'liveMatchEvents/event_1',
+    'matchReports/match_001',
+  ];
+
+  it.each(SERVER_ONLY)('denies a league operator writing %s directly', async (path) => {
+    await assertFails(setDoc(doc(asUser(LEAGUE_ADMIN), path), { matchId: 'match_001', leagueId: 'league_001' }));
+  });
+
+  it.each(SERVER_ONLY)('denies reading %s from the client', async (path) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), path), { matchId: 'match_001', leagueId: 'league_001' });
+    });
+
+    await assertFails(getDoc(doc(asUser(LEAGUE_ADMIN), path)));
+  });
+
+  it('lets the governing league read its own exception queue', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'matchOperationalExceptions/match_001_declared_score_mismatch'), {
+        id: 'match_001_declared_score_mismatch',
+        matchId: 'match_001',
+        leagueId: 'league_001',
+        code: 'declared_score_mismatch',
+        blocking: true,
+        status: 'open',
+      });
+    });
+
+    // A case nobody can see is a case nobody resolves, which is why this one collection is
+    // readable where the other seven are not.
+    await assertSucceeds(
+      getDoc(doc(asUser(LEAGUE_ADMIN), 'matchOperationalExceptions/match_001_declared_score_mismatch')),
+    );
+  });
+
+  it('denies an unrelated user reading another league exception queue', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'matchOperationalExceptions/match_001_clock_anomaly'), {
+        matchId: 'match_001',
+        leagueId: 'league_001',
+        code: 'clock_anomaly',
+        status: 'open',
+      });
+    });
+
+    await assertFails(getDoc(doc(asUser(OUTSIDER), 'matchOperationalExceptions/match_001_clock_anomaly')));
+  });
+
+  it('denies the league closing its own case from the client', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'matchOperationalExceptions/match_001_takeover_occurred'), {
+        matchId: 'match_001',
+        leagueId: 'league_001',
+        code: 'takeover_occurred',
+        status: 'open',
+      });
+    });
+
+    // Resolution goes through a reviewed route that records who decided and why, and checks
+    // conflict of interest first. A client write would skip all three.
+    await assertFails(
+      setDoc(
+        doc(asUser(LEAGUE_ADMIN), 'matchOperationalExceptions/match_001_takeover_occurred'),
+        { status: 'resolved' },
+        { merge: true },
+      ),
+    );
+  });
+});

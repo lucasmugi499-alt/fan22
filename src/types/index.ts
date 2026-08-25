@@ -743,6 +743,216 @@ export interface AthleteStatIssue {
   updatedAt: string;
 }
 
+/**
+ * A reusable contact record for somebody who captures matches. Not an account.
+ *
+ * ADR-002: a Field Manager is a principal but not an account. They hold no Firebase Auth
+ * user, no access assignment and no accessIndex document, and this record exists so a league
+ * that uses the same person every week does not retype their phone number every week.
+ */
+export interface FieldManager {
+  id: string;
+  leagueId: string;
+  displayName: string;
+  phone: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt?: string;
+  status: 'active' | 'inactive';
+}
+
+/** One assignment, one match, one five-hour window. */
+export interface FieldManagerAssignment {
+  id: string;
+  matchId: string;
+  leagueId: string;
+  seasonId: string;
+  fieldManagerId: string;
+  assignedByUserId: string;
+  status: 'assigned' | 'accepted' | 'checked_in' | 'in_progress' | 'submitted' | 'cancelled';
+  accessStartsAt: string;
+  accessExpiresAt: string;
+  /**
+   * Clubs this observer has declared a relationship with. Recorded either way: an affiliated
+   * Field Manager is not automatically disqualified, because in grassroots reality the only
+   * person present with a working phone may be an assistant coach. What is not permitted is
+   * hiding it, so the affiliation is carried into the report's provenance and lowers the
+   * data-quality tier.
+   */
+  declaredAffiliations: string[];
+  /** From the competition. When true, an affiliated observer cannot be assigned at all. */
+  neutralityRequired: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * The bearer session a Field Manager holds during a match.
+ *
+ * Only hashes are stored. The plaintext link secret, the PIN and the session token exist in
+ * exactly two places: the message the Field Manager received, and the memory of the request
+ * that verified them. A database that can reconstruct any of the three is a database whose
+ * compromise hands an attacker live capture access to every fixture it holds.
+ */
+export interface MatchAccessSession {
+  id: string;
+  matchId: string;
+  assignmentId: string;
+  bootstrapTokenHash: string;
+  bootstrapConsumedAt?: string;
+  sessionTokenHash?: string;
+  pinHash: string;
+  pinSalt: string;
+  /** Failed PIN attempts. Counted per assignment, never per IP: a stadium shares one hotspot. */
+  attempts: number;
+  lockedUntil?: string;
+  deviceFingerprintHash?: string;
+  /** Incremented by a takeover. Events from an older generation are quarantined, not accepted. */
+  sessionGeneration: number;
+  issuedAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  revocationReason?: string;
+}
+
+/**
+ * The match clock, as anchors rather than a running timer.
+ *
+ * A JavaScript timer dies when Safari is backgrounded, battery saver engages, or the phone
+ * locks, and every one of those is ordinary on the hardware this runs on. The elapsed time is
+ * therefore always computed from `periodStartedAt` and `accumulatedMs`, never read off a
+ * ticking display, so reopening the page reconstructs the clock rather than resuming it.
+ */
+export interface MatchClockState {
+  id: string;
+  matchId: string;
+  period: '1' | '2' | 'ET1' | 'ET2';
+  state: 'not_started' | 'running' | 'paused' | 'period_break' | 'full_time';
+  periodStartedAt?: string;
+  pausedAt?: string;
+  /** Time already banked in this period, in milliseconds. */
+  accumulatedMs: number;
+  sessionGeneration: number;
+  /** Optimistic concurrency: a stale writer loses rather than overwrites. */
+  version: number;
+  adjustments: { deltaMs: number; reason: string; at: string }[];
+  updatedAt: string;
+}
+
+/** What the Field Manager confirmed before kickoff. Immutable once written. */
+export interface MatchLineupSnapshot {
+  id: string;
+  matchId: string;
+  assignmentId: string;
+  confirmedAt: string;
+  teams: Record<string, {
+    starting: string[];
+    bench: string[];
+    notPresent: string[];
+  }>;
+  packageVersion: string;
+}
+
+/** One observation from the touchline. Append-only. */
+export interface LiveMatchEvent {
+  eventId: string;
+  matchId: string;
+  leagueId: string;
+  seasonId: string;
+  sport: SportSlug;
+  eventType: string;
+  period: string;
+  gameClockMs: number;
+  teamId: string;
+  athleteId: string | null;
+  payload: Record<string, unknown>;
+  source: 'field_manager' | 'league_emergency_takeover';
+  assignmentId: string;
+  sessionId: string;
+  sessionGeneration: number;
+  clientEventId: string;
+  clientSequence: number;
+  /** An observation, never authority. The clock comes from the anchor. */
+  deviceTime: string;
+  createdAtServer: string;
+  supersedesEventId?: string;
+  correctionReason?: string;
+  status: 'active' | 'superseded' | 'quarantined';
+}
+
+/** The attested claim a Field Manager submits at full time. */
+export interface MatchReport {
+  /** The match id. One active report per match, atomically. */
+  id: string;
+  matchId: string;
+  leagueId: string;
+  assignmentId?: string;
+  sessionId?: string;
+  /**
+   * V2 sources only. `legacy_team_submission` is deliberately not a value here: legacy
+   * submissions stay in `resultSubmissions` and adapt into the finalization candidate
+   * directly. Putting the legacy value in this enum invites a backfill that copies history
+   * into a document shape that did not exist when the history was made.
+   */
+  source: 'field_capture' | 'league_post_match';
+  /** Collected independently, before the reconstructed score is shown. The omission detector. */
+  declaredHomeScore: number;
+  declaredAwayScore: number;
+  reconstructedHomeScore: number;
+  reconstructedAwayScore: number;
+  eventCount: number;
+  payloadHash: string;
+  lineupSnapshotId?: string;
+  clockAdjustments: { deltaMs: number; reason: string; at: string }[];
+  attestedAt: string;
+  attestationText: string;
+  exceptions: string[];
+  status: 'submitted' | 'auto_finalized' | 'league_review' | 'official' | 'superseded';
+  resultVersion: number;
+  finalizationKey?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MatchExceptionCode =
+  | 'declared_score_mismatch'
+  | 'event_sequence_gap'
+  | 'unsynced_events_at_submit'
+  | 'late_events_from_revoked_session'
+  | 'athlete_not_registered'
+  | 'athlete_ineligible'
+  | 'match_abandoned'
+  | 'policy_violation'
+  | 'lineup_discrepancy_reported'
+  | 'clock_anomaly'
+  | 'post_window_correction'
+  | 'takeover_occurred'
+  | 'affiliated_observer'
+  | 'result_never_reported';
+
+/** The League's review queue. Distinct from reconciliationExceptions, which Platform owns. */
+export interface MatchOperationalException {
+  id: string;
+  matchId: string;
+  leagueId: string;
+  reportId?: string;
+  code: MatchExceptionCode;
+  /** Blocking exceptions stop auto-finalization. Non-blocking ones lower confidence. */
+  blocking: boolean;
+  detail: Record<string, unknown>;
+  status: 'open' | 'proposed' | 'resolved' | 'escalated' | 'superseded';
+  conflictContext?: Record<string, unknown>;
+  proposedByUserId?: string;
+  proposedResolution?: string;
+  proposedAt?: string;
+  ratifiedByUserId?: string;
+  ratifiedAt?: string;
+  escalatedAt?: string;
+  escalationDeadline?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Person {
   id: string;
   legalName?: string;

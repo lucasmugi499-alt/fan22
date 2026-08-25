@@ -1,0 +1,179 @@
+import { createHash } from 'node:crypto';
+import { FieldValue } from 'firebase-admin/firestore';
+import { z } from 'zod';
+import { adminDb } from '@/lib/firebase/admin';
+import { parseJsonBody } from '@/server/api/security';
+import { requireMatchOpsSession } from '@/server/matchOps/session';
+import { hasClockAnomaly } from '@/lib/matchOps/clock';
+import { reconstructMatchScore } from '@/kernel/formulas/score';
+import { SPORT_DEFINITIONS } from '@/kernel/definitions/sportCatalogues';
+import type { LiveMatchEvent, Match, MatchClockState, MatchExceptionCode } from '@/types';
+import type { OfficialSportEvent } from '@/kernel/types';
+
+export const runtime = 'nodejs';
+
+const bodySchema = z.object({
+  /**
+   * Collected on the client BEFORE the reconstructed score is shown, and sent here for
+   * comparison. See the comment on the mismatch below: this field is the only omission
+   * detector field capture has.
+   */
+  declaredHomeScore: z.number().int().min(0).max(200),
+  declaredAwayScore: z.number().int().min(0).max(200),
+  attestationText: z.string().trim().min(10).max(400),
+  /** What the device still holds. A non-empty queue is a blocking exception, not a warning. */
+  unsyncedCount: z.number().int().min(0).max(10_000).default(0),
+  abandoned: z.boolean().optional(),
+});
+
+export async function POST(request: Request, { params }: { params: Promise<{ matchId: string }> }) {
+  const { matchId } = await params;
+  const auth = await requireMatchOpsSession(request, matchId);
+  if ('response' in auth) return auth.response;
+
+  const parsed = await parseJsonBody(request, bodySchema, { maxBytes: 4_096 });
+  if ('response' in parsed) return Response.json({ error: 'Invalid match report.' }, { status: 400 });
+  const input = parsed.data;
+
+  const [matchSnapshot, eventsSnapshot, clockSnapshot, lineupSnapshot] = await Promise.all([
+    adminDb.collection('matches').doc(matchId).get(),
+    adminDb.collection('liveMatchEvents').where('matchId', '==', matchId).get(),
+    adminDb.collection('matchClockStates').doc(matchId).get(),
+    adminDb.collection('matchLineupSnapshots').doc(matchId).get(),
+  ]);
+  if (!matchSnapshot.exists) return Response.json({ error: 'Match not found.' }, { status: 404 });
+  const match = { id: matchSnapshot.id, ...matchSnapshot.data() } as Match;
+
+  const allEvents = eventsSnapshot.docs.map((doc) => doc.data() as LiveMatchEvent);
+  const active = allEvents.filter((event) => event.status === 'active');
+
+  const sport = ['football', 'basketball', 'rugby'].includes(String(match.sport))
+    ? (String(match.sport) as 'football' | 'basketball' | 'rugby')
+    : 'football';
+  const definition = SPORT_DEFINITIONS.find((entry) => entry.sportId === sport);
+
+  const trace = definition
+    ? reconstructMatchScore({
+      sportDefinition: definition,
+      events: active as unknown as OfficialSportEvent[],
+      teams: { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId },
+    })
+    : { home: 0, away: 0, status: 'unavailable' as const, issues: [], formulaVersion: '0' };
+
+  const exceptions: MatchExceptionCode[] = [];
+
+  /**
+   * The omission detector, and the reason the attestation screen asks for a score at all.
+   *
+   * A score reconstructed purely from captured events reconciles perfectly with itself by
+   * construction. A goal the Field Manager never tapped is not an inconsistency: it is simply
+   * absent, and every other gate passes. The old bilateral ceremony, for all its friction,
+   * caught exactly this class of error, and asking one independent question is what replaces
+   * it.
+   *
+   * A mismatch is not refused. The Field Manager may genuinely be unsure, and refusing would
+   * teach them to type whatever the app already shows.
+   */
+  if (input.declaredHomeScore !== trace.home || input.declaredAwayScore !== trace.away) {
+    exceptions.push('declared_score_mismatch');
+  }
+  if (input.unsyncedCount > 0) exceptions.push('unsynced_events_at_submit');
+
+  const sequences = new Set(active.map((event) => event.clientSequence));
+  const highest = Math.max(0, ...sequences);
+  for (let sequence = 1; sequence <= highest; sequence += 1) {
+    if (!sequences.has(sequence)) { exceptions.push('event_sequence_gap'); break; }
+  }
+
+  if (allEvents.some((event) => event.status === 'quarantined')) {
+    exceptions.push('late_events_from_revoked_session');
+  }
+  if (input.abandoned) exceptions.push('match_abandoned');
+
+  const clock = clockSnapshot.exists ? (clockSnapshot.data() as MatchClockState) : null;
+  if (clock && hasClockAnomaly(clock)) exceptions.push('clock_anomaly');
+  if (clock && clock.sessionGeneration > 1) exceptions.push('takeover_occurred');
+  if (allEvents.some((event) => event.correctionReason)) exceptions.push('post_window_correction');
+
+  const now = new Date().toISOString();
+  const reportRef = adminDb.collection('matchReports').doc(matchId);
+  const existing = await reportRef.get();
+  if (existing.exists && existing.data()?.status !== 'submitted') {
+    return Response.json({ error: 'This match has already been reported.' }, { status: 409 });
+  }
+
+  await reportRef.set({
+    id: matchId,
+    matchId,
+    leagueId: match.leagueId,
+    assignmentId: auth.session.assignmentId,
+    sessionId: auth.session.sessionId,
+    source: 'field_capture',
+    declaredHomeScore: input.declaredHomeScore,
+    declaredAwayScore: input.declaredAwayScore,
+    reconstructedHomeScore: trace.home,
+    reconstructedAwayScore: trace.away,
+    eventCount: active.length,
+    // Over the active events only, so a superseded observation cannot change the hash of what
+    // was actually attested to.
+    payloadHash: createHash('sha256')
+      .update(JSON.stringify(active.map((event) => event.eventId).sort()))
+      .digest('hex'),
+    ...(lineupSnapshot.exists ? { lineupSnapshotId: matchId } : {}),
+    clockAdjustments: clock?.adjustments ?? [],
+    attestedAt: now,
+    attestationText: input.attestationText,
+    exceptions,
+    // Never `official` from here. A report is a claim; the finalizer decides.
+    status: exceptions.some((code) => BLOCKING.has(code)) ? 'league_review' : 'submitted',
+    resultVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+  }, { merge: true });
+
+  const batch = adminDb.batch();
+  for (const code of new Set(exceptions)) {
+    const exceptionId = `${matchId}_${code}`;
+    batch.set(adminDb.collection('matchOperationalExceptions').doc(exceptionId), {
+      id: exceptionId,
+      matchId,
+      leagueId: match.leagueId,
+      reportId: matchId,
+      code,
+      blocking: BLOCKING.has(code),
+      detail: {
+        declared: { home: input.declaredHomeScore, away: input.declaredAwayScore },
+        reconstructed: { home: trace.home, away: trace.away },
+        unsyncedCount: input.unsyncedCount,
+      },
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  }
+  batch.update(adminDb.collection('fieldManagerAssignments').doc(auth.session.assignmentId), {
+    status: 'submitted',
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+
+  return Response.json({
+    ok: true,
+    matchId,
+    reconstructed: { home: trace.home, away: trace.away },
+    exceptions,
+    underReview: exceptions.some((code) => BLOCKING.has(code)),
+  });
+}
+
+/** Exceptions that stop auto-finalization. The rest attach as quality signals. */
+const BLOCKING = new Set<MatchExceptionCode>([
+  'declared_score_mismatch',
+  'event_sequence_gap',
+  'unsynced_events_at_submit',
+  'late_events_from_revoked_session',
+  'athlete_not_registered',
+  'athlete_ineligible',
+  'match_abandoned',
+  'policy_violation',
+]);

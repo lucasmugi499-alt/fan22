@@ -898,6 +898,65 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /**
+     * Field Capture, in its entirety.
+     *
+     * Seven collections, seven identical rules, and that is the point worth noticing: field
+     * capture introduces no new client-write surface at all. Every Match Ops write travels
+     * through an Admin SDK route, because a Match Ops principal holds a bearer token rather
+     * than a Firebase identity and so never satisfies `request.auth != null`.
+     *
+     * Compare the roughly ninety lines `resultSubmissions` needs above. The old workflow had
+     * to express a two-sided confirmation in Rules because both parties wrote directly; this
+     * one has a server in front of it, so Rules only has to say no.
+     *
+     * Read is denied too, not merely write. A match access session document holds the hashes
+     * that gate live capture, and a live event stream is a league's operational data during
+     * the match it is being played. Both are served to the people entitled to them through
+     * routes that check a capability first.
+     */
+    match /fieldManagers/{fieldManagerId} {
+      allow read, write: if false;
+    }
+
+    match /fieldManagerAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+
+    match /matchAccessSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /matchClockStates/{matchId} {
+      allow read, write: if false;
+    }
+
+    match /matchLineupSnapshots/{matchId} {
+      allow read, write: if false;
+    }
+
+    match /liveMatchEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /matchReports/{matchId} {
+      allow read, write: if false;
+    }
+
+    /**
+     * The League's own review queue, and the one field-capture collection a client may read.
+     *
+     * `reconciliationExceptions` above is the Platform-owned equivalent for finalization
+     * surplus; this is its League-owned peer. The governing league reads its own queue, which
+     * is the whole point of exception-driven governance: a case nobody can see is a case
+     * nobody resolves. Writes stay server-only, because a client that could set `resolved`
+     * would close a blocked result with no capability check and no audit entry.
+     */
+    match /matchOperationalExceptions/{exceptionId} {
+      allow read: if isPlatformAdmin() || hasLeagueOperatorCapability(resource.data.leagueId);
+      allow write: if false;
+    }
+
     match /feedPosts/{postId} {
       allow read: if true;
       allow create: if signedIn() &&
