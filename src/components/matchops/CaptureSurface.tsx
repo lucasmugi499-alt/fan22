@@ -4,26 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MatchPackage, PackageAthlete } from '@/lib/matchOps/package';
 import type { CapturePayload } from './MatchOpsClient';
 
-/**
- * The football capture palette.
- *
- * Deliberately short. Assists, shots, corners and saves are tempting because professional
- * systems collect them, and one observer with a phone cannot capture them accurately while
- * also running the clock. Data collected badly is worse than data not collected: it poisons
- * fantasy and it is invisible in aggregate, because a missing assist looks exactly like a goal
- * that had none.
- */
-const PALETTE = [
-  { type: 'football.goal', label: 'Goal', tone: 'brand', needsAthlete: true },
-  { type: 'football.own_goal', label: 'Own goal', tone: 'muted', needsAthlete: true },
-  { type: 'football.penalty_scored', label: 'Penalty scored', tone: 'brand', needsAthlete: true },
-  { type: 'football.penalty_missed', label: 'Penalty missed', tone: 'muted', needsAthlete: true },
-  { type: 'football.yellow_card', label: 'Yellow card', tone: 'warn', needsAthlete: true },
-  { type: 'football.second_yellow_card', label: 'Second yellow', tone: 'warn', needsAthlete: true },
-  { type: 'football.red_card', label: 'Red card', tone: 'danger', needsAthlete: true },
-  { type: 'football.substitution_on', label: 'Sub on', tone: 'muted', needsAthlete: true },
-  { type: 'football.substitution_off', label: 'Sub off', tone: 'muted', needsAthlete: true },
-] as const;
+import { paletteForSport, usesPersistentScoringPanel, type PaletteEntry } from '@/lib/matchOps/palette';
 
 const UNDO_WINDOW_MS = 8_000;
 
@@ -43,7 +24,13 @@ export function CaptureSurface(props: {
   onClock: (action: Record<string, unknown>) => Promise<void>;
   onFullTime: () => void;
 }) {
-  const [picking, setPicking] = useState<(typeof PALETTE)[number] | null>(null);
+  /**
+   * Read from the sport rather than hardcoded. The kernel already knows which event types are
+   * legal, and a second list in the client is a second answer that can disagree with it.
+   */
+  const palette = paletteForSport(props.pack.sport);
+  const persistentScoring = usesPersistentScoringPanel(props.pack.sport);
+  const [picking, setPicking] = useState<PaletteEntry | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [recent, setRecent] = useState<{ label: string; clock: string; clientEventId: string; event: CapturePayload }[]>([]);
   const [undoable, setUndoable] = useState<{ clientEventId: string; event: CapturePayload } | null>(null);
@@ -66,6 +53,9 @@ export function CaptureSurface(props: {
       period: props.clock.period,
       // Taken from the derived clock, never typed. The app already knows the time.
       gameClockMs: props.gameClockMs,
+      // A three-pointer is one event worth three, never three events worth one: three events
+      // would put scoring actions in the timeline that never happened.
+      ...(picking.variableValue?.length ? { payload: { value: picking.variableValue[0] } } : {}),
     };
     const entry = await props.onCapture(event);
     if (entry) {
@@ -130,9 +120,26 @@ export function CaptureSurface(props: {
         >
           Start match
         </button>
+      ) : persistentScoring ? (
+        /*
+          Basketball scores roughly every forty seconds, which is a materially harder capture
+          problem than football's. A scorer who has to open a sheet for every basket falls
+          behind in the first quarter, so the point values live permanently on screen.
+        */
+        <div className="grid grid-cols-3 gap-2">
+          {palette.filter((entry) => entry.variableValue?.length).map((entry) => (
+            <button
+              key={entry.label}
+              onClick={() => setPicking(entry)}
+              className="min-h-16 rounded-2xl bg-brand text-2xl font-bold text-black active:scale-[0.98]"
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
       ) : (
         <button
-          onClick={() => setPicking(PALETTE[0])}
+          onClick={() => setPicking(palette[0])}
           disabled={props.clock.state === 'full_time'}
           className="min-h-20 rounded-2xl bg-brand text-xl font-bold text-black transition active:scale-[0.98] disabled:opacity-40"
         >
@@ -189,7 +196,7 @@ export function CaptureSurface(props: {
               <>
                 <h2 className="mb-3 text-sm font-semibold text-text-strong">What happened?</h2>
                 <div className="grid grid-cols-2 gap-2">
-                  {PALETTE.map((option) => (
+                  {palette.map((option) => (
                     <button
                       key={option.type}
                       onClick={() => setPicking(option)}

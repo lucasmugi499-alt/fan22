@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody } from '@/server/api/security';
 import { requireMatchOpsSession } from '@/server/matchOps/session';
 import { hasClockAnomaly } from '@/lib/matchOps/clock';
-import { reconstructMatchScore } from '@/kernel/formulas/score';
+import { reconcileBasketballBoxScore, reconstructMatchScore } from '@/kernel/formulas/score';
 import { SPORT_DEFINITIONS } from '@/kernel/definitions/sportCatalogues';
 import type { LiveMatchEvent, Match, MatchClockState, MatchExceptionCode } from '@/types';
 import type { OfficialSportEvent } from '@/kernel/types';
@@ -61,6 +61,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
     : { home: 0, away: 0, status: 'unavailable' as const, issues: [], formulaVersion: '0' };
 
   const exceptions: MatchExceptionCode[] = [];
+
+  /**
+   * Basketball's box score has to add up.
+   *
+   * The reconstructed score comes from summing payload values, so it agrees with itself by
+   * construction. What it cannot tell you is whether the points were attributed to the right
+   * players: a basket credited to nobody, or to a player on the wrong team, produces the same
+   * team total. Reconciling the per-athlete totals against the team score is the check that
+   * catches it, and it only exists for basketball because football and rugby attribute one
+   * scoring event to one athlete with a fixed weight.
+   */
+  if (sport === 'basketball') {
+    const athleteTeamPoints: Record<string, number> = {};
+    for (const event of active) {
+      if (!event.athleteId) continue;
+      const value = typeof event.payload?.value === 'number' ? event.payload.value : 0;
+      athleteTeamPoints[event.teamId] = (athleteTeamPoints[event.teamId] ?? 0) + value;
+    }
+    const boxScore = reconcileBasketballBoxScore({
+      athleteTeamPoints,
+      teamScore: { [match.homeTeamId]: trace.home, [match.awayTeamId]: trace.away },
+    });
+    // A point that reached the team total without reaching a player is a real gap in the
+    // record, so it blocks: a career stat built on it would be wrong and invisible.
+    if (boxScore.status === 'inconsistent') exceptions.push('athlete_not_registered');
+  }
 
   /**
    * The omission detector, and the reason the attestation screen asks for a score at all.
