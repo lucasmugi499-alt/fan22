@@ -73,7 +73,8 @@
     "test:integration": "firebase emulators:exec --only firestore --project goalplace256-integration \"vitest run --config vitest.integration.config.ts\"",
     "access:migrate-v1": "tsx scripts/access/migrate-v1-workflow.ts",
     "access:sunset-invariants": "tsx scripts/access/team-sunset-invariants.ts",
-    "release:evidence": "tsx scripts/release/migration-evidence.ts"
+    "release:evidence": "tsx scripts/release/migration-evidence.ts",
+    "release:canary": "tsx scripts/release/field-capture-canary.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

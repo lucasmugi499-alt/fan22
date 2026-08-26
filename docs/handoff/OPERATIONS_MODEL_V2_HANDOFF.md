@@ -70,7 +70,7 @@ deploying.** State which plane, always.
 
 | Plane | State |
 |---|---|
-| App Hosting | `build-2026-08-23-004`, **unchanged by the push**. ABIU reads Enabled but automatic rollouts last fired 2026-08-08 and every deploy since has been manual CLI. The demo app still serves pre-migration code. |
+| App Hosting | `build-2026-08-23-004`, **unchanged by the push**. ABIU reads Enabled but **automatic rollouts do not work** (confirmed by the owner; the last automatic one succeeded 2026-08-05 and the 2026-08-08 attempt failed). Every deploy is manual CLI. The demo app still serves pre-migration code, and pushing to `main` never changes that. |
 | Cloud Functions | 7 live: `convergeLifecycle`, `onOfficialResultFinalized`, `onResultSubmissionWritten`, 4 search indexers |
 | `onMatchReportWritten` | **not deployed**. Field capture is not live |
 | `reconcilePaymentIntents` | not deployed, and must stay that way for this milestone |
@@ -188,9 +188,22 @@ Do not deploy scheduled Functions as a group. Do not deploy `reconcilePaymentInt
 
 ### Step 8: canary
 
-One league, one fixture, two demo teams with full squads, one Field Manager session. Full
-workflow through to officialization. Then replay the trigger and confirm nothing changes.
-Then submit one deliberately bad report and confirm an exception with zero official writes.
+One league, one fixture, two demo teams with full squads, one Field Manager session. Drive the
+full workflow by hand: link, PIN, check-in, lineup, clock, events, half time, second half, full
+time, attestation.
+
+Then verify it, rather than inspecting by eye:
+
+```bash
+npm run release:canary -- --match <matchId> --bad-match <badMatchId>
+```
+
+It checks counts, not existence. A duplicate finalization looks correct on the surface, because
+the score is right, and only the cardinality reveals it. Replay the trigger, re-run, and confirm
+every count is identical.
+
+The `--bad-match` argument is not optional in practice: a path that only ever succeeds has not
+been shown to refuse anything, and the script says so if you omit it.
 
 ---
 
@@ -244,6 +257,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | `npm run access:migrate:*` | Projection rebuild: dry-run, apply, gate |
 | `npm run access:sunset-invariants` | Post-migration proof |
 | `npm run release:evidence` | Accumulating migration evidence, and the push gate |
+| `npm run release:canary` | Verifies a field capture canary end to end, and the bad-report case |
 
 ---
 
@@ -262,6 +276,8 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-25 | `ae46f61` | W5: canonical planner regression suite |
 | 2026-08-25 | `a84ad65` | W2: league report loader, third source complete |
 | 2026-08-25 | `aba00ee` | W14: evidence generator; merged to main and pushed |
+| 2026-08-25 | `1e46b9d` | Recorded that the push deployed nothing |
+| 2026-08-25 | | W17: canary verifier, proven against the emulator |
 
 **Next action:** supply credentials, then run step 1.
 
