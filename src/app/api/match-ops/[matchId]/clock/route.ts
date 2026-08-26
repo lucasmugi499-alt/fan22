@@ -61,9 +61,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
       const { action, ...detail } = parsed.data;
       const result = applyClockAction(current, { type: action, ...detail } as never, now);
       if (!result.ok) throw new Error(result.reason);
+      const persistedClock = Object.fromEntries(
+        Object.entries(result.next).filter(([, value]) => value !== undefined),
+      );
 
       transaction.set(ref, {
-        ...result.next,
+        ...persistedClock,
         sessionGeneration: auth.session.sessionGeneration,
         updatedAtServer: FieldValue.serverTimestamp(),
       });

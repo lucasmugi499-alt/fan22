@@ -15,6 +15,8 @@ vi.mock('@/server/matchOps/session', () => ({
 }));
 
 const context = { params: Promise.resolve({ matchId: 'match_1' }) };
+const transactionGet = vi.fn();
+const transactionSet = vi.fn();
 
 function request(body: Record<string, unknown>) {
   return new Request('https://goalplace256.test/api/match-ops/match_1/clock', {
@@ -27,6 +29,7 @@ function request(body: Record<string, unknown>) {
 describe('match ops clock route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    transactionGet.mockResolvedValue({ exists: false });
 
     vi.mocked(requireMatchOpsSession).mockResolvedValue({
       session: {
@@ -41,8 +44,8 @@ describe('match ops clock route', () => {
       doc: vi.fn(() => ref),
     } as never);
     vi.mocked(adminDb.runTransaction).mockImplementation(async (operation) => operation({
-      get: vi.fn(async () => ({ exists: false })),
-      set: vi.fn(),
+      get: transactionGet,
+      set: transactionSet,
     } as never));
   });
 
@@ -57,5 +60,31 @@ describe('match ops clock route', () => {
       state: 'running',
       sessionGeneration: 1,
     });
+  });
+
+  it('omits cleared clock anchors from the Firestore write at half time', async () => {
+    transactionGet.mockResolvedValue({
+      exists: true,
+      id: 'match_1',
+      data: () => ({
+        id: 'match_1',
+        matchId: 'match_1',
+        period: '1',
+        state: 'running',
+        periodStartedAt: '2026-08-26T19:00:00.000Z',
+        accumulatedMs: 0,
+        sessionGeneration: 1,
+        version: 2,
+        adjustments: [],
+        updatedAt: '2026-08-26T19:00:00.000Z',
+      }),
+    });
+
+    const response = await POST(request({ action: 'end_period' }), context);
+    const written = transactionSet.mock.calls[0]?.[1];
+
+    expect(response.status).toBe(200);
+    expect(written).toMatchObject({ state: 'period_break', period: '1' });
+    expect(written).not.toHaveProperty('periodStartedAt');
   });
 });
