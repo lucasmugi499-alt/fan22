@@ -1,0 +1,74 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T13:35:24.815Z",
+  "commit": {
+    "sha": "a84ad65b8bea3a23c418deb40dbbb3e93e019aed",
+    "branch": "handbook-v2",
+    "pushed": false
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1380
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 19
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "v1DrainBefore": "not_run",
+    "workflowsMigrated": [],
+    "v1DrainAfter": "not_run",
+    "teamAuthorityStage": "frozen",
+    "projectionsRebuilt": "not_run",
+    "legacyTeamCapabilitiesRemaining": "not_run",
+    "sunsetInvariants": "not_run"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "fan22 backend, updated 2026-08-23T11:55:38Z (pre-migration)",
+      "status": "not_run"
+    },
+    "firestoreRules": {
+      "revision": null,
+      "status": "not_run"
+    },
+    "storageRules": {
+      "revision": null,
+      "status": "not_run"
+    },
+    "cloudFunctions": {
+      "revision": "7 deployed, onMatchReportWritten ABSENT",
+      "status": "not_run"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    }
+  },
+  "canary": {
+    "matchId": null,
+    "reportId": null,
+    "candidateId": null,
+    "officialResultVersion": null,
+    "officialEventCount": null,
+    "duplicateReplay": "not_run",
+    "badReportException": "not_run"
+  },
+  "exclusions": [
+    "onMatchReportWritten is not deployed: field capture is not live on any environment.",
+    "V1 drain, straggler migration, projection rebuild and sunset invariants have never run against real data. No credentials on the build machine.",
+    "Team authority stage is frozen. Issuance closed; existing holders retain authority so open V1 workflows can finish.",
+    "Branch is local and unpushed by deliberate decision, not omission.",
+    "Field capture canary not run. Nothing about the field path is cloud-verified.",
+    "Production untouched and out of scope for this milestone."
+  ]
+}

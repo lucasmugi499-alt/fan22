@@ -5,7 +5,7 @@ this file alone. It records what is done, what is left, how to do it, and the tr
 
 **Last updated:** 2026-08-25
 **Branch:** `handbook-v2`, local only, not pushed
-**Head:** `b067eaa`
+**Head:** `a84ad65`
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -46,6 +46,11 @@ deploying.** State which plane, always.
 | E propose/ratify, post-match entry, escalation, staleness | implemented, tested |
 | F basketball and rugby palettes, box score | implemented, tested |
 | W1 report immutability, event digest, candidate versioning | implemented, tested |
+| W2 third source loader, all three wired | implemented, tested |
+| W3/W4 first-class provenance, four separate facts | implemented, tested |
+| W5 canonical planner regression suite | implemented, tested |
+| W7 Team Admin issuance closed in product and server | implemented, tested |
+| W14 migration evidence generator | implemented, tested |
 
 ### Operations (real environment)
 
@@ -202,6 +207,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | Wrong rules file | `firebase.json` points at `firestore.rules.next` (1188 lines), not `firestore.rules` (302). Editing the wrong one deploys nothing and fails nothing. |
 | Guard budgets are shrink-only | `access:guard` fails when a budget is too high **or** too low. Lower it in the same commit as the fix. |
 | Stale `functions/lib` | `verify:bundle` reads emitted output. After changing the tsconfig include/exclude, `rm -rf functions/lib` before rebuilding. |
+| Evidence that resets itself | The first evidence generator overwrote its file on every run, so checking readiness erased what had been proven and then correctly reported nothing was proven. It now merges. Use `--reset` deliberately if you want a blank one. |
 
 ---
 
@@ -237,6 +243,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | `npm run access:migrate-v1` | Governed straggler migration |
 | `npm run access:migrate:*` | Projection rebuild: dry-run, apply, gate |
 | `npm run access:sunset-invariants` | Post-migration proof |
+| `npm run release:evidence` | Accumulating migration evidence, and the push gate |
 
 ---
 
@@ -250,5 +257,18 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-25 | `83c6cfa` | Workstream B: staged team authority, drain inventory, migration, invariants |
 | 2026-08-25 | `6167529` | Milestone runbook |
 | 2026-08-25 | `b067eaa` | W1: report immutability, event digest, candidate versioning |
+| 2026-08-25 | `1e1db74` | W3/W4: provenance as four facts |
+| 2026-08-25 | `8ef1e1a` | W7: last Team Admin issuance path closed |
+| 2026-08-25 | `ae46f61` | W5: canonical planner regression suite |
+| 2026-08-25 | `a84ad65` | W2: league report loader, third source complete |
 
 **Next action:** supply credentials, then run step 1.
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS_JSON='<service account for manifest-quasar-479416-s7>'
+npm run access:v1-drain
+```
+
+Record every count in `docs/evidence/operations-model-v2-<sha>.json`. Never edit a status to
+`passed` without the command output that proves it: `npm run release:evidence` re-checks the
+push gate from that file and preserves whatever has already been recorded.

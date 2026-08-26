@@ -72,7 +72,8 @@
     "data:migrate-athlete-identity": "tsx scripts/data/migrate-athlete-identity.ts",
     "test:integration": "firebase emulators:exec --only firestore --project goalplace256-integration \"vitest run --config vitest.integration.config.ts\"",
     "access:migrate-v1": "tsx scripts/access/migrate-v1-workflow.ts",
-    "access:sunset-invariants": "tsx scripts/access/team-sunset-invariants.ts"
+    "access:sunset-invariants": "tsx scripts/access/team-sunset-invariants.ts",
+    "release:evidence": "tsx scripts/release/migration-evidence.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
