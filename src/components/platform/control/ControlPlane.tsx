@@ -16,9 +16,33 @@ type EnvironmentReport = {
   blockers: string[];
 };
 
+/**
+ * One intake source's activation, as this origin reads it.
+ *
+ * Reported per source rather than as one mode because the three pipelines mature
+ * independently: the bilateral V1 path has been enabled on demo since 2026-08-08, and field
+ * capture has never run against the real environment. A single number for "the finalizer"
+ * cannot say that, and an operator reading `enabled` while an unproven source sits behind
+ * the same word is the exact misreading this console exists to prevent.
+ */
+type SourceActivation = {
+  source: string;
+  /** Null when this origin cannot reach the source, which is not the same as `off`. */
+  modeThisOrigin: string | null;
+  canaryAllowlistSize: number | null;
+  reachableFromThisOrigin: boolean;
+  variable: string;
+  canaryVariable: string;
+  governedBy: string;
+};
+
 type ControlPlanePayload = {
   demo: { environment: string; active: boolean; publicBaseUrl: string | null };
-  finalizer: { modeThisOrigin: string; canaryAllowlistSize: number };
+  finalizer: {
+    modeThisOrigin: string;
+    canaryAllowlistSize: number;
+    sources: SourceActivation[];
+  };
   beta: EnvironmentReport;
   production: EnvironmentReport;
   scheduledJobs: { state: string; note: string };
@@ -39,6 +63,7 @@ type ControlPlaneState = {
   environment: string | null;
   finalizerMode: string | null;
   canaryAllowlistSize: number | null;
+  sources: SourceActivation[] | null;
   beta: EnvironmentReport | null;
   production: EnvironmentReport | null;
   scheduledJobsNote: string;
@@ -62,6 +87,7 @@ const DEMO_STATE: ControlPlaneState = {
   environment: 'demo',
   finalizerMode: null,
   canaryAllowlistSize: null,
+  sources: null,
   beta: null,
   production: null,
   scheduledJobsNote: 'Verify with `firebase functions:list`. The app cannot see the deployed function set.',
@@ -78,6 +104,10 @@ function fromPayload(payload: ControlPlanePayload): ControlPlaneState {
     environment: payload.demo.environment,
     finalizerMode: payload.finalizer.modeThisOrigin,
     canaryAllowlistSize: payload.finalizer.canaryAllowlistSize,
+    // Tolerated as absent: an origin serving a build from before the gates were split
+    // reports no `sources`, and rendering "not measured" is the honest answer rather than
+    // an empty table that reads as "no sources configured".
+    sources: payload.finalizer.sources ?? null,
     beta: payload.beta,
     production: payload.production,
     scheduledJobsNote: payload.scheduledJobs.note,
@@ -254,9 +284,39 @@ export function ControlPlane() {
             {state.scheduledJobsNote} Open cases are listed in{' '}
             <Link href="/admin/competition" className="text-brand hover:underline">Competition integrity</Link>.
           </p>
+          <div className="mt-3 border-t border-border pt-3">
+            <h3 className="text-sm font-semibold text-text-strong">Activation by result source</h3>
+            {state.sources === null ? (
+              <p className="mt-1 text-sm text-muted">{NOT_MEASURED}</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {state.sources.map((entry) => (
+                  <li key={entry.source} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-text-strong">{entry.source}</p>
+                      <StatusChip label={entry.modeThisOrigin ?? NOT_MEASURED} />
+                    </div>
+                    <p className="mt-1 text-xs text-subtle">
+                      {entry.variable}
+                      {entry.modeThisOrigin === 'canary'
+                        ? ` — ${entry.canaryAllowlistSize} allowlisted id(s) in ${entry.canaryVariable}`
+                        : null}
+                    </p>
+                    <p className="text-xs text-subtle">
+                      Decided by: {entry.governedBy}
+                      {entry.reachableFromThisOrigin
+                        ? null
+                        : ' — not reachable from this origin, so this runtime holds no reading'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <p className="mt-2 text-xs text-subtle">
-            The Cloud Functions runtime holds its own copy of the finalizer switch. This
-            reports what THIS origin would apply; the two are configured separately.
+            The Cloud Functions runtime holds its own copy of every one of these switches, and
+            it is that copy which governs the two trigger-driven sources. This reports what
+            THIS origin would apply; the two are configured separately.
           </p>
         </Card>
       </div>

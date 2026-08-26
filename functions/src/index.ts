@@ -15,7 +15,8 @@ import {
   sweepOverdueConfirmations,
 } from './finalize';
 import { applySearchIndexChange } from './searchIndex';
-import { currentFinalizerActivation } from './finalizerMode';
+import { currentActivationFor, currentFinalizerActivation } from './finalizerMode';
+import { activationSourceForReport } from '../../src/server/finalizerActivation';
 import { expireLapsedAssignments, runProjectionRepairs } from './lifecycle';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 
@@ -174,15 +175,52 @@ export const onMatchReportWritten = onDocumentWritten(
      * nothing else: one is bound to an event stream and one is somebody typing a score, so a
      * single loader handling both would have to branch on source in exactly the place the
      * candidate architecture exists to keep source-free.
+     *
+     * The source branch also selects the ACTIVATION, and this is the only place in the system
+     * where that is allowed to happen. Field capture and league post-match entry mature
+     * independently of the bilateral V1 path and of each other, so each carries its own
+     * switch: `GOALPLACE_FIELD_CAPTURE_MODE` and `GOALPLACE_LEAGUE_ENTRY_MODE`. Resolving it
+     * here keeps the branch at ingress, where the source is still a legitimate fact, and hands
+     * the planner a decision it cannot trace back to a source.
+     *
+     * Both default to `off`. A source that has never been proven against the real environment
+     * starts inert and is named into life one match at a time.
      */
-    const activation = currentFinalizerActivation();
-    const result = report.source === 'league_post_match'
+    const source = activationSourceForReport(report.source);
+    const activation = currentActivationFor(source);
+    const result = source === 'league_post_match'
       ? await finalizeLeagueReport(db, matchId, activation)
       : await finalizeFieldReport(db, matchId, activation);
     if (result.action === 'finalized') {
-      logger.info('Field report finalized', { matchId, finalizationKey: result.finalizationKey });
-    } else if (result.action === 'skipped') {
-      logger.info('Field report not finalized', { matchId, reason: result.reason });
+      logger.info('Report finalized', {
+        matchId,
+        source,
+        finalizationKey: result.finalizationKey,
+        mode: activation.mode,
+      });
+    } else if (result.action === 'blocked') {
+      // Same reasoning as the submission trigger: a contradictory report is the one outcome
+      // an operator must not have to go looking for.
+      logger.warn('Report finalization blocked for League review', {
+        matchId,
+        source,
+        reason: result.reason,
+        exceptionId: result.exceptionId,
+        mode: activation.mode,
+      });
+    } else if (result.reason === 'finalizer_off' || result.reason === 'not_in_canary_allowlist') {
+      // Distinguished from an ordinary no-op on purpose. The report is sitting at
+      // `ready_for_finalization`: nothing blocks it and nothing will happen to it, which is a
+      // correct state and an invisible one unless the suppression says so by name.
+      logger.info('Report finalization suppressed by activation mode', {
+        matchId,
+        source,
+        mode: activation.mode,
+        reason: result.reason,
+        allowlistSize: activation.canaryAllowlist.length,
+      });
+    } else {
+      logger.info('Report not finalized', { matchId, source, reason: result.reason, mode: activation.mode });
     }
   },
 );

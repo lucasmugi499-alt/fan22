@@ -1,7 +1,11 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { hasCapability } from '@/server/access/capabilities';
-import { activationFromEnvironment } from '@/server/finalizerActivation';
+import {
+  ACTIVATION_VARIABLES,
+  activationForSource,
+  type FinalizationSource,
+} from '@/server/finalizerActivation';
 import {
   environmentReadiness,
   routingMechanismAvailable,
@@ -48,7 +52,6 @@ export async function GET(request: Request) {
       .catch(() => null),
   ]);
 
-  const activation = activationFromEnvironment();
 
   return Response.json({
     demo: {
@@ -56,11 +59,23 @@ export async function GET(request: Request) {
       active: true,
       publicBaseUrl: process.env.GOALPLACE_APP_BASE_URL ?? null,
     },
-    // The finalizer switch as THIS runtime reads it. The Cloud Functions runtime holds its
-    // own copy, which is why the value is labelled by origin rather than stated globally.
+    /**
+     * The finalizer switches as THIS runtime reads them, one per intake source.
+     *
+     * Two things an operator has to be able to see separately, and could not while a single
+     * flag governed every source: which door is open, and how wide. A pipeline that has never
+     * been cloud-verified reading `enabled` is the report that should stop a release, and it
+     * is unreadable from a single aggregate mode.
+     *
+     * `modeThisOrigin`, not `mode`. The Cloud Functions runtime holds its own copy of every
+     * one of these, and it is the copy that governs the two trigger-driven sources — this
+     * runtime cannot reach field capture or league entry at all. Reporting these as global
+     * state would be a lie of exactly the kind this endpoint exists to refuse.
+     */
     finalizer: {
-      modeThisOrigin: activation.mode,
-      canaryAllowlistSize: activation.canaryAllowlist.length,
+      modeThisOrigin: activationForSource('legacy_submission').mode,
+      canaryAllowlistSize: activationForSource('legacy_submission').canaryAllowlist.length,
+      sources: sourceActivationReport(),
     },
     // Every outstanding blocker is listed, not summarised to one line: an operator told
     // only about placeholders would fix them and expect to be ready, when the routing wall
@@ -94,4 +109,39 @@ function environmentReport(readiness: EnvironmentReadiness) {
     ready: readiness.ready,
     blockers: readiness.blockers,
   };
+}
+
+/**
+ * Every source gate, named by the variable that sets it.
+ *
+ * The variable name is reported alongside the value because the failure this endpoint keeps
+ * being asked about is "we thought it was on": an operator reading `off` needs the exact
+ * string to grep for and set, not a label they then have to map back to configuration.
+ *
+ * `governedBy` says which runtime's copy actually decides, so nobody reads a mode off this
+ * origin and concludes the trigger will honour it.
+ */
+function sourceActivationReport() {
+  const governedBy: Record<FinalizationSource, string> = {
+    legacy_submission: 'App Hosting routes and onResultSubmissionWritten',
+    field_capture: 'onMatchReportWritten',
+    league_post_match: 'onMatchReportWritten',
+  };
+  return (Object.keys(ACTIVATION_VARIABLES) as FinalizationSource[]).map((source) => {
+    const activation = activationForSource(source);
+    // Whether a claim of this source can reach the finalizer THROUGH THIS RUNTIME at all.
+    // Field and league reports arrive on a Firestore trigger, so App Hosting reads their
+    // variables and never acts on them: reporting `off` for one of those without saying so
+    // would read as "field capture is disabled", which is not what this origin knows.
+    const reachable = source === 'legacy_submission';
+    return {
+      source,
+      modeThisOrigin: reachable ? activation.mode : null,
+      canaryAllowlistSize: reachable ? activation.canaryAllowlist.length : null,
+      reachableFromThisOrigin: reachable,
+      variable: ACTIVATION_VARIABLES[source].mode,
+      canaryVariable: ACTIVATION_VARIABLES[source].canaryIds,
+      governedBy: governedBy[source],
+    };
+  });
 }
