@@ -22,6 +22,49 @@ export type CapabilityScope = {
   scopeId: string;
 };
 
+/**
+ * Capabilities that a superseded name still satisfies, until projections are rebuilt.
+ *
+ * ADR-003 renamed and split the League capabilities. Changing the catalogue does not rewrite
+ * already-materialized projections, so between the deploy and the rebuild every stored league
+ * index carries only the old names. Without this map, a League Admin would be refused athlete
+ * creation, claim verification, evidence review, field-manager assignment and post-match entry
+ * on the day the new application shipped, and nothing about the deploy would have suggested it.
+ *
+ * The Rules helper was widened for precisely this reason and the server check was not, which is
+ * the kind of half-migration that looks complete because one of the two enforcement points was
+ * remembered.
+ *
+ * Every mapping is a genuine equivalence rather than a convenience. Each superseded capability
+ * was held by the same bundle and covered the same domain, so this restores the status quo for
+ * existing operators rather than granting anybody something they did not have:
+ *
+ *   team.manage          was team.create
+ *   roster.manage        was roster.verify
+ *   athlete.manage       was roster.verify, which is what verifying a roster meant
+ *   fixture.manage       was implicit in season.manage
+ *   result.enter         a league that could resolve a result could set one
+ *   match.takeover       the same adjudication authority
+ *   field_manager.manage running the competition, which season.manage expressed
+ *
+ * This map is deleted once `access:sunset-invariants` reports zero stale projections. It is
+ * migration scaffolding, and leaving it in place would quietly make two spellings permanent.
+ */
+const SUPERSEDED_CAPABILITY_EQUIVALENTS: Partial<Record<PermissionCapability, PermissionCapability[]>> = {
+  'league.team.manage': ['league.team.create'],
+  'league.roster.manage': ['league.roster.verify'],
+  'league.athlete.manage': ['league.roster.verify'],
+  'league.fixture.manage': ['league.season.manage'],
+  'league.result.enter': ['league.result.resolve'],
+  'league.match.takeover': ['league.result.resolve'],
+  'league.field_manager.manage': ['league.season.manage'],
+};
+
+/** The capability asked for, plus any superseded spelling that still satisfies it. */
+export function acceptedSpellings(capability: PermissionCapability): PermissionCapability[] {
+  return [capability, ...(SUPERSEDED_CAPABILITY_EQUIVALENTS[capability] ?? [])];
+}
+
 export function indexGrantsCapability(
   data: FirebaseFirestore.DocumentData | undefined,
   capability: PermissionCapability,
@@ -32,7 +75,9 @@ export function indexGrantsCapability(
   // cache of a decision that is no longer valid.
   if (!isAccessIndexLive(data, now)) return false;
   const capabilities = data?.capabilities;
-  return Array.isArray(capabilities) && capabilities.includes(capability);
+  if (!Array.isArray(capabilities)) return false;
+  // Either spelling, while stored projections still carry the pre-ADR-003 names.
+  return acceptedSpellings(capability).some((accepted) => capabilities.includes(accepted));
 }
 
 /** Canonical check: does the projection for this scope grant the capability? */

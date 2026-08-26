@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminDb } from '@/lib/firebase/admin';
 import { recordAccessDivergence } from './securityEvents';
-import { authorizeCapability, hasCapability, hasCapabilityOrPlatformGrant } from './capabilities';
+import { authorizeCapability, hasCapability, hasCapabilityOrPlatformGrant, indexGrantsCapability } from './capabilities';
 
 vi.mock('server-only', () => ({}));
 
@@ -169,5 +169,64 @@ describe('authorizeCapability', () => {
     // Exact scope + exact capability. Holding one capability in a scope is not authority
     // over the whole scope.
     expect(decision.granted).toBe(false);
+  });
+});
+
+describe('superseded capability spellings, during the migration window', () => {
+  function index(capabilities: string[]) {
+    return {
+      capabilities,
+      userId: 'user_1',
+      scopeType: 'league',
+      scopeId: 'league_1',
+      updatedAt: '2026-08-25T00:00:00.000Z',
+      accessVersion: 1,
+    };
+  }
+
+  /**
+   * The failure this prevents: changing the capability catalogue does not rewrite stored
+   * projections, so between the deploy and the rebuild every league index carries only the old
+   * names. Without this, a League Admin loses most of their surface on the day the new
+   * application ships, and nothing about the deploy suggests it will happen.
+   */
+  it.each([
+    ['league.team.manage', 'league.team.create'],
+    ['league.roster.manage', 'league.roster.verify'],
+    ['league.athlete.manage', 'league.roster.verify'],
+    ['league.fixture.manage', 'league.season.manage'],
+    ['league.result.enter', 'league.result.resolve'],
+    ['league.match.takeover', 'league.result.resolve'],
+    ['league.field_manager.manage', 'league.season.manage'],
+  ] as const)('satisfies %s from a stored %s', (asked, stored) => {
+    expect(indexGrantsCapability(index([stored]), asked)).toBe(true);
+  });
+
+  it('still satisfies the new spelling once projections are rebuilt', () => {
+    expect(indexGrantsCapability(index(['league.athlete.manage']), 'league.athlete.manage')).toBe(true);
+  });
+
+  /**
+   * The map is an equivalence, not a widening. Nobody gains authority they did not hold: each
+   * superseded capability was in the same bundle and covered the same domain.
+   */
+  it('does not let an unrelated capability satisfy a league one', () => {
+    expect(indexGrantsCapability(index(['league.notice.publish']), 'league.athlete.manage')).toBe(false);
+    expect(indexGrantsCapability(index(['team.roster.manage']), 'league.roster.manage')).toBe(false);
+    expect(indexGrantsCapability(index([]), 'league.team.manage')).toBe(false);
+  });
+
+  it('never resurrects a retired team capability', () => {
+    // Nothing maps INTO the team namespace. The sunset is not undone by the migration shim.
+    expect(indexGrantsCapability(index(['league.roster.manage']), 'team.roster.manage')).toBe(false);
+  });
+
+  it('still refuses everything once the projection has expired', () => {
+    // Expiry outranks spelling: a lapsed projection grants nothing under either name.
+    expect(indexGrantsCapability(
+      { ...index(['league.roster.verify']), expiresAtMillis: 1 },
+      'league.athlete.manage',
+      new Date('2026-08-25T00:00:00.000Z'),
+    )).toBe(false);
   });
 });
