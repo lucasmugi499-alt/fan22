@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { initializeMigrationFirestore } from '../lib/firestoreTarget';
 
 /**
  * Move one stranded V1 claim from the bilateral workflow to league resolution.
@@ -54,11 +54,17 @@ export function planWorkflowMigration(submission: { status?: string } | undefine
   return { ok: true, from: status, to: 'disputed' };
 }
 
+/**
+ * The NAMED database, never `(default)`.
+ *
+ * This used to be `getFirestore()`, which asks for `(default)` — a database that does not
+ * exist on any GoalPlace project. The whole output of this script is a count, and a count
+ * taken against the wrong database is worse than no count at all: on a project that happens
+ * to have an empty `(default)`, every number here would read zero and the verdict would read
+ * green. See `scripts/lib/firestoreTarget.ts`.
+ */
 function initialize() {
-  if (getApps().length) return getFirestore();
-  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  initializeApp(raw ? { credential: cert(JSON.parse(raw)) } : { credential: applicationDefault() });
-  return getFirestore();
+  return initializeMigrationFirestore();
 }
 
 export async function migrateWorkflow(db: Firestore, matchId: string, reason: string, apply: boolean) {
@@ -133,8 +139,8 @@ async function main() {
     return;
   }
 
-  const db = initialize();
-  console.log(`Migrating V1 workflow${apply ? '' : ' (dry run)'}:`);
+  const { db, label } = initialize();
+  console.log(`Migrating V1 workflow${apply ? '' : ' (dry run)'} on ${label}:`);
   const verdict = await migrateWorkflow(db, matchId, reason, apply);
 
   if (!apply) console.log('\nDry run. Re-run with --apply to write.');

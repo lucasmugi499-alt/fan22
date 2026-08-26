@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
+import { initializeMigrationFirestore } from '../lib/firestoreTarget';
 
 /**
  * Proves one field capture canary end to end, against whatever Firestore it is pointed at.
@@ -225,11 +225,17 @@ export async function verifyBadReport(db: Firestore, matchId: string): Promise<C
   };
 }
 
+/**
+ * The NAMED database, never `(default)`.
+ *
+ * This used to be `getFirestore()`, which asks for `(default)` — a database that does not
+ * exist on any GoalPlace project. The whole output of this script is a count, and a count
+ * taken against the wrong database is worse than no count at all: on a project that happens
+ * to have an empty `(default)`, every number here would read zero and the verdict would read
+ * green. See `scripts/lib/firestoreTarget.ts`.
+ */
 function initialize() {
-  if (getApps().length) return getFirestore();
-  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  initializeApp(raw ? { credential: cert(JSON.parse(raw)) } : { credential: applicationDefault() });
-  return getFirestore();
+  return initializeMigrationFirestore();
 }
 
 function render(title: string, report: CanaryReport) {
@@ -251,7 +257,8 @@ async function main() {
     return;
   }
 
-  const db = initialize();
+  const { db, label } = initialize();
+  console.log(`Target: ${label}`);
   const report = await verifyCanary(db, matchId);
   render(`Field capture canary: ${matchId}`, report);
 

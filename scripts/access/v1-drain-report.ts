@@ -1,7 +1,6 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeMigrationFirestore } from '../lib/firestoreTarget';
 
 /**
  * Which Result Workflow V1 submissions still need a team to answer them.
@@ -130,15 +129,21 @@ export function buildDrainReport(input: {
   };
 }
 
+/**
+ * The NAMED database, never `(default)`.
+ *
+ * This used to be `getFirestore()`, which asks for `(default)` — a database that does not
+ * exist on any GoalPlace project. The whole output of this script is a count, and a count
+ * taken against the wrong database is worse than no count at all: on a project that happens
+ * to have an empty `(default)`, every number here would read zero and the verdict would read
+ * green. See `scripts/lib/firestoreTarget.ts`.
+ */
 function initialize() {
-  if (getApps().length) return getFirestore();
-  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  initializeApp(raw ? { credential: cert(JSON.parse(raw)) } : { credential: applicationDefault() });
-  return getFirestore();
+  return initializeMigrationFirestore();
 }
 
 async function main() {
-  const db = initialize();
+  const { db, label } = initialize();
   const [submissionsSnap, assignmentsSnap, invitationsSnap] = await Promise.all([
     db.collection('resultSubmissions').get(),
     db.collection('accessAssignments').where('scopeType', '==', 'team').get(),
@@ -152,6 +157,9 @@ async function main() {
   });
 
   console.log('Result Workflow V1 drain report');
+  // Stated on every run. These counts are recorded as migration evidence, and a count
+  // whose target is not written down beside it cannot be checked by anybody later.
+  console.log(`  Target                             ${label}`);
   console.log(`  Submissions total                  ${report.totals.submissions}`);
   console.log(`  Awaiting a TEAM answer             ${report.totals.strandedByRetirement}   <- blocks retirement`);
   console.log(`  Open but league-resolvable         ${report.totals.leagueResolvable}`);

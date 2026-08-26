@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
+import { initializeMigrationFirestore } from '../lib/firestoreTarget';
 import { RETIRING_TEAM_CAPABILITIES } from '../../src/lib/auth/access';
 
 /**
@@ -73,11 +73,17 @@ export function checkTeamSunsetInvariants(input: InvariantInput): InvariantViola
   return violations;
 }
 
+/**
+ * The NAMED database, never `(default)`.
+ *
+ * This used to be `getFirestore()`, which asks for `(default)` — a database that does not
+ * exist on any GoalPlace project. The whole output of this script is a count, and a count
+ * taken against the wrong database is worse than no count at all: on a project that happens
+ * to have an empty `(default)`, every number here would read zero and the verdict would read
+ * green. See `scripts/lib/firestoreTarget.ts`.
+ */
 function initialize() {
-  if (getApps().length) return getFirestore();
-  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  initializeApp(raw ? { credential: cert(JSON.parse(raw)) } : { credential: applicationDefault() });
-  return getFirestore();
+  return initializeMigrationFirestore();
 }
 
 export async function runTeamSunsetInvariants(db: Firestore) {
@@ -112,7 +118,10 @@ export async function runTeamSunsetInvariants(db: Firestore) {
 }
 
 async function main() {
-  const violations = await runTeamSunsetInvariants(initialize());
+  const { db, label } = initialize();
+  // The proof is only as good as the database it was taken against.
+  console.log(`Team authority sunset invariants on ${label}`);
+  const violations = await runTeamSunsetInvariants(db);
   process.exitCode = violations.length ? 1 : 0;
 }
 
