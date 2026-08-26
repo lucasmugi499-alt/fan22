@@ -190,22 +190,18 @@ export async function POST(request: Request) {
       }
       if (data.status !== 'invited') return Response.json({ error: 'Invitation is no longer active.' }, { status: 409 });
 
-      // A legacy invitation link must still produce CANONICAL authority.
-      //
-      // This path used to write `teamAssignments` and `team.adminUserIds` and stop there. The
-      // person was told they were a Team Admin, their role claim said so, and the canonical
-      // model — the one Firestore Rules and every capability check actually consult — had
-      // never heard of them. That is split-brain identity: an administrative UI they can
-      // enter and cannot use, or worse, legacy surfaces that keep pretending they own a team.
-      //
-      // Rather than reject old links and strand invitees, acceptance now flows into the same
-      // canonical assignment plus projection that the modern invitation produces. There is
-      // one path by which authority becomes real; this is now a second door onto it, not a
-      // second mechanism.
       /**
-       * The legacy team invitation door, closed by the same rule. It used to flow into the
-       * canonical assignment path so old links did not strand their invitee; there is now
-       * nothing on the other side of that path for a team scope to receive.
+       * The legacy team invitation door, closed.
+       *
+       * This path once wrote `teamAssignments` and `team.adminUserIds` and stopped there, so the
+       * person was told they were a Team Admin while the canonical model had never heard of
+       * them. It was then rebuilt to flow into the same canonical assignment the modern
+       * invitation produced, which was the right fix at the time.
+       *
+       * ADR-004 removes what was on the other side of it. There is no team authority left for
+       * an acceptance to create, so an old link is refused by name rather than accepted into an
+       * assignment that grants nothing. An accepted invitation that silently confers nothing is
+       * the same split-brain failure in a new costume.
        */
       return Response.json({
         error: 'Team administration has moved to League Operations. Ask your league for access.',

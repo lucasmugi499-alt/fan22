@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Buildings, Check, CheckCircle, ClipboardText, EnvelopeSimple, FileCsv, Plus, UserPlus, WarningCircle } from '@phosphor-icons/react';
+import { Buildings, Check, CheckCircle, ClipboardText, EnvelopeSimple, FileCsv, Plus, WarningCircle } from '@phosphor-icons/react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
@@ -39,9 +39,8 @@ export function LeagueTeams() {
   const { teams, matches, athletes, rosters, retry } = detail;
   const loading = catalog.loading || (Boolean(league) && detail.loading);
   const [tab, setTab] = useState<Tab>('Standings');
-  const [mode, setMode] = useState<'team' | 'invite' | 'import' | null>(null);
+  const [mode, setMode] = useState<'team' | 'import' | null>(null);
   const [saving, setSaving] = useState(false);
-  const [teamId, setTeamId] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [inviteEmailDelivery, setInviteEmailDelivery] = useState<DataWriteResult['emailDelivery']>();
@@ -83,43 +82,15 @@ export function LeagueTeams() {
       scoring: season ? scoringForSeason(season, league.sport) : undefined,
     });
   }, [league, lTeams, matches, seasons]);
-  const activeSeason = league ? currentSeasonFor(seasons, league.id, league.currentSeasonId) : undefined;
 
-  function openOperation(nextMode: 'team' | 'invite' | 'import') {
+  function openOperation(nextMode: 'team' | 'import') {
     setInviteLink('');
     setInviteEmailDelivery(undefined);
     setInviteEmailError('');
     setMode(nextMode);
   }
 
-  function invitationUrl(actionUrl?: string) {
-    if (!actionUrl || typeof window === 'undefined') return '';
-    return new URL(actionUrl, window.location.origin).toString();
-  }
 
-  async function recordInvitationResult(invitation: DataWriteResult, createdTeam: boolean) {
-    const link = invitationUrl(invitation.actionUrl);
-    setInviteLink(link);
-    setInviteEmailDelivery(invitation.emailDelivery);
-    setInviteEmailError(invitation.emailError ?? '');
-    if (link) await navigator.clipboard.writeText(link).catch(() => undefined);
-
-    if (invitation.emailDelivery === 'sent') {
-      toast.success(createdTeam ? 'Team created and invitation email sent. Fallback link copied.' : 'Invitation email sent. Fallback link copied.');
-      return Boolean(link);
-    }
-    if (invitation.emailDelivery === 'failed') {
-      toast.warning(link ? 'Invitation link created, but email delivery needs attention.' : 'Invitation created, but email delivery needs attention.');
-      return Boolean(link);
-    }
-    if (invitation.emailDelivery === 'not_configured') {
-      toast.warning(link ? 'Invitation link created. Email is not configured yet.' : 'Invitation created. Email is not configured yet.');
-      return Boolean(link);
-    }
-
-    toast.success(link ? 'Invitation link copied.' : 'Team Admin invitation created.');
-    return Boolean(link);
-  }
 
   async function saveOperation() {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
@@ -128,7 +99,7 @@ export function LeagueTeams() {
       return;
     }
     setSaving(true);
-    let keepOpen = false;
+
     try {
       if (mode === 'team') {
         const normalizedName = teamName.trim();
@@ -161,40 +132,14 @@ export function LeagueTeams() {
           verificationStatus: 'pending',
           createdAt: now,
         }]);
-        setTeamId(newTeamId);
-        if (inviteEmail.trim()) {
-          if (!inviteEmail.includes('@') || !activeSeason) throw new Error('A valid admin email and active season are required.');
-          const invitation = await provider.createTeamAdminInvitation({
-            id: `${newTeamId}_${inviteEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-            userId: '',
-            teamId: newTeamId,
-            leagueId: league.id,
-            seasonId: activeSeason.id,
-            role: 'team_admin',
-            status: 'invited',
-            invitedByUserId: actorUserId,
-            invitedEmail: inviteEmail.trim().toLowerCase(),
-            createdAt: now,
-          });
-          keepOpen = await recordInvitationResult(invitation, true);
-        } else {
-          toast.success('Team created. You can invite its administrator when ready.');
-        }
-      } else if (mode === 'invite') {
-        if (!teamId || !inviteEmail.includes('@') || !activeSeason) throw new Error('Choose a team, valid email, and active season.');
-        const invitation = await provider.createTeamAdminInvitation({
-          id: `${teamId}_${inviteEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-          userId: '',
-          teamId,
-          leagueId: league.id,
-          seasonId: activeSeason.id,
-          role: 'team_admin',
-          status: 'invited',
-          invitedByUserId: actorUserId,
-          invitedEmail: inviteEmail.trim().toLowerCase(),
-          createdAt: new Date().toISOString(),
-        });
-        keepOpen = await recordInvitationResult(invitation, false);
+        /**
+         * No administrator to invite. ADR-004 retired the account class, and the server refuses
+         * the action outright, so offering the field here would be a control that always fails.
+         *
+         * The league runs the club now: rosters, athletes and results are all reachable from
+         * League Operations without anybody at the club holding an account.
+         */
+        toast.success('Team created. You manage its roster and results from League Operations.');
       } else {
         if (!importRows.length || importErrors.length) throw new Error('Resolve the CSV validation errors first.');
         const now = new Date().toISOString();
@@ -224,7 +169,7 @@ export function LeagueTeams() {
         await provider.createTeams(imported);
         toast.success(`${imported.length} teams imported.`);
       }
-      if (!keepOpen) setMode(null);
+      setMode(null);
       retry();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'This operation could not be completed.');
@@ -328,16 +273,16 @@ export function LeagueTeams() {
       <Sheet
         open={mode !== null}
         onClose={() => setMode(null)}
-        title={mode === 'team' ? 'Add team and administrator' : mode === 'invite' ? 'Send Team Admin call-up' : 'Import teams'}
-        description={mode === 'team' ? 'Create the club record and send its first matchday operator link if you have the admin email.' : mode === 'invite' ? 'Email the expiring assignment link and keep a fallback copy for matchday ops.' : 'CSV columns: name, city, venue'}
+        title={mode === 'team' ? 'Add team' : 'Import teams'}
+        description={mode === 'team' ? 'Create the club record. You manage its roster, athletes and results from League Operations.' : 'CSV columns: name, city, venue'}
         footer={
           <Button
             block
-            icon={inviteLink ? Check : mode === 'team' ? Plus : mode === 'invite' ? UserPlus : Check}
-            onClick={inviteLink ? () => setMode(null) : saveOperation}
+            icon={mode === 'team' ? Plus : Check}
+            onClick={saveOperation}
             disabled={saving || Boolean(importErrors.length)}
           >
-            {inviteLink ? 'Done' : saving ? (mode === 'invite' || (mode === 'team' && inviteEmail.trim()) ? 'Sending...' : 'Saving...') : mode === 'team' ? (inviteEmail.trim() ? 'Create and send' : 'Create team') : mode === 'invite' ? 'Send invite' : `Import ${importRows.length} teams`}
+            {saving ? 'Saving...' : mode === 'team' ? 'Create team' : `Import ${importRows.length} teams`}
           </Button>
         }
       >
@@ -350,13 +295,6 @@ export function LeagueTeams() {
             </div>
             <label className="block text-xs font-semibold uppercase text-subtle">First Team Admin email <span className="font-normal normal-case text-muted">(optional)</span><input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
             <p className="text-xs leading-5 text-muted">The team begins unverified with no administrator. When an email is supplied, GoalPlace256 sends an expiring call-up link and keeps a copied fallback for matchday ops.</p>
-            {inviteLink ? <InvitationLink value={inviteLink} status={inviteEmailDelivery} error={inviteEmailError} /> : null}
-          </div>
-        ) : mode === 'invite' ? (
-          <div className="space-y-4">
-            <label className="block text-xs font-semibold uppercase text-subtle">Team<select className="field mt-2 normal-case" value={teamId} onChange={(event) => setTeamId(event.target.value)}><option value="">Choose team</option>{lTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
-            <label className="block text-xs font-semibold uppercase text-subtle">Admin email<input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
-            <p className="text-xs text-muted">The recipient signs in with this email and accepts the assignment. A trusted server then issues the Team Admin claim.</p>
             {inviteLink ? <InvitationLink value={inviteLink} status={inviteEmailDelivery} error={inviteEmailError} /> : null}
           </div>
         ) : (
