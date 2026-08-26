@@ -1,0 +1,148 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T19:31:29.000Z",
+  "commit": {
+    "sha": "b3c89ff30e2a55e433c020a1a4fdcee18c7b0a94",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1430
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 26
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "target": "manifest-quasar-479416-s7/fg256",
+    "v1DrainBefore": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 18,
+      "openButLeagueResolvable": 6,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 0
+    },
+    "workflowsMigrated": [
+      "match_kmcfl_09_01",
+      "match_kmcfl_09_02",
+      "match_kmcfl_09_04",
+      "match_eurdl_09_01",
+      "match_eurdl_09_02",
+      "match_eurdl_09_04",
+      "match_kcrc_09_01",
+      "match_kcrc_09_02",
+      "match_kcrc_09_04",
+      "match_nerdl_09_01",
+      "match_nerdl_09_02",
+      "match_nerdl_09_04",
+      "match_kmbl_09_01",
+      "match_kmbl_09_02",
+      "match_kmbl_09_04",
+      "match_nucbl_09_01",
+      "match_nucbl_09_02",
+      "match_nucbl_09_04"
+    ],
+    "migrationReason": "Bilateral confirmation window lapsed 111-140 days earlier; no opponent response and none expected. Each moved pending_confirmation or confirmation_overdue to disputed, one command at a time, with an audit event. No claim's scores, parties or history were rewritten.",
+    "v1DrainAfter": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 0,
+      "openButLeagueResolvable": 24,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 1
+    },
+    "teamAuthorityStage": "retired",
+    "projectionsRebuilt": 1123,
+    "projectionGate": "passed",
+    "projectionRebuildDetail": {
+      "scopesChecked": 1123,
+      "staleBefore": 1123,
+      "staleAfter": 0,
+      "missingIndex": 0,
+      "orphanIndex": 0,
+      "legacyCoverageGaps": 0,
+      "teamIndexesEmptied": 100,
+      "note": "Team indexes are emptied to zero capabilities, not deleted. The assignment records survive: retire authority, preserve history."
+    },
+    "legacyTeamCapabilitiesRemaining": 0,
+    "sunsetInvariants": "passed",
+    "spellingShimRemoved": "passed",
+    "spellingShimEvidence": "All 1123 stored indexes scanned: zero scopes whose authority depended on a superseded spelling. acceptedSpellings() and SUPERSEDED_CAPABILITY_EQUIVALENTS deleted from src/server/access/capabilities.ts; the three deprecated names removed from hasLeagueOperatorCapability in firestore.rules.next in the same commit. Guard test src/server/access/spellingSunset.test.ts fails if either returns.",
+    "teamAuthorityStageVerified": "retired, confirmed on BOTH runtimes. App Hosting: read back live from /api/environment. Cloud Functions: set in functions/.env.manifest-quasar-479416-s7 and deployed to convergeLifecycle; not independently read back, because gcloud has no credentialed account here. The 2026-08-26 sunset-invariants reading stayed green after more than an hour and after every canary deploy, which behaviourally proves convergeLifecycle did not rebuild frozen team capabilities. Declared in apphosting.yaml AND apphosting.demo.yaml; scripts/lib/deploymentPlanes.test.ts fails if they disagree.",
+    "gatesRerunAfterAllDeploys": "passed after the final enabled-mode onMatchReportWritten deploy: drain, projection gate and sunset invariants all exit 0"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-26-006, rolled out from main at b3c89ff after the live canary exposed and regression-tested two Field Manager clock persistence defects. Live origin reports environmentVersion fan22-build-2026-08-26-006 AND teamAuthorityStage=retired, so the App Hosting build and stage are read back rather than inferred.",
+      "status": "passed"
+    },
+    "firestoreRules": {
+      "revision": "firestore.rules.next released to fg256 2026-08-26T18:1x, with indexes. Narrowed hasLeagueOperatorCapability to canonical spellings only.",
+      "status": "passed"
+    },
+    "storageRules": {
+      "revision": "storage.rules unchanged since 2026-08-26 release; not re-released in this session.",
+      "status": "passed"
+    },
+    "cloudFunctions": {
+      "revision": "onMatchReportWritten targeted deploy 1 loaded Demo env with GOALPLACE_FIELD_CAPTURE_MODE=canary and allowlisted match_eurdl_18_03. After clean, replay, contradictory and contradictory-replay proofs passed, targeted deploy 2 loaded Demo env with GOALPLACE_FIELD_CAPTURE_MODE=enabled. The working V1 finalizer was left enabled and untouched. convergeLifecycle remains deployed with GOALPLACE_TEAM_AUTHORITY_STAGE=retired. 8 functions live. reconcilePaymentIntents, lockFantasyLineups and reconcileResultSubmissions deliberately absent.",
+      "status": "passed"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    },
+    "activationGates": {
+      "revision": "GOALPLACE_FINALIZER_MODE=enabled (legacy V1, cloud-verified 2026-08-08). GOALPLACE_FIELD_CAPTURE_MODE=enabled after a successful live canary on 2026-08-26. GOALPLACE_LEAGUE_ENTRY_MODE=off. The final Functions env was loaded by the targeted onMatchReportWritten deploy and the update succeeded; Functions environment variables still cannot be independently read back from this machine.",
+      "status": "passed"
+    }
+  },
+  "canary": {
+    "matchId": "match_eurdl_18_03",
+    "reportId": "match_eurdl_18_03",
+    "candidateId": "field_capture:match_eurdl_18_03:v1",
+    "officialResultVersion": 1,
+    "officialEventCount": 3,
+    "duplicateReplay": "passed",
+    "badReportException": "passed",
+    "cleanProof": {
+      "fixtureControl": "No report, result submission, official result, fantasy competition or competing result existed before capture. Both registered squads contained 18 eligible athletes. The historical fixture was moved into the live Field Manager access window before the report existed.",
+      "report": "official; reportVersion=1; declared=2-1; reconstructed=2-1; eventCount=3; eventDigest=40a9ca56337bd4c0a3c200fc5987d8e5cd14893ad1d86460c8ec242c639960f1",
+      "finalization": "Exactly one ledger/version; source=field_capture; workflow=result_engine_v2; candidate=field_capture:match_eurdl_18_03:v1; source principal=match_ops_session.",
+      "canonicalGraph": "Exactly 3 official goal events, 1 public provenance record, 1 valid official reconciliation record, 2 evidence-supported athlete stat projections, and one result application to the two affected standings rows.",
+      "replay": "Forced report-trigger replay: official versions +0, official events +0, standings +0, athlete stats +0, provenance +0, reconciliation +0, exceptions +0, outbox +0, audit side effects +0. Stored canonical content was unchanged."
+    },
+    "badProof": {
+      "matchId": "match_eurdl_18_04",
+      "fixtureControl": "No report, result submission, official result, fantasy competition or competing result existed before capture. Both registered squads contained 18 eligible athletes. The historical fixture was moved into the live Field Manager access window before the report existed.",
+      "report": "league_review; reportVersion=1; declared=2-1; reconstructed=3-1; exception=declared_score_mismatch; eventCount=4; eventDigest=046d0cc591b70f361fb7d240f7ebd2ac488cb6871c80f01c1c589501a840b00d",
+      "blockedGraph": "Zero finalization ledgers, OfficialResultVersions, official events, athlete stats, public provenance, official reconciliation records, outbox records or audit side effects. The match stayed pending and unscored.",
+      "exception": "Exactly one deterministic blocking matchOperationalExceptions record. No finalizer-level reconciliationExceptions record is expected because the contradiction is blocked at field-capture ingress before a candidate reaches sports truth reconciliation.",
+      "replay": "Forced report-trigger replay: all official cardinalities stayed zero and the single operational exception stayed one with unchanged content."
+    },
+    "verifier": "npm run release:canary -- --match match_eurdl_18_03 --bad-match match_eurdl_18_04 passed before and after the final enabled-mode function deploy"
+  },
+  "exclusions": [
+    "NOT READ BACK: the deployed Cloud Functions' environment variables. gcloud has no credentialed account on this machine and the Firebase CLI cannot show function env. The live clean/bad/replay canary behaviourally proves the canary activation that was deployed before capture. The final targeted deploy log records the same env file being loaded with field capture enabled and the update succeeding, but enabled mode itself is not independently read back. access:sunset-invariants remaining green after more than an hour and after every deploy behaviorally proves convergeLifecycle is not rebuilding frozen team authority.",
+    "The App Hosting runtime IS read back: /api/environment returned environmentVersion=fan22-build-2026-08-26-006 and teamAuthorityStage=retired.",
+    "apphosting.beta.yaml and apphosting.production.yaml declare no GOALPLACE_TEAM_AUTHORITY_STAGE, so both would run at the frozen default. Correct for environments that have not drained; must be a decision when either is promoted. apphosting.demo.yaml was missing it entirely until c119d68 while apphosting.yaml had it, and which file a backend reads is not visible from the CLI.",
+    "sweepUnreportedMatches is written in functions/src/matchReports.ts and STILL NOT WIRED into functions/src/index.ts. Do not simply wire it: modelled against real demo data it would open 5 false result_never_reported cases in the first 200 matches alone, 4 of them on claims in active league adjudication and 1 on a match still live. MatchStatus has no postponed or abandoned, so 'called off' cannot currently be expressed.",
+    "Six of the eight deployed Functions carry an older environment generation; only onMatchReportWritten and convergeLifecycle were redeployed. None of the six projects access or finalizes results, so this is drift rather than a defect.",
+    "Storage rules were not re-released this session; unchanged. Firestore reports one index in the project that is not in firestore.indexes.json, pre-existing.",
+    "reconcileResultSubmissions is not deployed, matching its pre-existing state. reconcilePaymentIntents and lockFantasyLineups deliberately not deployed.",
+    "League post-match entry (GOALPLACE_LEAGUE_ENTRY_MODE=off) has never been cloud-verified. It was governed by the shared finalizer flag until 2026-08-26 and is now explicitly off, awaiting its own readiness.",
+    "Production untouched."
+  ],
+  "carriedFrom": "c1d51b0"
+}
