@@ -1,4 +1,8 @@
-import type { TeamAuthorityStage } from '../../src/lib/auth/teamAuthorityStage';
+import {
+  currentTeamAuthorityStage,
+  teamAuthorityGrants,
+  type TeamAuthorityStage,
+} from '../../src/lib/auth/teamAuthorityStage';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -15,6 +19,7 @@ import {
   type AccessScopeKey,
 } from '../../src/lib/auth/accessProjection';
 import { loadDemoDataset as loadCompatibilityDemoDataset } from './compatibility-report';
+import { resolveDatabaseId } from '../lib/firestoreTarget';
 
 /**
  * Stage B of the access migration: rebuild every `accessIndex` document from canonical
@@ -53,6 +58,7 @@ type MigrationReport = {
   };
   driftCounts: Record<DriftRow['reason'], number>;
   drift: DriftRow[];
+  stage: TeamAuthorityStage;
   legacyCoverage: {
     gaps: number;
     byGrant: Record<LegacyCoverageRow['grant'], number>;
@@ -78,10 +84,15 @@ function parseArgs(argv: string[]) {
       valueAfter(argv, '--project')
       ?? process.env.GOALPLACE_ADMIN_PROJECT_ID
       ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    databaseId:
-      valueAfter(argv, '--database')
-      ?? process.env.GOALPLACE_FIRESTORE_DATABASE_ID
-      ?? process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID,
+    /**
+     * The NAMED database. Never `(default)` by omission.
+     *
+     * This used to end at the two environment variables, and fell through to `(default)` when
+     * neither was set — a database no GoalPlace project has. The shared resolver ends at
+     * `fg256` instead, so forgetting to export one variable cannot quietly point the rebuild
+     * that retires an authority model at a different database.
+     */
+    databaseId: resolveDatabaseId(argv),
   };
 }
 
@@ -221,9 +232,12 @@ export function findLegacyCoverageGaps(input: {
   teams: JsonRecord[];
   teamAssignments: JsonRecord[];
   now?: Date;
+  /** Which stage to judge coverage under. See the team loop below for why it matters. */
+  stage?: TeamAuthorityStage;
 }): LegacyCoverageRow[] {
   const now = input.now ?? new Date();
   const nowIso = now.toISOString();
+  const stage = input.stage ?? currentTeamAuthorityStage();
 
   const covered = (userId: string, scopeType: 'league' | 'team', scopeId: string) => {
     const projected = projectScopeIndex({
@@ -231,6 +245,7 @@ export function findLegacyCoverageGaps(input: {
       assignments: input.assignments,
       updatedAt: nowIso,
       now,
+      stage,
     });
     return Boolean(projected && projected.capabilities.length > 0);
   };
@@ -259,6 +274,26 @@ export function findLegacyCoverageGaps(input: {
       }
     }
   }
+
+  /**
+   * Legacy team assignments, and only while team authority still grants something.
+   *
+   * The league loop above already carries this reasoning: a coverage gap means "a legacy
+   * field grants something the canonical model does not yet cover", which presumes the
+   * canonical model CAN cover it. It was applied there and not here, and the omission makes
+   * `--strict` unreachable the moment the stage becomes `retired`: every team bundle grants
+   * nothing, so `covered()` is false for every team scope, so every active legacy team
+   * assignment becomes a permanent gap and the gate that is supposed to certify the rebuild
+   * can never pass.
+   *
+   * Under retirement an operator losing team access is not a gap. It is the outcome. Reading
+   * it as a gap would send the next person to `backfill-assignments.ts`, which would create
+   * canonical team assignments that grant nothing — new issuance during a sunset, to close a
+   * hole that is the point of the sunset.
+   *
+   * The rows do not disappear from history; they stop being counted as work outstanding.
+   */
+  if (!teamAuthorityGrants(stage)) return gaps;
 
   for (const record of input.teamAssignments) {
     if (record.status !== 'active') continue;
@@ -347,12 +382,14 @@ async function main() {
     );
   }
 
+  const stage = currentTeamAuthorityStage();
   const legacyGaps = findLegacyCoverageGaps({
     assignments: plan.assignments,
     leagues: dataset.leagues ?? [],
     teams: dataset.teams ?? [],
     teamAssignments: dataset.teamAssignments ?? [],
     now,
+    stage,
   });
 
   const driftCounts = plan.drift.reduce((counts, row) => {
@@ -364,6 +401,15 @@ async function main() {
     source: dataset.label,
     generatedAt: now.toISOString(),
     apply: args.apply,
+    /**
+     * The stage this plan was computed under.
+     *
+     * Recorded because the plan is meaningless without it: the same assignments produce
+     * different desired projections at `frozen` and at `retired`, and the report is kept as
+     * migration evidence. A rebuild whose stage nobody wrote down cannot be checked later,
+     * and re-running to find out changes the answer.
+     */
+    stage,
     counts: {
       users: dataset.users.length,
       assignments: dataset.assignments.length,
@@ -398,6 +444,9 @@ async function main() {
     console.log('GoalPlace256 access projection migration');
     console.log(`Source: ${report.source}`);
     console.log(`Mode: ${args.apply ? 'APPLY (writes)' : 'dry run (no writes)'}`);
+    // The stage decides what the desired projections are. A rebuild reported without it
+    // cannot be checked by anybody later.
+    console.log(`Team authority stage: ${report.stage}`);
     console.log(`Users: ${report.counts.users}`);
     console.log(`Assignments: ${report.counts.assignments}`);
     console.log(`Access indexes: ${report.counts.indexes}`);

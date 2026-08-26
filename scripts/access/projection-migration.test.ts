@@ -217,9 +217,57 @@ describe('legacy coverage gaps', () => {
       teams: [],
       teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_2', status: 'active' }],
       now: NOW,
+      // While authority still grants, this operator really would lose access.
+      stage: 'frozen',
     });
 
     expect(gaps[0]).toMatchObject({ grant: 'teamAssignment', userId: 'user_9', scopeId: 'team_2' });
+  });
+
+  /**
+   * The same row, once team authority is retired, and the reason the gate could not pass.
+   *
+   * `covered()` asks whether the canonical model grants this operator anything. At `retired`
+   * every team bundle grants nothing, so the answer is no for EVERY team scope on the
+   * platform — 60 of them on demo — and each became a permanent coverage gap. `--strict`
+   * fails on any gap, so `access:migrate:gate` was unreachable by construction.
+   *
+   * The league loop above already carried this exact reasoning and excluded team scope for
+   * it. This loop did not, which is the whole of the defect.
+   *
+   * Reading these as gaps is worse than noisy. It sends the next operator to
+   * `backfill-assignments.ts`, which would create canonical team assignments granting
+   * nothing: new issuance during a sunset, to close a hole that is the point of the sunset.
+   */
+  it('stops counting legacy team assignments once authority is retired', () => {
+    const input = {
+      assignments,
+      leagues: [],
+      teams: [],
+      teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_2', status: 'active' }],
+      now: NOW,
+    };
+
+    expect(findLegacyCoverageGaps({ ...input, stage: 'frozen' })).toHaveLength(1);
+    expect(findLegacyCoverageGaps({ ...input, stage: 'retired' })).toHaveLength(0);
+  });
+
+  it('still reports league coverage gaps after retirement', () => {
+    // Retirement removes team authority and nothing else. A League Admin sitting in a legacy
+    // array with no canonical assignment is still an operator about to be locked out, and
+    // suppressing that alongside the team rows would be the opposite mistake.
+    const gaps = findLegacyCoverageGaps({
+      assignments: [],
+      leagues: [{ id: 'league_1', adminUserIds: ['user_1'] }],
+      teams: [],
+      teamAssignments: [{ id: 'ta_1', userId: 'user_9', teamId: 'team_2', status: 'active' }],
+      now: NOW,
+      stage: 'retired',
+    });
+
+    expect(gaps).toEqual([
+      { scopeType: 'league', scopeId: 'league_1', userId: 'user_1', grant: 'adminUserIds' },
+    ]);
   });
 
   it('ignores inactive legacy team assignments', () => {

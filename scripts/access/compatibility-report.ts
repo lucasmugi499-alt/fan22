@@ -15,6 +15,7 @@ import {
 } from '../../src/lib/auth/access';
 import { accountClassForRole, isAccountClass, resolveAccountClass } from '../../src/lib/auth/accountClass';
 import type { AccountClass } from '../../src/types';
+import { resolveDatabaseId } from '../lib/firestoreTarget';
 
 type JsonRecord = { id: string; [key: string]: unknown };
 
@@ -90,10 +91,12 @@ function parseArgs(argv: string[]) {
       process.env.GOALPLACE_ADMIN_PROJECT_ID ??
       process.env.FIREBASE_ADMIN_PROJECT_ID ??
       process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    databaseId:
-      valueAfter(argv, '--database') ??
-      process.env.GOALPLACE_FIRESTORE_DATABASE_ID ??
-      process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID,
+    /**
+     * The NAMED database. `resolveDatabaseId` already honours `--database` and both
+     * environment variables, and ends at `fg256` rather than falling through to `(default)`,
+     * which is a database no GoalPlace project has.
+     */
+    databaseId: resolveDatabaseId(argv),
   };
 }
 
