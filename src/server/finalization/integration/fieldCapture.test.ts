@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { clearFirestore, ENABLED, integrationDb, shutdown } from './harness';
-import { finalizeFieldReport, finalizeSubmission } from '@/server/resultFinalizer';
+import { finalizeFieldReport, finalizeLeagueReport, finalizeSubmission } from '@/server/resultFinalizer';
 import { bindReportToEvents } from '@/lib/matchOps/digest';
 
 let db: Firestore;
@@ -548,5 +548,75 @@ describe('an attested report means one exact set of events', () => {
 
     expect(outcome).toMatchObject({ action: 'finalized' });
     expect((await db.collection('matches').doc(MATCH).get()).data()?.score).toEqual({ home: 3, away: 1 });
+  });
+});
+
+describe('the third source: a league entering a result afterwards', () => {
+  async function seedLeagueReport(overrides: Record<string, unknown> = {}) {
+    await db.collection('matchReports').doc(MATCH).set({
+      id: MATCH,
+      matchId: MATCH,
+      leagueId: 'league_1',
+      seasonId: 'season_1',
+      sport: 'football',
+      source: 'league_post_match',
+      declaredHomeScore: 2,
+      declaredAwayScore: 1,
+      reconstructedHomeScore: 2,
+      reconstructedAwayScore: 1,
+      eventCount: 0,
+      enteredByUserId: 'league_admin_1',
+      scorers: [
+        { athleteId: 'athlete_1', teamId: 'team_home', count: 2 },
+        { athleteId: 'athlete_2', teamId: 'team_away', count: 1 },
+      ],
+      exceptions: [],
+      status: 'ready_for_finalization',
+      resultVersion: 1,
+      attestedAt: '2026-08-25T17:00:00.000Z',
+      ...overrides,
+    });
+  }
+
+  it('finalizes through the same engine and says what it was', async () => {
+    await seedMatch();
+    await seedAthletes();
+    await seedLeagueReport();
+
+    const outcome = await finalizeLeagueReport(db, MATCH, ENABLED);
+
+    expect(outcome).toMatchObject({ action: 'finalized' });
+    expect((await db.collection('matches').doc(MATCH).get()).data()?.score).toEqual({ home: 2, away: 1 });
+
+    const entry = (await db.collection('finalizations').get()).docs[0].data();
+    expect(entry.provenance).toMatchObject({
+      workflow: 'result_engine_v2',
+      source: { type: 'league_post_match' },
+      principal: { type: 'user', actor: 'league_admin', userId: 'league_admin_1' },
+    });
+    // Bronze however careful the operator was: the evidence for a typed score is somebody's
+    // memory, and no amount of care changes that.
+    expect(entry.dataQuality.tier).toBe('bronze');
+  });
+
+  it('needs no event binding, because there are no events to be bound to', async () => {
+    // The digest check is meaningless here. A typed score is exactly what somebody typed, and
+    // reconciling it against itself would manufacture a comparison that proves nothing.
+    await seedMatch();
+    await seedAthletes();
+    // No eventDigest field at all, which is what a league report actually looks like.
+    await seedLeagueReport();
+
+    expect((await finalizeLeagueReport(db, MATCH, ENABLED)).action).toBe('finalized');
+  });
+
+  it('refuses to run a league report through the field loader, and the reverse', async () => {
+    await seedMatch();
+    await seedAthletes();
+    await seedLeagueReport();
+
+    // The loaders are not interchangeable, and a mix-up would attribute a typed score to a
+    // Field Manager who was never there.
+    expect(await finalizeFieldReport(db, MATCH, ENABLED)).toEqual({ action: 'skipped', reason: 'not_field_capture' });
   });
 });

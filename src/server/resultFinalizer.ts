@@ -26,6 +26,7 @@ import { decideFinalization, type FinalizerActivation } from './finalizerActivat
 // Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
 import {
   buildCandidateFromFieldReport,
+  buildCandidateFromLeagueReport,
   buildCandidateFromLegacySubmission,
   type FinalizationCandidate,
 } from './finalization/candidate';
@@ -36,6 +37,7 @@ import { computeDataQuality } from './finalization/quality';
 import { buildResultProvenance } from './finalization/provenance';
 import {
   fieldReportLifecycle,
+  leagueReportLifecycle,
   legacySubmissionLifecycle,
   type SourceLifecycleAdapter,
 } from './finalization/lifecycle';
@@ -1710,6 +1712,55 @@ export function fieldReportLoader(db: Firestore, matchId: string): CandidateLoad
 }
 
 /**
+ * The league post-match loader.
+ *
+ * Shares storage with field capture, because it is the same kind of record: one party's account
+ * of what happened. Everything else differs. There is no event stream to bind to, so there is no
+ * digest to verify and nothing to recompute: a typed score is exactly what somebody typed, and
+ * pretending to reconcile it against itself would manufacture a comparison that proves nothing
+ * and would make the real one, on field reports, look like the same ceremony.
+ *
+ * The scorers come from the form rather than from events, which is why this path can never reach
+ * Gold however careful the operator was.
+ */
+export function leagueReportLoader(db: Firestore, matchId: string): CandidateLoader {
+  return async (tx) => {
+    const reportRef = db.collection('matchReports').doc(matchId);
+    const reportSnap = await tx.get(reportRef);
+    if (!reportSnap.exists) return { skip: 'no_report' };
+
+    const report = { id: reportSnap.id, ...reportSnap.data() } as Record<string, unknown> & { id: string };
+    if (report.status === 'official') return { skip: 'already_finalized' };
+    if (report.status !== 'ready_for_finalization') return { skip: 'not_finalizable' };
+    if (report.source !== 'league_post_match') return { skip: 'not_league_entry' };
+
+    const scorers = Array.isArray(report.scorers)
+      ? (report.scorers as { athleteId: string; teamId: string; count: number; minute?: number }[])
+      : [];
+
+    return {
+      candidate: buildCandidateFromLeagueReport({
+        matchId: String(report.matchId ?? report.id),
+        leagueId: String(report.leagueId ?? ''),
+        seasonId: String(report.seasonId ?? ''),
+        sport: typeof report.sport === 'string' ? report.sport : undefined,
+        homeScore: Number(report.declaredHomeScore ?? 0),
+        awayScore: Number(report.declaredAwayScore ?? 0),
+        scorers,
+        evidenceRefs: Array.isArray(report.evidenceRefs) ? (report.evidenceRefs as string[]) : [],
+        enteredByUserId: String(report.enteredByUserId ?? ''),
+        recordId: report.id,
+        resultVersion: Number(report.resultVersion ?? 1),
+        submittedAt: typeof report.attestedAt === 'string' ? report.attestedAt : undefined,
+      }),
+      lifecycle: leagueReportLifecycle({ reportRef }),
+      oversizeShape: { scorers, athleteStatLines: [], activeSquads: {} },
+      alreadyFinalized: false,
+    };
+  };
+}
+
+/**
  * The bilateral workflow's entry point, unchanged for every existing caller.
  *
  * Kept because four call sites use it and because the signature says what it does. What
@@ -1731,4 +1782,13 @@ export async function finalizeFieldReport(
   activation: FinalizerActivation,
 ): Promise<FinalizeOutcome> {
   return finalizeCandidate(db, fieldReportLoader(db, matchId), activation, matchId);
+}
+
+/** The league post-match entry point. Third source, same engine. */
+export async function finalizeLeagueReport(
+  db: Firestore,
+  matchId: string,
+  activation: FinalizerActivation,
+): Promise<FinalizeOutcome> {
+  return finalizeCandidate(db, leagueReportLoader(db, matchId), activation, matchId);
 }

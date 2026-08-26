@@ -10,7 +10,7 @@ import { ResultSubmission } from '../../src/types';
 import { finalizeSubmission } from '../../src/server/resultFinalizer';
 import type { FinalizerActivation } from '../../src/server/finalizerActivation';
 
-export { finalizeSubmission, finalizeFieldReport } from '../../src/server/resultFinalizer';
+export { finalizeSubmission, finalizeFieldReport, finalizeLeagueReport } from '../../src/server/resultFinalizer';
 
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';

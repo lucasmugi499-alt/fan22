@@ -9,6 +9,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import {
   finalizeSubmission,
   finalizeFieldReport,
+  finalizeLeagueReport,
   retryStalledFinalizations,
   sendDueConfirmationReminders,
   sweepOverdueConfirmations,
@@ -166,10 +167,18 @@ export const onMatchReportWritten = onDocumentWritten(
       }
     }
 
-    // Only a gated report proceeds. A report already `official` or under review returns null
-    // above and reaches here unchanged, where the loader refuses it.
+    /**
+     * Only a gated report proceeds, and it goes to the loader for its own source.
+     *
+     * One trigger, two loaders. A field report and a league entry share this collection and
+     * nothing else: one is bound to an event stream and one is somebody typing a score, so a
+     * single loader handling both would have to branch on source in exactly the place the
+     * candidate architecture exists to keep source-free.
+     */
     const activation = currentFinalizerActivation();
-    const result = await finalizeFieldReport(db, matchId, activation);
+    const result = report.source === 'league_post_match'
+      ? await finalizeLeagueReport(db, matchId, activation)
+      : await finalizeFieldReport(db, matchId, activation);
     if (result.action === 'finalized') {
       logger.info('Field report finalized', { matchId, finalizationKey: result.finalizationKey });
     } else if (result.action === 'skipped') {
