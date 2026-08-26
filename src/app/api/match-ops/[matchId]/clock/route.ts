@@ -58,7 +58,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
         throw new Error('This session has been replaced. Another device is running this match.');
       }
 
-      const result = applyClockAction(current, parsed.data as never, now);
+      const { action, ...detail } = parsed.data;
+      const result = applyClockAction(current, { type: action, ...detail } as never, now);
       if (!result.ok) throw new Error(result.reason);
 
       transaction.set(ref, {
