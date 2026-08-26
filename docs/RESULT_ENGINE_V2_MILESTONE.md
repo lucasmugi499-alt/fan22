@@ -93,10 +93,15 @@ negotiations into decisions one party never got to contest. Writes a
 Only once step 2 exits 0.
 
 ```bash
-# 3a. Retire. Nothing is retired until this is set.
+# 3a. Retire, in EVERY runtime that builds a projection. See the warning below.
+#     - functions/.env.<project>   (convergeLifecycle)
+#     - apphosting.yaml            (the Next server's projector)
 GOALPLACE_TEAM_AUTHORITY_STAGE=retired
 
 # 3b. Rehearse the rebuild, then apply it, then gate on zero drift.
+#     Export the target explicitly: no GoalPlace project has a `(default)` database.
+export GOALPLACE_FIRESTORE_DATABASE_ID=fg256
+export GOALPLACE_ADMIN_PROJECT_ID=<project>
 npm run access:migrate:dry-run
 npm run access:migrate:apply
 npm run access:migrate:gate
@@ -106,6 +111,23 @@ The stage defaults to `frozen`, which is the safe state: issuance stopped, exist
 intact. Changing the capability catalogue does not rewrite already-materialized
 projections, so until the rebuild runs the retirement has happened in the code and not in
 the database.
+
+> **Set it in both runtimes, and deploy them, before you rebuild.**
+>
+> `projectScopeIndex` reads this variable at the moment a projection is *built*, and two
+> runtimes build them: the Next server whenever an assignment changes, and
+> `convergeLifecycle` hourly. Rebuild to `retired` while either one still reads `frozen` and
+> it will write the team capabilities back, one user at a time.
+>
+> The symptom is the worst kind: `access:sunset-invariants` passes on the day you run it and
+> fails a week later with nothing having changed. `scripts/lib/deploymentPlanes.test.ts`
+> fails if the two configuration files disagree, or if either omits the variable — an unset
+> value falls back to `frozen`, so an absent declaration is a disagreement too.
+
+The rebuild is stage-dependent in both directions, so the report records which stage it ran
+under. The same assignments produce different desired projections at `frozen` and at
+`retired`, these reports are kept as migration evidence, and re-running later to find out
+changes the answer.
 
 ### 4. Invariants verified against real stored data
 
@@ -131,12 +153,29 @@ invitations, and every V1 submission stay readable. **Retire authority, preserve
 5. Deploy the application
 6. Deploy Functions
 7. Deploy Rules (`firestore.rules.next`, which is the file `firebase.json` actually points at)
-8. Controlled field-report canary: one fixture, one Field Manager, `FINALIZER_MODE=canary`
-   with that match in the allowlist
+8. Controlled field-report canary: one fixture, one Field Manager,
+   `GOALPLACE_FIELD_CAPTURE_MODE=canary` with that match id in
+   `GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS`, deploying **only** `onMatchReportWritten`
 9. Verify the official result end to end: official result version, canonical events with
    `sourcePrincipal.principalType === 'match_ops_session'`, ledger entry with
-   `sourceType: field_capture`, standings updated, report `official`
-10. Enable the V2 workflow for Demo
+   `sourceType: field_capture`, standings updated, report `official`. Then **replay the
+   trigger** and confirm every count is identical, and run the bad-report canary
+10. Enable field capture for Demo: `GOALPLACE_FIELD_CAPTURE_MODE=enabled`
+
+> **One switch per source since 2026-08-26.** `GOALPLACE_FINALIZER_MODE` governs the
+> bilateral V1 path only. Field capture and league post-match entry have their own gates and
+> inherit nothing from it — an unset gate means `off`.
+>
+> The split exists because a single flag reading `enabled` for a finalizer cloud-verified in
+> August also armed a field capture pipeline that had never run against real data. Narrowing
+> the shared flag to protect the new source would have degraded the proven one. Do not
+> collapse them back.
+>
+> | Source | Variable | Allowlist |
+> |---|---|---|
+> | Bilateral V1 | `GOALPLACE_FINALIZER_MODE` | `GOALPLACE_FINALIZER_CANARY_SUBMISSION_IDS` |
+> | Field capture | `GOALPLACE_FIELD_CAPTURE_MODE` | `GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS` |
+> | League post-match | `GOALPLACE_LEAGUE_ENTRY_MODE` | `GOALPLACE_LEAGUE_ENTRY_CANARY_MATCH_IDS` |
 
 ## Rollback
 
@@ -146,7 +185,7 @@ Each gate is reversible on its own.
 |---|---|
 | 3a | Set the stage back to `frozen`, rebuild projections. Authority returns. |
 | 5 to 7 | Standard revision rollback per plane. Deploying one plane never implies another. |
-| 8 | `FINALIZER_MODE=off`. No official record can be written by any caller. |
+| 8 | `GOALPLACE_FIELD_CAPTURE_MODE=off`, redeploy `onMatchReportWritten`. No field report can produce an official record by any caller, and the bilateral V1 finalizer is untouched. |
 
 The finalization ledger makes a re-run safe: a redelivered trigger finds the key already
 present and skips, which the integration suite asserts.

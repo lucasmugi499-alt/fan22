@@ -1,0 +1,128 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T18:34:06.812Z",
+  "commit": {
+    "sha": "e4c36f1f3feddb47a47944d2dd2d2ce18f0fa400",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1423
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 26
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "target": "manifest-quasar-479416-s7/fg256",
+    "v1DrainBefore": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 18,
+      "openButLeagueResolvable": 6,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 0
+    },
+    "workflowsMigrated": [
+      "match_kmcfl_09_01",
+      "match_kmcfl_09_02",
+      "match_kmcfl_09_04",
+      "match_eurdl_09_01",
+      "match_eurdl_09_02",
+      "match_eurdl_09_04",
+      "match_kcrc_09_01",
+      "match_kcrc_09_02",
+      "match_kcrc_09_04",
+      "match_nerdl_09_01",
+      "match_nerdl_09_02",
+      "match_nerdl_09_04",
+      "match_kmbl_09_01",
+      "match_kmbl_09_02",
+      "match_kmbl_09_04",
+      "match_nucbl_09_01",
+      "match_nucbl_09_02",
+      "match_nucbl_09_04"
+    ],
+    "migrationReason": "Bilateral confirmation window lapsed 111-140 days earlier; no opponent response and none expected. Each moved pending_confirmation or confirmation_overdue to disputed, one command at a time, with an audit event. No claim's scores, parties or history were rewritten.",
+    "v1DrainAfter": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 0,
+      "openButLeagueResolvable": 24,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 1
+    },
+    "teamAuthorityStage": "retired",
+    "projectionsRebuilt": 1123,
+    "projectionGate": "passed",
+    "projectionRebuildDetail": {
+      "scopesChecked": 1123,
+      "staleBefore": 1123,
+      "staleAfter": 0,
+      "missingIndex": 0,
+      "orphanIndex": 0,
+      "legacyCoverageGaps": 0,
+      "teamIndexesEmptied": 100,
+      "note": "Team indexes are emptied to zero capabilities, not deleted. The assignment records survive: retire authority, preserve history."
+    },
+    "legacyTeamCapabilitiesRemaining": 0,
+    "sunsetInvariants": "passed",
+    "spellingShimRemoved": "passed",
+    "spellingShimEvidence": "All 1123 stored indexes scanned: zero scopes whose authority depended on a superseded spelling. acceptedSpellings() and SUPERSEDED_CAPABILITY_EQUIVALENTS deleted from src/server/access/capabilities.ts; the three deprecated names removed from hasLeagueOperatorCapability in firestore.rules.next in the same commit. Guard test src/server/access/spellingSunset.test.ts fails if either returns."
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-26-003, SUCCEEDED 2026-08-26T18:24:37Z, rolled out from main at e4c36f1. Live origin reports environmentVersion fan22-build-2026-08-26-003.",
+      "status": "passed"
+    },
+    "firestoreRules": {
+      "revision": "firestore.rules.next released to fg256 2026-08-26T18:1x, with indexes. Narrowed hasLeagueOperatorCapability to canonical spellings only.",
+      "status": "passed"
+    },
+    "storageRules": {
+      "revision": "storage.rules unchanged since 2026-08-26 release; not re-released in this session.",
+      "status": "passed"
+    },
+    "cloudFunctions": {
+      "revision": "onMatchReportWritten UPDATED 2026-08-26 with the split field capture gate. convergeLifecycle UPDATED 2026-08-26 with GOALPLACE_TEAM_AUTHORITY_STAGE=retired. 8 functions live. reconcilePaymentIntents, lockFantasyLineups and reconcileResultSubmissions deliberately absent.",
+      "status": "passed"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    },
+    "activationGates": {
+      "revision": "GOALPLACE_FINALIZER_MODE=enabled (legacy V1, cloud-verified 2026-08-08). GOALPLACE_FIELD_CAPTURE_MODE=canary with an empty allowlist (provably inert). GOALPLACE_LEAGUE_ENTRY_MODE=off. Deployed on onMatchReportWritten; the deployed revision's environment variables were NOT independently read back, because gcloud has no credentialed account on this machine.",
+      "status": "passed"
+    }
+  },
+  "canary": {
+    "matchId": null,
+    "reportId": null,
+    "candidateId": null,
+    "officialResultVersion": null,
+    "officialEventCount": null,
+    "duplicateReplay": "not_run",
+    "badReportException": "not_run"
+  },
+  "exclusions": [
+    "FIELD CAPTURE CANARY NOT RUN. GOALPLACE_FIELD_CAPTURE_MODE=canary with an empty allowlist, which refuses every match id, so field capture cannot finalize anything. This is deliberate and it is also the reason the canary is still outstanding: the good canary, its replay and the bad canary all remain unproven in the cloud.",
+    "matchReports is empty on demo (0 documents). No field report has ever existed, so the previously armed trigger never fired. The hazard was real and did not land.",
+    "The deployed onMatchReportWritten revision's environment variables were not read back. gcloud has no credentialed account here, and the Firebase CLI cannot show function env. The deploy log records that functions/.env.manifest-quasar-479416-s7 was loaded and the update succeeded. Behavioural proof waits on the canary.",
+    "sweepUnreportedMatches is written in functions/src/matchReports.ts and STILL NOT WIRED into functions/src/index.ts. The staleness sweep does not run, so result_never_reported is never raised. Its eligibility logic also does not consider postponed, cancelled or abandoned fixtures.",
+    "reconcileResultSubmissions is not deployed, matching its pre-existing state. The scheduled finalization sweeper does not run on demo.",
+    "reconcilePaymentIntents and lockFantasyLineups deliberately not deployed.",
+    "League post-match entry (GOALPLACE_LEAGUE_ENTRY_MODE=off) has never been cloud-verified. It was governed by the shared finalizer flag until 2026-08-26 and is now explicitly off, awaiting its own readiness.",
+    "Production untouched."
+  ]
+}
