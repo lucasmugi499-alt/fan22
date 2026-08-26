@@ -153,10 +153,27 @@ describe('a clean field report becomes official with no human action', () => {
     // The ledger records how this became official, and what it is worth.
     const ledger = await db.collection('finalizations').get();
     expect(ledger.size).toBe(1);
-    expect(ledger.docs[0].data()).toMatchObject({
+    const entry = ledger.docs[0].data();
+    expect(entry).toMatchObject({
       sourceType: 'field_capture',
       sourcePrincipalType: 'match_ops_session',
     });
+
+    /**
+     * Four separate facts, which is what makes an official number explainable later.
+     *
+     * A reader asking "how did this become official" gets: the V2 operating model, report 381
+     * at version 1, a named match ops session, a planner version, and a computed tier. One
+     * enum carrying all of that would answer none of it.
+     */
+    expect(entry.provenance).toMatchObject({
+      workflow: 'result_engine_v2',
+      source: { type: 'field_capture', recordId: MATCH, recordVersion: 1 },
+      principal: { type: 'match_ops_session', actor: 'match_ops_session', matchSessionId: 'mos_1' },
+      quality: expect.any(String),
+    });
+    expect(entry.provenance.finalization.candidateId).toBe(`field_capture:${MATCH}:v1`);
+    expect(entry.dataQuality.tier).toEqual(expect.any(String));
 
     // And the report says official only now, not at attestation.
     const report = (await db.collection('matchReports').doc(MATCH).get()).data()!;
@@ -271,10 +288,19 @@ describe('the bilateral workflow still behaves exactly as before', () => {
 
     // And the provenance says what produced it, not what produces everything.
     const ledger = await db.collection('finalizations').get();
-    expect(ledger.docs[0].data()).toMatchObject({
+    const entry = ledger.docs[0].data();
+    expect(entry).toMatchObject({
       sourceType: 'legacy_team_submission',
       sourcePrincipalType: 'user',
       sourcePrincipalId: 'user_9',
+    });
+
+    // History keeps its own words: V1 workflow, legacy team operator, not relabelled into V2
+    // terminology by a migration that happened years later.
+    expect(entry.provenance).toMatchObject({
+      workflow: 'result_engine_v1',
+      source: { type: 'legacy_team_submission' },
+      principal: { type: 'user', actor: 'legacy_team_operator', userId: 'user_9' },
     });
   });
 

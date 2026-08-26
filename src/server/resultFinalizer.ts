@@ -33,6 +33,7 @@ import { planCandidateFinalization } from './finalization/plan';
 // Relative: this file compiles into the Cloud Functions bundle.
 import { bindReportToEvents, verifyReportBinding } from '../lib/matchOps/digest';
 import { computeDataQuality } from './finalization/quality';
+import { buildResultProvenance } from './finalization/provenance';
 import {
   fieldReportLifecycle,
   legacySubmissionLifecycle,
@@ -1251,6 +1252,20 @@ export async function finalizeCandidate(
      * should be trusted; the quality tier that reads it is computed at finalization in a
      * later phase and is never settable by hand.
      */
+    const quality = computeDataQuality({
+      sourceType: candidate.sourceType,
+      eventsFullySynced: true,
+      lineupKnown: Boolean(candidate.activeSquads && Object.keys(candidate.activeSquads).length),
+      noReconciliationIssues: surplusGate?.trace.status !== 'inconsistent',
+      allAthletesEligible: eligibilityIssues.length === 0,
+      clockProvenanceIntact: true,
+      neutralObserver: true,
+      takeoverOccurred: false,
+      legacyConfirmation: candidate.confirmationProvenance === 'mutual_confirmation'
+        ? 'mutual_confirmation'
+        : 'league_admin_nonresponse_confirmation',
+    });
+
     tx.create(ledgerRef, {
       matchId: candidate.matchId,
       submissionId: candidate.sourceRecordId,
@@ -1271,18 +1286,20 @@ export async function finalizeCandidate(
        * choose would be chosen, and the fantasy engine and the scouts reading it would have no
        * way to tell a careful capture from a confident assertion.
        */
-      dataQuality: computeDataQuality({
-        sourceType: candidate.sourceType,
-        eventsFullySynced: true,
-        lineupKnown: Boolean(candidate.activeSquads && Object.keys(candidate.activeSquads).length),
-        noReconciliationIssues: surplusGate?.trace.status !== 'inconsistent',
-        allAthletesEligible: eligibilityIssues.length === 0,
-        clockProvenanceIntact: true,
-        neutralObserver: true,
-        takeoverOccurred: false,
-        legacyConfirmation: candidate.confirmationProvenance === 'mutual_confirmation'
-          ? 'mutual_confirmation'
-          : 'league_admin_nonresponse_confirmation',
+      dataQuality: quality,
+      /**
+       * The full provenance, as four separate facts rather than one enum.
+       *
+       * This is where the architecture starts paying: every public official number traces back
+       * to which operating model produced it, which record and which version of that record,
+       * who acted, which planner decided, and how much it should be trusted. A single `source`
+       * field carrying all of that would mean four things at once and answer none of them.
+       */
+      provenance: buildResultProvenance({
+        candidate,
+        sportDefinitionVersion: sportDefinitionVersionFor(candidate.sport),
+        finalizedAt,
+        quality: quality.tier,
       }),
       finalizedAt,
     });
