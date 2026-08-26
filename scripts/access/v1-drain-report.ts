@@ -171,6 +171,28 @@ async function main() {
     for (const [leagueId, count] of Object.entries(report.byLeague).sort((a, b) => b[1] - a[1])) {
       console.log(`  ${leagueId}  ${count}`);
     }
+
+    /**
+     * The ids themselves, because the next line tells an operator to migrate by match id and
+     * nothing above it says what those ids are. Finding them meant writing a throwaway query
+     * against production data, which is the wrong shape of work to leave in a runbook.
+     *
+     * The age is printed beside each one because it is the fact the decision turns on. The
+     * preferred outcome is that the parties finish; the whole justification for migrating
+     * instead is that they never will, and a claim's age is the evidence for that.
+     */
+    console.log('\nClaims awaiting a team answer:');
+    const now = Date.now();
+    const byAge = [...report.strandedByRetirement].sort((a, b) =>
+      String(a.confirmationDeadline ?? '').localeCompare(String(b.confirmationDeadline ?? '')));
+    for (const row of byAge) {
+      const deadline = Date.parse(String(row.confirmationDeadline ?? ''));
+      const overdueDays = Number.isNaN(deadline)
+        ? 'unknown'
+        : `${Math.floor((now - deadline) / 86_400_000)}d past deadline`;
+      console.log(`  ${row.id}  ${row.status}  ${row.leagueId ?? 'unknown league'}  ${overdueDays}`);
+    }
+
     console.log('\nFinish or migrate these before retiring team authority.');
     console.log('After retirement the opponent cannot confirm, dispute or withdraw them.');
     console.log('Migrate with: npm run access:migrate-v1 -- --match <matchId> --reason "<why>"');
