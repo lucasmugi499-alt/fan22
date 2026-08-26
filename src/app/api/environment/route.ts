@@ -1,5 +1,6 @@
 import { publicEnvironment } from '@/lib/environment';
 import { activationFromEnvironment } from '@/server/finalizerActivation';
+import { currentTeamAuthorityStage } from '@/lib/auth/teamAuthorityStage';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +45,22 @@ export function GET(request: Request) {
     // finalizing — reporting the mode makes that visible instead of a mystery. It is the
     // mode only, never the canary allowlist: submission ids are not public.
     finalizerMode: activationFromEnvironment().mode,
+    /**
+     * The team authority sunset stage THIS runtime is in.
+     *
+     * Reported for the same reason as the finalizer mode, and with more at stake. This
+     * variable decides what a team bundle grants at the moment a projection is BUILT, and two
+     * runtimes build projections: this one whenever an assignment changes, and
+     * `convergeLifecycle` hourly. If they disagree, the one on the older stage quietly writes
+     * retired capabilities back, one user at a time, and `access:sunset-invariants` passes on
+     * the day it is run and fails a week later with nothing having changed.
+     *
+     * Until now there was no way to observe this on either runtime — the migration's most
+     * consequential variable was the one nobody could read back. An unset value resolves to
+     * `frozen`, so a deployment that failed to declare it looks identical to one that chose
+     * it, which is exactly the ambiguity worth removing. It is a stage name, not a secret.
+     */
+    teamAuthorityStage: currentTeamAuthorityStage(),
   }, {
     headers: {
       // Never cached: a stale identity is worse than none, since the entire purpose is

@@ -3,6 +3,19 @@ env:
   - variable: GOALPLACE_FINALIZER_MODE
     value: "enabled"
     availability: [RUNTIME]
+  # Team authority sunset stage: active | frozen | retired.
+  #
+  # `retired` since 2026-08-26, and declared HERE as well as in apphosting.yaml because which
+  # of the two a backend actually reads is not visible from the CLI. An overlay that simply
+  # omitted this would leave the App Hosting runtime on the `frozen` default while the
+  # Functions runtime said `retired` — and the runtime on the older stage writes team
+  # capabilities back into every projection it rebuilds, one user at a time.
+  #
+  # scripts/lib/deploymentPlanes.test.ts fails if this file and apphosting.yaml disagree, or
+  # if either omits it. Unset falls back to `frozen`, so an absent declaration is not neutral.
+  - variable: GOALPLACE_TEAM_AUTHORITY_STAGE
+    value: "retired"
+    availability: [RUNTIME]
   - variable: GOALPLACE_ENVIRONMENT
     value: demo
     availability: [BUILD, RUNTIME]

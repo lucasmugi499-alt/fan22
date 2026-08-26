@@ -67,6 +67,35 @@ describe('team authority stage across deployment planes', () => {
  * that the field capture gate exists as its own variable at all — collapsing it back into
  * `GOALPLACE_FINALIZER_MODE` is what armed an unproven pipeline the first time.
  */
+/**
+ * Every App Hosting config that could be the one a backend reads must agree.
+ *
+ * `apphosting.yaml` is the base, and `apphosting.<environment>.yaml` overrides it when a
+ * backend is built with an environment name. Which of the two a given backend uses is not
+ * visible from the CLI, so "I set it in apphosting.yaml" is not by itself a statement about
+ * what the runtime received.
+ *
+ * The demo overlay exists and had no `GOALPLACE_TEAM_AUTHORITY_STAGE` at all. If that file is
+ * the one in force, the App Hosting runtime falls back to `frozen` while the Functions
+ * runtime says `retired` — the exact split this whole test file exists to catch, hidden one
+ * level further down than the first check looks.
+ *
+ * Rather than guess which file wins, both declare it and both must say the same thing.
+ */
+describe('team authority stage across App Hosting config files', () => {
+  const OVERLAYS = ['apphosting.demo.yaml'];
+
+  it.each(OVERLAYS)('%s declares the same stage as apphosting.yaml', (overlay) => {
+    const base = appHostingValue(VARIABLE);
+    const yaml = readFileSync(overlay, 'utf8');
+    const match = yaml.match(
+      new RegExp(`-\\s*variable:\\s*${VARIABLE}\\s*\\n\\s*value:\\s*"?([a-z_]+)"?`),
+    );
+    expect(match?.[1], `${VARIABLE} missing from ${overlay}`).toBeDefined();
+    expect(match?.[1]).toBe(base);
+  });
+});
+
 describe('finalizer gates on the Functions plane', () => {
   it('gives field capture its own declared mode', () => {
     expect(functionsEnvValue('GOALPLACE_FIELD_CAPTURE_MODE')).toBeDefined();
