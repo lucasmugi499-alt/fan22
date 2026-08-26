@@ -43,6 +43,12 @@ Target: project `manifest-quasar-479416-s7`, database `fg256`, 2026-08-26.
   success; the final Functions environment value cannot be independently read back from this
   machine. V1 stayed enabled and untouched. League post-match entry remains off.
 
+The canary was manual and endpoint-by-endpoint against the deployed authenticated routes; it
+did not use the browser/phone UI. Treat the finalizer, route orchestration and persistence graph
+as cloud-verified, but do not claim separate browser UI verification. Likewise, the bad case's
+single blocking exception is an ingress `matchOperationalExceptions` record, not a downstream
+`reconciliationExceptions` record; the candidate never reached that plane.
+
 The live canary found two route/persistence bugs. Both are regression-tested, pushed and live:
 the route's `{action}` shape now adapts to the clock kernel's `{type}` shape, and cleared
 optional clock anchors are omitted rather than written as Firestore `undefined`.

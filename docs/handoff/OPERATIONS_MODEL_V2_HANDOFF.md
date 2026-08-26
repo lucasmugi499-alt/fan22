@@ -169,8 +169,11 @@ before capture: clean `match_eurdl_18_03` to 21:00Z and contradictory
 `match_eurdl_18_04` to 21:15Z. No score or sporting truth was set by that control step.
 
 The clean fixture was allowlisted and `onMatchReportWritten` alone was deployed in `canary`
-mode. The real Field Manager routes were driven through link, PIN, check-in, immutable lineup,
-clock, three goal events, half time, second half, full time and 2-1 attestation. Persisted proof:
+mode. Every real, deployed authenticated Field Manager route was driven manually, one
+transition at a time, through link, PIN, check-in, immutable lineup, clock, three goal events,
+half time, second half, full time and 2-1 attestation. This was an endpoint-level manual canary,
+not a browser/phone UI run; the client UI orchestration is therefore not independently proven
+by this evidence. Persisted proof:
 
 - report `official`, `reportVersion=1`, declared and reconstructed 2-1, 3 events, digest
   `40a9ca56337bd4c0a3c200fc5987d8e5cd14893ad1d86460c8ec242c639960f1`;
@@ -415,7 +418,10 @@ report → inspected every persisted cardinality and principal → forced trigge
 deltas zero → completed the contradictory 2-1/3-1 report, zero official records and exactly
 one operational exception → forced bad replay, exception stayed one → `release:canary` passed →
 set Demo field capture to `enabled` and targeted `onMatchReportWritten` only → re-ran all three
-migration gates and `release:canary`, still green.
+migration gates and `release:canary`, still green → ran the complete `deploy:ready` suite,
+1430 unit / 155 Rules / 26 integration, green → two-axis review found no standards violations
+and recorded the two literal proof boundaries: endpoint-level rather than browser-UI operation,
+and an ingress operational exception rather than a downstream reconciliation exception.
 
 **Next action:** fix eligibility in `isUnreportedAndStale`, model it against Demo again, and
 release `sweepUnreportedMatches` separately. Section 4.2. Do not bundle it with any canary
