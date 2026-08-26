@@ -3,6 +3,21 @@ env:
     value: "enabled"
     availability:
       - RUNTIME
+  # Team authority sunset stage: active | frozen | retired.
+  #
+  # `retired` since 2026-08-26, after the V1 drain read zero on both blocking counts. This
+  # runtime needs it because the Next server owns access projection too: `access/projector.ts`
+  # rebuilds an accessIndex document whenever an assignment changes, and `projectScopeIndex`
+  # reads this variable to decide what a team bundle grants. Left at the `frozen` default, a
+  # single assignment edit would write team capabilities back into a rebuilt projection and
+  # quietly reopen what the migration closed.
+  #
+  # The Cloud Functions runtime holds its own copy in functions/.env.<project>. Both have to
+  # say `retired`, because either one can rebuild a projection.
+  - variable: GOALPLACE_TEAM_AUTHORITY_STAGE
+    value: "retired"
+    availability:
+      - RUNTIME
   - variable: GOALPLACE_ENVIRONMENT
     value: demo
     availability:
