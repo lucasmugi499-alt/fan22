@@ -100,6 +100,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
       );
     }
   }
+  /**
+   * The stream version advances on every accepted write, and an already-attested report is
+   * invalidated rather than quietly amended.
+   *
+   * This is the case the whole binding exists for: the Field Manager attests at 17:00, a
+   * quarantined session syncs at 17:04, and without this the report still says
+   * `ready_for_finalization` while meaning something it never claimed. The event is kept, because
+   * it is a real observation. What it invalidates is the claim that a particular set of events
+   * was the match.
+   */
+  if (verdict.accepted.length) {
+    batch.set(
+      adminDb.collection('matches').doc(matchId),
+      { eventStreamVersion: FieldValue.increment(verdict.accepted.length) },
+      { merge: true },
+    );
+
+    const reportRef = adminDb.collection('matchReports').doc(matchId);
+    const report = await reportRef.get();
+    const reportStatus = String(report.data()?.status ?? '');
+    if (['submitted', 'ready_for_finalization'].includes(reportStatus)) {
+      batch.update(reportRef, {
+        status: 'requires_re_attestation',
+        reAttestationReason: 'Events arrived after this report was attested.',
+        updatedAt: now,
+      });
+    }
+  }
+
   await batch.commit();
 
   if (verdict.quarantined) {

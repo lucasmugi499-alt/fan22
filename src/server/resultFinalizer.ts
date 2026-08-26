@@ -30,6 +30,8 @@ import {
   type FinalizationCandidate,
 } from './finalization/candidate';
 import { planCandidateFinalization } from './finalization/plan';
+// Relative: this file compiles into the Cloud Functions bundle.
+import { bindReportToEvents, verifyReportBinding } from '../lib/matchOps/digest';
 import { computeDataQuality } from './finalization/quality';
 import {
   fieldReportLifecycle,
@@ -1575,6 +1577,7 @@ export function fieldReportLoader(db: Firestore, matchId: string): CandidateLoad
       db.collection('liveMatchEvents').where('matchId', '==', matchId),
     );
     const events = eventsSnap.docs.map((doc) => doc.data() as {
+      eventId: string;
       eventType: string;
       teamId: string;
       athleteId: string | null;
@@ -1623,19 +1626,41 @@ export function fieldReportLoader(db: Firestore, matchId: string): CandidateLoad
       : { home: 0, away: 0 };
 
     /**
-     * Attested, then recomputed, and they must still agree.
+     * The report is bound to an exact event set, and finalization consumes that set or nothing.
      *
-     * The gate compared the declared score against the events at submission time. If the
-     * events have moved since, that comparison is no longer the one being finalized, and the
-     * honest response is to send it back for review rather than to officialise a number
-     * nobody attested to.
+     * Comparing scores was the first version of this check and it only catches the loud failure.
+     * A goal reattributed from one athlete to another between attestation and finalization
+     * leaves the total identical and changes whose career record it lands on, and the score
+     * comparison passes it. The digest is over content, so it does not.
+     *
+     * Sending it back is the only honest response. Officialising the new set would publish a
+     * result nobody attested to; officialising the old set is impossible, because the events it
+     * referred to have already changed.
      */
-    if (
-      trace.home !== Number(report.reconstructedHomeScore ?? 0)
-      || trace.away !== Number(report.reconstructedAwayScore ?? 0)
-    ) {
-      return { skip: 'events_changed_since_attestation' };
+    const currentBinding = bindReportToEvents(
+      events.map((event) => ({
+        eventId: event.eventId,
+        eventType: event.eventType,
+        teamId: event.teamId,
+        athleteId: event.athleteId,
+        gameClockMs: event.gameClockMs,
+        status: event.status,
+        payload: event.payload,
+      })),
+      Number(matchForScore.eventStreamVersion ?? events.length),
+    );
+
+    const attestedDigest = typeof report.eventDigest === 'string' ? report.eventDigest : '';
+    if (!attestedDigest) {
+      // A report written before the binding existed. Refused rather than finalized on trust:
+      // there is no way to tell whether its events are the ones it attested to.
+      return { skip: 'report_has_no_event_binding' };
     }
+    const binding = verifyReportBinding(
+      { eventDigest: attestedDigest, eventCount: Number(report.eventCount ?? 0), eventStreamVersion: Number(report.eventStreamVersion ?? 0) },
+      currentBinding,
+    );
+    if (!binding.matches) return { skip: 'events_changed_since_attestation' };
 
     return {
       candidate: buildCandidateFromFieldReport({
@@ -1653,6 +1678,7 @@ export function fieldReportLoader(db: Firestore, matchId: string): CandidateLoad
           sessionId: typeof report.sessionId === 'string' ? report.sessionId : undefined,
           resultVersion: Number(report.resultVersion ?? 1),
           attestedAt: typeof report.attestedAt === 'string' ? report.attestedAt : undefined,
+          reportVersion: Number(report.reportVersion ?? 1),
         },
         events,
         scoringEventTypes,

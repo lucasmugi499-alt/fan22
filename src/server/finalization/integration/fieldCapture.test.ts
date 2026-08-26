@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { clearFirestore, ENABLED, integrationDb, shutdown } from './harness';
 import { finalizeFieldReport, finalizeSubmission } from '@/server/resultFinalizer';
+import { bindReportToEvents } from '@/lib/matchOps/digest';
 
 let db: Firestore;
 
@@ -69,8 +70,26 @@ async function seedEvents(rows: { id: string; team: string; athlete: string | nu
   }
 }
 
+/**
+ * Seeds a report bound to whatever events currently exist, which is what attestation does.
+ *
+ * Computed here rather than hardcoded, so a test that changes the event set gets a report that
+ * genuinely attested to that set. A fixed digest would make every case pass or fail for the
+ * wrong reason.
+ */
+async function currentBinding() {
+  const snap = await db.collection('liveMatchEvents').where('matchId', '==', MATCH).get();
+  const events = snap.docs.map((doc) => doc.data() as never);
+  return bindReportToEvents(events, events.length);
+}
+
 async function seedReport(overrides: Record<string, unknown> = {}) {
+  const binding = await currentBinding();
   await db.collection('matchReports').doc(MATCH).set({
+    reportVersion: 1,
+    eventDigest: binding.eventDigest,
+    eventCount: binding.eventCount,
+    eventStreamVersion: binding.eventStreamVersion,
     id: MATCH,
     matchId: MATCH,
     leagueId: 'league_1',
@@ -323,6 +342,9 @@ describe('a correction produces a new version rather than an edit', () => {
     // The Field Manager missed a goal. The league corrects the record: a second version, with
     // its own events and its own ledger entry.
     await seedEvents([{ id: 'e4', team: 'team_home', athlete: 'athlete_1', seq: 4 }]);
+    // Re-attested over the new set, which is what a correction is: a new report version bound
+    // to a new digest, never an amendment of the one already finalized.
+    const rebound = await currentBinding();
     await db.collection('matchReports').doc(MATCH).set({
       id: MATCH,
       matchId: MATCH,
@@ -339,6 +361,10 @@ describe('a correction produces a new version rather than an edit', () => {
       exceptions: [],
       status: 'ready_for_finalization',
       resultVersion: 2,
+      reportVersion: 2,
+      eventDigest: rebound.eventDigest,
+      eventCount: rebound.eventCount,
+      eventStreamVersion: rebound.eventStreamVersion,
       attestedAt: '2026-08-24T18:00:00.000Z',
     });
 
@@ -424,5 +450,77 @@ describe('the surplus gate still refuses through the adapter', () => {
     expect(second).toEqual({ action: 'skipped', reason: 'blocked_reconciliation' });
     const events = await db.collection('resultSubmissions').doc(MATCH).collection('events').get();
     expect(events.size).toBe(1);
+  });
+});
+
+describe('an attested report means one exact set of events', () => {
+  /**
+   * The failure the score comparison could not see.
+   *
+   * A goal reattributed from one athlete to another between attestation and finalization leaves
+   * the total identical and changes whose career record it lands on. Before the binding this
+   * finalized cleanly, crediting the wrong player from an official record nobody attested to.
+   */
+  it('refuses a reattributed goal even though the score is unchanged', async () => {
+    await cleanFieldCapture();
+
+    // Same match, same score, different scorer.
+    await db.collection('liveMatchEvents').doc(`${MATCH}_e1`).update({ athleteId: 'athlete_2' });
+
+    const outcome = await finalizeFieldReport(db, MATCH, ENABLED);
+
+    expect(outcome).toEqual({ action: 'skipped', reason: 'events_changed_since_attestation' });
+    expect((await db.collection('finalizations').get()).size).toBe(0);
+    expect((await db.collection('officialSportEvents').where('matchId', '==', MATCH).get()).size).toBe(0);
+  });
+
+  it('refuses when an event is superseded after attestation', async () => {
+    await cleanFieldCapture();
+
+    // A correction that removes a goal from the active set. The ids are unchanged; the record
+    // is not.
+    await db.collection('liveMatchEvents').doc(`${MATCH}_e3`).update({ status: 'superseded' });
+
+    expect(await finalizeFieldReport(db, MATCH, ENABLED))
+      .toEqual({ action: 'skipped', reason: 'events_changed_since_attestation' });
+  });
+
+  /**
+   * A report written before the binding existed cannot be finalized on trust, because there is
+   * no way to tell whether its events are the ones it attested to. Refusing is the safe answer:
+   * the league re-attests, which is one screen, rather than the platform publishing a result it
+   * cannot vouch for.
+   */
+  it('refuses a report carrying no binding at all', async () => {
+    await cleanFieldCapture();
+    await db.collection('matchReports').doc(MATCH).update({ eventDigest: '' });
+
+    expect(await finalizeFieldReport(db, MATCH, ENABLED))
+      .toEqual({ action: 'skipped', reason: 'report_has_no_event_binding' });
+  });
+
+  it('finalizes once the report is re-attested over the new set', async () => {
+    await cleanFieldCapture();
+    await seedEvents([{ id: 'e4', team: 'team_home', athlete: 'athlete_1', seq: 4 }]);
+
+    // Stale binding: refused.
+    expect((await finalizeFieldReport(db, MATCH, ENABLED)).action).toBe('skipped');
+
+    // Re-attested over what is actually there, as a new report version.
+    const rebound = await currentBinding();
+    await db.collection('matchReports').doc(MATCH).update({
+      reportVersion: 2,
+      eventDigest: rebound.eventDigest,
+      eventCount: rebound.eventCount,
+      eventStreamVersion: rebound.eventStreamVersion,
+      declaredHomeScore: 3,
+      reconstructedHomeScore: 3,
+      status: 'ready_for_finalization',
+    });
+
+    const outcome = await finalizeFieldReport(db, MATCH, ENABLED);
+
+    expect(outcome).toMatchObject({ action: 'finalized' });
+    expect((await db.collection('matches').doc(MATCH).get()).data()?.score).toEqual({ home: 3, away: 1 });
   });
 });

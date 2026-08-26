@@ -1,5 +1,6 @@
 import type { FinalizationSourceType, Principal } from '../../kernel/principal';
 import type { AthleteStatLine, FinalizationSource } from '../../types';
+import { candidateIdFor } from '../../lib/matchOps/digest';
 // Relative, and deliberately the shared implementation: a second spelling of this format is a
 // second answer to "have we already finalized this", and the ledger can only hold one.
 import { finalizationKeyFor } from '../../lib/resultSubmission';
@@ -32,12 +33,16 @@ export type ScorerEntry = {
 
 export type FinalizationCandidate = {
   /**
-   * Identifies this attempt, distinctly from the record it came from.
+   * Identifies exactly one set of sporting claims, forever.
    *
-   * `sourceRecordId` says which document produced it; this says which candidate. They differ
-   * whenever one record produces more than one attempt, which is exactly what a correction is.
+   * Three parts: source type, source record, source version. Two would not be enough.
+   * `field_capture:report_381` would be a stable name for a changing thing, so a retry could
+   * not tell whether it was replaying its own work or committing somebody else's. With the
+   * version in the name, a changed source produces a new candidate rather than a changed one.
    */
   candidateId: string;
+  /** The version of the source record this candidate was built from. */
+  sourceVersion: number;
   matchId: string;
   leagueId: string;
   competitionId?: string;
@@ -136,7 +141,12 @@ function normalizeSport(sport: unknown): FinalizationCandidate['sport'] {
 export function buildCandidateFromLegacySubmission(submission: LegacySubmissionShape): FinalizationCandidate {
   const resultVersion = submission.resultVersion ?? 1;
   return {
-    candidateId: `${submission.matchId}:legacy:${resultVersion}`,
+    candidateId: candidateIdFor({
+      sourceType: 'legacy_team_submission',
+      sourceRecordId: submission.id,
+      sourceVersion: resultVersion,
+    }),
+    sourceVersion: resultVersion,
     submittedAt: submission.submittedAt ?? '',
     submittedByTeamId: submission.submittedByTeamId,
     submittedByUserId: submission.submittedByUserId,
@@ -174,6 +184,7 @@ type FieldReportShape = {
   assignmentId?: string;
   sessionId?: string;
   resultVersion?: number;
+  reportVersion?: number;
   attestedAt?: string;
 };
 
@@ -200,6 +211,7 @@ export function buildCandidateFromFieldReport(input: {
   scoringEventTypes: string[];
 }): FinalizationCandidate {
   const resultVersion = input.report.resultVersion ?? 1;
+  const reportVersion = input.report.reportVersion ?? 1;
   const active = input.events.filter((event) => event.status === 'active');
 
   // One scorer entry per athlete per team, counted from the events themselves. A team-only
@@ -223,7 +235,14 @@ export function buildCandidateFromFieldReport(input: {
   }
 
   return {
-    candidateId: `${input.report.matchId}:field:${resultVersion}`,
+    candidateId: candidateIdFor({
+      sourceType: 'field_capture',
+      sourceRecordId: input.report.id,
+      // The REPORT version, not the result version. Re-attesting after a late event produces a
+      // new report version and therefore a new candidate, which is the point.
+      sourceVersion: reportVersion,
+    }),
+    sourceVersion: reportVersion,
     submittedAt: input.report.attestedAt ?? '',
     matchId: input.report.matchId,
     leagueId: input.report.leagueId,
@@ -270,7 +289,12 @@ export function buildCandidateFromLeagueReport(input: {
 }): FinalizationCandidate {
   const resultVersion = input.resultVersion ?? 1;
   return {
-    candidateId: `${input.matchId}:league:${resultVersion}`,
+    candidateId: candidateIdFor({
+      sourceType: 'league_post_match',
+      sourceRecordId: input.recordId,
+      sourceVersion: resultVersion,
+    }),
+    sourceVersion: resultVersion,
     submittedAt: input.submittedAt ?? '',
     submittedByUserId: input.enteredByUserId,
     matchId: input.matchId,

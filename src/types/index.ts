@@ -919,8 +919,29 @@ export interface MatchReport {
   declaredAwayScore: number;
   reconstructedHomeScore: number;
   reconstructedAwayScore: number;
+  /**
+   * The exact event set this report attested to.
+   *
+   * A Field Manager confirms a record at full time and the events beneath it can still change:
+   * a quarantined session syncs minutes later, a correction lands. Without this binding,
+   * finalization consumes whatever the collection happens to hold when it runs, and the official
+   * result is built from events nobody attested to.
+   *
+   * The digest is over content rather than a total, because the loud failure is a score that
+   * moved and the quiet one is a goal reattributed from one athlete to another: identical score,
+   * different career record.
+   */
   eventCount: number;
-  payloadHash: string;
+  eventDigest: string;
+  eventStreamVersion: number;
+  /**
+   * Which attestation this is. A late event does not amend a report; it invalidates this
+   * version and the Field Manager attests again, producing the next one.
+   */
+  reportVersion: number;
+  attestedByMatchSessionId?: string;
+  /** @deprecated Superseded by `eventDigest`, which is sensitive to content rather than ids. */
+  payloadHash?: string;
   lineupSnapshotId?: string;
   clockAdjustments: { deltaMs: number; reason: string; at: string }[];
   attestedAt: string;
@@ -934,7 +955,21 @@ export interface MatchReport {
    * finalized with no official result version behind it is exactly the kind of second source
    * of truth this architecture exists to prevent.
    */
-  status: 'submitted' | 'ready_for_finalization' | 'auto_finalized' | 'league_review' | 'official' | 'superseded';
+  /**
+   * `requires_re_attestation` is what a late event produces.
+   *
+   * Not a silent amendment, and not a refusal to record the event. The observation is real and
+   * is kept; what it invalidates is the claim that a particular set of events was the match. The
+   * Field Manager, or the league, attests again over the new set.
+   */
+  status:
+    | 'submitted'
+    | 'ready_for_finalization'
+    | 'requires_re_attestation'
+    | 'auto_finalized'
+    | 'league_review'
+    | 'official'
+    | 'superseded';
   resultVersion: number;
   finalizationKey?: string;
   createdAt: string;

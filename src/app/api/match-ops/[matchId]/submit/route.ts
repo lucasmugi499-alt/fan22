@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody } from '@/server/api/security';
 import { requireMatchOpsSession } from '@/server/matchOps/session';
 import { hasClockAnomaly } from '@/lib/matchOps/clock';
+import { bindReportToEvents } from '@/lib/matchOps/digest';
 import { reconcileBasketballBoxScore, reconstructMatchScore } from '@/kernel/formulas/score';
 import { SPORT_DEFINITIONS } from '@/kernel/definitions/sportCatalogues';
 import type { LiveMatchEvent, Match, MatchClockState, MatchExceptionCode } from '@/types';
@@ -124,9 +125,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
   const now = new Date().toISOString();
   const reportRef = adminDb.collection('matchReports').doc(matchId);
   const existing = await reportRef.get();
-  if (existing.exists && existing.data()?.status !== 'submitted') {
+  const previousStatus = String(existing.data()?.status ?? '');
+  /**
+   * Re-attestation is permitted; re-reporting a settled match is not.
+   *
+   * `requires_re_attestation` is exactly the state a late event puts a report into, and refusing
+   * it here would leave the Field Manager holding a match they can neither finalize nor correct.
+   */
+  if (existing.exists && !['submitted', 'ready_for_finalization', 'requires_re_attestation'].includes(previousStatus)) {
     return Response.json({ error: 'This match has already been reported.' }, { status: 409 });
   }
+
+  /**
+   * The exact set being attested to, bound into the report.
+   *
+   * Computed over EVERY event, not only the active ones: a superseded goal is part of what the
+   * Field Manager confirmed, and a set where it is still active is a different record.
+   */
+  const binding = bindReportToEvents(
+    allEvents.map((event) => ({
+      eventId: event.eventId,
+      eventType: event.eventType,
+      teamId: event.teamId,
+      athleteId: event.athleteId,
+      gameClockMs: event.gameClockMs,
+      status: event.status,
+      payload: event.payload,
+    })),
+    Number(matchSnapshot.data()?.eventStreamVersion ?? allEvents.length),
+  );
+
+  // Attesting again over a changed set produces the next version rather than amending this one.
+  const reportVersion = Number(existing.data()?.reportVersion ?? 0) + 1;
 
   await reportRef.set({
     id: matchId,
@@ -134,12 +164,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
     leagueId: match.leagueId,
     assignmentId: auth.session.assignmentId,
     sessionId: auth.session.sessionId,
+    attestedByMatchSessionId: auth.session.sessionId,
+    reportVersion,
+    eventDigest: binding.eventDigest,
+    eventStreamVersion: binding.eventStreamVersion,
     source: 'field_capture',
     declaredHomeScore: input.declaredHomeScore,
     declaredAwayScore: input.declaredAwayScore,
     reconstructedHomeScore: trace.home,
     reconstructedAwayScore: trace.away,
-    eventCount: active.length,
+    eventCount: binding.eventCount,
     // Over the active events only, so a superseded observation cannot change the hash of what
     // was actually attested to.
     payloadHash: createHash('sha256')
