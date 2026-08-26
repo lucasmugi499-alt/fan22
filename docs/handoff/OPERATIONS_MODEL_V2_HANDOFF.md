@@ -64,8 +64,8 @@ deploying.** State which plane, always.
 | Sunset invariants | **not proven** | rebuild |
 | Push | **done** | main at `de4af7c` |
 | App Hosting + Rules deploy | **done** 2026-08-26 | verified live |
-| Functions deploy | **not done** | deliberate: the field path should not finalize before the drain |
-| Field capture canary | **not done** | deploy |
+| Functions deploy | **done** 2026-08-26 | 3 functions, verified |
+| Field capture canary | **not run** | the first real report is the canary |
 
 ### Deployed planes on `demo` (`manifest-quasar-479416-s7`), queried 2026-08-25
 
@@ -74,8 +74,8 @@ deploying.** State which plane, always.
 | App Hosting | **`build-2026-08-26-001` / `rollout-2026-08-26-000`, both SUCCEEDED.** Serving the new build, verified by probing `/manifest.webmanifest`, `/offline` and `/sw.js`, none of which exist in the old build. Automatic rollouts from GitHub do not work on this backend: deploys are `apphosting:rollouts:create`. |
 | Firestore Rules | **deployed 2026-08-26** to database `fg256`, with indexes |
 | Storage Rules | **re-released 2026-08-26**, unchanged |
-| Cloud Functions | 7 live: `convergeLifecycle`, `onOfficialResultFinalized`, `onResultSubmissionWritten`, 4 search indexers |
-| `onMatchReportWritten` | **still not deployed.** A field report can now be captured and attested through the live app, and nothing will finalize it: reports sit at `submitted`. Deploying this Function is the next deployment step. |
+| Cloud Functions | **8 live.** `onMatchReportWritten` deployed 2026-08-26; `onResultSubmissionWritten` and `onOfficialResultFinalized` updated. `reconcilePaymentIntents` and `lockFantasyLineups` deliberately absent. |
+| `onMatchReportWritten` | **deployed.** With `GOALPLACE_FINALIZER_MODE=enabled` on demo, the first clean field report finalizes to an official result with no human step. |
 | `reconcilePaymentIntents` | not deployed, and must stay that way for this milestone |
 
 ---
@@ -223,6 +223,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | Wrong rules file | `firebase.json` points at `firestore.rules.next` (1188 lines), not `firestore.rules` (302). Editing the wrong one deploys nothing and fails nothing. |
 | Guard budgets are shrink-only | `access:guard` fails when a budget is too high **or** too low. Lower it in the same commit as the fix. |
 | Stale `functions/lib` | `verify:bundle` reads emitted output. After changing the tsconfig include/exclude, `rm -rf functions/lib` before rebuilding. |
+| Dead scheduled code | `sweepUnreportedMatches` is written and never wired into `functions/src/index.ts`. It does not run, so `result_never_reported` is never raised. Either wire and deploy it, or delete it: code that looks scheduled and is not is worse than neither. |
 | Half-migrated capability checks | The Rules helper was widened to accept both capability spellings and the SERVER check was not, so Rules would have said yes and the route would have said no. Deploying the app before rebuilding projections would have refused every League Admin. `acceptedSpellings()` in `src/server/access/capabilities.ts` is the shim; delete it once `access:sunset-invariants` reports zero. |
 | Evidence that resets itself | The first evidence generator overwrote its file on every run, so checking readiness erased what had been proven and then correctly reported nothing was proven. It now merges. Use `--reset` deliberately if you want a blank one. |
 
@@ -283,6 +284,8 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-25 | `1e46b9d` | Recorded that the push deployed nothing |
 | 2026-08-25 | `9e8346c` | W17: canary verifier, proven against the emulator |
 | 2026-08-26 | `de4af7c` | Capability spelling shim; Rules + indexes + Storage + App Hosting deployed to demo |
+| 2026-08-26 | `0ee0d29` | Deployment recorded |
+| 2026-08-26 | | Cloud Functions deployed: onMatchReportWritten live. Field capture is now operational on demo. |
 
 **Next action:** supply credentials, then run step 1.
 

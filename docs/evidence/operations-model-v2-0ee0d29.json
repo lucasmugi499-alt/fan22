@@ -1,0 +1,75 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T14:09:21.403Z",
+  "commit": {
+    "sha": "de4af7ca8e0fe6aaaf09f67a7f33b0cbb4bae73d",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1380
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 19
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "v1DrainBefore": "not_run",
+    "workflowsMigrated": [],
+    "v1DrainAfter": "not_run",
+    "teamAuthorityStage": "frozen",
+    "projectionsRebuilt": "not_run",
+    "legacyTeamCapabilitiesRemaining": "not_run",
+    "sunsetInvariants": "not_run"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-26-001 / rollout-2026-08-26-000, both SUCCEEDED",
+      "status": "passed"
+    },
+    "firestoreRules": {
+      "revision": "firestore.rules.next released to database fg256, 2026-08-26",
+      "status": "passed"
+    },
+    "storageRules": {
+      "revision": "storage.rules unchanged, re-released 2026-08-26",
+      "status": "passed"
+    },
+    "cloudFunctions": {
+      "revision": "onMatchReportWritten CREATED; onResultSubmissionWritten and onOfficialResultFinalized UPDATED, 2026-08-26. 8 total deployed. reconcilePaymentIntents and lockFantasyLineups deliberately absent.",
+      "status": "passed"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    }
+  },
+  "canary": {
+    "matchId": null,
+    "reportId": null,
+    "candidateId": null,
+    "officialResultVersion": null,
+    "officialEventCount": null,
+    "duplicateReplay": "not_run",
+    "badReportException": "not_run"
+  },
+  "exclusions": [
+    "GOALPLACE_FINALIZER_MODE=enabled on demo. Field capture is LIVE: the first clean field report anybody creates will finalize to an official result with no human step. That first report is the canary. Verify it with npm run release:canary before treating field capture as operational.",
+    "sweepUnreportedMatches is written and NEVER WIRED into functions/src/index.ts. The staleness sweep does not run. result_never_reported cases will not be raised.",
+    "reconcileResultSubmissions is not deployed, matching its pre-existing state. The scheduled finalization sweeper does not run on demo.",
+    "V1 drain, straggler migration, projection rebuild and sunset invariants have never run against real data. No credentials on the build machine.",
+    "Team authority stage is frozen. Issuance closed; existing holders retain authority.",
+    "Server capability checks accept superseded spellings so League Admins keep working until projections are rebuilt. Migration scaffolding; delete once sunset-invariants reports zero.",
+    "Production untouched."
+  ]
+}
