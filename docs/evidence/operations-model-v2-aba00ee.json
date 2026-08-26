@@ -1,0 +1,74 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T13:51:16.880Z",
+  "commit": {
+    "sha": "aba00eeb4b0d687cce9ce561e28a611277e61862",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1380
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 19
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "v1DrainBefore": "not_run",
+    "workflowsMigrated": [],
+    "v1DrainAfter": "not_run",
+    "teamAuthorityStage": "frozen",
+    "projectionsRebuilt": "not_run",
+    "legacyTeamCapabilitiesRemaining": "not_run",
+    "sunsetInvariants": "not_run"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-23-004 (cli-firebase), unchanged by this push",
+      "status": "not_run"
+    },
+    "firestoreRules": {
+      "revision": null,
+      "status": "not_run"
+    },
+    "storageRules": {
+      "revision": null,
+      "status": "not_run"
+    },
+    "cloudFunctions": {
+      "revision": "7 deployed at pre-migration code; onMatchReportWritten ABSENT",
+      "status": "not_run"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    }
+  },
+  "canary": {
+    "matchId": null,
+    "reportId": null,
+    "candidateId": null,
+    "officialResultVersion": null,
+    "officialEventCount": null,
+    "duplicateReplay": "not_run",
+    "badReportException": "not_run"
+  },
+  "exclusions": [
+    "main is pushed at aba00ee. The App Hosting backend did NOT rebuild: the latest rollout remains build-2026-08-23-004, and automatic rollouts last fired 2026-08-08. The demo app still serves pre-migration code.",
+    "onMatchReportWritten is not deployed. Field capture cannot run on any environment.",
+    "V1 drain, straggler migration, projection rebuild and sunset invariants have never run against real data. No credentials on the build machine.",
+    "Team authority stage is frozen. Issuance closed; existing holders retain authority so open V1 workflows can finish.",
+    "Field capture canary not run. Nothing about the field path is cloud-verified.",
+    "Production untouched and out of scope."
+  ]
+}

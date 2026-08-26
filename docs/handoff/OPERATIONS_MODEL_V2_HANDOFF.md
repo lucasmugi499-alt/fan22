@@ -4,8 +4,8 @@
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
 **Last updated:** 2026-08-25
-**Branch:** `handbook-v2`, local only, not pushed
-**Head:** `a84ad65`
+**Branch:** `main` at `aba00ee`, pushed 2026-08-25. `handbook-v2` also pushed.
+**Head:** `aba00ee`
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -62,7 +62,7 @@ deploying.** State which plane, always.
 | Team authority retirement | **not done** | drain = zero |
 | Access projection rebuild | **not done** | retirement |
 | Sunset invariants | **not proven** | rebuild |
-| Push | **held deliberately** | gates above |
+| Push | **done** 2026-08-25 | main at `aba00ee` |
 | Functions deploy | **not done** | push |
 | Field capture canary | **not done** | deploy |
 
@@ -70,7 +70,7 @@ deploying.** State which plane, always.
 
 | Plane | State |
 |---|---|
-| App Hosting | backend `fan22`, updated 2026-08-23, **automatic builds enabled** |
+| App Hosting | `build-2026-08-23-004`, **unchanged by the push**. ABIU reads Enabled but automatic rollouts last fired 2026-08-08 and every deploy since has been manual CLI. The demo app still serves pre-migration code. |
 | Cloud Functions | 7 live: `convergeLifecycle`, `onOfficialResultFinalized`, `onResultSubmissionWritten`, 4 search indexers |
 | `onMatchReportWritten` | **not deployed**. Field capture is not live |
 | `reconcilePaymentIntents` | not deployed, and must stay that way for this milestone |
@@ -261,8 +261,13 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-25 | `8ef1e1a` | W7: last Team Admin issuance path closed |
 | 2026-08-25 | `ae46f61` | W5: canonical planner regression suite |
 | 2026-08-25 | `a84ad65` | W2: league report loader, third source complete |
+| 2026-08-25 | `aba00ee` | W14: evidence generator; merged to main and pushed |
 
 **Next action:** supply credentials, then run step 1.
+
+> Pushing to `main` did **not** deploy anything. Nothing in the migration changed state as a
+> result of the push: App Hosting did not rebuild, Functions were untouched, and team
+> authority is still `frozen`. Steps 1 to 6 below are all still ahead.
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS_JSON='<service account for manifest-quasar-479416-s7>'
