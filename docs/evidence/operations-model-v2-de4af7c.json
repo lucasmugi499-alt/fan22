@@ -1,0 +1,75 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-26T14:09:21.403Z",
+  "commit": {
+    "sha": "de4af7ca8e0fe6aaaf09f67a7f33b0cbb4bae73d",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1380
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 19
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "v1DrainBefore": "not_run",
+    "workflowsMigrated": [],
+    "v1DrainAfter": "not_run",
+    "teamAuthorityStage": "frozen",
+    "projectionsRebuilt": "not_run",
+    "legacyTeamCapabilitiesRemaining": "not_run",
+    "sunsetInvariants": "not_run"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-26-001 / rollout-2026-08-26-000, both SUCCEEDED",
+      "status": "passed"
+    },
+    "firestoreRules": {
+      "revision": "firestore.rules.next released to database fg256, 2026-08-26",
+      "status": "passed"
+    },
+    "storageRules": {
+      "revision": "storage.rules unchanged, re-released 2026-08-26",
+      "status": "passed"
+    },
+    "cloudFunctions": {
+      "revision": "7 deployed at PRE-migration code; onMatchReportWritten still ABSENT",
+      "status": "not_run"
+    },
+    "scheduledFunctions": {
+      "revision": null,
+      "status": "not_applicable"
+    }
+  },
+  "canary": {
+    "matchId": null,
+    "reportId": null,
+    "candidateId": null,
+    "officialResultVersion": null,
+    "officialEventCount": null,
+    "duplicateReplay": "not_run",
+    "badReportException": "not_run"
+  },
+  "exclusions": [
+    "Cloud Functions were NOT deployed. onMatchReportWritten is absent, so a field report can be captured and attested but nothing finalizes it: reports will sit at submitted.",
+    "Firestore indexes were deployed alongside rules; composite indexes may still be building.",
+    "V1 drain, straggler migration, projection rebuild and sunset invariants have never run against real data. No credentials on the build machine.",
+    "Team authority stage is frozen. Issuance closed; existing holders retain authority so open V1 workflows can finish.",
+    "Server capability checks accept superseded spellings so League Admins keep working until projections are rebuilt. This is migration scaffolding and must be deleted once sunset-invariants reports zero.",
+    "Field capture canary not run. Nothing about the field path is cloud-verified.",
+    "Production untouched."
+  ]
+}

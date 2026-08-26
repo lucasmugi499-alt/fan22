@@ -3,9 +3,9 @@
 **Purpose.** If the agent working on this stops mid-migration, another one picks it up from
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 **Branch:** `main` at `aba00ee`, pushed 2026-08-25. `handbook-v2` also pushed.
-**Head:** `aba00ee`
+**Head:** `de4af7c`, on `main`, pushed
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -62,17 +62,20 @@ deploying.** State which plane, always.
 | Team authority retirement | **not done** | drain = zero |
 | Access projection rebuild | **not done** | retirement |
 | Sunset invariants | **not proven** | rebuild |
-| Push | **done** 2026-08-25 | main at `aba00ee` |
-| Functions deploy | **not done** | push |
+| Push | **done** | main at `de4af7c` |
+| App Hosting + Rules deploy | **done** 2026-08-26 | verified live |
+| Functions deploy | **not done** | deliberate: the field path should not finalize before the drain |
 | Field capture canary | **not done** | deploy |
 
 ### Deployed planes on `demo` (`manifest-quasar-479416-s7`), queried 2026-08-25
 
 | Plane | State |
 |---|---|
-| App Hosting | `build-2026-08-23-004`, **unchanged by the push**. ABIU reads Enabled but **automatic rollouts do not work** (confirmed by the owner; the last automatic one succeeded 2026-08-05 and the 2026-08-08 attempt failed). Every deploy is manual CLI. The demo app still serves pre-migration code, and pushing to `main` never changes that. |
+| App Hosting | **`build-2026-08-26-001` / `rollout-2026-08-26-000`, both SUCCEEDED.** Serving the new build, verified by probing `/manifest.webmanifest`, `/offline` and `/sw.js`, none of which exist in the old build. Automatic rollouts from GitHub do not work on this backend: deploys are `apphosting:rollouts:create`. |
+| Firestore Rules | **deployed 2026-08-26** to database `fg256`, with indexes |
+| Storage Rules | **re-released 2026-08-26**, unchanged |
 | Cloud Functions | 7 live: `convergeLifecycle`, `onOfficialResultFinalized`, `onResultSubmissionWritten`, 4 search indexers |
-| `onMatchReportWritten` | **not deployed**. Field capture is not live |
+| `onMatchReportWritten` | **still not deployed.** A field report can now be captured and attested through the live app, and nothing will finalize it: reports sit at `submitted`. Deploying this Function is the next deployment step. |
 | `reconcilePaymentIntents` | not deployed, and must stay that way for this milestone |
 
 ---
@@ -220,6 +223,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | Wrong rules file | `firebase.json` points at `firestore.rules.next` (1188 lines), not `firestore.rules` (302). Editing the wrong one deploys nothing and fails nothing. |
 | Guard budgets are shrink-only | `access:guard` fails when a budget is too high **or** too low. Lower it in the same commit as the fix. |
 | Stale `functions/lib` | `verify:bundle` reads emitted output. After changing the tsconfig include/exclude, `rm -rf functions/lib` before rebuilding. |
+| Half-migrated capability checks | The Rules helper was widened to accept both capability spellings and the SERVER check was not, so Rules would have said yes and the route would have said no. Deploying the app before rebuilding projections would have refused every League Admin. `acceptedSpellings()` in `src/server/access/capabilities.ts` is the shim; delete it once `access:sunset-invariants` reports zero. |
 | Evidence that resets itself | The first evidence generator overwrote its file on every run, so checking readiness erased what had been proven and then correctly reported nothing was proven. It now merges. Use `--reset` deliberately if you want a blank one. |
 
 ---
@@ -277,7 +281,8 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-25 | `a84ad65` | W2: league report loader, third source complete |
 | 2026-08-25 | `aba00ee` | W14: evidence generator; merged to main and pushed |
 | 2026-08-25 | `1e46b9d` | Recorded that the push deployed nothing |
-| 2026-08-25 | | W17: canary verifier, proven against the emulator |
+| 2026-08-25 | `9e8346c` | W17: canary verifier, proven against the emulator |
+| 2026-08-26 | `de4af7c` | Capability spelling shim; Rules + indexes + Storage + App Hosting deployed to demo |
 
 **Next action:** supply credentials, then run step 1.
 
