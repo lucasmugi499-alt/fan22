@@ -2,6 +2,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { initializeMigrationFirestore } from '../lib/firestoreTarget';
+import { matchVerificationFor } from '../../src/lib/resultSubmission';
 
 /**
  * Move one stranded V1 claim from the bilateral workflow to league resolution.
@@ -86,6 +87,25 @@ export async function migrateWorkflow(db: Firestore, matchId: string, reason: st
       disputeReason: `Migrated from the bilateral workflow: ${reason}`,
       workflowMigratedFrom: verdict.from,
       workflowMigratedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    /**
+     * The public match record, moved with the claim.
+     *
+     * `matches.verificationStatus` is derived from the claim's status, and every other
+     * transition in the system carries it across: the overdue sweep does it, the dispute
+     * route does it. This did not, so a migrated claim left the match reading `pending` while
+     * the claim itself was `disputed` and sitting in a league's adjudication queue.
+     *
+     * That gap is invisible in exactly the way that matters. The claim moves, the league is
+     * asked to decide, and every reader of the fixture — the table, the club, the league's own
+     * queue — is still told the result is merely awaiting an opponent. Derived from
+     * `matchVerificationFor` rather than written as a literal, so this cannot be the one place
+     * that disagrees with the mapping.
+     */
+    transaction.update(db.collection('matches').doc(matchId), {
+      verificationStatus: matchVerificationFor('disputed'),
       updatedAt: FieldValue.serverTimestamp(),
     });
 

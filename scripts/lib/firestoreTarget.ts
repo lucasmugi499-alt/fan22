@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { readFileSync } from 'node:fs';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
@@ -58,12 +59,35 @@ export function resolveDatabaseId(argv: string[] = process.argv): string {
     ?? GOALPLACE_DATABASE_ID;
 }
 
+/**
+ * The project, including the one named inside the credential itself.
+ *
+ * The credential is the most reliable source and the least likely to be set: these scripts do
+ * not load `.env.local`, so the process usually has nothing but
+ * `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service account file. Without this the label
+ * printed beside every count reads `unknown/fg256`, and half of the target an operator is
+ * being asked to trust is missing from the evidence.
+ */
 export function resolveProjectId(argv: string[] = process.argv): string | undefined {
   return flagValue(argv, '--project')
     ?? process.env.GOALPLACE_FIREBASE_PROJECT_ID
     ?? process.env.FIREBASE_ADMIN_PROJECT_ID
     ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    ?? process.env.GOOGLE_CLOUD_PROJECT;
+    ?? process.env.GOOGLE_CLOUD_PROJECT
+    ?? projectIdFromCredential();
+}
+
+function projectIdFromCredential(): string | undefined {
+  try {
+    const inline = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    if (inline) return JSON.parse(inline).project_id;
+    const path = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (path) return JSON.parse(readFileSync(path, 'utf8')).project_id;
+  } catch {
+    // A credential this cannot parse is the connection's problem, not the label's. Say
+    // `unknown` and let the connection fail with its own message.
+  }
+  return undefined;
 }
 
 /**
