@@ -15,13 +15,13 @@ against the real Demo environment and prove it.** Do not redesign anything.
    Every trap listed there was a real bug on this branch; five of them were found in the last
    session alone.
 2. `docs/RESULT_ENGINE_V2_MILESTONE.md` — the deploy runbook.
-3. `docs/evidence/operations-model-v2-e4c36f1.json` — what has actually been proven. Anything
+3. `docs/evidence/operations-model-v2-c119d68.json` — what has actually been proven. Anything
    marked `not_run` has not been.
 
 ## Where things stand
 
 The migration itself is **done and green against the real Demo database**
-(`manifest-quasar-479416-s7`, database `fg256`), as of 2026-08-26 at `e4c36f1` on `main`,
+(`manifest-quasar-479416-s7`, database `fg256`), as of 2026-08-26 at `c119d68` on `main`,
 pushed:
 
 - V1 drain: 18 stranded claims found, all 18 migrated one at a time, drain now reads **0** on
@@ -31,8 +31,9 @@ pushed:
 - `access:sunset-invariants`: **exit 0** against stored documents.
 - The `acceptedSpellings()` compatibility shim: **deleted**, server and Rules together.
 - `npm run deploy:ready`: exit 0. 1423 unit, 155 rules, 26 integration.
-- Deployed: App Hosting `build-2026-08-26-003` (confirmed serving), Firestore Rules, and the
-  Cloud Functions `onMatchReportWritten` and `convergeLifecycle`.
+- Deployed: App Hosting `build-2026-08-26-004`, Firestore Rules, and the Cloud Functions
+  `onMatchReportWritten` and `convergeLifecycle`. The live origin reports both its build id
+  and `teamAuthorityStage: retired`, so the stage is read back, not inferred.
 
 All three gates were re-run after the deploys and still exit 0.
 

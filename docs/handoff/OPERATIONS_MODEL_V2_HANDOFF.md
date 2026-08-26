@@ -4,7 +4,7 @@
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
 **Last updated:** 2026-08-26
-**Head:** `e4c36f1`, on `main`, pushed.
+**Head:** `c119d68`, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -52,7 +52,7 @@ one scheduled function that must be fixed before it is wired.
 
 All three gates were re-run **after** the deploys and still exit 0.
 
-Evidence: `docs/evidence/operations-model-v2-e4c36f1.json`. Every count above is in it.
+Evidence: `docs/evidence/operations-model-v2-c119d68.json`. Every count above is in it.
 
 ### What the 18 migrations did
 
@@ -82,7 +82,7 @@ match_kmbl_09_01   _09_02  _09_04      match_nucbl_09_01  _09_02  _09_04
 
 | Plane | State |
 |---|---|
-| App Hosting | **`build-2026-08-26-003`, SUCCEEDED 18:24:37Z**, rolled out from `main` at `e4c36f1`. The live origin reports `environmentVersion: fan22-build-2026-08-26-003`, so this is confirmed serving and not merely built. Rollouts are `apphosting:rollouts:create --git-branch main`; automatic rollouts from GitHub do not work on this backend. |
+| App Hosting | **`build-2026-08-26-004`**, rolled out from `main` at `c119d68`. The live origin reports `environmentVersion: fan22-build-2026-08-26-004` **and `teamAuthorityStage: retired`**, so both the build and the stage are read back rather than inferred. Rollouts are `apphosting:rollouts:create --git-branch main`; automatic rollouts from GitHub do not work on this backend. |
 | Firestore Rules | **released 2026-08-26** to `fg256`, with indexes. `hasLeagueOperatorCapability` narrowed to canonical spellings only. |
 | Storage Rules | unchanged since the 2026-08-26 release; not re-released this session |
 | Cloud Functions | **8 live.** `onMatchReportWritten` and `convergeLifecycle` both updated 2026-08-26. |
@@ -203,11 +203,20 @@ Wire it and deploy it as its **own** release, after the canary. Not bundled with
 
 ### 4.3 Smaller things
 
-- `apphosting.demo.yaml`, `apphosting.beta.yaml` and `apphosting.production.yaml` were not
-  touched. Only `apphosting.yaml` carries `GOALPLACE_TEAM_AUTHORITY_STAGE=retired`. Check
-  which file each environment actually reads before promoting anything beyond demo.
+- **`apphosting.beta.yaml` and `apphosting.production.yaml` do not declare
+  `GOALPLACE_TEAM_AUTHORITY_STAGE`,** so both would run at the `frozen` default. That is the
+  correct state for environments that have not drained, and it must be a decision rather than
+  an oversight when either is promoted. `apphosting.demo.yaml` was in the same position and
+  was fixed: it is now declared in both demo files, and
+  `scripts/lib/deploymentPlanes.test.ts` fails if they disagree.
 - Storage rules were not re-released this session. They are unchanged, so this is
   bookkeeping, not a gap.
+- Six of the eight deployed Functions still carry an older environment generation; only
+  `onMatchReportWritten` and `convergeLifecycle` were redeployed. Neither builds projections
+  nor finalizes, so this is drift rather than a defect — but a full `--only functions` deploy
+  would align them.
+- Firestore reports one index present in the project that is not in `firestore.indexes.json`.
+  Pre-existing, not touched, and removing it needs `--force`.
 
 ---
 
@@ -259,6 +268,7 @@ this session.
 | **Migration left the match record behind** | `matches.verificationStatus` is derived from the claim's status and every other transition carries it across. The straggler migration moved the claim to `disputed` and left the match reading `pending` — so the league was asked to adjudicate while every club, every table and the league's own queue was still told the result was merely awaiting an opponent. Found by inspecting the 18 real claims before migrating any of them, not by a test. |
 | **The coverage gate could never pass** | `findLegacyCoverageGaps` asks whether the canonical model grants an operator anything. At `retired` every team bundle grants nothing, so all 60 legacy team assignments became permanent gaps and `--strict` failed by construction. The league loop above it already carried this exact reasoning and excluded team scope; the team loop did not. Worse than noisy: the report sent the operator to `backfill-assignments.ts`, which would have created canonical team assignments granting nothing — new issuance during a sunset, to close a hole that is the point of the sunset. |
 | **The staleness sweep would raise false cases** | See section 4.2. It would call four matches under active league adjudication "never reported". |
+| **The App Hosting overlay silently omitted the stage** | `apphosting.yaml` is the base and `apphosting.<environment>.yaml` overrides it when a backend is built with an environment name — and which file a backend reads is not visible from the CLI. `apphosting.demo.yaml` had no `GOALPLACE_TEAM_AUTHORITY_STAGE` at all, so "it is set in `apphosting.yaml`" was not a statement about what the runtime received. Both now declare it, the guard test requires agreement, and `/api/environment` reports the stage so it can be read back instead of reasoned about. |
 
 ---
 
@@ -328,6 +338,8 @@ this session.
 | 2026-08-26 | `df3bf83` | **Team authority retired**, on both runtimes that build projections |
 | 2026-08-26 | `725321a` | Coverage gate made stage-aware; it could not otherwise pass |
 | 2026-08-26 | `e4c36f1` | **Spelling shim deleted**, server and Rules together. Pushed |
+| 2026-08-26 | `85db6d6` | Handoff, pickup prompt, runbook and evidence recorded |
+| 2026-08-26 | `c119d68` | `/api/environment` reports the authority stage; demo overlay declares it. **The overlay had been missing it entirely** |
 
 ### This session, in order
 

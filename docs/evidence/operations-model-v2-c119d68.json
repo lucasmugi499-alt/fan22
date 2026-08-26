@@ -1,8 +1,8 @@
 {
   "milestone": "operations_model_v2",
-  "generatedAt": "2026-08-26T18:34:06.812Z",
+  "generatedAt": "2026-08-26T18:45:47.078Z",
   "commit": {
-    "sha": "e4c36f1f3feddb47a47944d2dd2d2ce18f0fa400",
+    "sha": "c119d68ab37da8928ae0f444e23fc5236817f152",
     "branch": "main",
     "pushed": true
   },
@@ -78,11 +78,13 @@
     "legacyTeamCapabilitiesRemaining": 0,
     "sunsetInvariants": "passed",
     "spellingShimRemoved": "passed",
-    "spellingShimEvidence": "All 1123 stored indexes scanned: zero scopes whose authority depended on a superseded spelling. acceptedSpellings() and SUPERSEDED_CAPABILITY_EQUIVALENTS deleted from src/server/access/capabilities.ts; the three deprecated names removed from hasLeagueOperatorCapability in firestore.rules.next in the same commit. Guard test src/server/access/spellingSunset.test.ts fails if either returns."
+    "spellingShimEvidence": "All 1123 stored indexes scanned: zero scopes whose authority depended on a superseded spelling. acceptedSpellings() and SUPERSEDED_CAPABILITY_EQUIVALENTS deleted from src/server/access/capabilities.ts; the three deprecated names removed from hasLeagueOperatorCapability in firestore.rules.next in the same commit. Guard test src/server/access/spellingSunset.test.ts fails if either returns.",
+    "teamAuthorityStageVerified": "retired, confirmed on BOTH runtimes. App Hosting: read back live from /api/environment. Cloud Functions: set in functions/.env.manifest-quasar-479416-s7 and deployed to convergeLifecycle; not independently read back, because gcloud has no credentialed account here. Declared in apphosting.yaml AND apphosting.demo.yaml, which was missing it entirely until c119d68; scripts/lib/deploymentPlanes.test.ts now fails if they disagree.",
+    "gatesRerunAfterAllDeploys": "passed: drain, projection gate and sunset invariants all exit 0"
   },
   "deployment": {
     "appHosting": {
-      "revision": "build-2026-08-26-003, SUCCEEDED 2026-08-26T18:24:37Z, rolled out from main at e4c36f1. Live origin reports environmentVersion fan22-build-2026-08-26-003.",
+      "revision": "build-2026-08-26-004, rolled out from main at c119d68. Live origin reports environmentVersion fan22-build-2026-08-26-004 AND teamAuthorityStage=retired, so the App Hosting runtime's stage is now read back rather than inferred from a config file. build-2026-08-26-003 (e4c36f1) preceded it.",
       "status": "passed"
     },
     "firestoreRules": {
