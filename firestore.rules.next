@@ -107,14 +107,19 @@ service cloud.firestore {
      * legitimately does from a console.
      */
     /**
-     * Both the current League capability names and the ones they replaced.
+     * The current League capability names. One spelling each.
      *
-     * ADR-003 renamed `league.team.create` to `league.team.manage` and deprecated
-     * `league.team_admin.invite` and `league.roster.verify`. Stored accessIndex documents
-     * still carry the old names until their projections are rebuilt, so listing only the new
-     * ones would lock every league operator out between the deploy and the rebuild. The
-     * deprecated entries can be dropped once no projection carries them; until then, holding
-     * either spelling means the same thing.
+     * This list also carried `league.team.create`, `league.team_admin.invite` and
+     * `league.roster.verify` — the names ADR-003 replaced — because changing the catalogue
+     * does not rewrite already-materialized projections, and listing only the new names would
+     * have locked every league operator out between the deploy and the rebuild.
+     *
+     * The rebuild happened on 2026-08-26. All 1123 stored projections were rebuilt,
+     * `access:migrate:gate` reports zero drift, and a scan found no scope whose authority
+     * depended on a superseded name. The server-side equivalence map in
+     * `src/server/access/capabilities.ts` was deleted in the same change, which is the point:
+     * Rules and the server were widened together and have to narrow together. Widening one
+     * and not the other is the half-migration that made Rules say yes while the route said no.
      */
     function hasLeagueOperatorCapability(leagueId) {
       return hasScopeCapability('league', leagueId, [
@@ -129,9 +134,6 @@ service cloud.firestore {
           'league.result.resolve',
           'league.match.takeover',
           'league.notice.publish',
-          'league.team.create',
-          'league.team_admin.invite',
-          'league.roster.verify',
         ]);
     }
 

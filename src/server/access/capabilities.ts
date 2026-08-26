@@ -22,49 +22,6 @@ export type CapabilityScope = {
   scopeId: string;
 };
 
-/**
- * Capabilities that a superseded name still satisfies, until projections are rebuilt.
- *
- * ADR-003 renamed and split the League capabilities. Changing the catalogue does not rewrite
- * already-materialized projections, so between the deploy and the rebuild every stored league
- * index carries only the old names. Without this map, a League Admin would be refused athlete
- * creation, claim verification, evidence review, field-manager assignment and post-match entry
- * on the day the new application shipped, and nothing about the deploy would have suggested it.
- *
- * The Rules helper was widened for precisely this reason and the server check was not, which is
- * the kind of half-migration that looks complete because one of the two enforcement points was
- * remembered.
- *
- * Every mapping is a genuine equivalence rather than a convenience. Each superseded capability
- * was held by the same bundle and covered the same domain, so this restores the status quo for
- * existing operators rather than granting anybody something they did not have:
- *
- *   team.manage          was team.create
- *   roster.manage        was roster.verify
- *   athlete.manage       was roster.verify, which is what verifying a roster meant
- *   fixture.manage       was implicit in season.manage
- *   result.enter         a league that could resolve a result could set one
- *   match.takeover       the same adjudication authority
- *   field_manager.manage running the competition, which season.manage expressed
- *
- * This map is deleted once `access:sunset-invariants` reports zero stale projections. It is
- * migration scaffolding, and leaving it in place would quietly make two spellings permanent.
- */
-const SUPERSEDED_CAPABILITY_EQUIVALENTS: Partial<Record<PermissionCapability, PermissionCapability[]>> = {
-  'league.team.manage': ['league.team.create'],
-  'league.roster.manage': ['league.roster.verify'],
-  'league.athlete.manage': ['league.roster.verify'],
-  'league.fixture.manage': ['league.season.manage'],
-  'league.result.enter': ['league.result.resolve'],
-  'league.match.takeover': ['league.result.resolve'],
-  'league.field_manager.manage': ['league.season.manage'],
-};
-
-/** The capability asked for, plus any superseded spelling that still satisfies it. */
-export function acceptedSpellings(capability: PermissionCapability): PermissionCapability[] {
-  return [capability, ...(SUPERSEDED_CAPABILITY_EQUIVALENTS[capability] ?? [])];
-}
-
 export function indexGrantsCapability(
   data: FirebaseFirestore.DocumentData | undefined,
   capability: PermissionCapability,
@@ -76,8 +33,24 @@ export function indexGrantsCapability(
   if (!isAccessIndexLive(data, now)) return false;
   const capabilities = data?.capabilities;
   if (!Array.isArray(capabilities)) return false;
-  // Either spelling, while stored projections still carry the pre-ADR-003 names.
-  return acceptedSpellings(capability).some((accepted) => capabilities.includes(accepted));
+  /**
+   * One spelling. The canonical one.
+   *
+   * A `SUPERSEDED_CAPABILITY_EQUIVALENTS` map used to sit above this, letting a stored
+   * pre-ADR-003 name satisfy the capability that replaced it. That was migration scaffolding
+   * with a stated deletion condition, and the condition is met: the demo projections were
+   * rebuilt on 2026-08-26, `access:migrate:gate` reports zero drift, and a scan of all 1123
+   * stored indexes found zero scopes whose authority depended on the old spelling.
+   *
+   * It is deleted rather than left in place because a compatibility alias with no expiry
+   * becomes the authorization language. Two spellings for one permission make capability
+   * audits, revocation, Rules comparison and search permanently non-deterministic, and the
+   * cost is paid by everyone who ever has to ask "who can do this" afterwards.
+   *
+   * Historical audit records keep their own words. This removes an authorization alias, not a
+   * string from history: an `AuditEvent` that says `league.team.create` still says it.
+   */
+  return capabilities.includes(capability);
 }
 
 /** Canonical check: does the projection for this scope grant the capability? */

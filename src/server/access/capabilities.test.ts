@@ -172,7 +172,7 @@ describe('authorizeCapability', () => {
   });
 });
 
-describe('superseded capability spellings, during the migration window', () => {
+describe('capability spellings after the rebuild', () => {
   function index(capabilities: string[]) {
     return {
       capabilities,
@@ -185,10 +185,17 @@ describe('superseded capability spellings, during the migration window', () => {
   }
 
   /**
-   * The failure this prevents: changing the capability catalogue does not rewrite stored
-   * projections, so between the deploy and the rebuild every league index carries only the old
-   * names. Without this, a League Admin loses most of their surface on the day the new
-   * application ships, and nothing about the deploy suggests it will happen.
+   * What replaced the migration shim.
+   *
+   * `SUPERSEDED_CAPABILITY_EQUIVALENTS` let a stored pre-ADR-003 name satisfy the capability
+   * that replaced it, so League Admins kept working between the deploy and the projection
+   * rebuild. It was scaffolding with a stated deletion condition, that condition was met on
+   * 2026-08-26, and it is gone.
+   *
+   * These tests are the inverse of the ones they replace. The old spellings must now be
+   * refused, because a compatibility alias with no expiry becomes the authorization language:
+   * two names for one permission make audits, revocation and Rules comparison permanently
+   * non-deterministic.
    */
   it.each([
     ['league.team.manage', 'league.team.create'],
@@ -198,18 +205,15 @@ describe('superseded capability spellings, during the migration window', () => {
     ['league.result.enter', 'league.result.resolve'],
     ['league.match.takeover', 'league.result.resolve'],
     ['league.field_manager.manage', 'league.season.manage'],
-  ] as const)('satisfies %s from a stored %s', (asked, stored) => {
-    expect(indexGrantsCapability(index([stored]), asked)).toBe(true);
+  ] as const)('no longer satisfies %s from a stored %s', (asked, stored) => {
+    expect(indexGrantsCapability(index([stored]), asked)).toBe(false);
   });
 
-  it('still satisfies the new spelling once projections are rebuilt', () => {
+  it('satisfies a capability from its own canonical spelling', () => {
     expect(indexGrantsCapability(index(['league.athlete.manage']), 'league.athlete.manage')).toBe(true);
+    expect(indexGrantsCapability(index(['league.team.manage']), 'league.team.manage')).toBe(true);
   });
 
-  /**
-   * The map is an equivalence, not a widening. Nobody gains authority they did not hold: each
-   * superseded capability was in the same bundle and covered the same domain.
-   */
   it('does not let an unrelated capability satisfy a league one', () => {
     expect(indexGrantsCapability(index(['league.notice.publish']), 'league.athlete.manage')).toBe(false);
     expect(indexGrantsCapability(index(['team.roster.manage']), 'league.roster.manage')).toBe(false);
@@ -217,14 +221,13 @@ describe('superseded capability spellings, during the migration window', () => {
   });
 
   it('never resurrects a retired team capability', () => {
-    // Nothing maps INTO the team namespace. The sunset is not undone by the migration shim.
     expect(indexGrantsCapability(index(['league.roster.manage']), 'team.roster.manage')).toBe(false);
   });
 
   it('still refuses everything once the projection has expired', () => {
-    // Expiry outranks spelling: a lapsed projection grants nothing under either name.
+    // Expiry outranks everything: a lapsed projection grants nothing under any name.
     expect(indexGrantsCapability(
-      { ...index(['league.roster.verify']), expiresAtMillis: 1 },
+      { ...index(['league.athlete.manage']), expiresAtMillis: 1 },
       'league.athlete.manage',
       new Date('2026-08-25T00:00:00.000Z'),
     )).toBe(false);
