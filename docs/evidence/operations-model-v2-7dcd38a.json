@@ -1,8 +1,8 @@
 {
   "milestone": "operations_model_v2",
-  "generatedAt": "2026-08-26T18:45:47.078Z",
+  "generatedAt": "2026-08-26T18:49:24.374Z",
   "commit": {
-    "sha": "c119d68ab37da8928ae0f444e23fc5236817f152",
+    "sha": "7dcd38aeafabd6e457ff3b5b2dec75c6dc931257",
     "branch": "main",
     "pushed": true
   },
@@ -129,5 +129,6 @@
     "reconcileResultSubmissions is not deployed, matching its pre-existing state. reconcilePaymentIntents and lockFantasyLineups deliberately not deployed.",
     "League post-match entry (GOALPLACE_LEAGUE_ENTRY_MODE=off) has never been cloud-verified. It was governed by the shared finalizer flag until 2026-08-26 and is now explicitly off, awaiting its own readiness.",
     "Production untouched."
-  ]
+  ],
+  "carriedFrom": "c119d68"
 }

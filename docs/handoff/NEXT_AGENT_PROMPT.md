@@ -15,14 +15,14 @@ against the real Demo environment and prove it.** Do not redesign anything.
    Every trap listed there was a real bug on this branch; five of them were found in the last
    session alone.
 2. `docs/RESULT_ENGINE_V2_MILESTONE.md` — the deploy runbook.
-3. `docs/evidence/operations-model-v2-c119d68.json` — what has actually been proven. Anything
-   marked `not_run` has not been.
+3. The newest `docs/evidence/operations-model-v2-*.json` — what has actually been proven.
+   Anything marked `not_run` has not been. It carries forward across commits and records
+   `carriedFrom`, so the newest file is the live record even after unrelated commits.
 
 ## Where things stand
 
 The migration itself is **done and green against the real Demo database**
-(`manifest-quasar-479416-s7`, database `fg256`), as of 2026-08-26 at `c119d68` on `main`,
-pushed:
+(`manifest-quasar-479416-s7`, database `fg256`), as of 2026-08-26 on `main`, pushed:
 
 - V1 drain: 18 stranded claims found, all 18 migrated one at a time, drain now reads **0** on
   both blocking counts.
@@ -111,6 +111,44 @@ or `abandoned`, so "called off" cannot currently be expressed. Fix eligibility i
 `isUnreportedAndStale` first. Its job is to detect and surface; it must never finalize
 anything or guess a score. Its own release, after the canary, not bundled with it.
 
+## Gaps you are inheriting
+
+None of these blocks the canary. They are named because each one is a place where a
+plausible-looking state is not a verified one, and you should not rediscover them the hard way.
+
+**One claim in the handoff rests on a deploy log, not a reading.** The deployed Cloud
+Functions' environment variables were never read back: `gcloud` has no credentialed account on
+this machine and the Firebase CLI cannot show function env. So there is no direct confirmation
+that the running `onMatchReportWritten` holds `GOALPLACE_FIELD_CAPTURE_MODE=canary` or that
+`convergeLifecycle` holds `GOALPLACE_TEAM_AUTHORITY_STAGE=retired`.
+
+Two things close it, and you should do the second one first:
+
+- **Re-run `access:sunset-invariants` at the start of your session.** If `convergeLifecycle`
+  were still on `frozen`, it rebuilds team capabilities back in within the hour and the
+  invariants fail on their own. A green reading a day after the migration is the observation
+  that proves the Functions runtime got its stage. A red one means the deploy did not take.
+- The canary proves the field capture gate behaviourally. That is the real test regardless.
+
+The App Hosting half of the same question was closed, and the pattern is worth repeating:
+`/api/environment` reports `finalizerMode` and `teamAuthorityStage`, so that runtime is read
+back rather than inferred. A trivial callable returning the Functions runtime's own resolved
+activation would end the ambiguity there permanently, if it becomes worth it.
+
+**`apphosting.beta.yaml` and `apphosting.production.yaml` declare no
+`GOALPLACE_TEAM_AUTHORITY_STAGE`,** so both would run at the `frozen` default. That is correct
+for environments that have not drained — but it must be a *decision* when either is promoted,
+not the oversight it was on demo. `apphosting.demo.yaml` was missing it entirely while
+`apphosting.yaml` had it, and which of the two a backend actually reads is not visible from
+the CLI. Both demo files now declare it and `scripts/lib/deploymentPlanes.test.ts` fails if
+they disagree, absence included.
+
+**Smaller:** six of the eight deployed Functions carry an older environment generation (only
+`onMatchReportWritten` and `convergeLifecycle` were redeployed; neither of the six projects or
+finalizes, so it is drift, not a defect). Storage rules were not re-released and are
+unchanged. Firestore reports one index in the project that is not in
+`firestore.indexes.json`, pre-existing.
+
 ## Rules of engagement
 
 - Never conflate **implemented, tested, migrated, deployed, enabled, cloud-verified.** Say
@@ -131,4 +169,7 @@ anything or guess a score. Its own release, after the canary, not bundled with i
 - Relative imports only in anything under `src/kernel/**` or the shared server modules.
 - Rules live in `firestore.rules.next`, not `firestore.rules`.
 - Do not deploy `reconcilePaymentIntents` or `lockFantasyLineups`. Do not enable Production.
+- **Verify the plane, not the file you edited.** `apphosting.<environment>.yaml` overrides
+  `apphosting.yaml` and the CLI will not tell you which one a backend reads. When a variable
+  matters, make the runtime report it and read it back.
 - Update the handoff's session log before you finish.

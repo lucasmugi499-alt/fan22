@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -51,7 +51,40 @@ export type MigrationEvidence = {
     badReportException: EvidenceStatus;
   };
   exclusions: string[];
+  /**
+   * The commit this evidence was carried forward from, when it was not produced against this
+   * tree. Absent when the evidence and the commit are the same thing.
+   */
+  carriedFrom?: string;
 };
+
+/**
+ * The newest evidence file other than this commit's own.
+ *
+ * Ordered by file modification time rather than by name: the sha in the filename is not
+ * sortable into history, and reading each file to compare commit dates would mean trusting a
+ * field the file itself supplies. When this run is the first for a commit, whatever was most
+ * recently written is the state being inherited.
+ */
+export function mostRecentEvidence(dir: string, exclude: string): MigrationEvidence | null {
+  if (!existsSync(dir)) return null;
+  const candidates = readdirSync(dir)
+    .filter((name) => name.startsWith('operations-model-v2-') && name.endsWith('.json'))
+    .map((name) => path.join(dir, name))
+    .filter((full) => full !== exclude)
+    .map((full) => ({ full, at: statSync(full).mtimeMs }))
+    .sort((a, b) => b.at - a.at);
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(readFileSync(candidate.full, 'utf8')) as MigrationEvidence;
+    } catch {
+      // A corrupt file is not a reason to lose the rest of the history.
+      continue;
+    }
+  }
+  return null;
+}
 
 function git(command: string) {
   try {
@@ -153,18 +186,48 @@ function main() {
    * that a claim without evidence is not a claim: it would quietly return every field to
    * `not_run` and make the checker look correct while erasing its own inputs.
    */
-  const existing = existsSync(file) && !process.argv.includes('--reset')
+  const reset = process.argv.includes('--reset');
+  const sameCommit = existsSync(file) && !reset
     ? (JSON.parse(readFileSync(file, 'utf8')) as MigrationEvidence)
     : null;
 
-  const evidence: MigrationEvidence = existing
-    ? { ...existing, generatedAt: fresh.generatedAt, commit: fresh.commit }
+  /**
+   * Evidence also carries forward ACROSS commits, not just across re-runs of one.
+   *
+   * The file is named for the commit, which is right — evidence is a claim about a specific
+   * tree. But the merge above only found a file with the identical sha, so the first commit
+   * after a gate was run produced a blank template and printed `Ready to push: NO` with every
+   * gate listed as blocking. Nothing had regressed. The migration had been proven hours
+   * earlier and a documentation commit erased the record of it.
+   *
+   * That is the same failure the merge was added to fix, one level up: the checker destroying
+   * its own inputs and then correctly reporting that nothing is proven. Carrying forward keeps
+   * the claim attached to the commit that inherited it, and `carriedFrom` says where it came
+   * from — so a reader can see that a gate was proven on an earlier tree and judge for
+   * themselves whether the commits since could have invalidated it.
+   *
+   * `--reset` still gives a blank one deliberately.
+   */
+  const previous = sameCommit ?? (reset ? null : mostRecentEvidence(dir, file));
+
+  const evidence: MigrationEvidence = previous
+    ? {
+      ...previous,
+      generatedAt: fresh.generatedAt,
+      commit: fresh.commit,
+      ...(sameCommit ? {} : { carriedFrom: previous.commit.sha.slice(0, 7) }),
+    }
     : fresh;
 
   writeFileSync(file, `${JSON.stringify(evidence, null, 2)}\n`);
 
   const { ready, blocking } = readyToPush(evidence);
-  console.log(`${existing ? 'Evidence updated at' : 'Evidence template written to'} ${path.relative(process.cwd(), file)}`);
+  const origin = sameCommit
+    ? 'Evidence updated at'
+    : previous
+      ? `Evidence carried forward from ${previous.commit.sha.slice(0, 7)} to`
+      : 'Evidence template written to';
+  console.log(`${origin} ${path.relative(process.cwd(), file)}`);
   console.log(`Commit ${evidence.commit.sha.slice(0, 7)} on ${evidence.commit.branch}, pushed: ${evidence.commit.pushed}`);
   console.log(`\nReady to push: ${ready ? 'YES' : 'NO'}`);
   if (!ready) {

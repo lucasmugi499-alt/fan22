@@ -4,7 +4,7 @@
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
 **Last updated:** 2026-08-26
-**Head:** `c119d68`, on `main`, pushed.
+**Head:** `7dcd38a`+, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -52,7 +52,8 @@ one scheduled function that must be fixed before it is wired.
 
 All three gates were re-run **after** the deploys and still exit 0.
 
-Evidence: `docs/evidence/operations-model-v2-c119d68.json`. Every count above is in it.
+Evidence: the newest `docs/evidence/operations-model-v2-*.json`. It carries forward across
+commits and records `carriedFrom`, so the newest file is always the live record. Every count above is in it.
 
 ### What the 18 migrations did
 
@@ -104,9 +105,9 @@ right now, which is why nothing can finalize by accident and also why the canary
 outstanding.
 
 > **Not independently read back.** The deployed function's environment variables were not
-> queried. `gcloud` has no credentialed account on this machine and the Firebase CLI cannot
-> show function env. The deploy log records that `functions/.env.manifest-quasar-479416-s7`
-> was loaded and the update succeeded. **Behavioural proof waits on the canary.**
+> queried — see §4.4 for what that does and does not leave open. The deploy log records that
+> `functions/.env.manifest-quasar-479416-s7` was loaded and the update succeeded.
+> **Behavioural proof waits on the canary.**
 
 ---
 
@@ -134,6 +135,21 @@ Firebase CLI, which is separately logged in as `lucasmugi499@gmail.com`.
 ---
 
 ## 4. What is left
+
+At a glance. Three categories, and they are not the same kind of thing: one blocks the
+milestone, one is housekeeping somebody has to decide about, and one is a claim nobody on this
+machine can check.
+
+| | Item | Status |
+|---|---|---|
+| **Blocks the milestone** | Field capture canary, replay, bad canary | **not run** — §4.1 |
+| **Blocks the milestone** | `sweepUnreportedMatches` | written, never wired, **and wrong as written** — §4.2 |
+| Decide before promoting | `apphosting.beta.yaml` / `apphosting.production.yaml` declare no authority stage | §4.3 |
+| Housekeeping | 6 of 8 Functions on an older env generation; Storage rules not re-released; one untracked Firestore index | §4.3 |
+| **Cannot be checked here** | The deployed Functions' environment variables | §4.4 |
+
+Nothing in the migration itself is outstanding. Steps 1 to 7 all ran, all gates exit 0, and
+all three were re-run after every deploy.
 
 ### 4.1 The field capture canary — the main outstanding item
 
@@ -218,6 +234,34 @@ Wire it and deploy it as its **own** release, after the canary. Not bundled with
 - Firestore reports one index present in the project that is not in `firestore.indexes.json`.
   Pre-existing, not touched, and removing it needs `--force`.
 
+### 4.4 What could not be verified from this machine
+
+One claim in this document rests on a deploy log rather than on a reading, and it is named
+here rather than left as a footnote, because the difference between those two is the entire
+discipline this migration runs on.
+
+**The deployed Cloud Functions' environment variables were never read back.** `gcloud` has no
+credentialed account here and the Firebase CLI cannot show function env, so there is no way to
+confirm from this machine that the running `onMatchReportWritten` actually holds
+`GOALPLACE_FIELD_CAPTURE_MODE=canary`, or that `convergeLifecycle` actually holds
+`GOALPLACE_TEAM_AUTHORITY_STAGE=retired`. What is known is that the deploy log records
+`functions/.env.manifest-quasar-479416-s7` being loaded and the update succeeding.
+
+The App Hosting half of the same question **was** closed, and the way it was closed is the
+pattern to repeat: `/api/environment` now reports `finalizerMode` and `teamAuthorityStage`, so
+that runtime's state is read back rather than inferred from a config file. Do the same for
+Functions if it becomes worth it — a trivial callable that returns its own resolved
+activation would end the ambiguity permanently.
+
+Until then:
+
+- The Functions field capture gate is proven by the **canary**, behaviourally. That is the
+  real test and it is outstanding anyway.
+- The Functions authority stage is proven by `access:sunset-invariants` **staying** green over
+  time. If `convergeLifecycle` were still on `frozen`, it would rebuild team capabilities back
+  in within the hour and the invariants would start failing on their own. **Re-run them at the
+  start of the next session.** A green reading a day later is the observation that closes this.
+
 ---
 
 ## 5. The gate split, and why
@@ -262,6 +306,7 @@ this session.
 | Guard budgets are shrink-only | `access:guard` fails when a budget is too high **or** too low. |
 | Stale `functions/lib` | `verify:bundle` reads emitted output. `rm -rf functions/lib` before rebuilding after a tsconfig change. |
 | Evidence that resets itself | The first generator overwrote its file on every run. It now merges. `--reset` is deliberate. |
+| **Evidence that resets itself, again** | The merge only looked for a file with the identical commit sha, so the first commit *after* a gate ran produced a blank template and printed `Ready to push: NO` with every gate blocking. Nothing had regressed — the migration had been proven hours earlier and a documentation commit erased the record of it. Evidence now carries forward from the most recent file and records `carriedFrom`, so a reader can see which tree a gate was actually proven against. |
 | **One switch, three sources** | See section 5. A global flag armed an unproven pipeline. |
 | **`getFirestore()` with no database id** | The drain, the straggler migration, the sunset invariants and the field capture canary all asked for `(default)`. **No GoalPlace project has a `(default)` database.** Here that fails loudly with `5 NOT_FOUND`; anywhere with an empty `(default)` every count reads zero and the drain prints `Safe to retire: YES`. A gate that passes by measuring nothing. Now resolved through `scripts/lib/firestoreTarget.ts`, and every script prints `project/database` beside its counts. |
 | **The stage must be set on every runtime that projects** | `projectScopeIndex` reads `GOALPLACE_TEAM_AUTHORITY_STAGE` at the moment a projection is **built**, and two runtimes build them: the Next server on any assignment change, `convergeLifecycle` hourly. Rebuilding to `retired` while either still read `frozen` would have written team capabilities back one user at a time. `access:sunset-invariants` would have passed on the day and failed a week later with nothing having changed. Guarded by `scripts/lib/deploymentPlanes.test.ts`. |

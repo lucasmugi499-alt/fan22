@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { emptyEvidence, readyToPush } from './migration-evidence';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { emptyEvidence, mostRecentEvidence, readyToPush } from './migration-evidence';
 
 describe('migration evidence', () => {
   /**
@@ -90,5 +93,64 @@ describe('migration evidence', () => {
 
     expect(rechecked.local.unitTests).toEqual({ status: 'passed', count: 1380 });
     expect(rechecked.migration.sunsetInvariants).toBe('passed');
+  });
+});
+
+/**
+ * Evidence survives the next commit.
+ *
+ * The file is named for the commit, which is right — evidence is a claim about a specific
+ * tree. But the merge only ever looked for a file with the identical sha, so the first commit
+ * after a gate was run produced a blank template and printed `Ready to push: NO` with every
+ * gate blocking. Nothing had regressed: the migration had been proven hours earlier and a
+ * documentation commit erased the record of it.
+ *
+ * That is the same failure the merge was added to fix, one level up — the checker destroying
+ * its own inputs and then correctly reporting that nothing is proven.
+ */
+describe('evidence carried across commits', () => {
+  function scratch() {
+    return mkdtempSync(path.join(tmpdir(), 'goalplace-evidence-'));
+  }
+
+  function write(dir: string, name: string, evidence: unknown) {
+    const full = path.join(dir, name);
+    writeFileSync(full, JSON.stringify(evidence));
+    return full;
+  }
+
+  it('finds the most recent evidence when this commit has none', () => {
+    const dir = scratch();
+    const proven = emptyEvidence('demo');
+    proven.migration.sunsetInvariants = 'passed';
+    proven.commit.sha = 'aaaaaaaaaaaa';
+    write(dir, 'operations-model-v2-aaaaaaa.json', proven);
+
+    const found = mostRecentEvidence(dir, path.join(dir, 'operations-model-v2-bbbbbbb.json'));
+
+    expect(found?.migration.sunsetInvariants).toBe('passed');
+  });
+
+  it('never carries a file forward onto itself', () => {
+    // The exclusion is what stops a re-run reading its own half-written output as history.
+    const dir = scratch();
+    const self = write(dir, 'operations-model-v2-aaaaaaa.json', emptyEvidence('demo'));
+
+    expect(mostRecentEvidence(dir, self)).toBeNull();
+  });
+
+  it('skips a corrupt file rather than losing the whole history', () => {
+    const dir = scratch();
+    const proven = emptyEvidence('demo');
+    proven.migration.sunsetInvariants = 'passed';
+    write(dir, 'operations-model-v2-aaaaaaa.json', proven);
+    writeFileSync(path.join(dir, 'operations-model-v2-bbbbbbb.json'), '{ not json');
+
+    expect(mostRecentEvidence(dir, path.join(dir, 'operations-model-v2-ccccccc.json'))
+      ?.migration.sunsetInvariants).toBe('passed');
+  });
+
+  it('returns null when there is genuinely nothing to inherit', () => {
+    expect(mostRecentEvidence(scratch(), 'nothing.json')).toBeNull();
   });
 });
