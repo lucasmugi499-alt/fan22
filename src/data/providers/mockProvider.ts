@@ -32,7 +32,6 @@ import {
   rosters,
   seasons,
   sponsorReports,
-  standings,
   teamAssignments,
   verifications,
 } from '../mockDatabase';
@@ -657,9 +656,6 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getResultSubmissionEvents(matchId) {
     return resultSubmissionEvents.filter((event) => event.submissionId === matchId);
-  },
-  async getStoredStandings() {
-    return standings;
   },
   async getSponsorReports() {
     return sponsorReports;

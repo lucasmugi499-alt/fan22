@@ -4,6 +4,7 @@ import type { GoalPlaceDataProvider } from '@/data/providers/types';
 
 function providerWithCalls() {
   const empty = vi.fn().mockResolvedValue([]);
+  const getStoredStandings = vi.fn().mockResolvedValue([]);
   const provider = {
     mode: 'firebase',
     getAthletes: vi.fn().mockResolvedValue([]),
@@ -30,7 +31,7 @@ function providerWithCalls() {
     getCommentsByPost: empty,
     getNotificationsByUser: empty,
     getRosters: empty,
-    getStoredStandings: empty,
+    getStoredStandings,
     getSponsorReports: empty,
     getSponsorCampaigns: empty,
     getLeagueNotices: empty,
@@ -64,6 +65,15 @@ describe('loadGoalPlaceData', () => {
     expect(provider.getReports).not.toHaveBeenCalled();
     expect(provider.getVerifications).not.toHaveBeenCalled();
     expect(provider.getUsers).not.toHaveBeenCalled();
+  });
+
+  it('does not read the obsolete stored standings projection', async () => {
+    const provider = providerWithCalls();
+
+    await loadGoalPlaceData(provider, { role: 'fan' });
+
+    expect((provider as GoalPlaceDataProvider & { getStoredStandings: ReturnType<typeof vi.fn> })
+      .getStoredStandings).not.toHaveBeenCalled();
   });
 
   it('requests platform-only collections for platform admin data loads', async () => {

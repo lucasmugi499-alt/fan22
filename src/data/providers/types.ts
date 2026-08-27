@@ -26,7 +26,6 @@ import {
   Sponsor,
   SponsorCampaign,
   SponsorReport,
-  StoredStanding,
   SupportNeed,
   Team,
   TeamAssignment,
@@ -252,7 +251,6 @@ export interface GoalPlaceDataProvider {
   getAccessIndexByUser(userId: string): Promise<AccessIndexRecord[]>;
   getRosters(options?: DataQueryOptions): Promise<Roster[]>;
   getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
-  getStoredStandings(): Promise<StoredStanding[]>;
   getSponsorReports(): Promise<SponsorReport[]>;
   getSponsorCampaigns(): Promise<SponsorCampaign[]>;
   getLeagueNotices(options?: DataQueryOptions): Promise<LeagueNotice[]>;

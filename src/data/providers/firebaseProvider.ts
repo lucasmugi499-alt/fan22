@@ -59,7 +59,6 @@ import {
   Roster,
   SponsorReport,
   SponsorCampaign,
-  StoredStanding,
   SupportNeed,
   Team,
   TeamAssignment,
@@ -434,11 +433,6 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     };
     if (!response.ok) throw new Error(body.error ?? 'Result provenance is unavailable.');
     return body.events ?? [];
-  },
-  async getStoredStandings() {
-    return isFirebaseConfigured
-      ? readCollection<StoredStanding>('standings')
-      : mockProvider.getStoredStandings();
   },
   async getSponsorReports() {
     return isFirebaseConfigured

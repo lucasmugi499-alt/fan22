@@ -22,7 +22,6 @@ import {
   SponsorReport,
   SponsorCampaign,
   Sponsor,
-  StoredStanding,
   SupportNeed,
   Team,
   TeamAssignment,
@@ -163,7 +162,6 @@ const initialData = {
   seasons: [] as Season[],
   verifications: [] as Verification[],
   rosters: [] as Roster[],
-  storedStandings: [] as StoredStanding[],
   sponsorReports: [] as SponsorReport[],
   sponsorCampaigns: [] as SponsorCampaign[],
   leagueNotices: [] as LeagueNotice[],
@@ -226,7 +224,6 @@ export async function loadGoalPlaceData(
     reports,
     verifications,
     rosters,
-    storedStandings,
     sponsorReports,
     sponsorCampaigns,
     leagueNotices,
@@ -254,9 +251,6 @@ export async function loadGoalPlaceData(
       ? provider.getVerifications()
       : Promise.resolve([] as Verification[]),
     shouldLoad('rosters') ? provider.getRosters({ ...scope, limit: recordLimit }) : Promise.resolve([] as Roster[]),
-    shouldLoad('storedStandings')
-      ? provider.getStoredStandings()
-      : Promise.resolve([] as StoredStanding[]),
     shouldLoad('sponsorReports')
       ? provider.getSponsorReports()
       : Promise.resolve([] as SponsorReport[]),
@@ -298,7 +292,6 @@ export async function loadGoalPlaceData(
     reports,
     verifications: verifications.map(adaptVerification),
     rosters,
-    storedStandings,
     sponsorReports,
     sponsorCampaigns,
     leagueNotices,
@@ -537,7 +530,6 @@ export function useGoalPlaceData({
       reports: items.reports,
       verifications: items.verifications,
       rosters: items.rosters,
-      storedStandings: items.storedStandings,
       sponsorReports: items.sponsorReports,
       sponsorCampaigns: items.sponsorCampaigns,
       leagueNotices: items.leagueNotices,
