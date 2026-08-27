@@ -13,6 +13,8 @@
  * match with no result.
  */
 
+import { isCapturePolicy } from '../../lib/capturePolicy';
+
 export const ESCALATION_DEADLINE_DAYS = 7;
 
 /**
@@ -62,13 +64,23 @@ export function escalationState(input: {
 /** Fixtures past kickoff with no report at all, which is how standings quietly go wrong. */
 export function isUnreportedAndStale(input: {
   scheduledAt: string;
+  status: string;
+  verificationStatus: string;
   hasReport: boolean;
+  hasResultSubmission: boolean;
+  hasOfficialResult: boolean;
   effectiveCapturePolicy?: string;
+  capturePolicyBoundAt?: string;
   now: Date;
 }) {
-  if (input.hasReport) return false;
+  if (!input.capturePolicyBoundAt) return false;
+  if (!isCapturePolicy(input.effectiveCapturePolicy)) return false;
+  const policyBoundAt = Date.parse(input.capturePolicyBoundAt);
   const kickoff = Date.parse(input.scheduledAt);
-  if (Number.isNaN(kickoff)) return false;
+  if (Number.isNaN(policyBoundAt) || Number.isNaN(kickoff) || policyBoundAt > kickoff) return false;
+  if (input.status !== 'scheduled' && input.status !== 'completed') return false;
+  if (input.verificationStatus !== 'pending') return false;
+  if (input.hasReport || input.hasResultSubmission || input.hasOfficialResult) return false;
   const days = Math.floor((input.now.getTime() - kickoff) / 86_400_000);
   const threshold = input.effectiveCapturePolicy === 'FIELD_REQUIRED'
     ? STALENESS_DAYS.fieldRequired

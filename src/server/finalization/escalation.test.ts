@@ -38,27 +38,137 @@ describe('escalation liveness', () => {
 });
 
 describe('a match nobody reports', () => {
+  it('does not call a match unreported while it is still live', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'live',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      capturePolicyBoundAt: daysAgo(30),
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not reopen a match already in league adjudication', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'completed',
+      verificationStatus: 'disputed',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      capturePolicyBoundAt: daysAgo(30),
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not call a match unreported when a bilateral submission exists', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'scheduled',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: true,
+      hasOfficialResult: false,
+      effectiveCapturePolicy: 'POST_MATCH_ALLOWED',
+      capturePolicyBoundAt: daysAgo(30),
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not open a missing-report case over an existing official result', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'completed',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: true,
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      capturePolicyBoundAt: daysAgo(30),
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not retroactively impose a reporting obligation on legacy fixtures', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'scheduled',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not treat an invalid policy binding as proof of governance', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'scheduled',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      capturePolicyBoundAt: 'not-a-date',
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('does not let a policy bound after kickoff create a retroactive obligation', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'scheduled',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      capturePolicyBoundAt: daysAgo(2),
+      effectiveCapturePolicy: 'FIELD_REQUIRED',
+      now: NOW,
+    })).toBe(false);
+  });
+
+  it('requires the policy itself as well as its binding timestamp', () => {
+    expect(isUnreportedAndStale({
+      scheduledAt: daysAgo(8),
+      status: 'scheduled',
+      verificationStatus: 'pending',
+      hasReport: false,
+      hasResultSubmission: false,
+      hasOfficialResult: false,
+      capturePolicyBoundAt: daysAgo(30),
+      now: NOW,
+    })).toBe(false);
+  });
+
   it('raises sooner where field capture was required', () => {
     // Somebody was assigned and did not report, which is a question worth asking the same week.
     expect(isUnreportedAndStale({
-      scheduledAt: daysAgo(4), hasReport: false, effectiveCapturePolicy: 'FIELD_REQUIRED', now: NOW,
+      scheduledAt: daysAgo(4), status: 'scheduled', verificationStatus: 'pending', hasReport: false, hasResultSubmission: false, hasOfficialResult: false, effectiveCapturePolicy: 'FIELD_REQUIRED', capturePolicyBoundAt: daysAgo(30), now: NOW,
     })).toBe(true);
     expect(isUnreportedAndStale({
-      scheduledAt: daysAgo(4), hasReport: false, effectiveCapturePolicy: 'POST_MATCH_ALLOWED', now: NOW,
+      scheduledAt: daysAgo(4), status: 'scheduled', verificationStatus: 'pending', hasReport: false, hasResultSubmission: false, hasOfficialResult: false, effectiveCapturePolicy: 'POST_MATCH_ALLOWED', capturePolicyBoundAt: daysAgo(30), now: NOW,
     })).toBe(false);
   });
 
   it('raises later where entering results at the weekend is ordinary', () => {
     expect(isUnreportedAndStale({
-      scheduledAt: daysAgo(8), hasReport: false, effectiveCapturePolicy: 'POST_MATCH_ALLOWED', now: NOW,
+      scheduledAt: daysAgo(8), status: 'scheduled', verificationStatus: 'pending', hasReport: false, hasResultSubmission: false, hasOfficialResult: false, effectiveCapturePolicy: 'POST_MATCH_ALLOWED', capturePolicyBoundAt: daysAgo(30), now: NOW,
     })).toBe(true);
   });
 
   it('never raises for a match that was reported', () => {
-    expect(isUnreportedAndStale({ scheduledAt: daysAgo(90), hasReport: true, now: NOW })).toBe(false);
+    expect(isUnreportedAndStale({ scheduledAt: daysAgo(90), status: 'scheduled', verificationStatus: 'pending', hasReport: true, hasResultSubmission: false, hasOfficialResult: false, capturePolicyBoundAt: daysAgo(100), now: NOW })).toBe(false);
   });
 
   it('never raises for a fixture that has not been played', () => {
-    expect(isUnreportedAndStale({ scheduledAt: daysAgo(-3), hasReport: false, now: NOW })).toBe(false);
+    expect(isUnreportedAndStale({ scheduledAt: daysAgo(-3), status: 'scheduled', verificationStatus: 'pending', hasReport: false, hasResultSubmission: false, hasOfficialResult: false, capturePolicyBoundAt: daysAgo(30), now: NOW })).toBe(false);
   });
 });

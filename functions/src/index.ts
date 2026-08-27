@@ -1,7 +1,7 @@
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
-import { gateMatchReport } from './matchReports';
+import { gateMatchReport, sweepUnreportedMatches as runUnreportedMatchSweep } from './matchReports';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -296,6 +296,24 @@ export const reconcileResultSubmissions = onSchedule(
       retried: retried.length,
     });
   }
+);
+
+/**
+ * Hourly visibility for governed fixtures whose reporting grace period elapsed.
+ *
+ * This opens an operational case only. It never changes the match lifecycle, supplies a
+ * score, or invokes any finalizer. The runner re-checks every controlling record inside the
+ * transaction so a report arriving during the scan wins over the sweep.
+ */
+export const sweepUnreportedMatches = onSchedule(
+  {
+    schedule: 'every 60 minutes',
+    region: REGION,
+    timeoutSeconds: 300,
+  },
+  async () => {
+    await runUnreportedMatchSweep(db);
+  },
 );
 
 /**
