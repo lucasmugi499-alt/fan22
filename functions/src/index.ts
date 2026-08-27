@@ -1,7 +1,7 @@
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
-import { gateMatchReport, sweepUnreportedMatches as runUnreportedMatchSweep } from './matchReports';
+import { gateMatchReport } from './matchReports';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -19,6 +19,7 @@ import { currentActivationFor, currentFinalizerActivation } from './finalizerMod
 import { activationSourceForReport } from '../../src/server/finalizerActivation';
 import { expireLapsedAssignments, runProjectionRepairs } from './lifecycle';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
+import { sweepUnreportedMatches as runUnreportedMatchSweep } from '../../src/server/finalization/unreportedSweep';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -312,7 +313,7 @@ export const sweepUnreportedMatches = onSchedule(
     timeoutSeconds: 300,
   },
   async () => {
-    await runUnreportedMatchSweep(db);
+    logger.info('Unreported match sweep complete', await runUnreportedMatchSweep(db));
   },
 );
 

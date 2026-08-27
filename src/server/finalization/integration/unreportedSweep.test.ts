@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { sweepUnreportedMatches } from '../../../../functions/src/matchReports';
+import { sweepUnreportedMatches } from '../unreportedSweep';
 import { clearFirestore, integrationDb, shutdown } from './harness';
 
 const NOW = new Date('2026-08-26T18:00:00.000Z');

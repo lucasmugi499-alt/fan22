@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { sweepUnreportedMatches } from '../../functions/src/matchReports';
+import { sweepUnreportedMatches } from '../../src/server/finalization/unreportedSweep';
 import { initializeMigrationFirestore } from '../lib/firestoreTarget';
 
 function numericFlag(argv: string[], name: string, fallback: number) {
