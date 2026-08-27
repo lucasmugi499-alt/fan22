@@ -165,7 +165,7 @@ invitations, and every V1 submission stay readable. **Retire authority, preserve
 
 Demo completion: clean `match_eurdl_18_03` and contradictory `match_eurdl_18_04` were proven
 on 2026-08-26. `onMatchReportWritten` now reads `enabled` with an empty canary allowlist.
-App Hosting `build-2026-08-27-001` is live. The three migration gates remain green.
+App Hosting `build-2026-08-27-002` is live. The three migration gates remain green.
 
 > **One switch per source since 2026-08-26.** `GOALPLACE_FINALIZER_MODE` governs the
 > bilateral V1 path only. Field capture and league post-match entry have their own gates and
@@ -201,9 +201,11 @@ only one deterministic `result_never_reported` operational exception. It never f
 infers a score.
 
 Demo proof on `canary_unreported_20260826`: the first deployed delivery opened one exception
-with zero official records; a duplicate delivery kept the exception at one. Before the canary,
-the full dry-run scanned 578 past-cutoff matches and found zero eligible. The scheduled function
-is ACTIVE in `us-central1`.
+with zero official records; a duplicate delivery and an invocation of the actual Firebase-created
+Cloud Scheduler job both kept the exception at one. Before the canary, the full dry-run scanned
+578 past-cutoff matches and found zero eligible. The scheduled function is ACTIVE in
+`us-central1`; Scheduler recorded the successful manual dispatch at
+`2026-08-27T00:50:53.291470Z`.
 
 The finalization ledger makes a re-run safe: a redelivered trigger finds the key already
 present and skips, which the integration suite asserts.

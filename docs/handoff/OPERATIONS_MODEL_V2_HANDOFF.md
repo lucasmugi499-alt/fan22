@@ -3,8 +3,8 @@
 **Purpose.** If the agent working on this stops mid-migration, another one picks it up from
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
-**Last updated:** 2026-08-26
-**Head:** `68376f5`+, on `main`, pushed.
+**Last updated:** 2026-08-27
+**Head:** `5a9e121`+, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -50,12 +50,12 @@ cloud-verified afterwards without writing sporting truth.
 | `access:migrate:gate` | **exit 0** |
 | `access:sunset-invariants` | **exit 0**, against stored documents |
 | `acceptedSpellings()` shim | **deleted**, server and Rules together |
-| `npm run deploy:ready` | **exit 0.** 1440 unit, 155 rules, 29 integration |
+| `npm run deploy:ready` | **exit 0.** 1444 unit, 155 rules, 29 integration |
 | Field capture clean canary | `match_eurdl_18_03`: **one** result version, **3** canonical events, **2** evidence-supported athlete projections; the derived standings builder counts its canonical match document once |
 | Field capture replay | contemporaneously observed: versions +0, events +0, athlete stats +0, audit side effects +0. Standings have no write path, so no standings delta is claimed |
 | Field capture bad canary | `match_eurdl_18_04`: attested 2-1, reconstructed 3-1; **0** official records, **1** deterministic blocking exception; replay stayed at one |
 | Unreported sweep, before canary | **578** past-cutoff matches scanned, **0** eligible, **0** would open |
-| Unreported sweep canary | `canary_unreported_20260826`: first deployed delivery opened **1** deterministic case and wrote **0** official records; replay stayed at one |
+| Unreported sweep canary | `canary_unreported_20260826`: first deployed delivery opened **1** deterministic case and wrote **0** official records; direct replay and an actual Cloud Scheduler dispatch both stayed at one |
 
 All three migration gates and `release:canary` were re-run **after** the final enabled-mode
 Functions deploy and still pass.
@@ -87,14 +87,14 @@ match_kmbl_09_01   _09_02  _09_04      match_nucbl_09_01  _09_02  _09_04
 
 ---
 
-## 2. Deployed planes on demo, verified through 2026-08-26
+## 2. Deployed planes on demo, verified through 2026-08-27
 
 | Plane | State |
 |---|---|
-| App Hosting | **`build-2026-08-27-001`**, rolled out from exact commit `68376f5`. The live origin reports `environmentVersion: fan22-build-2026-08-27-001` **and `teamAuthorityStage: retired`**, so both the build and the stage are read back rather than inferred. It removes the dead stored-standings read and contains the typed clock adapter. Rollouts are `apphosting:rollouts:create`; automatic rollouts from GitHub do not work on this backend. |
+| App Hosting | **`build-2026-08-27-002`**, rolled out from exact commit `5a9e121`. The live origin reports `environmentVersion: fan22-build-2026-08-27-002` **and `teamAuthorityStage: retired`**, so both the build and the stage are read back rather than inferred. It removes the dead stored-standings read, contains the typed clock adapter, and emits the versioned 2.1.0 event provenance payload from its trusted finalization routes. Rollouts are `apphosting:rollouts:create`; automatic rollouts from GitHub do not work on this backend. |
 | Firestore Rules | **released 2026-08-26** to `fg256`, with indexes. `hasLeagueOperatorCapability` narrowed to canonical spellings only. |
 | Storage Rules | unchanged since the 2026-08-26 release; not re-released this session |
-| Cloud Functions | **9 live.** `sweepUnreportedMatches` is the ninth and was released separately. `onMatchReportWritten` and the sweep are ACTIVE on source hash `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI reads their deployed environment directly. |
+| Cloud Functions | **9 live.** `sweepUnreportedMatches` is the ninth and was released separately. `onMatchReportWritten` is ACTIVE on source hash `aa616e99290e892836730957ea5131c2333a31bd`; the separately deployed sweep remains ACTIVE on `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI reads their deployed environment directly. The legacy V1 trigger was not redeployed. |
 | `reconcileResultSubmissions` | **not deployed**, matching its pre-existing state |
 | `reconcilePaymentIntents`, `lockFantasyLineups` | not deployed, and must stay that way |
 
@@ -243,6 +243,10 @@ Live Demo proof, in order:
    finalizations, official events, athlete stats, provenance or reconciliation.
 5. Second deployed invocation kept the exception at exactly one. The follow-up dry-run read
    eligible 1, already-open 1, would-open 0, opened 0.
+6. Invoked the Firebase-created Cloud Scheduler job itself through the Scheduler API. The
+   request returned 200, `lastAttemptTime` advanced to `2026-08-27T00:50:53.291470Z` with no
+   error status, and post-dispatch verification still found one exception and zero official
+   records. This proves Scheduler delivery, not only the deployed HTTP handler.
 
 Commands: `release:unreported-sweep` (dry-run unless `--apply`) and
 `release:unreported-canary -- --prepare|--verify`.
@@ -338,7 +342,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | **The clock route and clock kernel spoke different action vocabularies** | The route validated `{ action: "start" }` and passed that object directly to a kernel that dispatches on `{ type: "start" }`. The real Field Manager workflow reached it and returned 409 while route validation and clock unit tests both looked green in isolation. The route now adapts the validated API shape explicitly, with a route-level regression test. |
 | **`as never` erased the clock seam** | Even after the runtime bug was fixed, the adapter cast its result to `never`, so TypeScript could not stop the same discriminator mismatch returning. The route now performs an exhaustive, typed `ClockRequest` → `ClockAction` translation. |
 | **Clearing a clock anchor wrote `undefined` to Firestore** | Half time correctly cleared `periodStartedAt` in the state machine, but the route spread the resulting `undefined` into the Firestore transaction. The fake route database accepted it; the live Demo database rejected the first half-time transition. Optional clock fields are now omitted at the persistence boundary, with a route-level regression test. |
-| **Canonical events claimed every source was a result submission** | Shared event builders hardcoded `payload.source=result_submission_*`, including for field reports with zero `resultSubmissions`. New events carry the candidate's exact `sourceType`; reconciliation construction is separately named by `derivation`. Historical immutable events keep their old payload. |
+| **Canonical events claimed every source was a result submission** | Shared event builders hardcoded `payload.source=result_submission_*`, including for field reports with zero `resultSubmissions`. The corrected emitter uses event schema 2.1.0: `payload.sourceType` carries exact ingress provenance and `derivation` separately names reconciliation construction. Historical 1.0.0/2.0.0 events remain immutable. App Hosting build 002 and the redeployed field/league trigger emit 2.1.0; the untouched legacy V1 trigger retains its prior bundle and semantics. |
 | **A stale standings collection looked authoritative** | Nothing writes the stored `standings` documents and no component renders them, but every general data load fetched them. Current tables derive from verified matches. The provider/read path is removed and stored documents are preserved as history. |
 | **Functions environment was declared unreadable when it was not** | `firebase functions:list --json` exposes deployed environment variables. The final release reads the field/V1/league gates, empty canary list and authority stage directly instead of relying on deploy logs. |
 
@@ -372,7 +376,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | Command | Purpose |
 |---|---|
 | `env -u GOALPLACE_TEAM_AUTHORITY_STAGE npm run deploy:ready` | All 12 local gates; the suite exercises the unset/frozen default |
-| `npm test` | 1440 unit tests |
+| `npm test` | 1444 unit tests |
 | `npm run test:rules` | 155 rules tests, needs emulator |
 | `npm run test:integration` | 29 Firestore integration tests |
 | `npm run access:v1-drain` | The migration gate. Now prints the stranded ids and their age |
@@ -420,6 +424,7 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-26 | `faf2d00` | Official event payloads now carry exact ingress `sourceType`; clock API-to-kernel translation is exhaustively typed |
 | 2026-08-26 | `e09e362` | Dead stored-standings provider/read path removed; historical documents preserved; field canary allowlist cleared |
 | 2026-08-26 | `68376f5` | Sweep core deepened into the shared server module, all 1440/155/29 tests green, four commits pushed; sweep and `onMatchReportWritten` deployed separately; sweep clean/replay proven; App Hosting build 2026-08-27-001 live |
+| 2026-08-27 | `5a9e121` | Final two-axis review closed: Cloud Scheduler delivery observed directly; event payload shape published and enforced as schema 2.1.0; `onMatchReportWritten` and App Hosting redeployed from exact commit; V1 trigger untouched; all 1444/155/29 readiness tests and live gates green |
 
 ### Field capture canary session, in order
 
@@ -449,10 +454,14 @@ idempotent → initial live dry-run scanned 578 past-cutoff matches with zero el
 four implementation commits → `deploy:ready` passed with 1440 unit / 155 Rules / 29 integration
 → deployed only `sweepUnreportedMatches` → created one controlled governed fixture → deployed
 handler opened exactly one exception and no sporting truth → duplicate delivery stayed at one
-→ separately deployed only `onMatchReportWritten` to clear the ignored canary residue and put
-accurate event source semantics live → Functions env read back directly → App Hosting exact
-commit rollout completed as build 2026-08-27-001 and live origin read back → all three migration
-gates plus both release verifiers remained green.
+→ separately deployed only `onMatchReportWritten` to clear the ignored canary residue →
+Functions env read back directly → App Hosting exact-commit rollout completed as build
+2026-08-27-001 and live origin read back → final review identified the missing Scheduler-delivery
+observation and unversioned payload shape → invoked the real Cloud Scheduler job and observed a
+successful attempt with cardinality still one → published/enforced event schema 2.1.0 test-first
+→ pushed exact commit `5a9e121` → redeployed only `onMatchReportWritten` plus the affected App
+Hosting routes as build 2026-08-27-002; V1 trigger untouched → all three migration gates plus
+both release verifiers remained green.
 
 **Next action:** none for the Operations Model V2 Demo migration. Promotion to Beta or
 Production remains a separate decision: set the authority stage deliberately for that

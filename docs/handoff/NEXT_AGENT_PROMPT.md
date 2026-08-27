@@ -26,16 +26,18 @@ Target: `manifest-quasar-479416-s7`, named database `fg256`, 2026-08-26.
 - Field capture is `enabled` with an empty canary allowlist. Clean, replay, contradictory and
   contradictory-replay paths are cloud-verified. V1 remains enabled; league post-match entry
   remains off.
-- App Hosting `build-2026-08-27-001` is live and `/api/environment` reports both its build id
+- App Hosting `build-2026-08-27-002` is live and `/api/environment` reports both its build id
   and `teamAuthorityStage=retired`.
-- Nine Cloud Functions are live. `onMatchReportWritten` and `sweepUnreportedMatches` are ACTIVE
-  on source hash `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI directly reads their deployed
+- Nine Cloud Functions are live. `onMatchReportWritten` is ACTIVE on source hash
+  `aa616e99290e892836730957ea5131c2333a31bd`; `sweepUnreportedMatches` is ACTIVE on
+  `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI directly reads their deployed
   field/V1/league gates, empty field canary list and retired authority stage.
 - The separately released missing-report sweep is cloud-verified. Its pre-canary dry-run
   scanned 578 past-cutoff fixtures and found zero eligible. Controlled fixture
   `canary_unreported_20260826` produced exactly one `result_never_reported` operational case,
-  zero official records and no score; deployed replay kept the exception at one.
-- `deploy:ready` passed with 1440 unit, 155 Rules and 29 Firestore integration tests.
+  zero official records and no score; deployed replay and an actual Cloud Scheduler dispatch
+  both kept the exception at one.
+- `deploy:ready` passed with 1444 unit, 155 Rules and 29 Firestore integration tests.
 
 ## Proof boundaries
 
@@ -46,8 +48,10 @@ Target: `manifest-quasar-479416-s7`, named database `fg256`, 2026-08-26.
   but cannot recreate the historical before/after instant.
 - Standings are derived from verified match documents. There is no standings write or
   per-match standings ledger. The stale stored collection is preserved but no longer read.
-- Historical official events are immutable and keep old `payload.source=result_submission_*`
-  values. New events use accurate `sourceType` semantics.
+- Historical 1.0.0/2.0.0 official events are immutable and keep their old payloads. App Hosting
+  build 002 and the redeployed field/league trigger emit schema 2.1.0 with exact
+  `payload.sourceType` semantics. The legacy V1 trigger was deliberately not redeployed and
+  retains its prior bundle.
 - The bad field report opens `matchOperationalExceptions`, not downstream
   `reconciliationExceptions`, because ingress blocks candidate creation.
 

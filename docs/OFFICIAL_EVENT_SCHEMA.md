@@ -1,6 +1,8 @@
-# Official event schema: 1.0.0 and 2.0.0
+# Official event schema: 1.0.0, 2.0.0 and 2.1.0
 
-Status: 2.0.0 emitting as of Phase A0. Both versions are readable, forever.
+Status: 2.1.0 emits from App Hosting build `2026-08-27-002` and the redeployed
+`onMatchReportWritten` field/league plane. The deliberately untouched legacy V1 trigger retains
+its earlier bundle. All three versions are readable, forever.
 
 ## What changed
 
@@ -12,18 +14,27 @@ bearer token, has no Firebase Auth user, and never appears in `accessIndex`. An 
 event they produce has no uid to record.
 
 So the actor became a discriminated union (`src/kernel/principal.ts`), and the event schema
-was versioned rather than edited:
+was versioned rather than edited. A second shape change followed after the live field canary:
+shared builders had overloaded `payload.source` with values that falsely described every event
+as result-submission-derived. Schema 2.1.0 separates exact ingress provenance from derivation.
 
-| | 1.0.0 | 2.0.0 |
-|---|---|---|
-| Requires | `submittedByUserId` | `sourcePrincipal` |
-| Permits | | `submittedByUserId`, still written for user-produced events |
-| File | `official-event.schema.json` | `official-event.schema.2.0.0.json` |
+| | 1.0.0 | 2.0.0 | 2.1.0 |
+|---|---|---|---|
+| Required actor | `submittedByUserId` | `sourcePrincipal` | `sourcePrincipal` |
+| User id | required | permitted for user-produced events | permitted for user-produced events |
+| Payload provenance | historical/unconstrained | historical/unconstrained | required `sourceType`; overloaded `source` forbidden |
+| File | `official-event.schema.json` | `official-event.schema.2.0.0.json` | `official-event.schema.2.1.0.json` |
 
-The 1.0.0 file is unchanged and stays that way. Active rule records are immutable, and
-historical events are never rewritten to carry a `sourcePrincipal`. `principalFromEvent()`
+The 1.0.0 and 2.0.0 files are unchanged and stay that way. Active rule records are immutable,
+and historical events are never rewritten to carry a newer shape. `principalFromEvent()`
 interprets a 1.0.0 event as `{ principalType: 'user', userId }` at read time. There is no
 migration script, and none should ever be written.
+
+At 2.1.0, `payload.sourceType` is one of `field_capture`, `league_post_match`,
+`legacy_team_submission` or `platform_exception_resolution`. It answers which ingress record
+produced the candidate. When an event is constructed to reconcile an unattributed score,
+`payload.derivation: score_reconciliation` answers the separate question of how that event was
+derived. One field no longer pretends to answer both.
 
 ## Amendment to ADR-002
 
@@ -43,11 +54,12 @@ validates") had nothing to run against. And the instruction to move a field out 
 `required` reads as a behavioural change when it would in fact have changed nothing.
 
 **The amendment.** The schema files remain the published contract, addressed by `$id`, and
-2.0.0 is added as a new file rather than edited into the old one. Enforcement moves to
+2.0.0 and 2.1.0 are added as new files rather than edited into older ones. Enforcement moves to
 `validateOfficialEventShape()` in `src/kernel/validators/officialEventGuard.ts`, a
 hand-written, dependency-free guard that the finalizer calls on every event before it is
 written. `principal.test.ts` asserts that the guard's required-field lists and the schema
-files' `required` arrays agree, so the contract cannot drift away from what runs.
+files' `required` arrays agree, and that the 2.1.0 payload provenance contract is published,
+so the contract cannot drift away from what runs.
 
 **Why not add a JSON Schema runtime.** The kernel compiles into the Cloud Functions bundle
 via `../src/kernel/**/*.ts` in `functions/tsconfig.json`. That bundle declares exactly two
