@@ -8,7 +8,11 @@ import { resolveAthleteParticipation } from '../kernel/projections/participation
 import type { OfficialSportEvent } from '../kernel/types';
 // Relative, like every other import in this file: it compiles into the Cloud Functions
 // bundle, where a path alias survives into the emitted CommonJS and fails at require time.
-import { provenanceQuad, type Principal } from '../kernel/principal';
+import {
+  provenanceQuad,
+  type FinalizationSourceType,
+  type Principal,
+} from '../kernel/principal';
 import { athleteRegisteredPosition } from '../lib/athleteIdentity';
 import { validateOfficialEventShape } from '../kernel/validators/officialEventGuard';
 import { Athlete, AthleteStatLine, Match, ResultSubmission } from '../types';
@@ -98,6 +102,8 @@ export const BLOCKED_OVERSIZED = 'blocked_oversized_submission';
 type OfficialEventSource = {
   /** The record this result was built from. Becomes `sourceClaimId` on every event. */
   id: string;
+  /** Exact ingress provenance; never inferred from which event builder happened to run. */
+  sourceType: FinalizationSourceType;
   sourcePrincipal: Principal;
   /** Still written for a result a user produced. Absent for field capture. */
   submittedByUserId?: string;
@@ -433,7 +439,7 @@ function officialStatLineEvents({
           payload: {
             value: statKey === 'minutes_played' ? value : 1,
             statKey,
-            source: 'result_submission_stat_line',
+            sourceType: submission.sourceType,
           },
           sourceClaimId: submission.id,
           // The claim's author is the event's author. The caller (trigger, sweeper, route)
@@ -470,7 +476,7 @@ function officialStatLineEvents({
         payload: {
           value: 1,
           statKey: 'player_of_match',
-          source: 'result_submission_stat_line',
+          sourceType: submission.sourceType,
         },
         sourceClaimId: submission.id,
         // The claim's author is the event's author. The caller (trigger, sweeper, route)
@@ -543,7 +549,7 @@ function officialActiveSquadEvents({
       primaryAthleteId: entry.athleteId,
       payload: {
         value: 1,
-        source: 'result_submission_active_squad',
+        sourceType: submission.sourceType,
       },
       sourceClaimId: submission.id,
       // The claim's author is the event's author. The caller (trigger, sweeper, route)
@@ -652,7 +658,8 @@ function reconcileOfficialScore({
       primaryAthleteId: null,
       payload: {
         value: points,
-        source: 'score_reconciliation',
+        sourceType: submission.sourceType,
+        derivation: 'score_reconciliation',
         reason: 'Official score exceeds the points attributable to recorded events.',
       },
       sourceClaimId: submission.id,
@@ -737,7 +744,7 @@ function officialScorerEvents({
         primaryAthleteId: scorer.athleteId,
         payload: {
           value: sport === 'basketball' ? scorer.count : 1,
-          source: 'result_submission_scorer',
+          sourceType: submission.sourceType,
         },
         sourceClaimId: submission.id,
         // The claim's author is the event's author. The caller (trigger, sweeper, route)
@@ -966,6 +973,7 @@ export async function finalizeCandidate(
      */
     const eventSource: OfficialEventSource = {
       id: candidate.sourceRecordId,
+      sourceType: candidate.sourceType,
       sourcePrincipal: candidate.sourcePrincipal,
       submittedByUserId: candidate.submittedByUserId,
       submittedByTeamId: candidate.submittedByTeamId,

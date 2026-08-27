@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody } from '@/server/api/security';
 import { requireMatchOpsSession } from '@/server/matchOps/session';
 import { applyClockAction, gameClockMs, initialClockState } from '@/lib/matchOps/clock';
+import type { ClockAction } from '@/lib/matchOps/clock';
 import type { MatchClockState } from '@/types';
 
 export const runtime = 'nodejs';
@@ -21,6 +22,24 @@ const bodySchema = z.discriminatedUnion('action', [
     reason: z.string().trim().min(3).max(200),
   }),
 ]);
+
+type ClockRequest = z.infer<typeof bodySchema>;
+
+/** Translate the HTTP vocabulary to the state machine's vocabulary without erasing types. */
+function clockActionFromRequest(input: ClockRequest): ClockAction {
+  switch (input.action) {
+    case 'start':
+    case 'pause':
+    case 'resume':
+    case 'end_period':
+    case 'full_time':
+      return { type: input.action };
+    case 'start_period':
+      return { type: input.action, period: input.period };
+    case 'adjust':
+      return { type: input.action, deltaMs: input.deltaMs, reason: input.reason };
+  }
+}
 
 /**
  * The clock, moved one transition at a time under optimistic concurrency.
@@ -58,8 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
         throw new Error('This session has been replaced. Another device is running this match.');
       }
 
-      const { action, ...detail } = parsed.data;
-      const result = applyClockAction(current, { type: action, ...detail } as never, now);
+      const result = applyClockAction(current, clockActionFromRequest(parsed.data), now);
       if (!result.ok) throw new Error(result.reason);
       const persistedClock = Object.fromEntries(
         Object.entries(result.next).filter(([, value]) => value !== undefined),

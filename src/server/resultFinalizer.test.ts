@@ -149,7 +149,7 @@ describe('trusted result finalizer', () => {
       primaryAthleteId: 'athlete_1',
       payload: {
         value: 1,
-        source: 'result_submission_active_squad',
+        sourceType: 'legacy_team_submission',
       },
     });
     expect(records.get('officialSportEvents/match_1_v1_event_0002')).toMatchObject({
@@ -175,7 +175,7 @@ describe('trusted result finalizer', () => {
       evidenceRefs: ['matchEvidence/match_1/team_home/team_admin_1/photo.jpg'],
       payload: {
         value: 1,
-        source: 'result_submission_scorer',
+        sourceType: 'legacy_team_submission',
       },
     });
     expect(records.get('officialSportEvents/match_1_v1_event_0005')).toMatchObject({
@@ -190,7 +190,7 @@ describe('trusted result finalizer', () => {
       payload: {
         value: 66,
         statKey: 'minutes_played',
-        source: 'result_submission_stat_line',
+        sourceType: 'legacy_team_submission',
       },
     });
     expect(records.get('officialSportEvents/match_1_v1_event_0007')).toMatchObject({
@@ -338,7 +338,11 @@ describe('trusted result finalizer', () => {
       // null, not '': a team-only event has no athlete, and an empty string is an athlete id
       // that happens to be empty — it groups and joins like a real one downstream.
       primaryAthleteId: null,
-      payload: expect.objectContaining({ value: 17, source: 'score_reconciliation' }),
+      payload: expect.objectContaining({
+        value: 17,
+        sourceType: 'legacy_team_submission',
+        derivation: 'score_reconciliation',
+      }),
     });
   });
 

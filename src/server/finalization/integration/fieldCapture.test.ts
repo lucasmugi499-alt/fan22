@@ -146,6 +146,8 @@ describe('a clean field report becomes official with no human action', () => {
       matchSessionId: 'mos_1',
       fieldManagerAssignmentId: 'fma_1',
     });
+    expect(scorer?.payload).toMatchObject({ value: 1, sourceType: 'field_capture' });
+    expect(scorer?.payload).not.toHaveProperty('source');
     // A field capture event has no submitting user at all, which is the whole reason the
     // schema was versioned.
     expect(scorer?.submittedByUserId).toBeUndefined();

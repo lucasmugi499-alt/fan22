@@ -87,4 +87,22 @@ describe('match ops clock route', () => {
     expect(written).toMatchObject({ state: 'period_break', period: '1' });
     expect(written).not.toHaveProperty('periodStartedAt');
   });
+
+  it('preserves adjustment detail when translating the HTTP action', async () => {
+    const response = await POST(request({
+      action: 'adjust',
+      deltaMs: 30_000,
+      reason: 'Kickoff started late',
+    }), context);
+    const written = transactionSet.mock.calls[0]?.[1];
+
+    expect(response.status).toBe(200);
+    expect(written).toMatchObject({
+      accumulatedMs: 30_000,
+      adjustments: [expect.objectContaining({
+        deltaMs: 30_000,
+        reason: 'Kickoff started late',
+      })],
+    });
+  });
 });
