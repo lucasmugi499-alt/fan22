@@ -4,7 +4,7 @@
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
 **Last updated:** 2026-08-26
-**Head:** `b3c89ff`+, on `main`, pushed.
+**Head:** `68376f5`+, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
 
@@ -29,14 +29,14 @@ deploying.** State which plane, always.
 
 ---
 
-## 1. The migration and field capture canary are done
+## 1. The migration, field capture canary and staleness sweep are done
 
 Steps 1 to 8 all ran against the real Demo environment (`manifest-quasar-479416-s7`, database
 `fg256`) on 2026-08-26. The migration gates exit 0, the clean field capture canary finalized
 exactly once, both trigger replays were inert, and the contradictory canary produced exactly
 one blocking review exception with no official records. Field capture was then deployed in
-`enabled` mode on Demo. The separately-scoped staleness sweep remains unwired and must be
-fixed before its own release.
+`enabled` mode on Demo. The separately-scoped staleness sweep was corrected, released and
+cloud-verified afterwards without writing sporting truth.
 
 ### What ran, with its numbers
 
@@ -50,10 +50,12 @@ fixed before its own release.
 | `access:migrate:gate` | **exit 0** |
 | `access:sunset-invariants` | **exit 0**, against stored documents |
 | `acceptedSpellings()` shim | **deleted**, server and Rules together |
-| `npm run deploy:ready` | **exit 0.** 1430 unit, 155 rules, 26 integration |
-| Field capture clean canary | `match_eurdl_18_03`: **one** result version, **3** canonical events, **2** evidence-supported athlete projections, one standings application |
-| Field capture replay | versions +0, events +0, standings +0, athlete stats +0, audit side effects +0 |
+| `npm run deploy:ready` | **exit 0.** 1440 unit, 155 rules, 29 integration |
+| Field capture clean canary | `match_eurdl_18_03`: **one** result version, **3** canonical events, **2** evidence-supported athlete projections; the derived standings builder counts its canonical match document once |
+| Field capture replay | contemporaneously observed: versions +0, events +0, athlete stats +0, audit side effects +0. Standings have no write path, so no standings delta is claimed |
 | Field capture bad canary | `match_eurdl_18_04`: attested 2-1, reconstructed 3-1; **0** official records, **1** deterministic blocking exception; replay stayed at one |
+| Unreported sweep, before canary | **578** past-cutoff matches scanned, **0** eligible, **0** would open |
+| Unreported sweep canary | `canary_unreported_20260826`: first deployed delivery opened **1** deterministic case and wrote **0** official records; replay stayed at one |
 
 All three migration gates and `release:canary` were re-run **after** the final enabled-mode
 Functions deploy and still pass.
@@ -85,14 +87,14 @@ match_kmbl_09_01   _09_02  _09_04      match_nucbl_09_01  _09_02  _09_04
 
 ---
 
-## 2. Deployed planes on demo, verified 2026-08-26
+## 2. Deployed planes on demo, verified through 2026-08-26
 
 | Plane | State |
 |---|---|
-| App Hosting | **`build-2026-08-26-006`**, rolled out from `main` at `b3c89ff`. The live origin reports `environmentVersion: fan22-build-2026-08-26-006` **and `teamAuthorityStage: retired`**, so both the build and the stage are read back rather than inferred. It contains the two clock-route fixes discovered by the live canary. Rollouts are `apphosting:rollouts:create --git-branch main`; automatic rollouts from GitHub do not work on this backend. |
+| App Hosting | **`build-2026-08-27-001`**, rolled out from exact commit `68376f5`. The live origin reports `environmentVersion: fan22-build-2026-08-27-001` **and `teamAuthorityStage: retired`**, so both the build and the stage are read back rather than inferred. It removes the dead stored-standings read and contains the typed clock adapter. Rollouts are `apphosting:rollouts:create`; automatic rollouts from GitHub do not work on this backend. |
 | Firestore Rules | **released 2026-08-26** to `fg256`, with indexes. `hasLeagueOperatorCapability` narrowed to canonical spellings only. |
 | Storage Rules | unchanged since the 2026-08-26 release; not re-released this session |
-| Cloud Functions | **8 live.** `onMatchReportWritten` was targeted twice for the canary and is now deployed from the Demo env file with field capture `enabled`; `convergeLifecycle` was updated earlier with authority `retired`. |
+| Cloud Functions | **9 live.** `sweepUnreportedMatches` is the ninth and was released separately. `onMatchReportWritten` and the sweep are ACTIVE on source hash `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI reads their deployed environment directly. |
 | `reconcileResultSubmissions` | **not deployed**, matching its pre-existing state |
 | `reconcilePaymentIntents`, `lockFantasyLineups` | not deployed, and must stay that way |
 
@@ -109,8 +111,9 @@ The single `GOALPLACE_FINALIZER_MODE` was split on 2026-08-26. See section 5.
 The canary deployment allowlisted only `match_eurdl_18_03`. The contradictory fixture stopped
 at ingress before activation could matter, exactly as designed. Only after the clean proof,
 clean replay, contradiction and contradiction replay passed was the Demo value changed to
-`enabled` and `onMatchReportWritten` targeted again. The Functions env is still not
-independently readable from this machine; §4.4 states the remaining distinction precisely.
+`enabled` and `onMatchReportWritten` targeted again. The canary allowlist is now empty. A direct
+`firebase functions:list --json` reading shows field capture `enabled`, V1 `enabled`, league
+entry `off` and authority `retired` on both Functions deployed this session.
 
 ---
 
@@ -144,17 +147,16 @@ Firebase CLI, which is separately logged in as `lucasmugi499@gmail.com`.
 
 ## 4. What is left
 
-At a glance. The field capture canary no longer belongs in this list: it is complete. The
-remaining work is the separately-scoped staleness sweep, promotion decisions, housekeeping,
-and one Functions-runtime value that cannot be read back from this machine.
+At a glance. The migration and both Demo canaries are complete. What remains is promotion
+policy and non-blocking housekeeping.
 
 | | Item | Status |
 |---|---|---|
 | **Completed 2026-08-26** | Field capture canary, replay, bad canary and bad replay | **cloud-verified** — §4.1 |
-| **Blocks the milestone** | `sweepUnreportedMatches` | written, never wired, **and wrong as written** — §4.2 |
+| **Completed 2026-08-26** | `sweepUnreportedMatches` | corrected, deployed separately and cloud-verified — §4.2 |
 | Decide before promoting | `apphosting.beta.yaml` / `apphosting.production.yaml` declare no authority stage | §4.3 |
-| Housekeeping | 6 of 8 Functions on an older env generation; Storage rules not re-released; one untracked Firestore index | §4.3 |
-| **Cannot be checked here** | The deployed Functions' environment variables | §4.4 |
+| Housekeeping | 6 of 9 Functions on older generations; Storage rules not re-released; one untracked Firestore index | §4.3 |
+| **Closed 2026-08-26** | Functions runtime values | read back directly with the Firebase CLI — §4.4 |
 
 Nothing in the migration itself is outstanding. Steps 1 to 7 all ran, all gates exit 0, and
 all three were re-run after every deploy.
@@ -180,12 +182,15 @@ by this evidence. Persisted proof:
 - candidate `field_capture:match_eurdl_18_03:v1`, `source=field_capture`,
   `workflow=result_engine_v2`, with a `match_ops_session` source principal;
 - exactly one finalization ledger and `OfficialResultVersion`, three canonical goal events,
-  one public provenance record, one valid official reconciliation, and one standings result
-  application;
+  one public provenance record and one valid official reconciliation. There is no standings
+  write path: `buildLeagueStandings` derives the table from canonical match documents, and
+  this verified/completed 2-1 match is structurally included exactly once;
 - exactly two athlete projections, one for each scorer. No lineup-only athlete received a
   projection without event evidence;
-- forced trigger replay changed versions +0, events +0, standings +0, athlete stats +0,
+- forced trigger replay contemporaneously changed versions +0, events +0, athlete stats +0,
   provenance +0, reconciliation +0, exceptions +0, outbox +0 and audit side effects +0.
+  Present cardinalities remain consistent with that observation, but cannot reconstruct the
+  historical before/after instant. No standings-write delta is claimed because none exists.
 
 The contradictory fixture was then driven through the same real workflow with four goal
 events reconstructing 3-1 and an attested score of 2-1. Its report is `league_review` with
@@ -201,35 +206,46 @@ and the operational exception at exactly one with unchanged content.
 before and after the final Functions deploy. Only then was Demo field capture changed to
 `enabled` and only `onMatchReportWritten` deployed. V1 remained enabled and untouched.
 
-### 4.2 `sweepUnreportedMatches` — still not wired, and would be wrong if it were
+### 4.2 `sweepUnreportedMatches` — completed and proven
 
-It is written in `functions/src/matchReports.ts` and never exported from
-`functions/src/index.ts`, so the staleness sweep does not run and `result_never_reported` is
-never raised.
+The original implementation was not wired because it was unsafe: its first 200-row page
+would have opened five false cases, four over active league adjudication and one over a live
+match. A complete measurement later found **288** past scheduled/pending legacy fixtures with
+no source; retroactively imposing the new reporting obligation would have flooded the queue.
 
-**Do not simply wire it. It was modelled against the real demo data on 2026-08-26 and it is
-wrong.** Its only eligibility guard is `verificationStatus === 'verified'`. In the first page
-of 200 matches alone it would have opened **5 false cases**:
+The corrected domain rule is in `CONTEXT.md` and the pure predicate:
 
-- **4 matches in `disputed`** — including the very claims migrated in step 2 of this session.
-  They were reported. They are in league adjudication right now. Calling them "never
-  reported" is straightforwardly false, and it would bury the queue the case is meant to make
-  readable.
-- **1 match with `status: live`** — a fixture still in progress.
+- a postponed fixture remains `scheduled` at a revised future `scheduledAt`;
+- called-off or abandoned without a result is `cancelled`;
+- only a **governed fixture** with a valid capture policy bound no later than kickoff can be
+  classified as unreported, so pre-policy Demo history is not retroactively governed;
+- lifecycle must be `scheduled` or `completed`, verification must still be `pending`, the
+  grace period must have passed, and there must be no field report, bilateral submission or
+  official result;
+- disputed, verified, rejected, live and cancelled fixtures are ineligible.
 
-`MatchStatus` is `scheduled | live | completed | cancelled`. There is no `postponed` or
-`abandoned` in the vocabulary at all, so "the match was called off" cannot currently be
-expressed, and eligibility cannot be written correctly without deciding that first.
+The runner moved to `src/server/finalization/unreportedSweep.ts`, paginates the entire query,
+batches secondary reads only for governed possibilities, defaults to dry-run in the release
+script, caps writes per invocation, and transactionally re-reads the match, report, submission
+and deterministic exception before creating anything. It writes only
+`matchOperationalExceptions`; there is no finalizer call or score inference.
 
-Before wiring, `isUnreportedAndStale` in `src/server/finalization/escalation.ts` needs to
-answer: is this match in a state where completion was expected, has its grace window passed,
-is there genuinely no report **and no other live result source**, and has it not been called
-off. Also note `effectiveCapturePolicy` is `undefined` on every demo match, so the
-`FIELD_REQUIRED` 3-day threshold is never taken and everything falls to the 7-day branch.
+Live Demo proof, in order:
 
-Its job is to **detect and surface**. It must never finalize anything or guess a score.
+1. Before the controlled fixture existed: scanned 578 past-cutoff matches, eligible 0,
+   would-open 0.
+2. Deployed only `functions:sweepUnreportedMatches`; it is ACTIVE in `us-central1` on source
+   hash `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`.
+3. Created controlled fixture `canary_unreported_20260826` with a bound
+   `FIELD_REQUIRED` policy, two registered teams, no report, submission or official record.
+4. First authenticated invocation of the deployed handler opened exactly one deterministic
+   `result_never_reported` case. Match stayed completed/pending and null-null, with zero
+   finalizations, official events, athlete stats, provenance or reconciliation.
+5. Second deployed invocation kept the exception at exactly one. The follow-up dry-run read
+   eligible 1, already-open 1, would-open 0, opened 0.
 
-Wire it and deploy it as its **own** release, after the canary. Not bundled with it.
+Commands: `release:unreported-sweep` (dry-run unless `--apply`) and
+`release:unreported-canary -- --prepare|--verify`.
 
 ### 4.3 Smaller things
 
@@ -241,42 +257,31 @@ Wire it and deploy it as its **own** release, after the canary. Not bundled with
   `scripts/lib/deploymentPlanes.test.ts` fails if they disagree.
 - Storage rules were not re-released this session. They are unchanged, so this is
   bookkeeping, not a gap.
-- Six of the eight deployed Functions still carry an older environment generation; only
-  `onMatchReportWritten` and `convergeLifecycle` were redeployed. Neither builds projections
-  nor finalizes, so this is drift rather than a defect — but a full `--only functions` deploy
-  would align them.
+- Six of the nine deployed Functions carry older source/environment generations. None consumes
+  the field-capture gate or team-authority stage, so this does not undermine the migration.
+  Do not align them with an unrestricted `--only functions` deploy: the payment and fantasy
+  schedulers remain intentionally absent.
 - Firestore reports one index present in the project that is not in `firestore.indexes.json`.
   Pre-existing, not touched, and removing it needs `--force`.
 
-### 4.4 What could not be verified from this machine
+### 4.4 Functions runtime values — now read back
 
-One claim in this document rests on a deploy log rather than on a reading, and it is named
-here rather than left as a footnote, because the difference between those two is the entire
-discipline this migration runs on.
+The earlier handoff said the Firebase CLI could not show deployed Functions environment
+variables. That was wrong. `firebase functions:list --json` includes them. After the final two
+targeted deployments it read both `onMatchReportWritten` and `sweepUnreportedMatches` as:
 
-**The deployed Cloud Functions' environment variables still cannot be read back.** `gcloud`
-has no credentialed account here and the Firebase CLI cannot show function env. The canary
-deployment log records the Demo env loading in `canary` mode and its targeted function update;
-the live clean/bad/replay observations then prove that deployment behaviourally. The final
-targeted deploy log records the same env loading with `GOALPLACE_FIELD_CAPTURE_MODE=enabled`
-and the update succeeding, but the final enabled word itself remains a deploy-log observation,
-not an independent runtime reading.
+```
+GOALPLACE_FINALIZER_MODE=enabled
+GOALPLACE_FIELD_CAPTURE_MODE=enabled
+GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS=
+GOALPLACE_LEAGUE_ENTRY_MODE=off
+GOALPLACE_TEAM_AUTHORITY_STAGE=retired
+```
 
-The App Hosting half of the same question **was** closed, and the way it was closed is the
-pattern to repeat: `/api/environment` now reports `finalizerMode` and `teamAuthorityStage`, so
-that runtime's state is read back rather than inferred from a config file. Do the same for
-Functions if it becomes worth it — a trivial callable that returns its own resolved
-activation would end the ambiguity permanently.
-
-Until then:
-
-- The Functions field capture pipeline and canary activation are proven by the live canary,
-  behaviourally. The subsequent enabled-mode deployment succeeded but its environment value
-  is not independently readable from this machine.
-- The Functions authority stage is proven by `access:sunset-invariants` **staying** green over
-  time. If `convergeLifecycle` were still on `frozen`, it would rebuild team capabilities back
-  in within the hour and the invariants would start failing on their own. They remained green
-  after more than an hour and after every canary deploy, which closes this behaviourally.
+This closes the Functions configuration plane directly. The field canary remains the stronger
+behavioural proof that the gate actually governs ingress, and the sunset invariants remain the
+stored-data proof that team authority is not being rebuilt. These are complementary readings,
+not substitutes for one another.
 
 ---
 
@@ -310,8 +315,7 @@ Three rules came out of it, and they hold:
 
 ## 6. Traps that have already bitten
 
-Each of these was a real bug on this branch, not a hypothetical. The last five were found
-this session.
+Each of these was a real bug on this branch, not a hypothetical.
 
 | Trap | What happened |
 |---|---|
@@ -329,9 +333,14 @@ this session.
 | **Migration left the match record behind** | `matches.verificationStatus` is derived from the claim's status and every other transition carries it across. The straggler migration moved the claim to `disputed` and left the match reading `pending` — so the league was asked to adjudicate while every club, every table and the league's own queue was still told the result was merely awaiting an opponent. Found by inspecting the 18 real claims before migrating any of them, not by a test. |
 | **The coverage gate could never pass** | `findLegacyCoverageGaps` asks whether the canonical model grants an operator anything. At `retired` every team bundle grants nothing, so all 60 legacy team assignments became permanent gaps and `--strict` failed by construction. The league loop above it already carried this exact reasoning and excluded team scope; the team loop did not. Worse than noisy: the report sent the operator to `backfill-assignments.ts`, which would have created canonical team assignments granting nothing — new issuance during a sunset, to close a hole that is the point of the sunset. |
 | **The staleness sweep would raise false cases** | See section 4.2. It would call four matches under active league adjudication "never reported". |
+| **A new obligation was about to be applied to old fixtures** | The full Demo measurement found 288 past scheduled/pending fixtures with no source and no bound capture policy. Status/source guards alone would still have flooded the queue. Eligibility now requires a valid policy binding no later than kickoff; governance is not retroactive. |
 | **The App Hosting overlay silently omitted the stage** | `apphosting.yaml` is the base and `apphosting.<environment>.yaml` overrides it when a backend is built with an environment name — and which file a backend reads is not visible from the CLI. `apphosting.demo.yaml` had no `GOALPLACE_TEAM_AUTHORITY_STAGE` at all, so "it is set in `apphosting.yaml`" was not a statement about what the runtime received. Both now declare it, the guard test requires agreement, and `/api/environment` reports the stage so it can be read back instead of reasoned about. |
 | **The clock route and clock kernel spoke different action vocabularies** | The route validated `{ action: "start" }` and passed that object directly to a kernel that dispatches on `{ type: "start" }`. The real Field Manager workflow reached it and returned 409 while route validation and clock unit tests both looked green in isolation. The route now adapts the validated API shape explicitly, with a route-level regression test. |
+| **`as never` erased the clock seam** | Even after the runtime bug was fixed, the adapter cast its result to `never`, so TypeScript could not stop the same discriminator mismatch returning. The route now performs an exhaustive, typed `ClockRequest` → `ClockAction` translation. |
 | **Clearing a clock anchor wrote `undefined` to Firestore** | Half time correctly cleared `periodStartedAt` in the state machine, but the route spread the resulting `undefined` into the Firestore transaction. The fake route database accepted it; the live Demo database rejected the first half-time transition. Optional clock fields are now omitted at the persistence boundary, with a route-level regression test. |
+| **Canonical events claimed every source was a result submission** | Shared event builders hardcoded `payload.source=result_submission_*`, including for field reports with zero `resultSubmissions`. New events carry the candidate's exact `sourceType`; reconciliation construction is separately named by `derivation`. Historical immutable events keep their old payload. |
+| **A stale standings collection looked authoritative** | Nothing writes the stored `standings` documents and no component renders them, but every general data load fetched them. Current tables derive from verified matches. The provider/read path is removed and stored documents are preserved as history. |
+| **Functions environment was declared unreadable when it was not** | `firebase functions:list --json` exposes deployed environment variables. The final release reads the field/V1/league gates, empty canary list and authority stage directly instead of relying on deploy logs. |
 
 ---
 
@@ -363,15 +372,17 @@ this session.
 | Command | Purpose |
 |---|---|
 | `env -u GOALPLACE_TEAM_AUTHORITY_STAGE npm run deploy:ready` | All 12 local gates; the suite exercises the unset/frozen default |
-| `npm test` | 1430 unit tests |
+| `npm test` | 1440 unit tests |
 | `npm run test:rules` | 155 rules tests, needs emulator |
-| `npm run test:integration` | 26 finalization tests against real Firestore |
+| `npm run test:integration` | 29 Firestore integration tests |
 | `npm run access:v1-drain` | The migration gate. Now prints the stranded ids and their age |
 | `npm run access:migrate-v1` | Governed straggler migration. No bulk mode, on purpose |
 | `npm run access:migrate:dry-run` / `:apply` / `:gate` | Projection rebuild |
 | `npm run access:sunset-invariants` | Post-migration proof against stored documents |
 | `npm run release:evidence` | Accumulating migration evidence, and the push gate |
 | `npm run release:canary` | Verifies a field capture canary end to end, and the bad-report case |
+| `npm run release:unreported-sweep` | Full Demo dry-run; add `-- --apply` only for a governed release |
+| `npm run release:unreported-canary -- --prepare\|--verify` | Creates/verifies the Demo-only controlled missing-report fixture |
 
 ---
 
@@ -405,6 +416,10 @@ this session.
 | 2026-08-26 | `c119d68` | `/api/environment` reports the authority stage; demo overlay declares it. **The overlay had been missing it entirely** |
 | 2026-08-26 | `6245b4f` | Live canary found the clock API/kernel action mismatch; route adapter fixed, tested, pushed and deployed as App Hosting build 005 |
 | 2026-08-26 | `b3c89ff` | Live half-time found Firestore `undefined` clock persistence; optional fields omitted, tested, pushed and deployed as App Hosting build 006 |
+| 2026-08-26 | `06383e5` | Unreported-match eligibility corrected around governed fixtures, every result source, lifecycle/adjudication state and policy cutover; paginated transactional runner wired with release tools |
+| 2026-08-26 | `faf2d00` | Official event payloads now carry exact ingress `sourceType`; clock API-to-kernel translation is exhaustively typed |
+| 2026-08-26 | `e09e362` | Dead stored-standings provider/read path removed; historical documents preserved; field canary allowlist cleared |
+| 2026-08-26 | `68376f5` | Sweep core deepened into the shared server module, all 1440/155/29 tests green, four commits pushed; sweep and `onMatchReportWritten` deployed separately; sweep clean/replay proven; App Hosting build 2026-08-27-001 live |
 
 ### Field capture canary session, in order
 
@@ -423,6 +438,23 @@ migration gates and `release:canary`, still green → ran the complete `deploy:r
 and recorded the two literal proof boundaries: endpoint-level rather than browser-UI operation,
 and an ingress operational exception rather than a downstream reconciliation exception.
 
-**Next action:** fix eligibility in `isUnreportedAndStale`, model it against Demo again, and
-release `sweepUnreportedMatches` separately. Section 4.2. Do not bundle it with any canary
-change, and do not let it finalize or infer a score.
+### Unreported-match sweep session, in order
+
+Measured all 580 Demo matches and found 288 past scheduled/pending legacy fixtures that a
+status-only rule would retroactively govern → recorded the governed/postponed/cancelled/
+unreported vocabulary in `CONTEXT.md` → drove eligibility test-first across live, disputed,
+verified, reported, submitted, official, cancelled, legacy, malformed and retroactively bound
+states → paginated the whole query and made exception creation transactionally race-safe and
+idempotent → initial live dry-run scanned 578 past-cutoff matches with zero eligible → pushed
+four implementation commits → `deploy:ready` passed with 1440 unit / 155 Rules / 29 integration
+→ deployed only `sweepUnreportedMatches` → created one controlled governed fixture → deployed
+handler opened exactly one exception and no sporting truth → duplicate delivery stayed at one
+→ separately deployed only `onMatchReportWritten` to clear the ignored canary residue and put
+accurate event source semantics live → Functions env read back directly → App Hosting exact
+commit rollout completed as build 2026-08-27-001 and live origin read back → all three migration
+gates plus both release verifiers remained green.
+
+**Next action:** none for the Operations Model V2 Demo migration. Promotion to Beta or
+Production remains a separate decision: set the authority stage deliberately for that
+environment, rerun its drain/migration gates, and do not infer readiness from Demo. League
+post-match entry is still `off` and needs its own future canary if it is to be enabled.

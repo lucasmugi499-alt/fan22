@@ -1,6 +1,6 @@
 # GoalPlace Result Engine V2
 
-Status: built, gates green, **not deployed**. Branch `handbook-v2`, local.
+Status: **Demo migrated, deployed, enabled and cloud-verified.** Production untouched.
 
 This milestone means something specific, and it is deliberately larger than "eight phases
 shipped". It means all of the following are true at once:
@@ -44,7 +44,7 @@ source lifecycle adapters exist so that it never has to.
 
 ## Deployment sequence
 
-Steps 1 to 4 are gates. The branch stays local until all four are green.
+Steps 1 to 4 are gates. No release proceeds until all four are green.
 
 ### 1. Candidate finalizer complete and tested
 
@@ -56,7 +56,7 @@ Steps 1 to 4 are gates. The branch stays local until all four are green.
       and idempotency path
 - [x] Emulator integration tests: `npm run test:integration`
 
-Twelve integration cases pass against a real Firestore, including a clean field report end
+Twenty-nine integration cases pass against a real Firestore, including a clean field report end
 to end, a redelivered trigger producing one version, an ineligible athlete excluded without
 discarding the match, a correction producing v2 with v1 still readable, and the bilateral
 workflow behaving exactly as before.
@@ -150,17 +150,22 @@ invitations, and every V1 submission stay readable. **Retire authority, preserve
 
 ### 5 to 10. Release
 
-5. Deploy the application
-6. Deploy Functions
-7. Deploy Rules (`firestore.rules.next`, which is the file `firebase.json` actually points at)
-8. Controlled field-report canary: one fixture, one Field Manager,
+5. [x] Deploy the application
+6. [x] Deploy Functions
+7. [x] Deploy Rules (`firestore.rules.next`, which is the file `firebase.json` actually points at)
+8. [x] Controlled field-report canary: one fixture, one Field Manager,
    `GOALPLACE_FIELD_CAPTURE_MODE=canary` with that match id in
    `GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS`, deploying **only** `onMatchReportWritten`
-9. Verify the official result end to end: official result version, canonical events with
+9. [x] Verify the official result end to end: official result version, canonical events with
    `sourcePrincipal.principalType === 'match_ops_session'`, ledger entry with
-   `sourceType: field_capture`, standings updated, report `official`. Then **replay the
+   `sourceType: field_capture`, canonical match score included once by derived standings,
+   report `official`. Then **replay the
    trigger** and confirm every count is identical, and run the bad-report canary
-10. Enable field capture for Demo: `GOALPLACE_FIELD_CAPTURE_MODE=enabled`
+10. [x] Enable field capture for Demo: `GOALPLACE_FIELD_CAPTURE_MODE=enabled`
+
+Demo completion: clean `match_eurdl_18_03` and contradictory `match_eurdl_18_04` were proven
+on 2026-08-26. `onMatchReportWritten` now reads `enabled` with an empty canary allowlist.
+App Hosting `build-2026-08-27-001` is live. The three migration gates remain green.
 
 > **One switch per source since 2026-08-26.** `GOALPLACE_FINALIZER_MODE` governs the
 > bilateral V1 path only. Field capture and league post-match entry have their own gates and
@@ -186,6 +191,19 @@ Each gate is reversible on its own.
 | 3a | Set the stage back to `frozen`, rebuild projections. Authority returns. |
 | 5 to 7 | Standard revision rollback per plane. Deploying one plane never implies another. |
 | 8 | `GOALPLACE_FIELD_CAPTURE_MODE=off`, redeploy `onMatchReportWritten`. No field report can produce an official record by any caller, and the bilateral V1 finalizer is untouched. |
+
+## Post-release missing-report sweep
+
+This was intentionally released after the field canary, not bundled with it.
+`sweepUnreportedMatches` now applies only to fixtures whose capture policy was validly bound
+no later than kickoff, ignores every existing result source and adjudication state, and writes
+only one deterministic `result_never_reported` operational exception. It never finalizes or
+infers a score.
+
+Demo proof on `canary_unreported_20260826`: the first deployed delivery opened one exception
+with zero official records; a duplicate delivery kept the exception at one. Before the canary,
+the full dry-run scanned 578 past-cutoff matches and found zero eligible. The scheduled function
+is ACTIVE in `us-central1`.
 
 The finalization ledger makes a re-run safe: a redelivered trigger finds the key already
 present and skips, which the integration suite asserts.

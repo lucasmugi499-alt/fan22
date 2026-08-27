@@ -50,6 +50,14 @@ export type MigrationEvidence = {
     duplicateReplay: EvidenceStatus;
     badReportException: EvidenceStatus;
   };
+  unreportedSweep: {
+    matchId: string | null;
+    dryRunBeforeCanary: EvidenceStatus;
+    deployment: EvidenceStatus;
+    firstDelivery: EvidenceStatus;
+    duplicateReplay: EvidenceStatus;
+    officialWritesAbsent: EvidenceStatus;
+  };
   exclusions: string[];
   /**
    * The commit this evidence was carried forward from, when it was not produced against this
@@ -142,6 +150,14 @@ export function emptyEvidence(environment: string): MigrationEvidence {
       officialEventCount: null,
       duplicateReplay: 'not_run',
       badReportException: 'not_run',
+    },
+    unreportedSweep: {
+      matchId: null,
+      dryRunBeforeCanary: 'not_run',
+      deployment: 'not_run',
+      firstDelivery: 'not_run',
+      duplicateReplay: 'not_run',
+      officialWritesAbsent: 'not_run',
     },
     exclusions: [],
   };

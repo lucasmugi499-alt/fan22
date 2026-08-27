@@ -5,57 +5,65 @@ on the previous conversation.
 
 ---
 
-You are continuing the **GoalPlace Operations Model V2** release. The architecture, migration
-and live Field Capture canary are complete. Your next job is the separately-scoped
-`sweepUnreportedMatches` eligibility/release. Do not redesign or rerun the canary, and do not
-bundle the sweep with field capture changes.
+The **GoalPlace Operations Model V2 Demo migration is complete**. Do not redesign it or rerun
+its release canaries unless a new change actually touches those planes.
 
-**Read first, in this order:**
+Read, in order:
 
-1. `docs/handoff/OPERATIONS_MODEL_V2_HANDOFF.md` — live state, proof, traps and exact sweep gap.
-2. `docs/RESULT_ENGINE_V2_MILESTONE.md` — deploy runbook.
-3. The newest `docs/evidence/operations-model-v2-*.json` — machine-carried proof. Anything
-   marked `not_run` has not been proven.
+1. `docs/handoff/OPERATIONS_MODEL_V2_HANDOFF.md` — live state, exact proofs and traps.
+2. `docs/RESULT_ENGINE_V2_MILESTONE.md` — completed deploy runbook.
+3. The newest `docs/evidence/operations-model-v2-*.json` — machine-carried proof and explicit
+   exclusions.
 
-## Proven state on Demo
+## Proven Demo state
 
-Target: project `manifest-quasar-479416-s7`, database `fg256`, 2026-08-26.
+Target: `manifest-quasar-479416-s7`, named database `fg256`, 2026-08-26.
 
-- V1 drain has zero blocking claims; all 18 stragglers were migrated one at a time.
-- Team authority is `retired`; 1123 projections were rebuilt with zero stale or coverage gaps.
-- Drain, migration gate and sunset invariants all exit 0, including after the final canary
-  deploy. The invariants remaining green after more than an hour behaviorally prove the
-  Functions authority stage did not rebuild frozen team capabilities.
-- App Hosting `build-2026-08-26-006` is live and reports both its exact build id and
-  `teamAuthorityStage=retired` from `/api/environment`.
-- The clean Field Capture fixture `match_eurdl_18_03` completed 2-1 through the real link, PIN,
-  check-in, lineup, clock, events, half-time, second-half, full-time and attestation routes.
-  It produced exactly one official version, three canonical goal events, two
-  evidence-supported athlete projections and one standings result application. Its forced
-  trigger replay produced zero changes.
-- The contradictory fixture `match_eurdl_18_04` attested 2-1 with events reconstructing 3-1.
-  It produced zero official records and exactly one blocking `matchOperationalExceptions`
-  record. Its forced replay kept that exception at one. It correctly produced no
-  finalizer-level `reconciliationExceptions` record because ingress blocked the candidate.
-- `npm run release:canary -- --match match_eurdl_18_03 --bad-match match_eurdl_18_04` passes.
-- Only after those proofs, Demo `GOALPLACE_FIELD_CAPTURE_MODE` was changed to `enabled` and
-  only `onMatchReportWritten` was deployed. The deploy log records the Demo env loading and
-  success; the final Functions environment value cannot be independently read back from this
-  machine. V1 stayed enabled and untouched. League post-match entry remains off.
+- V1 drain has zero blocking claims; 18 stranded claims were migrated individually to league
+  adjudication without deciding sporting truth.
+- Team authority is `retired`; 1123 stored projections have zero drift and zero legacy
+  capability coverage gaps. Drain, migration gate and sunset invariants all exit 0.
+- Field capture is `enabled` with an empty canary allowlist. Clean, replay, contradictory and
+  contradictory-replay paths are cloud-verified. V1 remains enabled; league post-match entry
+  remains off.
+- App Hosting `build-2026-08-27-001` is live and `/api/environment` reports both its build id
+  and `teamAuthorityStage=retired`.
+- Nine Cloud Functions are live. `onMatchReportWritten` and `sweepUnreportedMatches` are ACTIVE
+  on source hash `4e1e62e95598aaa84050246bd4d4a50e76bb3dc8`. The Firebase CLI directly reads their deployed
+  field/V1/league gates, empty field canary list and retired authority stage.
+- The separately released missing-report sweep is cloud-verified. Its pre-canary dry-run
+  scanned 578 past-cutoff fixtures and found zero eligible. Controlled fixture
+  `canary_unreported_20260826` produced exactly one `result_never_reported` operational case,
+  zero official records and no score; deployed replay kept the exception at one.
+- `deploy:ready` passed with 1440 unit, 155 Rules and 29 Firestore integration tests.
 
-The canary was manual and endpoint-by-endpoint against the deployed authenticated routes; it
-did not use the browser/phone UI. Treat the finalizer, route orchestration and persistence graph
-as cloud-verified, but do not claim separate browser UI verification. Likewise, the bad case's
-single blocking exception is an ingress `matchOperationalExceptions` record, not a downstream
-`reconciliationExceptions` record; the candidate never reached that plane.
+## Proof boundaries
 
-The live canary found two route/persistence bugs. Both are regression-tested, pushed and live:
-the route's `{action}` shape now adapts to the clock kernel's `{type}` shape, and cleared
-optional clock anchors are omitted rather than written as Firestore `undefined`.
+- The original field canary exercised deployed authenticated routes endpoint-by-endpoint, not
+  the browser/phone UI. Route orchestration, finalization and persistence are cloud-verified;
+  separate UI orchestration is not claimed.
+- The field replay was observed contemporaneously. Current cardinalities verify the end state
+  but cannot recreate the historical before/after instant.
+- Standings are derived from verified match documents. There is no standings write or
+  per-match standings ledger. The stale stored collection is preserved but no longer read.
+- Historical official events are immutable and keep old `payload.source=result_submission_*`
+  values. New events use accurate `sourceType` semantics.
+- The bad field report opens `matchOperationalExceptions`, not downstream
+  `reconciliationExceptions`, because ingress blocks candidate creation.
 
-## Credentials
+## Remaining decisions, not migration gaps
 
-The scripts do not load `.env.local`; export all four:
+- Production is untouched. Beta and Production App Hosting overlays intentionally default
+  team authority to `frozen`; choose a stage only after that environment's own drain and gates.
+- League post-match entry is `off` and needs its own canary before enablement.
+- Six of nine Functions carry older generations, Storage Rules were not re-released, and one
+  pre-existing Firestore index is not represented locally. Do not use an unrestricted
+  all-functions deploy to tidy this: `reconcilePaymentIntents` and `lockFantasyLineups` must
+  remain undeployed.
+
+## Credentials and commands
+
+The scripts do not load `.env.local`:
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/Users/beno1017/.config/goalplace256/staging-admin.json
@@ -64,52 +72,11 @@ export GOALPLACE_ADMIN_PROJECT_ID=manifest-quasar-479416-s7
 export GOALPLACE_TEAM_AUTHORITY_STAGE=retired
 ```
 
-Always pass the database id. No GoalPlace project has a `(default)` database. Use
-`scripts/lib/firestoreTarget.ts`; never call `getFirestore()` without the database id.
-The local unit suite exercises the unset/frozen default, so run `deploy:ready` with only
-`GOALPLACE_TEAM_AUTHORITY_STAGE` removed from that process; restore `retired` before any Demo
-projection or migration command.
+Always use the named database through `scripts/lib/firestoreTarget.ts`. The local unit suite
+tests the unset/frozen default, so run `env -u GOALPLACE_TEAM_AUTHORITY_STAGE npm run
+deploy:ready`; restore `retired` before Demo migration commands.
 
-## Your task: fix sweep eligibility before wiring it
-
-`sweepUnreportedMatches` exists in `functions/src/matchReports.ts` and is not exported from
-`functions/src/index.ts`, so `result_never_reported` is never raised. **Do not simply wire it.**
-It was modeled against real Demo data and is wrong as written.
-
-Its only eligibility guard is `verificationStatus === 'verified'`. In the first 200 matches it
-would open five false cases:
-
-- four `disputed` matches already in active league adjudication, including claims migrated in
-  the prior session; and
-- one match whose status is still `live`.
-
-Fix `isUnreportedAndStale` in `src/server/finalization/escalation.ts` first. Eligibility must
-answer all of these before wiring:
-
-- Is the match in a state where completion was genuinely expected?
-- Has the correct grace window passed?
-- Is there no report and no other live result source?
-- Has it not been called off?
-
-The current `MatchStatus` vocabulary is only `scheduled | live | completed | cancelled`; it
-cannot express `postponed` or `abandoned`. Decide that domain gap explicitly before claiming
-eligibility handles called-off fixtures. Also, `effectiveCapturePolicy` is undefined on every
-Demo match, so all currently take the seven-day fallback rather than the `FIELD_REQUIRED`
-three-day window.
-
-The sweep may **detect and surface only**. It must never finalize, manufacture a result source,
-or infer a score. Model the corrected predicate against real Demo again before wiring it. Then
-wire and deploy it as its own release, with its own evidence. Do not deploy
-`reconcilePaymentIntents` or `lockFantasyLineups`, and do not enable Production.
-
-## Rules that remain absolute
-
-- Never conflate implemented, tested, migrated, deployed, enabled and cloud-verified.
-- Never manufacture a synthetic `ResultSubmission` for field capture.
-- Everything after `FinalizationCandidate` is source-agnostic; no source checks in the planner.
-- Every intake source keeps its own switch; unset means off and no switch falls back to another.
-- Retire authority, preserve history. Team access indexes are emptied, not deleted.
-- Relative imports only below `src/kernel/**` and in shared server modules.
-- Firestore Rules live in `firestore.rules.next`, not `firestore.rules`.
-- Verify the runtime plane rather than inferring it from a file.
-- Update the handoff session log and newest evidence before finishing.
+Absolute rules remain: no synthetic `ResultSubmission`, no source checks after
+`FinalizationCandidate`, one independent activation switch per intake source, relative imports
+in shared server/kernel code, Rules changes in `firestore.rules.next`, retire authority while
+preserving history, and verify deployed planes rather than inferring them from edited files.

@@ -16,6 +16,7 @@ describe('migration evidence', () => {
     expect(evidence.migration.v1DrainBefore).toBe('not_run');
     expect(evidence.migration.sunsetInvariants).toBe('not_run');
     expect(evidence.canary.duplicateReplay).toBe('not_run');
+    expect(evidence.unreportedSweep.duplicateReplay).toBe('not_run');
   });
 
   it('is not ready to push from a blank template', () => {
