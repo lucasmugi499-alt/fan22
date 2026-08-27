@@ -1,0 +1,163 @@
+{
+  "milestone": "operations_model_v2",
+  "generatedAt": "2026-08-27T00:42:22.664Z",
+  "commit": {
+    "sha": "094ac0fcbe6da41010e9266e68a29a883bbcc104",
+    "branch": "main",
+    "pushed": true
+  },
+  "local": {
+    "unitTests": {
+      "status": "passed",
+      "count": 1440
+    },
+    "rulesTests": {
+      "status": "passed",
+      "count": 155
+    },
+    "integrationTests": {
+      "status": "passed",
+      "count": 29
+    },
+    "functionsBuild": "passed",
+    "deployReady": "passed"
+  },
+  "migration": {
+    "environment": "demo",
+    "target": "manifest-quasar-479416-s7/fg256",
+    "v1DrainBefore": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 18,
+      "openButLeagueResolvable": 6,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 0
+    },
+    "workflowsMigrated": [
+      "match_kmcfl_09_01",
+      "match_kmcfl_09_02",
+      "match_kmcfl_09_04",
+      "match_eurdl_09_01",
+      "match_eurdl_09_02",
+      "match_eurdl_09_04",
+      "match_kcrc_09_01",
+      "match_kcrc_09_02",
+      "match_kcrc_09_04",
+      "match_nerdl_09_01",
+      "match_nerdl_09_02",
+      "match_nerdl_09_04",
+      "match_kmbl_09_01",
+      "match_kmbl_09_02",
+      "match_kmbl_09_04",
+      "match_nucbl_09_01",
+      "match_nucbl_09_02",
+      "match_nucbl_09_04"
+    ],
+    "migrationReason": "Bilateral confirmation window lapsed 111-140 days earlier; no opponent response and none expected. Each moved pending_confirmation or confirmation_overdue to disputed, one command at a time, with an audit event. No claim's scores, parties or history were rewritten.",
+    "v1DrainAfter": {
+      "submissionsTotal": 264,
+      "awaitingTeamAnswer": 0,
+      "openButLeagueResolvable": 24,
+      "activeTeamAssignments": 100,
+      "pendingTeamInvitations": 0,
+      "safeToRetire": 1
+    },
+    "teamAuthorityStage": "retired",
+    "projectionsRebuilt": 1123,
+    "projectionGate": "passed",
+    "projectionRebuildDetail": {
+      "scopesChecked": 1123,
+      "staleBefore": 1123,
+      "staleAfter": 0,
+      "missingIndex": 0,
+      "orphanIndex": 0,
+      "legacyCoverageGaps": 0,
+      "teamIndexesEmptied": 100,
+      "note": "Team indexes are emptied to zero capabilities, not deleted. The assignment records survive: retire authority, preserve history."
+    },
+    "legacyTeamCapabilitiesRemaining": 0,
+    "sunsetInvariants": "passed",
+    "spellingShimRemoved": "passed",
+    "spellingShimEvidence": "All 1123 stored indexes scanned: zero scopes whose authority depended on a superseded spelling. acceptedSpellings() and SUPERSEDED_CAPABILITY_EQUIVALENTS deleted from src/server/access/capabilities.ts; the three deprecated names removed from hasLeagueOperatorCapability in firestore.rules.next in the same commit. Guard test src/server/access/spellingSunset.test.ts fails if either returns.",
+    "teamAuthorityStageVerified": "retired, confirmed on BOTH runtimes. App Hosting: live /api/environment reports teamAuthorityStage=retired. Cloud Functions: firebase functions:list reads GOALPLACE_TEAM_AUTHORITY_STAGE=retired directly from both onMatchReportWritten and sweepUnreportedMatches; sunset invariants also remained green after every deploy. Declared in apphosting.yaml, apphosting.demo.yaml, and the Demo Functions env; scripts/lib/deploymentPlanes.test.ts fails if the declarations disagree.",
+    "gatesRerunAfterAllDeploys": "passed after the sweep, onMatchReportWritten and App Hosting rollouts: drain, projection gate and sunset invariants all exit 0"
+  },
+  "deployment": {
+    "appHosting": {
+      "revision": "build-2026-08-27-001, rolled out from exact commit 68376f5. Live /api/environment reports environmentVersion fan22-build-2026-08-27-001 and teamAuthorityStage=retired. This build removes the dead stored standings read and replaces the clock route's erased action cast with a typed adapter.",
+      "status": "passed"
+    },
+    "firestoreRules": {
+      "revision": "firestore.rules.next released to fg256 2026-08-26T18:1x, with indexes. Narrowed hasLeagueOperatorCapability to canonical spellings only.",
+      "status": "passed"
+    },
+    "storageRules": {
+      "revision": "storage.rules unchanged since 2026-08-26 release; not re-released in this session.",
+      "status": "passed"
+    },
+    "cloudFunctions": {
+      "revision": "9 functions live. sweepUnreportedMatches was created as its own scheduled release and onMatchReportWritten was separately updated from source hash 4e1e62e95598aaa84050246bd4d4a50e76bb3dc8. firebase functions:list reads both as ACTIVE with GOALPLACE_FIELD_CAPTURE_MODE=enabled, empty field canary allowlist, GOALPLACE_FINALIZER_MODE=enabled, GOALPLACE_LEAGUE_ENTRY_MODE=off and GOALPLACE_TEAM_AUTHORITY_STAGE=retired. The working V1 trigger was not redeployed. reconcilePaymentIntents, lockFantasyLineups and reconcileResultSubmissions remain absent.",
+      "status": "passed"
+    },
+    "scheduledFunctions": {
+      "revision": "sweepUnreportedMatches ACTIVE in us-central1, source hash 4e1e62e95598aaa84050246bd4d4a50e76bb3dc8, generation 1787790276487505. Its authenticated deployed URI was invoked twice for the controlled proof.",
+      "status": "passed"
+    },
+    "activationGates": {
+      "revision": "Direct Functions-plane reading: GOALPLACE_FINALIZER_MODE=enabled, GOALPLACE_FIELD_CAPTURE_MODE=enabled, GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS empty, GOALPLACE_LEAGUE_ENTRY_MODE=off and GOALPLACE_TEAM_AUTHORITY_STAGE=retired on both newly deployed functions.",
+      "status": "passed"
+    }
+  },
+  "canary": {
+    "matchId": "match_eurdl_18_03",
+    "reportId": "match_eurdl_18_03",
+    "candidateId": "field_capture:match_eurdl_18_03:v1",
+    "officialResultVersion": 1,
+    "officialEventCount": 3,
+    "duplicateReplay": "passed",
+    "badReportException": "passed",
+    "cleanProof": {
+      "fixtureControl": "No report, result submission, official result, fantasy competition or competing result existed before capture. Both registered squads contained 18 eligible athletes. The historical fixture was moved into the live Field Manager access window before the report existed.",
+      "report": "official; reportVersion=1; declared=2-1; reconstructed=2-1; eventCount=3; eventDigest=40a9ca56337bd4c0a3c200fc5987d8e5cd14893ad1d86460c8ec242c639960f1",
+      "finalization": "Exactly one ledger/version; source=field_capture; workflow=result_engine_v2; candidate=field_capture:match_eurdl_18_03:v1; source principal=match_ops_session.",
+      "canonicalGraph": "Exactly 3 official goal events, 1 public provenance record, 1 valid official reconciliation record and 2 evidence-supported athlete stat projections. Standings have no write path: buildLeagueStandings derives the table from verified completed match documents, and the canary's canonical score fields make it count exactly once.",
+      "replay": "Contemporaneous forced report-trigger replay observed official versions +0, official events +0, athlete stats +0, provenance +0, reconciliation +0, exceptions +0, outbox +0 and audit side effects +0. Current cardinalities remain consistent with that observation, but the before/after moment cannot be independently reconstructed later. Standings are derived, so no standings-write delta is claimed."
+    },
+    "badProof": {
+      "matchId": "match_eurdl_18_04",
+      "fixtureControl": "No report, result submission, official result, fantasy competition or competing result existed before capture. Both registered squads contained 18 eligible athletes. The historical fixture was moved into the live Field Manager access window before the report existed.",
+      "report": "league_review; reportVersion=1; declared=2-1; reconstructed=3-1; exception=declared_score_mismatch; eventCount=4; eventDigest=046d0cc591b70f361fb7d240f7ebd2ac488cb6871c80f01c1c589501a840b00d",
+      "blockedGraph": "Zero finalization ledgers, OfficialResultVersions, official events, athlete stats, public provenance, official reconciliation records, outbox records or audit side effects. The match stayed pending and unscored.",
+      "exception": "Exactly one deterministic blocking matchOperationalExceptions record. No finalizer-level reconciliationExceptions record is expected because the contradiction is blocked at field-capture ingress before a candidate reaches sports truth reconciliation.",
+      "replay": "Forced report-trigger replay: all official cardinalities stayed zero and the single operational exception stayed one with unchanged content."
+    },
+    "verifier": "npm run release:canary -- --match match_eurdl_18_03 --bad-match match_eurdl_18_04 passed again after the 2026-08-26 sweep and onMatchReportWritten deployments"
+  },
+  "unreportedSweep": {
+    "matchId": "canary_unreported_20260826",
+    "dryRunBeforeCanary": "passed",
+    "deployment": "passed",
+    "firstDelivery": "passed",
+    "duplicateReplay": "passed",
+    "officialWritesAbsent": "passed",
+    "eligibilityProof": "Before the controlled fixture existed, the corrected implementation scanned 578 past-cutoff Demo matches and found eligible=0, wouldOpen=0. This excludes 288 legacy scheduled/pending fixtures without a bound capture policy, active league adjudication, live/cancelled fixtures, and every fixture with a field report, bilateral submission or official result.",
+    "firstDeliveryProof": "The deployed handler returned HTTP 200 and created exactly one deterministic canary_unreported_20260826_result_never_reported operational exception. The match remained completed/pending with null-null score and no OfficialResultVersion.",
+    "replayProof": "A second authenticated invocation of the deployed handler returned HTTP 200. Verification still found exactly one exception; dry-run reported eligible=1, alreadyOpen=1, wouldOpen=0, opened=0.",
+    "absenceProof": "After both deliveries: reports=0, resultSubmissions=0, finalizations=0, officialSportEvents=0, officialAthleteMatchStats=0, publicResultProvenance=0 and officialMatchReconciliation=0. The sweep surfaced a case and inferred no sporting truth."
+  },
+  "exclusions": [
+    "The canary manually exercised every deployed authenticated Field Manager route one transition at a time, including link and PIN authentication, but did not drive those transitions through the browser/phone UI. The finalizer, persistence graph and route orchestration are cloud-verified; browser UI orchestration is not independently verified by this evidence.",
+    "The requested 'one reconciliation exception' is represented by exactly one blocking matchOperationalExceptions ingress record. The finalizer-level reconciliationExceptions collection remains empty by design because declared_score_mismatch blocks candidate creation before sports-truth reconciliation. This evidence records the collection-level distinction rather than treating the two exception planes as interchangeable.",
+    "The field-capture replay was observed contemporaneously. Present cardinalities independently verify the persisted end state but cannot recreate the historical before/after instant; the evidence does not overstate that distinction.",
+    "The App Hosting runtime is read back: /api/environment returned environmentVersion=fan22-build-2026-08-27-001 and teamAuthorityStage=retired.",
+    "apphosting.beta.yaml and apphosting.production.yaml declare no GOALPLACE_TEAM_AUTHORITY_STAGE, so both would run at the frozen default. Correct for environments that have not drained; must be a decision when either is promoted. apphosting.demo.yaml was missing it entirely until c119d68 while apphosting.yaml had it, and which file a backend reads is not visible from the CLI.",
+    "Six of the nine deployed Functions carry older source/environment generations. None consumes the field-capture gate or team-authority stage, so this is general deployment drift rather than a migration defect; do not align them with an unrestricted all-functions deploy because payment and fantasy schedulers remain intentionally absent.",
+    "Historical official events are immutable and retain payload.source=result_submission_* where previously written. Newly emitted events use sourceType for ingress provenance and derivation=score_reconciliation where applicable.",
+    "The stale standings collection was preserved as historical data but removed from the runtime provider/load path. Current standings are derived from canonical verified match documents.",
+    "Storage rules were not re-released this session; unchanged. Firestore reports one index in the project that is not in firestore.indexes.json, pre-existing.",
+    "reconcileResultSubmissions is not deployed, matching its pre-existing state. reconcilePaymentIntents and lockFantasyLineups deliberately not deployed.",
+    "League post-match entry (GOALPLACE_LEAGUE_ENTRY_MODE=off) has never been cloud-verified. It was governed by the shared finalizer flag until 2026-08-26 and is now explicitly off, awaiting its own readiness.",
+    "Production untouched."
+  ],
+  "carriedFrom": "a7817c8"
+}
