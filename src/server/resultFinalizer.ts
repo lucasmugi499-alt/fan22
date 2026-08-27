@@ -51,10 +51,11 @@ import {
  *
  * 2.0.0 since the actor became a union: `sourcePrincipal` replaces `submittedByUserId` as
  * the required record of who acted, because a field-capture event has no Firebase user.
- * Events already stored at 1.0.0 keep their shape and are never rewritten; readers handle
- * both via `principalFromEvent()`.
+ * 2.1.0 versions the payload vocabulary: exact ingress provenance is `sourceType`, while
+ * event derivation is named separately. Events already stored at earlier versions keep
+ * their shape and are never rewritten; readers handle all versions via `principalFromEvent()`.
  */
-const EVENT_SCHEMA_VERSION = '2.0.0';
+const EVENT_SCHEMA_VERSION = '2.1.0';
 
 const SUBMISSIONS = 'resultSubmissions';
 const MATCHES = 'matches';

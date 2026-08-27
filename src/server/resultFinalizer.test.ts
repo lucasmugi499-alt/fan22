@@ -295,7 +295,7 @@ describe('trusted result finalizer', () => {
 
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
-      expect(event.eventSchemaVersion).toBe('2.0.0');
+      expect(event.eventSchemaVersion).toBe('2.1.0');
       // The sport definition's version, which is a different question and must not be
       // answered with the event schema constant.
       expect(event.sportDefinitionVersion).toBe('1.0.0');

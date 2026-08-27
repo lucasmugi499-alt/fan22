@@ -140,7 +140,7 @@ describe('a clean field report becomes official with no human action', () => {
     const events = await db.collection('officialSportEvents').where('matchId', '==', MATCH).get();
     expect(events.size).toBeGreaterThan(0);
     const scorer = events.docs.map((doc) => doc.data()).find((event) => event.eventType === 'football.goal');
-    expect(scorer?.eventSchemaVersion).toBe('2.0.0');
+    expect(scorer?.eventSchemaVersion).toBe('2.1.0');
     expect(scorer?.sourcePrincipal).toEqual({
       principalType: 'match_ops_session',
       matchSessionId: 'mos_1',

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goalplace256.com/schemas/official-event.schema.2.1.0.json",
+  "title": "OfficialSportEvent",
+  "description": "Version 2.1.0 retains the 2.0.0 sourcePrincipal actor contract and versions the payload provenance vocabulary. Newly emitted event payloads name the exact ingress source in sourceType. The formerly overloaded source field is not permitted; derivation, where relevant, is recorded separately. Earlier schemas and stored events remain immutable and supported.",
+  "type": "object",
+  "required": ["id", "eventType", "eventSchemaVersion", "sportDefinitionVersion", "sportId", "competitionId", "seasonId", "matchId", "sequence", "payload", "sourceClaimId", "sourcePrincipal", "officialResultVersion", "officialEventVersion", "verificationStatus", "idempotencyKey", "createdAt", "finalizedAt"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "eventType": { "type": "string" },
+    "eventSchemaVersion": { "const": "2.1.0" },
+    "sportDefinitionVersion": { "type": "string" },
+    "sportId": { "enum": ["football", "basketball", "rugby"] },
+    "competitionId": { "type": "string" },
+    "seasonId": { "type": "string" },
+    "matchId": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "payload": {
+      "type": "object",
+      "required": ["sourceType"],
+      "additionalProperties": true,
+      "properties": {
+        "sourceType": {
+          "enum": ["field_capture", "league_post_match", "legacy_team_submission", "platform_exception_resolution"]
+        },
+        "source": false
+      }
+    },
+    "sourceClaimId": { "type": "string" },
+    "sourcePrincipal": {
+      "type": "object",
+      "description": "Who acted. A label, where present, is for the reader of an audit trail and is never an authorization input.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["principalType", "userId"],
+          "properties": {
+            "principalType": { "const": "user" },
+            "userId": { "type": "string", "minLength": 1 },
+            "displayLabel": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["principalType", "matchSessionId", "fieldManagerAssignmentId"],
+          "properties": {
+            "principalType": { "const": "match_ops_session" },
+            "matchSessionId": { "type": "string", "minLength": 1 },
+            "fieldManagerAssignmentId": { "type": "string", "minLength": 1 },
+            "displayLabel": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["principalType", "component"],
+          "properties": {
+            "principalType": { "const": "system" },
+            "component": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "submittedByUserId": { "type": "string" },
+    "submittedByTeamId": { "type": "string" },
+    "officialResultVersion": { "type": "integer", "minimum": 1 },
+    "officialEventVersion": { "type": "integer", "minimum": 1 },
+    "verificationStatus": { "const": "official" },
+    "idempotencyKey": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "finalizedAt": { "type": "string" }
+  }
+}

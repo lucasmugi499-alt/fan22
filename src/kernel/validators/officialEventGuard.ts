@@ -10,19 +10,20 @@
  * This guard is the enforcement. It is deliberately hand-written and dependency-free: the
  * kernel compiles into the Cloud Functions bundle, which declares exactly two runtime
  * dependencies and is policed by `verify:bundle`, and adding a validator runtime there to
- * interpret a documentation artifact is the wrong trade. `officialEventGuard.contract.test`
- * asserts the two stay in agreement, so the contract cannot drift away from what runs.
+ * interpret a documentation artifact is the wrong trade. The kernel contract tests assert
+ * the published schemas and guard stay in agreement, so documentation cannot drift away
+ * from what runs.
  *
  * Relative imports only, for the same bundle reason.
  */
 
 import { isPrincipal } from '../principal';
 
-export const SUPPORTED_EVENT_SCHEMA_VERSIONS = ['1.0.0', '2.0.0'] as const;
+export const SUPPORTED_EVENT_SCHEMA_VERSIONS = ['1.0.0', '2.0.0', '2.1.0'] as const;
 
 export type SupportedEventSchemaVersion = (typeof SUPPORTED_EVENT_SCHEMA_VERSIONS)[number];
 
-/** Required on every version. Mirrors the intersection of both schema files. */
+/** Required on every version. Mirrors the intersection of all published schema files. */
 export const COMMON_REQUIRED_FIELDS = [
   'id',
   'eventType',
@@ -48,12 +49,21 @@ export const COMMON_REQUIRED_FIELDS = [
  *
  * 1.0.0 requires a uid, because when it was written every actor was a Firebase user.
  * 2.0.0 requires a principal instead, because a field-capture event is produced by a match
- * ops session that has none.
+ * ops session that has none. 2.1.0 retains that actor contract and versions the payload's
+ * exact ingress-provenance vocabulary.
  */
 export const VERSION_REQUIRED_FIELDS: Record<SupportedEventSchemaVersion, readonly string[]> = {
   '1.0.0': ['submittedByUserId'],
   '2.0.0': ['sourcePrincipal'],
+  '2.1.0': ['sourcePrincipal'],
 };
+
+const EVENT_SOURCE_TYPES = new Set([
+  'field_capture',
+  'league_post_match',
+  'legacy_team_submission',
+  'platform_exception_resolution',
+]);
 
 export type OfficialEventShapeVerdict = {
   status: 'valid' | 'blocked';
@@ -106,8 +116,26 @@ export function validateOfficialEventShape(event: unknown): OfficialEventShapeVe
     }
   }
 
-  if (version === '2.0.0' && isPresent(record.sourcePrincipal) && !isPrincipal(record.sourcePrincipal)) {
+  if (version !== '1.0.0' && isPresent(record.sourcePrincipal) && !isPrincipal(record.sourcePrincipal)) {
     issues.push('sourcePrincipal is not a recognised principal.');
+  }
+
+  if (version === '2.1.0') {
+    const payload = record.payload;
+    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+      issues.push('Official events at schema 2.1.0 require an object payload.');
+    } else {
+      const payloadRecord = payload as Record<string, unknown>;
+      if (
+        typeof payloadRecord.sourceType !== 'string'
+        || !EVENT_SOURCE_TYPES.has(payloadRecord.sourceType)
+      ) {
+        issues.push('Official events at schema 2.1.0 require a recognised payload sourceType.');
+      }
+      if ('source' in payloadRecord) {
+        issues.push('Official events at schema 2.1.0 do not permit the overloaded payload source field.');
+      }
+    }
   }
 
   if (record.verificationStatus !== 'official') {

@@ -66,6 +66,31 @@ describe('the generalized actor', () => {
     expect(principalId(principalFromEvent(event)!)).toBe('mos_412');
   });
 
+  it('accepts a 2.1.0 event whose payload names exact ingress provenance', () => {
+    const event = officialEvent({
+      eventSchemaVersion: '2.1.0',
+      submittedByUserId: undefined,
+      sourcePrincipal: {
+        principalType: 'match_ops_session',
+        matchSessionId: 'mos_412',
+        fieldManagerAssignmentId: 'fma_2388',
+      },
+      payload: { value: 1, sourceType: 'field_capture' },
+    });
+
+    expect(validateOfficialEventShape(event)).toEqual({ status: 'valid', issues: [] });
+  });
+
+  it('refuses the overloaded legacy payload source vocabulary at 2.1.0', () => {
+    const verdict = validateOfficialEventShape(officialEvent({
+      eventSchemaVersion: '2.1.0',
+      sourcePrincipal: { principalType: 'user', userId: 'user_9' },
+      payload: { value: 1, source: 'result_submission_scorer' },
+    }));
+
+    expect(verdict.status).toBe('blocked');
+  });
+
   it('refuses a 2.0.0 event that names no author', () => {
     const verdict = validateOfficialEventShape(
       officialEvent({ eventSchemaVersion: '2.0.0', submittedByUserId: undefined }),
@@ -153,6 +178,19 @@ describe('the guard agrees with the published schemas', () => {
     expect(new Set(requiredFrom('official-event.schema.2.0.0.json'))).toEqual(
       new Set([...COMMON_REQUIRED_FIELDS, ...VERSION_REQUIRED_FIELDS['2.0.0']]),
     );
+  });
+
+  it('publishes the 2.1.0 payload-provenance contract', () => {
+    const schema = JSON.parse(
+      readFileSync(path.join(schemaDir, 'official-event.schema.2.1.0.json'), 'utf8'),
+    );
+
+    expect(schema.properties.eventSchemaVersion.const).toBe('2.1.0');
+    expect(new Set(schema.required)).toEqual(
+      new Set([...COMMON_REQUIRED_FIELDS, ...VERSION_REQUIRED_FIELDS['2.1.0']]),
+    );
+    expect(schema.properties.payload.required).toContain('sourceType');
+    expect(schema.properties.payload.properties.source).toBe(false);
   });
 
   it('leaves the 1.0.0 schema requiring submittedByUserId, because it is immutable', () => {
