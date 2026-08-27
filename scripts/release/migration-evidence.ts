@@ -102,6 +102,11 @@ function git(command: string) {
   }
 }
 
+/** A branch is pushed only when an upstream exists and HEAD has no commits ahead of it. */
+export function isPushedToUpstream(upstream: string, commitsAhead: string) {
+  return upstream.length > 0 && commitsAhead === '0';
+}
+
 /**
  * The template every run starts from.
  *
@@ -109,14 +114,15 @@ function git(command: string) {
  * being absent and read as fine.
  */
 export function emptyEvidence(environment: string): MigrationEvidence {
+  const upstream = git('rev-parse --abbrev-ref --symbolic-full-name @{u}');
   return {
     milestone: 'operations_model_v2',
     generatedAt: new Date().toISOString(),
     commit: {
       sha: git('rev-parse HEAD'),
       branch: git('rev-parse --abbrev-ref HEAD'),
-      // Measured, not assumed: an unpushed branch has no upstream ref.
-      pushed: git('rev-parse --abbrev-ref --symbolic-full-name @{u}') !== '',
+      // An upstream existing is not enough: HEAD may still be one or more commits ahead.
+      pushed: isPushedToUpstream(upstream, upstream ? git('rev-list --count @{u}..HEAD') : ''),
     },
     local: {
       unitTests: { status: 'not_run' },

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { emptyEvidence, mostRecentEvidence, readyToPush } from './migration-evidence';
+import {
+  emptyEvidence,
+  isPushedToUpstream,
+  mostRecentEvidence,
+  readyToPush,
+} from './migration-evidence';
 
 describe('migration evidence', () => {
   /**
@@ -75,6 +80,12 @@ describe('migration evidence', () => {
 
   it('records whether the branch is actually pushed rather than assuming', () => {
     expect(typeof emptyEvidence('demo').commit.pushed).toBe('boolean');
+  });
+
+  it('does not call an ahead commit pushed merely because an upstream exists', () => {
+    expect(isPushedToUpstream('origin/main', '1')).toBe(false);
+    expect(isPushedToUpstream('origin/main', '0')).toBe(true);
+    expect(isPushedToUpstream('', '0')).toBe(false);
   });
 
   /**
