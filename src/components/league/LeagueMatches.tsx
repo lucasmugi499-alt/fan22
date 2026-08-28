@@ -99,8 +99,11 @@ export function LeagueMatches() {
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error ?? 'Matches are unavailable.');
-        // The command read model already carries every row in the window.
-        if (!cancelled) setRows([...(body.today?.rows ?? []), ...(body.next ?? [])]);
+        // Every row in the window, so all four segments can populate. Falls back to the
+        // Command subsets for a server that predates `rows`.
+        if (!cancelled) {
+          setRows(body.rows ?? [...(body.today?.rows ?? []), ...(body.next ?? [])]);
+        }
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Matches are unavailable.');
       } finally {
@@ -233,8 +236,14 @@ function EmptySegment({ segment, unassignedOnly }: { segment: MatchSegment; unas
       : segment === 'review'
         ? { title: 'Nothing needs review.', detail: 'Clean Field Capture reports become official without you. Only exceptions arrive here.' }
         : segment === 'completed'
-          ? { title: 'No completed matches yet.', detail: 'Finished fixtures appear here once the result is official.' }
-          : { title: 'No fixtures scheduled.', detail: 'Generate the season schedule or create a single fixture to get started.' };
+          ? {
+            title: 'No completed matches in this window.',
+            detail: 'This workspace covers roughly three weeks either side of today. Older seasons are in Competition.',
+          }
+          : {
+            title: 'No fixtures in the next three weeks.',
+            detail: 'Generate the season schedule or create a single fixture. Fixtures further out appear here as they approach.',
+          };
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-dashed border-border p-8 text-center">

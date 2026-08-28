@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSchedulePreview,
   decideReschedule,
+  parseFixtureImport,
   matchDates,
   publicationNotice,
   roundRobinPairings,
@@ -330,5 +331,94 @@ describe('rescheduling', () => {
     const decision = decideReschedule({ ...base, nextScheduledAt: 'next Saturday' });
     if (decision.ok) throw new Error('expected refusal');
     expect(decision.reason).toContain('valid new kickoff');
+  });
+});
+
+describe('fixture import', () => {
+  const teams = [
+    { id: 'team_1', name: 'Kampala United', location: 'Nakivubo Stadium' },
+    { id: 'team_2', name: 'City Stars' },
+    { id: 'team_3', name: 'Villa SC' },
+  ];
+
+  it('reads a spreadsheet as a league actually writes one', () => {
+    const result = parseFixtureImport({
+      rows: [
+        { home: 'Kampala United', away: 'City Stars', date: '2026-09-12', time: '15:00' },
+        { home: 'Villa SC', away: 'Kampala United', date: '2026-09-19', time: '16:00', venue: 'Mengo Ground' },
+      ],
+      teams,
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0]).toMatchObject({ homeTeamId: 'team_1', awayTeamId: 'team_2' });
+    // Falls back to the home club's own venue when the file does not give one.
+    expect(result.rows[0].venue).toBe('Nakivubo Stadium');
+    expect(result.rows[1].venue).toBe('Mengo Ground');
+  });
+
+  it('matches club names as written, not exactly', () => {
+    const result = parseFixtureImport({
+      rows: [{ home: 'kampala utd', away: 'CITY STARS', date: '2026-09-12' }],
+      teams,
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ homeTeamId: 'team_1', awayTeamId: 'team_2' });
+  });
+
+  it('rejects a club it cannot find rather than guessing', () => {
+    const result = parseFixtureImport({
+      rows: [{ home: 'Kampala United', away: 'Nakawa Lions', date: '2026-09-12' }],
+      teams,
+    });
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]).toContain('no club in this league matches "Nakawa Lions"');
+  });
+
+  it('names the line for every problem', () => {
+    const result = parseFixtureImport({
+      rows: [
+        { home: 'Kampala United', away: 'City Stars', date: '2026-09-12' },
+        { home: 'Kampala United', away: 'Kampala United', date: '2026-09-13' },
+        { home: '', away: 'City Stars', date: '2026-09-14' },
+        { home: 'Villa SC', away: 'City Stars', date: 'sometime in September' },
+      ],
+      teams,
+    });
+    expect(result.rows).toHaveLength(1);
+    expect(result.errors).toContain('Line 2: a club cannot play itself.');
+    expect(result.errors).toContain('Line 3: both clubs are required.');
+    expect(result.errors.some((error) => error.startsWith('Line 4:') && error.includes('not a date'))).toBe(true);
+  });
+
+  it('catches a fixture the file lists twice, and says which line it duplicates', () => {
+    const result = parseFixtureImport({
+      rows: [
+        { home: 'Kampala United', away: 'City Stars', date: '2026-09-12', time: '15:00' },
+        { home: 'Kampala United', away: 'City Stars', date: '2026-09-12', time: '18:00' },
+      ],
+      teams,
+    });
+    expect(result.rows).toHaveLength(1);
+    expect(result.errors).toContain('Line 2: duplicates the fixture already on line 1.');
+  });
+
+  it('keeps imported fixtures inside the season', () => {
+    const result = parseFixtureImport({
+      rows: [{ home: 'Kampala United', away: 'City Stars', date: '2026-08-01' }],
+      teams,
+      seasonStart: '2026-09-01T00:00:00.000Z',
+    });
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]).toContain('before the season starts');
+  });
+
+  it('never defaults an unreadable date to now', () => {
+    const result = parseFixtureImport({
+      rows: [{ home: 'Kampala United', away: 'City Stars', date: '' }],
+      teams,
+    });
+    expect(result.rows).toEqual([]);
+    expect(result.errors).toHaveLength(1);
   });
 });

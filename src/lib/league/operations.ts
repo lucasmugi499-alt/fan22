@@ -181,6 +181,15 @@ export type AttentionItem = {
 };
 
 export type LeagueCommandModel = {
+  /**
+   * Every fixture in the window, in one place.
+   *
+   * The Command Centre only reads `today` and `next`, but the Matches workspace segments the
+   * whole window into Live, Upcoming, Needs review and Completed. Without this it could only
+   * ever show the handful of rows Command happened to need, so three of its four segments were
+   * permanently empty against live data.
+   */
+  rows: LeagueMatchRow[];
   today: {
     total: number;
     live: number;
@@ -288,6 +297,7 @@ export function buildLeagueCommand({
     .slice(0, nextLimit);
 
   return {
+    rows,
     today: {
       total: todayRows.length,
       live: todayRows.filter((row) => row.state === 'live').length,

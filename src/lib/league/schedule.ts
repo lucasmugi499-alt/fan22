@@ -393,3 +393,133 @@ export function decideReschedule({
     movedByHours: Math.round((to - from) / 3_600_000),
   };
 }
+
+export type ImportedFixtureRow = {
+  /** 1-based row number in the file, so an error can name the line. */
+  line: number;
+  homeTeamId: string;
+  awayTeamId: string;
+  scheduledAt: string;
+  venue: string;
+};
+
+export type FixtureImportResult = {
+  rows: ImportedFixtureRow[];
+  /** One message per rejected line, each naming its line number. */
+  errors: string[];
+};
+
+/**
+ * Reads a fixture list somebody already has.
+ *
+ * Leagues arrive with a season in a spreadsheet. Retyping ninety rows into a form to get them
+ * into the platform is the reason a league does not adopt it, so the import accepts what they
+ * have: club names as written, a date, a time, a venue.
+ *
+ * Clubs are matched by name rather than by id, because nobody has the ids. Matching is
+ * case- and punctuation-insensitive so "Kampala Utd." finds "Kampala United", and an
+ * ambiguous or unknown name is a rejected line naming what it could not find — never a guess.
+ * A fixture attached to the wrong club is worse than a fixture that failed to import.
+ */
+export function parseFixtureImport({
+  rows,
+  teams,
+  seasonStart,
+  seasonEnd,
+}: {
+  rows: ReadonlyArray<Record<string, string | undefined>>;
+  teams: ReadonlyArray<{ id: string; name: string; location?: string }>;
+  seasonStart?: string;
+  seasonEnd?: string;
+}): FixtureImportResult {
+  const normalize = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b(fc|sc|utd|united)\b/g, (match) =>
+      match === 'utd' ? 'united' : match).trim();
+
+  const byName = new Map<string, string[]>();
+  for (const team of teams) {
+    const key = normalize(team.name);
+    byName.set(key, [...(byName.get(key) ?? []), team.id]);
+  }
+  const venueById = new Map(teams.map((team) => [team.id, team.location]));
+
+  const accepted: ImportedFixtureRow[] = [];
+  const errors: string[] = [];
+
+  rows.forEach((raw, index) => {
+    const line = index + 1;
+    const home = (raw.home ?? raw.homeTeam ?? raw.home_team ?? '').trim();
+    const away = (raw.away ?? raw.awayTeam ?? raw.away_team ?? '').trim();
+    const date = (raw.date ?? raw.kickoff ?? raw.scheduledAt ?? '').trim();
+    const time = (raw.time ?? '').trim();
+    const venue = (raw.venue ?? '').trim();
+
+    if (!home || !away) {
+      errors.push(`Line ${line}: both clubs are required.`);
+      return;
+    }
+
+    const resolve = (name: string, side: string): string | null => {
+      const matches = byName.get(normalize(name)) ?? [];
+      if (matches.length === 1) return matches[0];
+      errors.push(matches.length === 0
+        ? `Line ${line}: no club in this league matches "${name}" (${side}).`
+        : `Line ${line}: "${name}" matches more than one club, so it is ambiguous.`);
+      return null;
+    };
+    const homeTeamId = resolve(home, 'home');
+    const awayTeamId = resolve(away, 'away');
+    if (!homeTeamId || !awayTeamId) return;
+
+    if (homeTeamId === awayTeamId) {
+      errors.push(`Line ${line}: a club cannot play itself.`);
+      return;
+    }
+
+    // A bare date is accepted; a time column refines it. Anything unparseable is rejected
+    // rather than defaulted to now, which would silently schedule a fixture today.
+    const stamp = time ? `${date}T${time}` : date;
+    const parsed = Date.parse(stamp);
+    if (!Number.isFinite(parsed)) {
+      errors.push(`Line ${line}: "${stamp}" is not a date and time this can read.`);
+      return;
+    }
+    const scheduledAt = new Date(parsed).toISOString();
+
+    if (seasonStart && parsed < Date.parse(seasonStart)) {
+      errors.push(`Line ${line}: kickoff is before the season starts.`);
+      return;
+    }
+    if (seasonEnd && parsed > Date.parse(seasonEnd)) {
+      errors.push(`Line ${line}: kickoff is after the season ends.`);
+      return;
+    }
+
+    accepted.push({
+      line,
+      homeTeamId,
+      awayTeamId,
+      scheduledAt,
+      venue: venue || venueById.get(homeTeamId) || '',
+    });
+  });
+
+  /*
+   * Duplicates inside the file itself, which a per-row check cannot see. A spreadsheet that
+   * lists the same fixture twice is common and would otherwise create it twice.
+   */
+  const seen = new Map<string, number>();
+  const deduped: ImportedFixtureRow[] = [];
+  for (const row of accepted) {
+    const key = `${row.homeTeamId}|${row.awayTeamId}|${row.scheduledAt.slice(0, 10)}`;
+    const first = seen.get(key);
+    if (first !== undefined) {
+      errors.push(`Line ${row.line}: duplicates the fixture already on line ${first}.`);
+      continue;
+    }
+    seen.set(key, row.line);
+    deduped.push(row);
+  }
+
+  return { rows: deduped, errors };
+}

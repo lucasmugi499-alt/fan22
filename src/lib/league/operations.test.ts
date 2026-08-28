@@ -273,3 +273,22 @@ describe('capture policy copy', () => {
     expect(capturePolicyCopy('POST_MATCH_ALLOWED').detail).toContain('quality will be limited');
   });
 });
+
+describe('the window the Matches workspace segments', () => {
+  const at = (hours: number) => new Date(Date.parse(NOW) + hours * 3_600_000).toISOString();
+
+  it('returns every fixture, not only the ones Command reads', () => {
+    const model = buildLeagueCommand({
+      matches: [
+        match({ id: 'played', status: 'completed', verificationStatus: 'verified', scheduledAt: at(-72) }),
+        match({ id: 'live', status: 'live', scheduledAt: at(-1) }),
+        match({ id: 'soon', scheduledAt: at(48) }),
+      ],
+      teams,
+      now: NOW,
+    });
+    // `next` is upcoming only and `today` is one day; the workspace needs all three.
+    expect(model.rows.map((row) => row.matchId).sort()).toEqual(['live', 'played', 'soon']);
+    expect(segmentMatches(model.rows)).toMatchObject({ live: 1, upcoming: 1, completed: 1 });
+  });
+});
