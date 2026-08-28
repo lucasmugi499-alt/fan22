@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Sheet } from '@/components/ui/Sheet';
+import { RegisterAthleteSheet } from '@/components/league/RegisterAthleteSheet';
 import { useAuth } from '@/context/AuthProvider';
 import { athleteLegalName, athleteRegisteredPosition } from '@/lib/athleteIdentity';
 import { summariseRoster, type RosterAction } from '@/lib/league/roster';
@@ -37,6 +38,7 @@ export function LeagueRoster({
   onChanged: () => void;
 }) {
   const [subject, setSubject] = useState<Athlete | null>(null);
+  const [adding, setAdding] = useState(false);
   const summary = useMemo(
     () => summariseRoster(athletes as unknown as Parameters<typeof summariseRoster>[0]),
     [athletes],
@@ -52,7 +54,22 @@ export function LeagueRoster({
           {summary.registrationIssues ? <span className="text-[var(--state-pending)]"> · {summary.registrationIssues} needs review</span> : null}
           {summary.unclaimed ? <span className="text-muted"> · {summary.unclaimed} unclaimed</span> : null}
         </p>
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="ml-auto min-h-11 rounded-[var(--radius-md)] border border-brand px-3.5 text-sm font-semibold text-brand"
+        >
+          Add athlete
+        </button>
       </div>
+
+      <RegisterAthleteSheet
+        open={adding}
+        teams={leagueTeams}
+        defaultTeamId={team.id}
+        onClose={() => setAdding(false)}
+        onRegistered={onChanged}
+      />
 
       {athletes.length ? (
         <ul className="divide-y divide-border border-y border-border">

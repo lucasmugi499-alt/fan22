@@ -11,6 +11,7 @@ import { athleteLegalName, athleteRegisteredPosition } from '@/lib/athleteIdenti
 import { Skeleton } from '@/components/ui/Skeleton';
 import { NoAssignment } from '@/components/ui/NoAssignment';
 import { ScrollRail } from '@/components/ui/ScrollRail';
+import { RegisterAthleteSheet } from '@/components/league/RegisterAthleteSheet';
 import { cn } from '@/lib/utils';
 
 type Filter = 'all' | 'issues' | 'unclaimed';
@@ -51,6 +52,7 @@ export function LeagueAthletes() {
     () => linked === 'issues' || linked === 'unclaimed' ? linked : 'all',
   );
   const [query, setQuery] = useState('');
+  const [registering, setRegistering] = useState(() => searchParams.get('create') === 'athlete');
 
   const teamName = useMemo(() => {
     const teams = league ? teamsInLeague(league.id, data.teams) : [];
@@ -84,6 +86,13 @@ export function LeagueAthletes() {
           Registered athletes
         </h1>
         <p className="mt-1 text-sm text-muted">{league.name}</p>
+        <button
+          type="button"
+          onClick={() => setRegistering(true)}
+          className="mt-3 min-h-11 w-full rounded-[var(--radius-md)] bg-brand px-4 text-sm font-semibold text-[var(--on-brand)] transition hover:bg-brand-hover sm:w-auto"
+        >
+          Register athlete
+        </button>
       </header>
 
       <ScrollRail className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
@@ -116,6 +125,13 @@ export function LeagueAthletes() {
           className="min-h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-1 pl-10 pr-3 text-sm text-text-strong placeholder:text-subtle"
         />
       </label>
+
+      <RegisterAthleteSheet
+        open={registering}
+        teams={league ? teamsInLeague(league.id, data.teams) : []}
+        onClose={() => setRegistering(false)}
+        onRegistered={data.retry}
+      />
 
       {athletes.length ? (
         <ul className="divide-y divide-border border-y border-border">
