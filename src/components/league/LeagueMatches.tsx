@@ -19,6 +19,8 @@ import { NoAssignment } from '@/components/ui/NoAssignment';
 import { ScrollRail } from '@/components/ui/ScrollRail';
 import { MatchRow } from '@/components/league/LeagueCommandCentre';
 import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerSheet';
+import { LeagueFixtureBuilder } from '@/components/league/LeagueFixtureBuilder';
+import { currentSeasonFor } from '@/lib/season';
 import { cn } from '@/lib/utils';
 
 const SEGMENTS: Array<{ id: MatchSegment; label: string }> = [
@@ -41,14 +43,19 @@ const SEGMENTS: Array<{ id: MatchSegment; label: string }> = [
 export function LeagueMatches() {
   const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
   const searchParams = useSearchParams();
-  const catalog = useGoalPlaceData({ collections: ['leagues'] });
+  const catalog = useGoalPlaceData({ collections: ['leagues', 'seasons'] });
   const league = useMemo(
     () => resolveMyLeague(userProfile, catalog.leagues, [], isDemoMode, accessContext),
     [userProfile, catalog.leagues, isDemoMode, accessContext],
   );
 
-  const demoData = useGoalPlaceData({
-    collections: isDemoMode ? ['teams', 'matches'] : [],
+  /*
+   * Teams and fixtures are loaded in both modes, not just demo: the fixture builder needs the
+   * club list and the existing schedule to validate against, and those are client-readable.
+   * Only the operational overlay — assignments and exceptions — requires the server model.
+   */
+  const leagueData = useGoalPlaceData({
+    collections: ['teams', 'matches'],
     scope: { leagueId: league?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
@@ -67,14 +74,15 @@ export function LeagueMatches() {
   );
   const [query, setQuery] = useState('');
   const [assigning, setAssigning] = useState<LeagueMatchRow | null>(null);
+  const [building, setBuilding] = useState(() => searchParams.get('create') === 'fixture');
 
   const demoRows = useMemo(() => {
     if (!isDemoMode || !league) return null;
     const now = new Date().toISOString();
-    const teams = teamsInLeague(league.id, demoData.teams);
-    return matchesInLeague(league.id, demoData.matches)
+    const teams = teamsInLeague(league.id, leagueData.teams);
+    return matchesInLeague(league.id, leagueData.matches)
       .map((match) => matchOperationalRow({ match, teams, now }));
-  }, [demoData.matches, demoData.teams, isDemoMode, league]);
+  }, [leagueData.matches, leagueData.teams, isDemoMode, league]);
 
   useEffect(() => {
     if (isDemoMode || !league) return;
@@ -118,7 +126,7 @@ export function LeagueMatches() {
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   }, [all, query, segment, unassignedOnly]);
 
-  if (catalog.loading || (isDemoMode && demoData.loading) || loading) return <MatchesSkeleton />;
+  if (catalog.loading || leagueData.loading || loading) return <MatchesSkeleton />;
   if (!league) return <NoAssignment kind="league" />;
   if (error) return <ErrorState onRetry={() => window.location.reload()} />;
 
@@ -132,6 +140,13 @@ export function LeagueMatches() {
         <p className="mt-1 text-sm text-muted">
           {unassignedOnly ? 'Fixtures with no Field Manager assigned.' : league.name}
         </p>
+        <button
+          type="button"
+          onClick={() => setBuilding(true)}
+          className="mt-3 min-h-11 w-full rounded-[var(--radius-md)] bg-brand px-4 text-sm font-semibold text-[var(--on-brand)] transition hover:bg-brand-hover sm:w-auto"
+        >
+          Create fixtures
+        </button>
       </header>
 
       <ScrollRail className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:px-0">
@@ -176,6 +191,16 @@ export function LeagueMatches() {
       ) : (
         <EmptySegment segment={segment} unassignedOnly={unassignedOnly} />
       )}
+
+      <LeagueFixtureBuilder
+        open={building}
+        league={league}
+        season={currentSeasonFor(catalog.seasons, league.id, league.currentSeasonId)}
+        teams={teamsInLeague(league.id, leagueData.teams)}
+        existingFixtures={matchesInLeague(league.id, leagueData.matches)}
+        onClose={() => setBuilding(false)}
+        onPublished={() => window.location.reload()}
+      />
 
       <AssignFieldManagerSheet
         open={Boolean(assigning)}

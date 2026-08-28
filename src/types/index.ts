@@ -576,7 +576,21 @@ export interface Team {
    * in a competition holding no results. The official standings projection is the only
    * authority for a sporting number; these survive only as a fallback on surfaces that have
    * not loaded a table, and a newly created team must not be given a fabricated zero.
-   * See scripts/data/deprecated-fields-guard.ts.
+   *
+   * ## Removal condition
+   *
+   * These fields are compatibility, not architecture, and they are meant to go. Delete them
+   * when both hold:
+   *
+   *   1. No team document written before 2026-08-28 remains without a standings projection
+   *      covering its competition — that is, every surface can resolve a real number.
+   *   2. `scripts/data/deprecated-fields-guard.ts` reports a budget of zero for
+   *      `leaguePoints`, `pointsFor` and `pointsAgainst`.
+   *
+   * The guard's budget is the ratchet: it counts every remaining read and fails the build if
+   * the count grows, so the fallbacks can only shrink. Nothing new may read them, and
+   * `?? 0` at a call site is a stopgap for an unmigrated document rather than a source of
+   * truth. See scripts/data/deprecated-fields-guard.ts.
    */
   wins?: number;
   draws?: number;

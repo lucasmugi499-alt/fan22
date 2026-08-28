@@ -89,3 +89,59 @@ export function generateDoubleRoundRobinFixtures({
     })),
   );
 }
+
+/**
+ * Turns a reviewed schedule preview into the fixtures the trusted command accepts.
+ *
+ * The preview owns pairing, dates and validation; this owns the `Match` shape — ids, city,
+ * the empty score and the pending verification status — so there is one place that knows what
+ * a fixture document looks like. Nothing is written here: the caller passes the result to
+ * `createFixtures`, which is the only path to the sporting record.
+ */
+export function fixturesFromPreview({
+  league,
+  season,
+  teams,
+  preview,
+  createdAt = new Date().toISOString(),
+}: {
+  league: Pick<League, 'id' | 'sport' | 'city'>;
+  season: Pick<Season, 'id'>;
+  teams: readonly Team[];
+  preview: ReadonlyArray<{
+    round: number;
+    homeTeamId: string;
+    awayTeamId: string;
+    scheduledAt: string;
+    venue: string;
+  }>;
+  createdAt?: string;
+}): Match[] {
+  const byId = new Map(teams.map((team) => [team.id, team]));
+  // Counted per round so two fixtures in the same round cannot collide on an id.
+  const seenInRound = new Map<number, number>();
+
+  return preview.map((fixture) => {
+    const index = (seenInRound.get(fixture.round) ?? 0) + 1;
+    seenInRound.set(fixture.round, index);
+    const home = byId.get(fixture.homeTeamId);
+    return {
+      id: `${season.id}_r${fixture.round}_m${index}`,
+      sport: league.sport,
+      leagueId: league.id,
+      seasonId: season.id,
+      homeTeamId: fixture.homeTeamId,
+      awayTeamId: fixture.awayTeamId,
+      venue: fixture.venue,
+      city: home?.city ?? league.city,
+      scheduledAt: fixture.scheduledAt,
+      status: 'scheduled',
+      score: { home: null, away: null },
+      verificationStatus: 'pending',
+      supportersCount: 0,
+      totalSupport: 0,
+      events: [],
+      createdAt,
+    } as Match;
+  });
+}

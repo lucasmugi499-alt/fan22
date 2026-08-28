@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { NoAssignment } from '@/components/ui/NoAssignment';
 import { StateChip } from '@/components/league/LeagueCommandCentre';
 import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerSheet';
+import { RescheduleSheet } from '@/components/league/RescheduleSheet';
 import { cn } from '@/lib/utils';
 
 /**
@@ -34,6 +35,7 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
     recordLimit: 250,
   });
   const [assigning, setAssigning] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const match = detail.matches.find((entry) => entry.id === matchId);
   const row = useMemo(() => {
@@ -105,9 +107,12 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
       {/* Contextual: only what this state permits. */}
       <section aria-label="Actions" className="space-y-2">
         {(row.state === 'unassigned' || row.state === 'ready') ? (
-          <ActionButton primary onClick={() => setAssigning(true)}>
-            {row.fieldManager ? 'Replace Field Manager' : 'Assign Field Manager'}
-          </ActionButton>
+          <>
+            <ActionButton primary onClick={() => setAssigning(true)}>
+              {row.fieldManager ? 'Replace Field Manager' : 'Assign Field Manager'}
+            </ActionButton>
+            <ActionButton onClick={() => setRescheduling(true)}>Reschedule match</ActionButton>
+          </>
         ) : null}
         {row.state === 'live' ? (
           <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
@@ -130,6 +135,18 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
           </p>
         ) : null}
       </section>
+
+      <MatchHistory matchId={row.matchId} />
+
+      <RescheduleSheet
+        open={rescheduling}
+        matchId={row.matchId}
+        matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
+        currentScheduledAt={row.scheduledAt}
+        currentVenue={row.venue}
+        onClose={() => setRescheduling(false)}
+        onRescheduled={() => window.location.reload()}
+      />
 
       <AssignFieldManagerSheet
         open={assigning}
@@ -186,5 +203,67 @@ function DetailSkeleton() {
       <Skeleton className="h-32 w-full rounded-[var(--radius-lg)]" />
       <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
     </div>
+  );
+}
+
+/**
+ * What has happened to this fixture, in the league's own words.
+ *
+ * Reads the schedule-change history rather than the raw audit trail: a League Admin asking
+ * "why is this on a Sunday" wants one sentence, not a forensic record. The audit entries still
+ * exist for anyone who needs them.
+ */
+function MatchHistory({ matchId }: { matchId: string }) {
+  const { currentUser, isDemoMode } = useAuth();
+  const [changes, setChanges] = useState<Array<{
+    id: string;
+    fromScheduledAt: string;
+    toScheduledAt: string;
+    reason: string;
+    createdAt: string;
+  }>>([]);
+
+  useEffect(() => {
+    if (isDemoMode || !currentUser) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(
+          `/api/matches/${encodeURIComponent(matchId)}/history`,
+          { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
+        );
+        if (!response.ok) return;
+        const body = await response.json().catch(() => ({}));
+        if (!cancelled) setChanges(body.changes ?? []);
+      } catch {
+        // History is context, not the record. A failure here must not take the page down.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser, isDemoMode, matchId]);
+
+  if (!changes.length) return null;
+
+  const format = (value: string) => new Intl.DateTimeFormat('en-UG', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kampala',
+  }).format(new Date(value));
+
+  return (
+    <section aria-label="History" className="rounded-[var(--radius-lg)] border border-border bg-surface-1 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">History</p>
+      <ol className="mt-2 space-y-3">
+        {changes.map((change) => (
+          <li key={change.id} className="text-sm leading-6">
+            <p className="text-xs text-subtle">{format(change.createdAt)}</p>
+            <p className="text-text-strong">Fixture rescheduled</p>
+            <p className="text-muted">
+              From {format(change.fromScheduledAt)} to {format(change.toScheduledAt)}
+            </p>
+            <p className="text-muted">Reason: {change.reason}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
