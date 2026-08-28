@@ -1,3 +1,5 @@
+import type { PlatformCaseEvidence } from './caseEvidence';
+
 export type PlatformCaseKind =
   | 'application'
   | 'athlete_verification'
@@ -53,6 +55,11 @@ export type PlatformCase = {
   sourceId: string;
   leagueId?: string;
   matchId?: string;
+  /**
+   * The facts that decide this case, so the operator does not have to open the entity to
+   * learn them. Absent when the source stored nothing worth showing.
+   */
+  evidence?: PlatformCaseEvidence;
 };
 
 const CONSEQUENCE_ORDER: Record<PlatformCaseConsequence, number> = {

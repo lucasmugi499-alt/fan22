@@ -9,8 +9,9 @@ import {
   type PlatformCommandFacts,
 } from '@/server/platform/commands/consequencePreview';
 import { environmentReadiness, routingMechanismAvailable } from '@/server/platform/environmentReadiness';
-import { networkDependencies, type NetworkObjectKind } from '@/server/platform/networkDependencies';
+import { mergeDependencies, networkDependencies, type NetworkObjectKind } from '@/server/platform/networkDependencies';
 import { policiesBelow } from '@/lib/platform/capturePolicyFloor';
+import { planMerge } from '@/lib/platform/merge';
 import { isCapturePolicy } from '@/lib/capturePolicy';
 
 export const runtime = 'nodejs';
@@ -69,6 +70,60 @@ async function loadLiveFacts(input: {
     const kind = input.inputs.kind;
     if (kind === 'league' || kind === 'team' || kind === 'athlete') {
       facts.dependencyCounts = await networkDependencies(kind as NetworkObjectKind, input.targetId);
+    }
+  }
+
+  /*
+   * A merge preview runs the same planner the write path runs, against live counts, so the
+   * sheet shows the operator the decision that will actually be made rather than a
+   * description of one. A planner refusal becomes a blocker, which disables the button.
+   */
+  if (input.commandId.endsWith('.merge')) {
+    const mergeKind = input.commandId.includes('.athlete.') ? 'athlete' as const : 'team' as const;
+    const duplicateId = typeof input.inputs.duplicateId === 'string' ? input.inputs.duplicateId : input.targetId;
+    const survivorId = typeof input.inputs.survivorId === 'string' ? input.inputs.survivorId : '';
+    if (duplicateId && survivorId) {
+      const collection = mergeKind === 'athlete' ? 'athletes' : 'teams';
+      const [duplicateSnapshot, survivorSnapshot, dependencies] = await Promise.all([
+        adminDb.collection(collection).doc(duplicateId).get(),
+        adminDb.collection(collection).doc(survivorId).get(),
+        mergeDependencies(mergeKind, duplicateId),
+      ]);
+      const duplicateData = duplicateSnapshot.data() ?? {};
+      const survivorData = survivorSnapshot.data() ?? {};
+      const survivorName = String(survivorData.name ?? survivorData.legalName ?? survivorId);
+      facts.mergeSurvivorName = survivorName;
+      const lifecycleOf = (value: unknown) =>
+        value === 'draft' || value === 'suspended' || value === 'archived' || value === 'active'
+          ? value
+          : 'active';
+      const plan = planMerge({
+        kind: mergeKind,
+        duplicate: {
+          id: duplicateId,
+          name: String(duplicateData.name ?? duplicateData.legalName ?? duplicateId),
+          lifecycleState: lifecycleOf(duplicateData.lifecycleStatus),
+          mergedIntoId: typeof duplicateData.mergedIntoId === 'string' ? duplicateData.mergedIntoId : null,
+          leagueId: typeof duplicateData.leagueId === 'string' ? duplicateData.leagueId : null,
+        },
+        survivor: {
+          id: survivorId,
+          name: survivorName,
+          lifecycleState: lifecycleOf(survivorData.lifecycleStatus),
+          mergedIntoId: typeof survivorData.mergedIntoId === 'string' ? survivorData.mergedIntoId : null,
+          leagueId: typeof survivorData.leagueId === 'string' ? survivorData.leagueId : null,
+        },
+        dependencies,
+        allowCrossLeague: input.inputs.allowCrossLeague === true,
+      });
+      if (plan.ok) {
+        facts.mergeMoves = plan.moves;
+        facts.mergePreserved = plan.preserved;
+      } else {
+        facts.mergeRefusal = plan.reason;
+      }
+    } else {
+      facts.mergeRefusal = 'Choose the record that survives before this can be previewed.';
     }
   }
 

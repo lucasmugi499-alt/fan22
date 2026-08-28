@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireAuthenticatedMutation } from '@/server/api/security';
 import { platformAuditEvent, refuse, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
-import { networkDependencies, type NetworkObjectKind } from '@/server/platform/networkDependencies';
+import { mergeDependencies, networkDependencies, type NetworkObjectKind } from '@/server/platform/networkDependencies';
+import { mergeArchivePatch, planMerge } from '@/lib/platform/merge';
 import {
   NO_DEPENDENCIES,
   decideLifecycleTransition,
@@ -102,6 +103,15 @@ const bodySchema = z.discriminatedUnion('command', [
       // Deliberately absent: anything to do with payout identity. That is not a profile
       // field and cannot be reached from a profile edit. See src/lib/platform/athletePayee.ts.
     }).strict(),
+  }),
+  z.object({
+    command: z.literal('merge'),
+    reason: reasonSchema,
+    kind: z.enum(['team', 'athlete']),
+    duplicateId: idSchema,
+    survivorId: idSchema,
+    /** Two clubs of the same name in different leagues are usually two clubs. */
+    allowCrossLeague: z.boolean().optional().default(false),
   }),
   z.object({
     command: z.literal('lifecycle'),
@@ -334,6 +344,113 @@ export async function POST(request: Request) {
           after: changed,
         });
         return { id: targetId, changed: Object.keys(changed) };
+      }
+
+      if (body.command === 'merge') {
+        /**
+         * Collapses a duplicate into the record that survives.
+         *
+         * Forward-looking references move; official results do not. Reattributing a played
+         * match would restate a verified fact through an admin tool rather than through the
+         * finalizer that owns official records, so the absorbed record is archived and
+         * carries a pointer instead. See src/lib/platform/merge.ts.
+         */
+        const { kind: mergeKind, duplicateId, survivorId, allowCrossLeague } = body;
+        const collection = COLLECTION[mergeKind];
+        const duplicateRef = adminDb.collection(collection).doc(duplicateId);
+        const survivorRef = adminDb.collection(collection).doc(survivorId);
+        const [duplicateSnapshot, survivorSnapshot] = await Promise.all([
+          duplicateRef.get(),
+          survivorRef.get(),
+        ]);
+        if (!duplicateSnapshot.exists) refuse('The duplicate record was not found.', 404);
+        if (!survivorSnapshot.exists) refuse('The surviving record was not found.', 404);
+        const duplicateData = duplicateSnapshot.data() ?? {};
+        const survivorData = survivorSnapshot.data() ?? {};
+
+        const dependencies = await mergeDependencies(mergeKind, duplicateId);
+        const plan = planMerge({
+          kind: mergeKind,
+          duplicate: {
+            id: duplicateId,
+            name: String(duplicateData.name ?? duplicateData.legalName ?? duplicateId),
+            lifecycleState: currentLifecycleState(duplicateData),
+            mergedIntoId: typeof duplicateData.mergedIntoId === 'string' ? duplicateData.mergedIntoId : null,
+            leagueId: typeof duplicateData.leagueId === 'string' ? duplicateData.leagueId : null,
+          },
+          survivor: {
+            id: survivorId,
+            name: String(survivorData.name ?? survivorData.legalName ?? survivorId),
+            lifecycleState: currentLifecycleState(survivorData),
+            mergedIntoId: typeof survivorData.mergedIntoId === 'string' ? survivorData.mergedIntoId : null,
+            leagueId: typeof survivorData.leagueId === 'string' ? survivorData.leagueId : null,
+          },
+          dependencies,
+          allowCrossLeague,
+        });
+        if (!plan.ok) refuse(plan.reason, 409);
+
+        /*
+         * Roster membership moves in a bounded batch. A club with more members than this is
+         * not a duplicate registration, it is a real club, and moving it silently would be a
+         * larger act than the operator agreed to.
+         */
+        let movedAthletes = 0;
+        if (mergeKind === 'team') {
+          const roster = await adminDb.collection('athletes')
+            .where('teamId', '==', duplicateId)
+            .limit(400)
+            .get();
+          if (roster.size >= 400) {
+            refuse(
+              'This record has more attached athletes than a merge will move in one operation. '
+              + 'Confirm it is genuinely a duplicate before proceeding.',
+              409,
+            );
+          }
+          const batch = adminDb.batch();
+          for (const member of roster.docs) {
+            batch.update(member.ref, { teamId: survivorId, updatedAt: now, updatedByUserId: actor.uid });
+          }
+          await batch.commit();
+          movedAthletes = roster.size;
+        }
+
+        await duplicateRef.update({
+          ...mergeArchivePatch({
+            survivorId,
+            actorUserId: actor.uid,
+            reason: body.reason,
+            at: now,
+          }),
+          publiclyVisible: isPubliclyVisible('archived'),
+          updatedAt: now,
+          updatedByUserId: actor.uid,
+        });
+
+        await writeAudit({
+          action: `platform.network.merge${mergeKind}`,
+          collection,
+          targetId: duplicateId,
+          before: {
+            lifecycleStatus: currentLifecycleState(duplicateData),
+            mergedIntoId: null,
+          },
+          after: {
+            lifecycleStatus: 'archived',
+            mergedIntoId: survivorId,
+            movedAthletes,
+            preservedOfficialMatches: dependencies.officialMatches,
+          },
+        });
+
+        return {
+          duplicateId,
+          survivorId,
+          movedAthletes,
+          preserved: plan.preserved,
+          notices: plan.notices,
+        };
       }
 
       const { kind, id, action } = body;

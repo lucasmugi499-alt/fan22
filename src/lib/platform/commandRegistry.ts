@@ -87,6 +87,15 @@ export const PLATFORM_COMMANDS = [
     destination: '/admin', keywords: ['desk', 'case', 'defer', 'snooze'],
   }),
   defineCommand({
+    method: 'POST', tier: 'quiet', reason: 'optional', confirmation: 'none', preview: 'none', availability: 'server',
+    id: 'desk.case.assign', label: 'Claim case',
+    description: 'Take a case, or release it back to the queue, so operators can divide one queue.',
+    entity: 'platform', endpoint: '/api/platform/desk/assign', capability: 'platform.admin.manage',
+    inputFields: ['caseId', 'sourceCollection', 'sourceId', 'action', 'reason'],
+    audit: { action: 'platform.desk.case_claimed', targetCollection: 'adminAuditEvents' },
+    destination: '/admin', keywords: ['desk', 'case', 'claim', 'assign', 'mine'],
+  }),
+  defineCommand({
     ...regular,
     id: 'network.league.create', label: 'Create league', description: 'Create a private draft league.',
     entity: 'league', endpoint: '/api/platform/network', capability: 'platform.network.manage',
@@ -149,6 +158,29 @@ export const PLATFORM_COMMANDS = [
       keywords: [entity, action, 'lifecycle'],
     })),
   ),
+  /*
+   * Merging is governed rather than consequential.
+   *
+   * It archives a real record and repoints live references, and while nothing is destroyed,
+   * undoing it means restoring the absorbed record and moving every reference back by hand.
+   * The typed confirmation is the friction that stops a mis-selected survivor.
+   */
+  ...(['team', 'athlete'] as const).map((entity) => defineCommand({
+    ...governed('type:MERGE'),
+    id: `network.${entity}.merge`,
+    label: `Merge duplicate ${entity}`,
+    description:
+      `Absorb a duplicate ${entity} into the record that survives. Forward references move; `
+      + 'official results stay attached to the record that earned them and read through the '
+      + 'merge pointer.',
+    entity,
+    endpoint: '/api/platform/network',
+    capability: entity === 'athlete' ? 'platform.athlete.manage' : 'platform.network.manage',
+    inputFields: ['duplicateId', 'survivorId', 'allowCrossLeague', 'reason'],
+    audit: { action: `platform.network.merge${entity}`, targetCollection: `${entity}s` },
+    destination: '/admin/network',
+    keywords: [entity, 'merge', 'duplicate', 'collapse'],
+  })),
   defineCommand({
     ...governed('type:DELETE DRAFT'),
     id: 'network.draft.hard_delete', label: 'Delete unused draft', description: 'Permanently delete a draft only when no dependency has ever attached.',

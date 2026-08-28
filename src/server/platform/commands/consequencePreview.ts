@@ -19,6 +19,11 @@ export type PlatformCommandFacts = {
   proposedPolicyFloor?: string;
   affectedSeasonCount?: number;
   existingFixtureCount?: number;
+  /** What a merge would move and leave, counted live. */
+  mergeMoves?: Array<{ what: string; count: number }>;
+  mergePreserved?: Array<{ what: string; count: number }>;
+  mergeSurvivorName?: string;
+  mergeRefusal?: string;
 };
 
 export type ConsequencePreview = {
@@ -82,6 +87,14 @@ function commandChanges(commandId: string, facts: PlatformCommandFacts) {
   if (commandId === 'site.update_settings') {
     return ['Publish only the reviewed site-setting fields if the version is still current.'];
   }
+  if (commandId.endsWith('.merge')) {
+    const moves = facts.mergeMoves ?? [];
+    const survivor = facts.mergeSurvivorName ?? 'the surviving record';
+    return [
+      ...moves.map((move) => `Move ${move.count} ${move.what.toLowerCase()} to ${survivor}.`),
+      `Archive this record and point it at ${survivor}, so every existing link keeps resolving.`,
+    ];
+  }
   if (commandId.includes('.archive')) return ['Archive the record and remove it from public discovery.'];
   if (commandId.includes('.suspend')) return ['Suspend the record until an operator restores it.'];
   if (commandId.includes('.restore')) return ['Restore the record to its prior operational lifecycle.'];
@@ -100,6 +113,13 @@ function unchangedFacts(commandId: string, liveFacts: PlatformCommandFacts) {
   }
   if (commandId.startsWith('environment.activation.')) {
     facts.push('Recording or advancing this request does not move production traffic.');
+  }
+  if (commandId.endsWith('.merge')) {
+    for (const preserved of liveFacts.mergePreserved ?? []) {
+      facts.push(`${preserved.count} ${preserved.what.toLowerCase()} stay attached to the absorbed record.`);
+    }
+    facts.push('No official result is reattributed. A played match keeps the identity that played it.');
+    facts.push('Nothing is deleted; the absorbed record stays readable through its merge pointer.');
   }
   if (commandId === 'integrity.capture_policy_floor.set') {
     facts.push(`${liveFacts.existingFixtureCount ?? 0} existing fixture binding(s) remain unchanged; policy is frozen when each fixture is created.`);
@@ -125,6 +145,10 @@ function reversibilityFor(commandId: string, tier: PlatformCommandTier) {
   if (commandId === 'integrity.exception.ratify') return 'The audit decision is permanent; a sporting correction requires a new governed result version.';
   if (commandId === 'application.approve_and_invite') return 'Created records remain historical; the invitation and assignments can be revoked through their own workflows.';
   if (commandId === 'integrity.capture_policy_floor.set') return 'Existing fixtures keep their frozen binding. This command only tightens the floor; it cannot loosen it.';
+  if (commandId.endsWith('.merge')) {
+    return 'Undoing a merge means restoring the absorbed record and moving every reference back by hand. '
+      + 'Nothing is destroyed, but nothing is automatically returned either.';
+  }
   if (commandId === 'invitation.revoke') return 'Revocation is permanent; restoring access requires a new invitation or assignment.';
   if (tier === 'governed') return 'The recorded step is permanent; later stages use an explicit follow-up transition.';
   if (tier === 'consequential') return 'Reversible through a separate audited command when policy allows.';
@@ -134,6 +158,8 @@ function reversibilityFor(commandId: string, tier: PlatformCommandTier) {
 function blockersFor(commandId: string, targetId: string | null, facts: PlatformCommandFacts, inputs: Record<string, unknown>) {
   const blockers: string[] = [];
   if (targetId && facts.exists === false) blockers.push('The target no longer exists. Reload and choose another record.');
+  // A merge the planner already refuses must not offer a runnable button.
+  if (facts.mergeRefusal) blockers.push(facts.mergeRefusal);
   if (commandId === 'integrity.exception.ratify') {
     if (facts.conflictWithMatch) {
       blockers.push('You are affiliated with a club in this match. Another unconflicted operator must decide.');

@@ -2,6 +2,7 @@ import 'server-only';
 import { adminDb } from '@/lib/firebase/admin';
 import type { LifecycleDependencies } from '@/lib/platform/lifecycle';
 import { NO_DEPENDENCIES } from '@/lib/platform/lifecycle';
+import type { MergeDependencies } from '@/lib/platform/merge';
 
 /**
  * What is actually attached to an object, counted at the moment of the decision.
@@ -131,4 +132,59 @@ export async function networkDependencies(
     countAuditEvents(id),
   ]);
   return { ...NO_DEPENDENCIES, payments, auditEvents };
+}
+
+/**
+ * What a merge would move, and what it would leave where it is.
+ *
+ * A different question from `networkDependencies`, which asks "is this safe to destroy".
+ * Merging destroys nothing, so the counts it needs are split by whether a record looks
+ * forward or backward: a scheduled fixture moves to the survivor, a played one does not.
+ *
+ * Counted at the moment of the decision, for the same reason: an operator confirming a merge
+ * is shown these numbers, and a number read from a drifted aggregate would be a number they
+ * approved on false evidence.
+ */
+export async function mergeDependencies(
+  kind: 'team' | 'athlete',
+  id: string,
+): Promise<MergeDependencies> {
+  if (kind === 'team') {
+    const [officialMatches, scheduledHome, scheduledAway, athletes, payments, activeAssignments] =
+      await Promise.all([
+        countOfficialMatches('teamId', id),
+        countWhere('matches', 'homeTeamId', id, [{ field: 'status', value: 'scheduled' }]),
+        countWhere('matches', 'awayTeamId', id, [{ field: 'status', value: 'scheduled' }]),
+        countWhere('athletes', 'teamId', id),
+        countWhere('supportPledges', 'teamId', id),
+        countWhere('accessAssignments', 'scopeId', id, [{ field: 'status', value: 'active' }])
+          .catch(() => 0),
+      ]);
+    return {
+      officialMatches,
+      scheduledMatches: scheduledHome + scheduledAway,
+      athletes,
+      payments,
+      activeAssignments,
+    };
+  }
+
+  /*
+   * An athlete's official history lives in match events rather than on the athlete document,
+   * so it is not counted here. The merge pointer is what makes a split career read as one;
+   * nothing about those events changes, and claiming a count we cannot cheaply verify would
+   * put a number on the confirmation screen that no query stands behind.
+   */
+  const [payments, activeAssignments] = await Promise.all([
+    countWhere('supportPledges', 'athleteId', id),
+    countWhere('accessAssignments', 'subjectAthleteId', id, [{ field: 'status', value: 'active' }])
+      .catch(() => 0),
+  ]);
+  return {
+    officialMatches: 0,
+    scheduledMatches: 0,
+    athletes: 0,
+    payments,
+    activeAssignments,
+  };
 }

@@ -377,3 +377,81 @@ Two things the review examined and deliberately left alone:
 Regression cover added: entity binding, demo entity rows and endpoint resolution are unit
 tested, including that binding respects authorization and that a create command is never
 offered against an existing entity.
+
+## Depth pass, 2026-08-28: "show your work"
+
+The five destinations, the registry, the palette and the Desk made the console a good
+**router**. It could get an operator to the right place quickly. It could not yet make them
+faster or more certain once they arrived, because every surface still described its records
+rather than explaining them.
+
+The artifact named four operator jobs — Decide, Intervene, Configure, Investigate. Decide and
+Configure shipped well. This pass is about the other two, plus the thing no single-operator
+design had noticed.
+
+### The diagnosis
+
+| Gap | Evidence |
+| --- | --- |
+| **Cases carried no evidence.** | Every `summary` was a category sentence: "Recorded events and the submitted score disagree." True of the whole class, silent about the instance. So every decision still cost a page load — the exact round trip the Desk exists to remove. |
+| **Investigate was unserved.** | History is a flat audit list per entity. Nothing answers "why is this result official" or "who granted this access, under which policy". |
+| **The console was single-player.** | `assignedToUserId` was read by the `Mine` filter and written by nothing. Two operators on one queue would both open the same escalation. |
+| **Duplicates had no answer.** | The defining data problem of grassroots sport — the same club registered twice, the same athlete entered by two secretaries — and the artifact marks both merges "new". There was no command for either. |
+
+### The concept
+
+**Every surface carries the evidence behind it, at the moment of use.** A case states the facts
+that decide it. An entity states why its record says what it says. A command states what it
+will do, and afterwards what it did.
+
+This is the platform's own thesis — verified data, provenance, audit — turned inward on the
+tools. It is also the cheapest possible source of operator trust: the console stops asking to
+be believed and starts showing its working.
+
+### Shipped in this pass
+
+**Case evidence** (`src/lib/platform/caseEvidence.ts`). Typed facts assembled from fields the
+platform already stored and had never displayed. A match-ops submission writes
+`detail.declared` and `detail.reconstructed`; a proposal writes `proposedResolution` and the
+`conflictContext` true at the time. The Desk now shows "The field report says 2-1; the recorded
+events reconstruct to 3-1", the proposal verbatim, and why the proposer cannot ratify it.
+
+The governing rule is that **nothing is invented**. Where a field is absent the fact is omitted
+rather than defaulted, because on a decision surface a confident zero is worse than a gap: the
+operator cannot tell a real zero from a missing read. Evidence is attached on both the server
+read model and the demo path, since the demo is where the console is shown.
+
+**Entity merge** (`src/lib/platform/merge.ts`, `network.{team,athlete}.merge`). The flagship
+management capability, and the one place where "do what the artifact says" had to be refused.
+
+The artifact says merge should "remap rosters and history". Remapping history is exactly what
+this platform must never do: a match played by one club was played by that club, and
+reattributing it would restate a verified fact through an admin tool rather than the finalizer
+that owns official records. So a merge here is **a redirect, not a rewrite** — forward
+references move, the absorbed record is archived and carries a `mergedInto` pointer, and every
+historical link keeps resolving. The reader sees one club; the ledger still says what happened.
+
+Governed tier with a typed confirmation, every refusal naming its condition, and a server
+preview that runs the same planner the write path runs so the sheet shows the decision that
+will actually be made.
+
+**Case assignment** (`/api/platform/desk/assign`). Claim, release, and take over, with `C` bound
+on the Desk. Written onto the source record rather than a side table, so the league's own view
+of its exception shows who picked it up. Deliberately not a lock: a claim can always be taken
+over and the audit records that it happened, because an operator who claims a case and goes
+home must not be able to freeze it.
+
+### Still open, in priority order
+
+1. **Provenance explorer.** The Investigate job. Given an official result, walk the chain:
+   submission → events → session and generation → finalization → result version → operator and
+   policy in force. Given an access assignment: grant → bundle → capability → audit. The data
+   exists; there is no surface that walks it.
+2. **Team contacts.** Coach, manager, secretary and captain as person records carrying zero
+   authority. Marked "new" in the artifact and still absent.
+3. **Match Ops session revoke.** Takeover exists; revoking a session without replacing it does
+   not.
+4. **League Admin replace and emergency ownership recovery.** The artifact calls this "partial"
+   and it still is.
+5. **Saved views and watchlists.** An operator tracking one league through a dispute has no way
+   to pin it.

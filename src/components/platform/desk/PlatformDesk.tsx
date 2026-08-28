@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Clock, UserCircle } from '@phosphor-icons/react';
+import { ArrowRight, Clock, UserCircle, Warning } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { openReports, pendingApprovals } from '@/lib/platform/platformContext';
+import { applicationEvidence, leagueVerificationEvidence, trustEvidence } from '@/lib/platform/caseEvidence';
 import { orderPlatformCases, type PlatformCase, type PlatformCaseAction, type PlatformCaseKind } from '@/lib/platform/platformCases';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -46,6 +47,35 @@ function demoCase(input: Pick<PlatformCase, 'id' | 'kind' | 'title' | 'summary' 
   };
 }
 
+/**
+ * Evidence for an approval case, from whichever record actually backs it.
+ *
+ * A real application record is the best source. Where there is none, the case is a league
+ * asking for verification, so the league's own counts are the facts that decide it.
+ */
+function deskEvidence(
+  kind: string,
+  application: unknown,
+  data: ReturnType<typeof useGoalPlaceData>,
+  approvalId: string,
+) {
+  if (application) {
+    const evidence = applicationEvidence(application as Record<string, unknown>);
+    return evidence ? { evidence } : {};
+  }
+  if (kind === 'athlete') return {};
+  const league = data.leagues.find((entry) => entry.id === approvalId);
+  if (!league) return {};
+  const evidence = leagueVerificationEvidence({
+    sport: league.sport,
+    city: league.city,
+    status: league.status,
+    teamCount: data.teams.filter((team) => team.leagueId === league.id).length,
+    athleteCount: data.athletes.filter((athlete) => athlete.leagueId === league.id).length,
+  });
+  return evidence ? { evidence } : {};
+}
+
 function demoDesk(data: ReturnType<typeof useGoalPlaceData>, filter: string, actorUserId: string): DeskPayload {
   const items: PlatformCase[] = [];
   for (const approval of pendingApprovals(data.leagues, data.athletes)) {
@@ -60,6 +90,7 @@ function demoDesk(data: ReturnType<typeof useGoalPlaceData>, filter: string, act
       consequence: 'normal',
       createdAt: application?.createdAt ?? new Date().toISOString(),
       waitingOn: 'Platform reviewer',
+      ...deskEvidence(approval.kind, application, data, approval.id),
       href: kind === 'application' ? `/admin/network/applications/${approval.id}` : `/admin/network/athletes/${approval.id}`,
       actions: kind === 'application' ? [
         { commandId: 'application.approve_and_invite', label: 'Approve and invite' },
@@ -79,6 +110,11 @@ function demoDesk(data: ReturnType<typeof useGoalPlaceData>, filter: string, act
       consequence: report.severity === 'Critical' ? 'critical' : report.severity === 'High' ? 'high' : 'normal',
       createdAt: report.createdAt,
       waitingOn: 'Trust reviewer',
+      // The demo path builds its own cases, so it has to attach evidence itself or the
+      // console demonstrates a Desk that cannot show why anything is on it.
+      ...(trustEvidence(report as unknown as Record<string, unknown>)
+        ? { evidence: trustEvidence(report as unknown as Record<string, unknown>) }
+        : {}),
       href: `/admin/integrity/trust/${report.id}`,
       actions: [{ commandId: 'trust.report.resolve', label: 'Resolve' }],
       sourceCollection: 'reports',
@@ -171,7 +207,7 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
   const router = useRouter();
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const demoData = useGoalPlaceData({
-    collections: isDemoMode ? ['leagues', 'athletes', 'leagueAdminApplications', 'reports', 'finalizations'] : [],
+    collections: isDemoMode ? ['leagues', 'teams', 'athletes', 'leagueAdminApplications', 'reports', 'finalizations'] : [],
     recordLimit: 500,
   });
   const [payload, setPayload] = useState<DeskPayload | null>(null);
@@ -185,6 +221,7 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
   const actorUserId = currentUser?.uid ?? userProfile?.uid ?? '';
   const deferCommand = usePlatformCommand('/api/platform/desk/defer');
   const caseCommand = useRegistryCommand();
+  const assignCommand = useRegistryCommand();
 
   const demoPayload = useMemo(
     () => demoDesk(demoData, initialFilter, actorUserId),
@@ -257,6 +294,31 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
     setActiveAction({ item, action });
   }
 
+  /**
+   * Claims or releases a case in place.
+   *
+   * The card updates from the server's answer rather than optimistically, because a claim is
+   * contended: if another operator took it first, the operator needs to see that, not a
+   * button that looked like it worked.
+   */
+  async function assignCase(item: PlatformCase, action: 'claim' | 'release') {
+    const ok = await assignCommand.run('desk.case.assign', {
+      caseId: item.id,
+      sourceCollection: item.sourceCollection,
+      sourceId: item.sourceId,
+      action,
+    }, action === 'claim' ? 'Case claimed.' : 'Case released.');
+    if (!ok) return;
+    setPayload((current) => current
+      ? {
+        ...current,
+        items: current.items.map((entry) => entry.id === item.id
+          ? { ...entry, assignedToUserId: action === 'claim' ? actorUserId : null }
+          : entry),
+      }
+      : current);
+  }
+
   function removeCase(caseId: string) {
     setPayload((current) => current
       ? { ...current, total: Math.max(0, current.total - 1), items: current.items.filter((entry) => entry.id !== caseId) }
@@ -276,6 +338,11 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
         else if (event.key === 'Enter' && items[activeIndex]) { event.preventDefault(); openCase(items[activeIndex]); }
         else if (/^[1-4]$/.test(event.key) && items[activeIndex]) { event.preventDefault(); startAction(items[activeIndex], Number(event.key) - 1); }
         else if (event.key.toLowerCase() === 'd' && items[activeIndex] && initialFilter !== 'history') { event.preventDefault(); setDeferCase(items[activeIndex]); }
+        else if (event.key.toLowerCase() === 'c' && items[activeIndex] && initialFilter !== 'history') {
+          event.preventDefault();
+          const item = items[activeIndex];
+          void assignCase(item, item.assignedToUserId === actorUserId ? 'release' : 'claim');
+        }
       }}
     >
       <WorkspaceTabs label="Desk filters" tabs={TABS} active={initialFilter} />
@@ -292,7 +359,7 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
         actual decision below the fold.
       */}
       <p className="hidden text-sm text-subtle md:block">
-        J and K move, Enter opens, 1–4 run the visible actions, D defers with a reason.
+        J and K move, Enter opens, 1–4 run the visible actions, C claims, D defers with a reason.
         Ordered by consequence, then stored escalation deadline, then age.
       </p>
 
@@ -318,7 +385,17 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
           {items.length ? (
             <div className="space-y-2.5">
               {items.map((item, index) => (
-                <DeskCaseCard key={item.id} item={item} now={data.generatedAt} selected={index === activeIndex} onOpen={() => openCase(item)} onAction={(actionIndex) => startAction(item, actionIndex)} onDefer={initialFilter === 'history' ? undefined : () => setDeferCase(item)} />
+                <DeskCaseCard
+                  key={item.id}
+                  item={item}
+                  now={data.generatedAt}
+                  selected={index === activeIndex}
+                  mine={Boolean(actorUserId) && item.assignedToUserId === actorUserId}
+                  onOpen={() => openCase(item)}
+                  onAction={(actionIndex) => startAction(item, actionIndex)}
+                  onDefer={initialFilter === 'history' ? undefined : () => setDeferCase(item)}
+                  onAssign={initialFilter === 'history' ? undefined : (action) => void assignCase(item, action)}
+                />
               ))}
               {data.nextCursor ? (
                 <div className="pt-2 text-center">
@@ -412,7 +489,17 @@ export function PlatformDesk({ initialFilter = 'all' }: { initialFilter?: string
   );
 }
 
-function DeskCaseCard({ item, now, selected, onOpen, onAction, onDefer }: { item: PlatformCase; now: string; selected: boolean; onOpen: () => void; onAction: (index: number) => void; onDefer?: () => void }) {
+function DeskCaseCard({ item, now, selected, mine, onOpen, onAction, onDefer, onAssign }: {
+  item: PlatformCase;
+  now: string;
+  selected: boolean;
+  /** True when the signed-in operator holds this case. */
+  mine: boolean;
+  onOpen: () => void;
+  onAction: (index: number) => void;
+  onDefer?: () => void;
+  onAssign?: (action: 'claim' | 'release') => void;
+}) {
   const overdue = Boolean(item.deadlineAt && Date.parse(item.deadlineAt) <= Date.parse(now));
   return (
     <article className={cn(
@@ -429,9 +516,26 @@ function DeskCaseCard({ item, now, selected, onOpen, onAction, onDefer }: { item
           <button type="button" onClick={onOpen} className="mt-2 block text-left text-base font-semibold text-text-strong transition hover:text-brand">
             {item.title}
           </button>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{item.summary}</p>
+          {/*
+            Some sources use the same sentence for the case title and its evidence headline.
+            Printing it twice reads as a rendering bug and costs a line of a card whose whole
+            job is density.
+          */}
+          {(() => {
+            const lead = item.evidence?.headline ?? item.summary;
+            return lead.trim() === item.title.trim()
+              ? null
+              : <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{lead}</p>;
+          })()}
+          {item.evidence ? <CaseEvidence evidence={item.evidence} /> : null}
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-subtle">
             <span className="inline-flex items-center gap-1.5"><UserCircle className="h-4 w-4" /> Waiting on {item.waitingOn}</span>
+            {item.assignedToUserId ? (
+              <span className={cn('inline-flex items-center gap-1.5', mine && 'text-brand')}>
+                <UserCircle className="h-4 w-4" weight="fill" />
+                {mine ? 'You have this' : 'Claimed by another operator'}
+              </span>
+            ) : null}
             <span className={cn('inline-flex items-center gap-1.5', overdue && 'text-[var(--state-error)]')}>
               <Clock className="h-4 w-4" /> {item.deadlineAt ? `${overdue ? 'Overdue' : 'Due'} ${new Date(item.deadlineAt).toLocaleString()}` : `Opened ${new Date(item.createdAt).toLocaleDateString()}`}
             </span>
@@ -449,6 +553,15 @@ function DeskCaseCard({ item, now, selected, onOpen, onAction, onDefer }: { item
               onClick={() => onAction(index)}
             />
           ))}
+          {onAssign ? (
+            <PlatformCommandButton
+              commandId="desk.case.assign"
+              label={mine ? 'Release' : item.assignedToUserId ? 'Take over' : 'Claim'}
+              shortcut="C"
+              size="sm"
+              onClick={() => onAssign(mine ? 'release' : 'claim')}
+            />
+          ) : null}
           {onDefer ? <PlatformCommandButton commandId="desk.case.defer" label="Defer" shortcut="D" size="sm" onClick={onDefer} /> : null}
           <Link href={item.href} className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-brand hover:underline">
             Open <ArrowRight className="h-4 w-4" weight="bold" />
@@ -456,6 +569,49 @@ function DeskCaseCard({ item, now, selected, onOpen, onAction, onDefer }: { item
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * The facts that decide the case, on the card the operator is already reading.
+ *
+ * Every value here is a stored measurement. Nothing is computed for display, so a number that
+ * looks wrong on this card is a number that is wrong in the record.
+ */
+function CaseEvidence({ evidence }: { evidence: NonNullable<PlatformCase['evidence']> }) {
+  return (
+    <div className="mt-3 space-y-2">
+      {evidence.facts.length ? (
+        <dl className="flex flex-wrap gap-x-5 gap-y-1.5">
+          {evidence.facts.map((fact, index) => (
+            <div key={`${fact.label}-${index}`} className="min-w-0">
+              <dt className="text-[11px] uppercase tracking-wide text-subtle">{fact.label}</dt>
+              <dd className={cn(
+                'text-sm font-semibold tabular-nums',
+                fact.tone === 'bad' && 'text-[var(--state-error)]',
+                fact.tone === 'warn' && 'text-[var(--state-pending)]',
+                fact.tone === 'good' && 'text-brand',
+                (!fact.tone || fact.tone === 'neutral') && 'text-text-strong',
+              )}>
+                {fact.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {evidence.proposal ? (
+        <p className="text-sm text-text">
+          <span className="font-semibold text-text-strong">{evidence.proposal.by} proposed:</span>{' '}
+          {evidence.proposal.resolution}
+        </p>
+      ) : null}
+      {evidence.conflict ? (
+        <p className="flex items-start gap-1.5 text-sm text-[var(--state-pending)]">
+          <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" />
+          <span>{evidence.conflict}</span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

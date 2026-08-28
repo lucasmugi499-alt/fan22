@@ -1,6 +1,23 @@
 import 'server-only';
 
+import {
+  applicationEvidence,
+  operationalExceptionEvidence,
+  payeeEvidence,
+  reconciliationExceptionEvidence,
+  trustEvidence,
+} from '@/lib/platform/caseEvidence';
 import { consequenceFrom, orderPlatformCases, type PlatformCase } from '@/lib/platform/platformCases';
+
+/**
+ * Spreads an evidence block onto a case, or nothing at all.
+ *
+ * A case with no stored facts carries no `evidence` key rather than an empty one, so the card
+ * can tell "nothing to show" from "shown, and empty".
+ */
+function evidenceOf(build: PlatformCase['evidence']) {
+  return build ? { evidence: build } : {};
+}
 
 export type DeskSourceRow = { id: string; data: FirebaseFirestore.DocumentData };
 
@@ -86,6 +103,7 @@ export function assemblePlatformCases(
       ]),
       sourceCollection: 'leagueAdminApplications',
       sourceId: row.id,
+      ...evidenceOf(applicationEvidence(row.data)),
     });
   }
 
@@ -137,6 +155,7 @@ export function assemblePlatformCases(
       ]),
       sourceCollection: 'matchOperationalExceptions',
       sourceId: row.id,
+      ...evidenceOf(operationalExceptionEvidence(row.data)),
       leagueId: typeof row.data.leagueId === 'string' ? row.data.leagueId : undefined,
       matchId: typeof row.data.matchId === 'string' ? row.data.matchId : undefined,
     });
@@ -164,6 +183,7 @@ export function assemblePlatformCases(
       ]),
       sourceCollection: 'reconciliationExceptions',
       sourceId: row.id,
+      ...evidenceOf(reconciliationExceptionEvidence(row.data)),
       leagueId: typeof row.data.leagueId === 'string' ? row.data.leagueId : undefined,
       matchId: typeof row.data.matchId === 'string' ? row.data.matchId : undefined,
     });
@@ -190,6 +210,7 @@ export function assemblePlatformCases(
       ]),
       sourceCollection: 'reports',
       sourceId: row.id,
+      ...evidenceOf(trustEvidence(row.data)),
     });
   }
 
@@ -214,6 +235,7 @@ export function assemblePlatformCases(
       ]),
       sourceCollection: 'athletePayees',
       sourceId: row.id,
+      ...evidenceOf(payeeEvidence(row.data)),
     });
   }
 
