@@ -156,3 +156,49 @@ Schedule generation, fixture import, rescheduling with history, roster managemen
 claim invitations, post-match fallback entry, emergency takeover from the league surface, and
 reports restyling. Each has a trusted endpoint or a clear place to sit; none is stubbed or
 faked in the UI.
+
+## Second pass, 2026-08-28 — review response
+
+Addressed the two things the review flagged, then continued the sequence.
+
+### Field Manager assignment, verified rather than assumed
+
+The browser proves the interaction chain: the sheet opens bound to the correct fixture
+(`Kyambogo Rangers v Kisenyi United`, `Saturday, 11 Apr, 16:00`), the submit button is disabled
+until name and phone validate, and submitting a demo session produces the guard message rather
+than failing silently.
+
+The endpoint gets its own contract test covering: unauthenticated refusal before any collection
+is touched, capability refusal scoped to the league, the access window (two hours before
+kickoff to five after), a declared affiliation opening a non-blocking exception rather than a
+refusal, neutrality refusal only where the competition demands it, and — the important one —
+**that the PIN and access token appear in the response and nowhere in the stored session.**
+
+What is still not exercised: the live submit path. It is guarded off in demo by design because
+it mints real credentials, and a demo-picker session carries no Firebase token to call it with.
+Exercising it needs a real seeded sign-in.
+
+### Deprecated Team aggregates now have a removal condition
+
+`wins`, `losses`, `pointsFor`, `pointsAgainst`, `leaguePoints` and `adminUserIds` carry an
+explicit removal condition on the type: delete them once no pre-2026-08-28 team document lacks
+a standings projection, and once the guard reports a budget of zero. The guard's budget is the
+ratchet — it fails the build if the count grows, so the fallbacks can only shrink. Currently 17
+reads across 10 files, budget matched.
+
+### Shipped in this pass
+
+| Item | What landed |
+| --- | --- |
+| **Fixture creation** | Single fixture with validation for self-play, competition membership, duplicate pairing, club double-booking, venue collision within two hours, and season bounds. |
+| **Schedule generation** | Single or double round robin, match-day selection, kickoff time, season-window bounding. Preview grouped by round before anything is written. **Refuses rather than truncating** when the window cannot hold the schedule. Verified live: 90 fixtures across 18 rounds for ten clubs. |
+| **Rescheduling with history** | A move, not a date edit. Old and new kickoff shown together, reason required, `matchScheduleChanges` history written beside the change, and a readable timeline on the match page. New trusted endpoint; the bound capture policy is deliberately not re-derived. |
+
+One convergence worth noting: a `generateDoubleRoundRobinFixtures` already existed. Rather than
+run two generators, pairing now has a single home in `src/lib/league/schedule.ts` and the older
+module keeps ownership of the `Match` shape through `fixturesFromPreview`.
+
+### Still outstanding from the review's list
+
+Roster management, athlete registration and claim invitations, emergency takeover, post-match
+fallback, fixture import, and the full end-to-end journey run.
