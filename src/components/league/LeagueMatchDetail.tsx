@@ -12,6 +12,9 @@ import { NoAssignment } from '@/components/ui/NoAssignment';
 import { StateChip } from '@/components/league/LeagueCommandCentre';
 import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerSheet';
 import { RescheduleSheet } from '@/components/league/RescheduleSheet';
+import { EmergencyTakeoverSheet } from '@/components/league/EmergencyTakeoverSheet';
+import { PostMatchEntrySheet } from '@/components/league/PostMatchEntrySheet';
+import { effectiveCapturePolicy } from '@/lib/capturePolicy';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,6 +39,8 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
   });
   const [assigning, setAssigning] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const [takingOver, setTakingOver] = useState(false);
+  const [enteringResult, setEnteringResult] = useState(false);
 
   const match = detail.matches.find((entry) => entry.id === matchId);
   const row = useMemo(() => {
@@ -115,10 +120,23 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
           </>
         ) : null}
         {row.state === 'live' ? (
-          <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
-            This match is being recorded now. Events are captured by the Field Manager; the
-            league does not edit a live event or clock.
-          </p>
+          <>
+            <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+              This match is being recorded now. Events are captured by the Field Manager; the
+              league does not edit a live event or clock.
+            </p>
+            {/*
+              Offered last and styled as the exception it is. A takeover displaces the only
+              person watching, so it must never sit among ordinary controls.
+            */}
+            <button
+              type="button"
+              onClick={() => setTakingOver(true)}
+              className="min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--state-error)] px-4 text-sm font-semibold text-[var(--state-error)] transition hover:bg-[color-mix(in_srgb,var(--state-error),transparent_92%)]"
+            >
+              Emergency takeover
+            </button>
+          </>
         ) : null}
         {row.state === 'needs_review' ? (
           <Link
@@ -127,6 +145,21 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
           >
             Review exception
           </Link>
+        ) : null}
+        {row.state === 'awaiting_result' ? (
+          <>
+            <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+              This match has been played and no official result has arrived. A captured report
+              becomes official on its own; enter a result by hand only if none is coming.
+            </p>
+            <button
+              type="button"
+              onClick={() => setEnteringResult(true)}
+              className="min-h-11 w-full rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-text-strong hover:border-border-strong"
+            >
+              Enter post-match result
+            </button>
+          </>
         ) : null}
         {row.state === 'official' ? (
           <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
@@ -137,6 +170,29 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
       </section>
 
       <MatchHistory matchId={row.matchId} />
+
+      <PostMatchEntrySheet
+        open={enteringResult}
+        matchId={row.matchId}
+        matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
+        homeTeamName={row.homeTeamName}
+        awayTeamName={row.awayTeamName}
+        capturePolicy={effectiveCapturePolicy(
+          (match as { effectiveCapturePolicy?: unknown }).effectiveCapturePolicy,
+          undefined,
+        )}
+        onClose={() => setEnteringResult(false)}
+        onEntered={() => window.location.reload()}
+      />
+
+      <EmergencyTakeoverSheet
+        open={takingOver}
+        matchId={row.matchId}
+        matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
+        fieldManagerName={row.fieldManager?.displayName}
+        onClose={() => setTakingOver(false)}
+        onTakenOver={() => window.location.reload()}
+      />
 
       <RescheduleSheet
         open={rescheduling}
