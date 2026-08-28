@@ -129,7 +129,7 @@ export function OrganizationDirectory() {
             {filtered.length ? filtered.map((node) => (
               <DirectoryRow
                 key={node.league.id}
-                href={`/admin/leagues/${encodeURIComponent(node.league.id)}`}
+                href={`/admin/network/leagues/${encodeURIComponent(node.league.id)}`}
                 title={node.league.name}
                 meta={`${node.league.city} · ${node.league.sport} · ${node.teams.length} teams · ${node.athletesCount} athletes`}
                 status={node.league.lifecycleStatus ?? node.league.status}

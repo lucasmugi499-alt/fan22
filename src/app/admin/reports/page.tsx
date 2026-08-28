@@ -1,5 +1,6 @@
-import { PlatformReports } from "@/components/platform/PlatformReports";
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function Page() {
-  return <PlatformReports />;
+export default async function Page({ searchParams }: PageProps<'/admin/reports'>) {
+  redirect(legacyAdminTarget('/admin/reports', await searchParams));
 }

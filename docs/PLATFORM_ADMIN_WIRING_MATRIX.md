@@ -1,42 +1,123 @@
-# Platform Admin Wiring Matrix
+# Platform Console V2 wiring matrix
 
-Status: build 32 platform command hardening slice.
+**Status:** Implemented on 2026-08-27. Full release verification remains recorded in the implementation plan.
 
-The Platform Admin is a dedicated `platform_operator` experience. Broad authority must move through trusted server APIs, capability checks, lifecycle validation, explicit audit reasons where risk changes, and immutable audit events. This matrix records what each visible Platform Admin surface reads and which actions are actually wired.
+The Platform Console is a dedicated `platform_operator` experience. Its retrieval layer may
+show broad operational context, but every mutation remains behind a trusted server route,
+account-class and capability checks, live state validation, and an immutable audit event.
 
-| Page | Component | Displayed data | Source | Query/API | Action | Command/API | Required capability | Audit event | Tests | Current status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `/admin` | `CommandCentre` | Critical status, priority work, network health, recent audit, quick commands | Firestore aggregates and bounded previews | `GET /api/platform/command-centre` | Navigation to real queues | Links only | `platform_admin` or `super_admin` claim plus `accountClass=platform_operator` | Not applicable for reads | `src/app/api/platform/command-centre/route.test.ts` | Wired read model |
-| `/admin/work` | `MyWork` | League applications, athlete verification, result disputes, failed finalizations, reports | Existing provider collections | `useGoalPlaceData` bounded by `recordLimit` | Navigation to detail queues | Links only | Platform route guard | Not applicable for reads | Covered by build route map | Wired read surface |
-| `/admin/applications` | `ApplicationDirectory` | Public league applications and onboarding state | `leagueAdminApplications` | Existing provider read | Review in existing approvals/workflows | Existing `/api/access` approval flow and `/api/admin/actions` review flow | Platform Admin | `adminAuditEvents` from existing command paths | Existing access/admin action tests | Directory wired, detail workspace read-only |
-| `/admin/organizations` | `OrganizationDirectory` | League/team tree, org status, invite/dispute counts | Leagues, teams, seasons, athletes, matches, assignments | Existing provider read | Create league | `POST /api/admin/actions` with `create_league` via `securePlatformCommand` | `platform_admin` or `super_admin` claim plus `accountClass=platform_operator` | `adminAuditEvents` action `created` with request ID and after summary | `src/app/api/admin/actions/route.test.ts` plus build | Hardened command |
-| `/admin/leagues/[leagueId]` | `PlatformEntityDetail` | League overview, teams, related audit | Existing provider collections | `useGoalPlaceData` bounded by `recordLimit` | Drill into teams | Links only | Platform route guard | Not applicable for reads | Covered by build route map | Detail read workspace |
-| `/admin/teams/[teamId]` | `PlatformEntityDetail` | Team overview, roster counts, match counts, assignments | Existing provider collections | `useGoalPlaceData` bounded by `recordLimit` | None in this slice | Not enabled | Platform route guard | Not applicable | Covered by build route map | Detail read workspace |
-| `/admin/people` | `PeopleDirectory` | Account class, lifecycle status, assignment counts | Users and team assignments | Existing provider read | Activate, suspend, disable | `POST /api/admin/actions` with `update_user_account` via `securePlatformCommand` | `platform_admin` or `super_admin` claim plus `accountClass=platform_operator`; explicit reason required | `adminAuditEvents` action `activated`, `suspended`, or `disabled` with before/after summary and request ID | `src/app/api/admin/actions/route.test.ts` plus build | Hardened command; suspension revokes refresh tokens |
-| `/admin/people/[userId]` | `PlatformEntityDetail` | Account, identity link, assignments, audit preview | Existing provider collections | `useGoalPlaceData` bounded by `recordLimit` | None in this slice | Not enabled | Platform route guard | Not applicable | Covered by build route map | Detail read workspace |
-| `/admin/access` | `AccessDirectory` | Team Admin invitations and assignments without token hashes | Team assignments, users, teams, leagues | Existing provider read | Revoke team assignment | `POST /api/admin/actions` with `revoke_team_assignment` via `securePlatformCommand` | `platform_admin` or `super_admin` claim plus `accountClass=platform_operator`; explicit reason required | `adminAuditEvents` action `revoked` with before/after summary and request ID | `src/app/api/admin/actions/route.test.ts` plus build | Hardened command |
-| `/admin/competition` | `CompetitionIntegrity` | Result disputes, overdue confirmations, failed finalizations, projection-health signals | Matches and finalization records | Existing provider read | Fixture creation through league workflows | `POST /api/admin/actions` with `create_fixtures` via `secureLeagueCommand` | `league.season.manage` scoped to the league, or dedicated Platform Operator | `adminAuditEvents` action `created` with fixture count and request ID | `src/app/api/admin/actions/route.test.ts` and `src/rules/firestore.rules.test.ts` | Fixture creation command-owned; direct browser match writes blocked |
-| `/admin/trust` | `PlatformTrust` | Open reports, compliance and trust queues | Existing platform trust component | Existing provider read | Resolve/dismiss reports | `POST /api/admin/actions` with `resolve_report` via `securePlatformCommand` | `platform_admin` or `super_admin` claim plus `accountClass=platform_operator`; explicit decision note required | `adminAuditEvents` action `resolved` or `dismissed` with before/after summary and request ID | Existing admin action tests plus build | Hardened command |
-| `/admin/trust/[caseId]` | `PlatformEntityDetail` | Trust case detail fields and action history | Reports | `useGoalPlaceData` bounded by `recordLimit` | None in this slice | Not enabled | Platform route guard | Not applicable | Covered by build route map | Detail read workspace |
-| `/admin/finance` | `FinancialOperations` | Allocations and compliance cases | Money read models | Existing provider read | None | Real payout commands disabled | Platform route guard | Not applicable | Existing build | Monitoring only |
-| `/admin/sponsors` | `SponsorReport` | Sponsor proof and campaign impact | Sponsor report models | Existing provider read | None in this slice | Not enabled | Platform route guard | Not applicable | Existing build | Existing report surface |
-| `/admin/reports` | `PlatformReports` | Platform report summaries and CSV export | Existing provider collections | Existing provider read | CSV export | Client-generated CSV | Platform route guard | Not applicable | Existing build | Basic reporting, needs server projections |
-| `/admin/system` | `SystemHealth` | Environment, Firebase project/database, runtime safeguards, job backlog | Public env and existing provider reads | Client env and bounded data reads | None | Infrastructure commands disabled | Platform route guard | Not applicable | Covered by build route map | Monitoring only |
-| `/admin/audit` | `AuditExplorer` | Immutable admin audit history | `adminAuditEvents` | Existing provider read | None | Audit writes disabled from browser | Platform route guard and Firestore rules | Server-owned audit from command APIs | Existing rules/tests plus build | Read-only audit explorer |
+## Primary destinations
 
-## Implemented Command-Layer Guardrails
+| Destination | Route | Tabs / surfaces | Primary read source | Mutation posture |
+| --- | --- | --- | --- | --- |
+| Desk | `/admin` | All, Mine, Applications, Integrity, Trust, Money, History | `GET /api/platform/desk` normalizes eight source queues into `PlatformCase` | Registered case actions open their workbench consequence flow; personal defer writes no source status |
+| Network | `/admin/network` | Leagues, Teams, Athletes, Organizations, People, Access, Applications | Authenticated directories plus `GET /api/platform/workbench/[kind]/[id]` | Network, access, application and invitation commands only |
+| Integrity | `/admin/integrity` | Live, Escalations, Quality, Trust, Audit | `GET /api/platform/integrity` plus existing trust/audit projections | Fenced takeover, exception transition/ratification, moderation and policy-floor commands |
+| Money | `/admin/money` | Allocations, Payees, Holds, Sponsors, Reports | Existing allocation/compliance/report projections | Payee workflow only; settlement release and real payout remain disabled |
+| Platform | `/admin/platform` | Site, Controls, Health, Activations, Audit | Site, health, activation and immutable-audit reads | Versioned site settings and governed environment activation |
 
-- `src/server/platform/commands/securePlatformCommand.ts` centralizes the current Platform Admin command boundary.
-- Platform commands reject non-Platform Operator account classes even when a stale/custom role claim says `platform_admin`.
-- Sensitive account, access, team verification, league suspension and trust decisions require an explicit reason before the transaction runs.
-- Account suspension, disable and deletion-pending transitions increment `accessVersion`; suspension revokes Firebase refresh tokens; disable/deletion-pending also disables the Firebase Auth user.
-- Server audit events now include `requestId`, environment, before summary and after summary for hardened commands.
-- `secureLeagueCommand` gates league-scoped operations by `accountClass=organization_operator` plus either legacy league admin membership or `league.season.manage`, while Platform Operators retain governed oversight.
-- Season creation, season transition and fixture creation moved behind trusted server commands; Firestore rules now block direct browser writes to `seasons` and `matches`.
+Desktop and mobile expose exactly these five destinations for Platform Operators. Other roles
+retain their existing navigation model. The authenticated command palette is a retrieval layer,
+not a sixth destination.
 
-## Next Command-Layer Work
+## Command contract
 
-- Move ordinary profile updates and fixture edits into trusted command APIs.
-- Add governed correction, finalization retry, ownership transfer, orphan recovery, and trust restriction commands.
-- Replace browser-generated platform reports with server-created report projections and export history.
-- Keep finance in monitoring-only mode until PSP, KYC, reconciliation, refund and legal gates are approved.
+`src/lib/platform/commandRegistry.ts` is the canonical inventory of 49 Platform-visible
+commands. Every entry declares its endpoint, capability, consequence tier, required inputs,
+reason/confirmation policy, audit action and collection, destination and search terms.
+
+| Tier | Operator friction | Example |
+| --- | --- | --- |
+| Regular | Required reason where declared; no consequence acknowledgement | Update a team profile |
+| Consequential | Server consequence preview, reason, explicit acknowledgement | Suspend a league, reject an application |
+| Governed | Server consequence preview, reason, exact typed phrase | Ratify, take over, revoke, change capture-policy floor |
+| Quiet | Minimal UI, still trusted and audited | Defer a Desk case for the current operator |
+
+`POST /api/platform/commands/preview` computes current changes, unchanged facts,
+notifications, reversibility, blockers, audit shape, state fingerprint and expiry. The preview
+does not authorize execution. The target route rechecks account class, capability, current
+state and version/conflict preconditions before writing.
+
+## Read and command API wiring
+
+| Concern | Read API | Command API(s) | Capability / invariant | Audit target |
+| --- | --- | --- | --- | --- |
+| Desk | `/api/platform/desk` | `/api/platform/desk/defer` | `platform.admin.manage`; source record is unchanged | `platformCaseDeferrals` |
+| Palette | `/api/platform/palette` | Registered target endpoint | Active `platform_operator`; private index never enters public search | Endpoint-defined |
+| Entity workbenches | `/api/platform/workbench/[kind]/[id]` | Registry-driven network/account/takeover APIs | Per-tab server pagination; payee and session secrets redacted | Endpoint-defined |
+| League/team/athlete lifecycle | Workbench + directories | `/api/platform/network` | `platform.network.manage` / `platform.athlete.manage`; lifecycle and dependency checks | Entity collection |
+| Application triage | `/api/platform/applications/[applicationId]` | Same route and `/api/access` | `platform.application.review`; approve-and-invite is atomic and retry-idempotent | `leagueAdminApplications` |
+| Invitation delivery | Application/access reads | `/api/platform/invitations/[invitationId]`, `/bulk` | `platform.access.manage`; token rotation and live-state checks | `invitations`, `invitationDeliveryAttempts` |
+| Live integrity | `/api/platform/integrity?view=live` | `/api/matches/[matchId]/takeover` | New attributed generation fences the old session; clock/events are not edited | Match Ops audit/exception records |
+| Escalations | `/api/platform/integrity?view=escalations` | `/api/exceptions/[exceptionId]/ratify`, `/api/platform/competition-integrity` | Unconflicted actor required; stored deadline or seven-day liveness | Exception collection |
+| Quality | `/api/platform/integrity?view=quality` | `/api/platform/capture-policy-floor` | Reads finalizer-computed tier; floor only tightens future fixture creation | `platformSettings` |
+| Trust | Existing trust projection | `/api/admin/actions` `resolve_report` | `platform.trust.decide`; decision reason required | `reports` |
+| Site | `/api/platform/site` | Same route | `platform.site.manage`; expected version required | `platformSettings` |
+| Environment | control/health reads | `/api/platform/environment-activation` | `platform.environment.activate`; stage machine and typed confirmation | `environmentActivations` |
+| Payee | Redacted workbench/queue | `/api/platform/payee` | `platform.payee.verify`; payout identity remains isolated | `athletePayees` |
+| Audit | Existing immutable projection | None | Browser writes/deletes are unavailable | Server-owned `adminAuditEvents` |
+
+## Workbench routes
+
+| Entity | Route | Distinct context |
+| --- | --- | --- |
+| League | `/admin/network/leagues/[leagueId]` | Overview, policy, teams, accountability, history |
+| Team | `/admin/network/teams/[teamId]` | Overview, roster, contacts, matches, history |
+| Athlete | `/admin/network/athletes/[athleteId]` | Sporting record, persona boundary, payee state, history |
+| Person | `/admin/network/people/[userId]` | Account, assignments, affiliations, history |
+| Match | `/admin/integrity/matches/[matchId]` | Overview, provenance, sessions, exceptions, history |
+| Application | `/admin/network/applications/[applicationId]` | Risk comparison, evidence, review and invitation delivery |
+| Trust case | `/admin/integrity/trust/[caseId]` | Read-only case evidence; decisions use the registered trust command |
+
+Session token hashes, invitation token hashes/action URLs and payout secrets are explicitly
+removed from workbench and operational API responses.
+
+## Legacy route migration
+
+The executable mapping is `src/lib/platform/adminRoutes.ts` and is covered by
+`src/lib/platform/adminRoutes.test.ts`. Search/status/filter query parameters are forwarded;
+an obsolete `tab` value cannot replace the new owning workspace tab.
+
+| Legacy route(s) | Destination |
+| --- | --- |
+| `/admin/work`, `/admin/approvals` | Desk Mine / Applications |
+| `/admin/applications`, `/admin/leagues`, `/admin/teams`, `/admin/athletes`, `/admin/organizations`, `/admin/people`, `/admin/access` | Network owning tab |
+| League, team, person and application detail routes | Corresponding Network workbench with ID preserved |
+| `/admin/competition`, `/admin/trust`, `/admin/audit` | Integrity Escalations / Trust / Audit |
+| Trust detail route | Integrity trust case with ID preserved |
+| `/admin/finance`, `/admin/sponsors`, `/admin/reports` | Money owning tab |
+| Campaign, organization and sponsor detail routes | Folded Money/Network view with ID preserved as a filter |
+| `/admin/site`, `/admin/control-plane`, `/admin/system` | Platform Site / Controls / Health |
+
+## Non-negotiable safety proof
+
+- No registry input or Platform API writes score, event, standing, statistic, capability or
+  data-quality fields. Contract tests fail if those mutation shapes appear.
+- Platform cannot edit a live clock or event. Takeover creates a new attributed generation and
+  fences the previous one.
+- No command grants ad hoc user capabilities. Authority still comes from canonical assignments
+  and permission bundles.
+- Quality distribution only reads `finalizations.dataQuality.tier`; no UI or Platform command
+  sets it.
+- A conflicted principal, including Platform, is refused by the ratification route and preview.
+- There is no impersonation command or support mode.
+- Capture-policy floor changes are versioned, tighten-only and never rewrite existing fixtures.
+- Finance remains monitoring-only until the PSP, KYC, legal, refund and reconciliation gates
+  are approved.
+
+## Test anchors
+
+- Registry and forbidden mutation fields: `src/lib/platform/commandRegistry.test.ts`
+- Route migration: `src/lib/platform/adminRoutes.test.ts`
+- Ratification conflicts: `src/app/api/exceptions/[exceptionId]/ratify/route.test.ts`
+- Palette privacy/authorization: `src/app/api/platform/palette/route.test.ts`
+- Desk normalization/order/read: `src/lib/platform/platformCases.test.ts`,
+  `src/server/platform/desk/platformDesk.test.ts`, `src/app/api/platform/desk/route.test.ts`
+- Workbench redaction: `src/server/platform/workbenches/platformWorkbench.test.ts`,
+  `src/app/api/platform/workbench/[kind]/[id]/route.test.ts`
+- Application/invitation risk, idempotency and delivery:
+  `src/lib/platform/applicationRisk.test.ts`, `src/app/api/access/route.test.ts`,
+  `src/app/api/platform/invitations/bulk/route.test.ts`
+- Integrity provenance and policy floor: `src/server/platform/integrity/integrityReadModel.test.ts`,
+  `src/app/api/platform/integrity/route.test.ts`,
+  `src/app/api/platform/capture-policy-floor/route.test.ts`

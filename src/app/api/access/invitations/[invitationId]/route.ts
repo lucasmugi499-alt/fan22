@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { DocumentData } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentData } from 'firebase-admin/firestore';
 import { jsonError, requireAuthenticatedUser } from '@/server/api/security';
 
 import { adminDb } from '@/lib/firebase/admin';
@@ -75,7 +75,8 @@ export async function GET(
   if (!token) return jsonError('A complete invitation link is required.', 400);
 
   const collectionName = kind === 'team' ? 'teamAssignments' : 'invitations';
-  const snapshot = await adminDb.collection(collectionName).doc(invitationId).get();
+  const invitationRef = adminDb.collection(collectionName).doc(invitationId);
+  const snapshot = await invitationRef.get();
   if (!snapshot.exists) return jsonError('Invitation not found.', 404);
 
   const data = snapshot.data()!;
@@ -86,10 +87,24 @@ export async function GET(
     return jsonError('Sign in with the email address that received this invitation.', 403);
   }
 
+  let safeData = data;
+  const canObserveView = kind !== 'team'
+    && ['queued', 'sent', 'delivered'].includes(String(data.status))
+    && (!data.expiresAt || Date.parse(String(data.expiresAt)) > Date.now());
+  if (canObserveView) {
+    const viewedAt = new Date().toISOString();
+    await invitationRef.update({
+      status: 'viewed',
+      viewedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    safeData = { ...data, status: 'viewed', viewedAt };
+  }
+
   return Response.json(
     kind === 'team'
-      ? safeTeamAssignment(snapshot.id, data)
-      : safeAccessInvitation(snapshot.id, data),
+      ? safeTeamAssignment(snapshot.id, safeData)
+      : safeAccessInvitation(snapshot.id, safeData),
     { headers: { 'cache-control': 'no-store' } },
   );
 }

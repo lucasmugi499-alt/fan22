@@ -15,16 +15,11 @@ import {
   Trophy,
   Coins,
   Gavel,
-  SlidersHorizontal,
   SignIn,
   Info,
   MapPin,
   HandHeart,
   DeviceMobile,
-  Key,
-  Pulse,
-  Scroll,
-  UserList,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -66,7 +61,7 @@ export interface NavDestination {
 export interface RoleNav {
   /** Shown in the top bar as the workspace identity. */
   workspace: string;
-  /** ≤4 primary destinations; the shell adds "More" as the 5th on mobile. */
+  /** Up to five primary destinations. The shell adds More only when `more` is non-empty. */
   primary: NavDestination[];
   /** Lower-frequency destinations, surfaced under "More". */
   more: NavDestination[];
@@ -163,49 +158,17 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       ...COMMON_MORE,
     ],
   },
-  /**
-   * Six workspaces, each answering one operational question.
-   *
-   * The previous shape grouped by system boundary — a CONTROL PLANE group holding release
-   * state next to a GROWTH group holding sponsors — which meant an operator had to know how
-   * the platform is built to find where a job lives. These six are named for the work:
-   * what needs me now, who is in the network, is the competition sound, what does the public
-   * see, where is the money, and who did what.
-   *
-   * Athlete management joins Leagues and Teams under NETWORK because athletes became managed
-   * profiles: the platform and their club write those records, so the console needs a front
-   * door to them exactly as it does for the objects that own them.
-   *
-   * Control plane and system health sit under WEBSITE & SETTINGS as the read-only end of
-   * platform configuration — what the environment currently is, next to what the public
-   * currently sees. Neither switches anything; both describe state an operator changing site
-   * settings needs in front of them.
-   */
+  /** Five operator destinations. Sections are workspace tabs; commands are not navigation. */
   platform_admin: {
-    workspace: 'Platform Command',
+    workspace: 'Platform Console',
     primary: [
-      { name: 'Command centre', href: '/admin', icon: SlidersHorizontal, group: 'COMMAND' },
-      { name: 'Leagues', href: '/admin/leagues', icon: Trophy, group: 'NETWORK' },
-      { name: 'Teams', href: '/admin/teams', icon: Buildings, group: 'NETWORK' },
-      { name: 'Integrity', href: '/admin/competition', icon: Gavel, group: 'INTEGRITY' },
+      { name: 'Desk', href: '/admin', icon: ListBullets },
+      { name: 'Network', href: '/admin/network', icon: Buildings },
+      { name: 'Integrity', href: '/admin/integrity', icon: Gavel },
+      { name: 'Money', href: '/admin/money', icon: Wallet },
+      { name: 'Platform', href: '/admin/platform', icon: Gear },
     ],
-    more: [
-      { name: 'Work queue', href: '/admin/work', icon: ListBullets, group: 'COMMAND' },
-      { name: 'Athletes', href: '/admin/athletes', icon: Users, group: 'NETWORK' },
-      { name: 'Organizations', href: '/admin/organizations', icon: Buildings, group: 'NETWORK' },
-      { name: 'Trust cases', href: '/admin/trust', icon: Gavel, group: 'INTEGRITY' },
-      { name: 'Website & settings', href: '/admin/site', icon: Gear, group: 'WEBSITE & SETTINGS' },
-      { name: 'Control plane', href: '/admin/control-plane', icon: SlidersHorizontal, group: 'WEBSITE & SETTINGS' },
-      { name: 'System health', href: '/admin/system', icon: Pulse, group: 'WEBSITE & SETTINGS' },
-      { name: 'Finance', href: '/admin/finance', icon: Wallet, group: 'FINANCE & SUPPORT' },
-      { name: 'Sponsors', href: '/admin/sponsors', icon: Coins, group: 'FINANCE & SUPPORT' },
-      { name: 'Reports', href: '/admin/reports', icon: ChartLine, group: 'FINANCE & SUPPORT' },
-      { name: 'Access', href: '/admin/access', icon: Key, group: 'AUDIT & ACCESS' },
-      { name: 'People', href: '/admin/people', icon: UserList, group: 'AUDIT & ACCESS' },
-      { name: 'Applications', href: '/admin/applications', icon: ShieldCheck, group: 'AUDIT & ACCESS' },
-      { name: 'Audit trail', href: '/admin/audit', icon: Scroll, group: 'AUDIT & ACCESS' },
-      ...COMMON_MORE,
-    ],
+    more: [],
   },
 };
 

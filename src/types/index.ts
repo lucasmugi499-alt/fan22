@@ -1561,7 +1561,31 @@ export interface Invitation {
   acceptedAt?: string;
   declinedAt?: string;
   revokedAt?: string;
+  sentAt?: string;
+  deliveredAt?: string;
+  deliveryAttemptCount?: number;
+  lastDeliveryAttemptId?: string;
+  lastDeliveryStatus?: "sent" | "not_configured" | "failed" | "queued";
+  deliveryError?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvitationDeliveryAttempt {
+  id: string;
+  invitationId: string;
+  channel: "email";
+  destination: string;
+  provider: "resend";
+  status: "queued" | "sent" | "failed_delivery";
+  providerStatus?: "sent" | "not_configured" | "failed";
+  providerMessageId?: string;
+  error?: string;
+  attemptNumber: number;
+  requestedByUserId: string;
+  reason?: string;
+  createdAt: string;
+  completedAt?: string;
   updatedAt: string;
 }
 
@@ -1632,6 +1656,25 @@ export interface LeagueAdminApplication {
   invitationId?: string;
   invitationActionUrl?: string;
   riskFlags?: string[];
+  riskLevel?: "low" | "medium" | "high";
+  duplicateCandidates?: Array<{
+    id: string;
+    kind: "league" | "application";
+    title: string;
+    city?: string;
+    status?: string;
+    score: number;
+    reason: string;
+  }>;
+  requestedInformation?: {
+    fields: string[];
+    message: string;
+    requestedByUserId: string;
+    requestedAt: string;
+  };
+  informationDeliveryStatus?: "queued" | "sent" | "failed_delivery";
+  informationDeliveryError?: string;
+  invitationDeliveryStatus?: "queued" | "sent" | "failed_delivery";
   reviewedByUserId?: string;
   applicantMessage?: string;
   createdAt: string;

@@ -6,6 +6,7 @@ import { requireAuthenticatedMutation, requireRole } from '@/server/api/security
 import { PERMISSION_BUNDLES, isIssuableBundle } from '@/lib/auth/access';
 import { normalizeAccessAssignment, readScopeProjection } from '@/server/access/projector';
 import { resolveAccountClass } from '@/lib/auth/accountClass';
+import { sendAccessInvitationEmail } from '@/server/email/accessInvitation';
 import type { AccountClass } from '@/types';
 
 export const runtime = 'nodejs';
@@ -258,6 +259,7 @@ export async function POST(request: Request) {
       const tokenHash = createHash('sha256').update(token).digest('hex');
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const actionUrl = `/invitations/access/${invitationId}?token=${encodeURIComponent(token)}`;
+      const deliveryAttemptId = `${invitationId}_email_1`;
 
       await adminDb.runTransaction(async (transaction) => {
         const current = await transaction.get(applicationRef);
@@ -325,13 +327,27 @@ export async function POST(request: Request) {
           permissionBundleId: 'league_owner',
           tokenHash,
           tokenVersion: 1,
-          status: 'sent',
+          // Creation proves only that the invitation is queued. Provider acceptance is
+          // recorded after the transaction and never inferred from this document existing.
+          status: 'queued',
           invitedByUserId: actor.uid,
           applicationId: application.id,
           organizationId,
           leagueId,
           actionUrl,
           expiresAt,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.set(adminDb.collection('invitationDeliveryAttempts').doc(deliveryAttemptId), {
+          id: deliveryAttemptId,
+          invitationId,
+          channel: 'email',
+          destination: invitedEmail,
+          provider: 'resend',
+          status: 'queued',
+          attemptNumber: 1,
+          requestedByUserId: actor.uid,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -342,6 +358,7 @@ export async function POST(request: Request) {
           leagueId,
           invitationId,
           invitationActionUrl: actionUrl,
+          invitationDeliveryStatus: 'queued',
           updatedAt: FieldValue.serverTimestamp(),
         });
         transaction.set(adminDb.collection('adminAuditEvents').doc(), {
@@ -353,12 +370,48 @@ export async function POST(request: Request) {
           createdAt: FieldValue.serverTimestamp(),
         });
       });
+
+      const delivery = await sendAccessInvitationEmail({
+        to: invitedEmail,
+        inviteUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
+        invitationId,
+        leagueName: String(data.leagueName),
+        roleLabel: 'League Owner',
+        expiresAt,
+        attemptId: deliveryAttemptId,
+      });
+      const deliveryStatus = delivery.status === 'sent' ? 'sent' : 'failed_delivery';
+      await adminDb.runTransaction(async (transaction) => {
+        transaction.update(adminDb.collection('invitations').doc(invitationId), {
+          status: deliveryStatus,
+          deliveryAttemptCount: 1,
+          lastDeliveryAttemptId: deliveryAttemptId,
+          lastDeliveryStatus: delivery.status,
+          ...(delivery.id ? { emailMessageId: delivery.id } : {}),
+          ...(delivery.error ? { deliveryError: delivery.error } : {}),
+          ...(delivery.status === 'sent' ? { sentAt: FieldValue.serverTimestamp() } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.update(adminDb.collection('invitationDeliveryAttempts').doc(deliveryAttemptId), {
+          status: deliveryStatus,
+          providerStatus: delivery.status,
+          ...(delivery.id ? { providerMessageId: delivery.id } : {}),
+          ...(delivery.error ? { error: delivery.error } : {}),
+          completedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        transaction.update(applicationRef, {
+          invitationDeliveryStatus: deliveryStatus,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
       return Response.json({
         ok: true,
         leagueId,
         organizationId,
         invitationId,
         actionUrl: new URL(actionUrl, publicBaseUrl(request)).toString(),
+        delivery: { status: deliveryStatus, providerStatus: delivery.status, ...(delivery.error ? { error: delivery.error } : {}) },
       });
     }
 

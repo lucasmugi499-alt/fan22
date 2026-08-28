@@ -26,6 +26,13 @@ const button = cva(
         subtle: 'bg-brand-subtle text-brand hover:bg-[color-mix(in_srgb,var(--brand-subtle),var(--brand)_10%)]',
         ghost: 'text-muted hover:bg-surface-glass hover:text-text-strong',
         danger: 'bg-[var(--state-error)] text-white shadow-e1 hover:opacity-90',
+        command:
+          'border border-border-strong bg-surface-2 text-text-strong bezel-core hover:border-brand/45 hover:bg-surface-3',
+        commandConsequential:
+          'border border-[color-mix(in_srgb,var(--state-warning),transparent_45%)] bg-[var(--state-warning-bg)] text-[var(--state-warning)] hover:border-[var(--state-warning)]',
+        commandGoverned:
+          'border border-[color-mix(in_srgb,var(--state-error),transparent_40%)] bg-[var(--state-error-bg)] text-[var(--state-error)] hover:border-[var(--state-error)]',
+        quiet: 'text-subtle hover:bg-surface-glass hover:text-text-strong',
       },
       size: {
         sm: 'min-h-11 px-4 text-sm md:min-h-9',

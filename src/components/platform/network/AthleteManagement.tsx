@@ -103,7 +103,7 @@ export function AthleteManagement() {
       header: 'Athlete',
       primary: true,
       cell: (row) => (
-        <Link href={`/athletes/${row.athlete.id}`} className="font-semibold text-text-strong hover:text-brand">
+        <Link href={`/admin/network/athletes/${row.athlete.id}`} className="font-semibold text-text-strong hover:text-brand">
           {row.athlete.legalName}
         </Link>
       ),
@@ -181,7 +181,7 @@ export function AthleteManagement() {
         </p>
         <p className="mt-2 text-sm text-muted">
           Payout state is reported as &ldquo;can be paid&rdquo; or not, and never as an account number, in{' '}
-          <Link href="/admin/finance" className="text-brand hover:underline">Finance &amp; support</Link>.
+          <Link href="/admin/money?tab=payees" className="text-brand hover:underline">Money operations</Link>.
         </p>
       </Card>
 

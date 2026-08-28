@@ -1,5 +1,6 @@
-import { SystemHealth } from '@/components/platform/system/SystemHealth';
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function AdminSystemPage() {
-  return <SystemHealth />;
+export default async function AdminSystemPage({ searchParams }: PageProps<'/admin/system'>) {
+  redirect(legacyAdminTarget('/admin/system', await searchParams));
 }

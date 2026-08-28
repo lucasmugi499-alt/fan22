@@ -1,6 +1,7 @@
-import { PlatformEntityDetail } from '@/components/platform/details/PlatformEntityDetail';
+import { redirect } from 'next/navigation';
+import { legacyAdminEntityTarget } from '@/lib/platform/adminRoutes';
 
 export default async function AdminSponsorDetailPage({ params }: { params: Promise<{ sponsorId: string }> }) {
   const { sponsorId } = await params;
-  return <PlatformEntityDetail kind="sponsor" id={decodeURIComponent(sponsorId)} />;
+  redirect(legacyAdminEntityTarget('sponsor', sponsorId));
 }

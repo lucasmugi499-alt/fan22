@@ -1,5 +1,6 @@
-import { SponsorReport } from "@/components/platform/SponsorReport";
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function Page() {
-  return <SponsorReport />;
+export default async function Page({ searchParams }: PageProps<'/admin/sponsors'>) {
+  redirect(legacyAdminTarget('/admin/sponsors', await searchParams));
 }

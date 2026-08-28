@@ -116,7 +116,7 @@ export function PeopleDirectory() {
             return (
               <div key={user.id} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
                 <DirectoryRow
-                  href={`/admin/people/${encodeURIComponent(user.id)}`}
+                  href={`/admin/network/people/${encodeURIComponent(user.id)}`}
                   title={user.displayName || user.name || user.email}
                   meta={`${user.email} · ${user.accountClass ?? 'legacy account'} · ${user.role.replace(/_/g, ' ')}`}
                   status={accountStatus}

@@ -9,9 +9,8 @@ import type { RoleNav } from '@/lib/nav';
 import { activeHref } from './navActive';
 
 /**
- * Mobile global nav: 4 primary destinations + a "More" sheet. Fixed to the bottom with
- * safe-area padding; every target meets --tap-min. This is the only *where am I going*
- * control on mobile — sections live in workspace tabs, actions live in the content.
+ * Mobile global nav: up to five primary destinations, with More only when lower-frequency
+ * destinations exist. Platform uses five direct destinations; other roles keep four + More.
  */
 export function BottomNav({ nav }: { nav: RoleNav }) {
   const pathname = usePathname();
@@ -51,7 +50,7 @@ export function BottomNav({ nav }: { nav: RoleNav }) {
               </li>
             );
           })}
-          <li className="flex-1">
+          {nav.more.length ? <li className="flex-1">
             <button
               onClick={() => setMoreOpen(true)}
               aria-haspopup="dialog"
@@ -66,11 +65,11 @@ export function BottomNav({ nav }: { nav: RoleNav }) {
               <DotsThreeOutline className="h-6 w-6" weight={moreActive ? 'fill' : 'regular'} />
               More
             </button>
-          </li>
+          </li> : null}
         </ul>
       </nav>
 
-      {moreOpen ? (
+      {moreOpen && nav.more.length ? (
         <MoreSheet nav={nav} active={active} onClose={() => setMoreOpen(false)} />
       ) : null}
     </>

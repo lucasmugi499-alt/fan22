@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight, MagnifyingGlass } from '@phosphor-icons/react';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { ScrollRail } from '@/components/ui/ScrollRail';
 import { cn } from '@/lib/utils';
 
@@ -19,11 +20,17 @@ export function PlatformAdminHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+    <header className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-4">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">{eyebrow}</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-text-strong md:text-4xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{description}</p>
+        {/*
+          Deliberately smaller on a phone. At the previous size the title and its description
+          filled most of a 390px viewport, so an operator arrived at a headline instead of at
+          the work. The console is used one-handed on a touchline; the first case card should
+          be reachable without a scroll.
+        */}
+        <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-text-strong sm:text-3xl md:mt-2 md:text-4xl">{title}</h1>
+        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted md:mt-2">{description}</p>
       </div>
       {action}
     </header>
@@ -32,19 +39,21 @@ export function PlatformAdminHeader({
 
 export function PlatformStatGrid({ items }: { items: Array<{ label: string; value: string | number; tone?: 'default' | 'good' | 'warn' | 'bad' }> }) {
   return (
-    <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-      {items.map((item) => (
-        <Card key={item.label} className={cn(
-          'p-3.5',
-          item.tone === 'good' && 'border-brand/30 bg-brand-subtle/25',
-          item.tone === 'warn' && 'border-[color-mix(in_srgb,var(--state-pending),transparent_55%)]',
-          item.tone === 'bad' && 'border-[color-mix(in_srgb,var(--state-error),transparent_55%)]',
-        )}>
-          <p data-numeric className="text-2xl font-bold tabular-nums text-text-strong">{item.value}</p>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-subtle">{item.label}</p>
-        </Card>
-      ))}
-    </div>
+    <ScrollRail className="-mx-[var(--gutter)] px-[var(--gutter)] md:mx-0 md:overflow-visible md:px-0">
+      <div className="flex gap-2.5 md:grid md:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <Card key={item.label} className={cn(
+            'min-w-[10.5rem] flex-1 p-3.5 md:min-w-0',
+            item.tone === 'good' && 'border-brand/30 bg-brand-subtle/25',
+            item.tone === 'warn' && 'border-[color-mix(in_srgb,var(--state-pending),transparent_55%)]',
+            item.tone === 'bad' && 'border-[color-mix(in_srgb,var(--state-error),transparent_55%)]',
+          )}>
+            <p data-numeric className="text-2xl font-bold tabular-nums text-text-strong">{item.value}</p>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-subtle">{item.label}</p>
+          </Card>
+        ))}
+      </div>
+    </ScrollRail>
   );
 }
 
@@ -109,11 +118,11 @@ export function DirectoryRow({
   const content = (
     <>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-text-strong">{title}</p>
-        <p className="mt-1 truncate text-xs text-muted">{meta}</p>
+        <p className="break-words text-sm font-semibold text-text-strong sm:truncate">{title}</p>
+        <p className="mt-1 break-words text-xs leading-5 text-muted sm:truncate">{meta}</p>
         {detail ? <div className="mt-2">{detail}</div> : null}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 sm:justify-end">
         {status ? <StatusChip label={status} tone={statusTone} /> : null}
         {href ? <ArrowRight className="h-4 w-4 text-subtle" weight="bold" /> : null}
       </div>
@@ -233,18 +242,15 @@ export function CommandButton({
   disabled?: boolean;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        'min-h-9 shrink-0 rounded-[var(--radius-sm)] border px-2.5 text-xs font-semibold transition disabled:opacity-40',
-        tone === 'primary' && 'border-transparent bg-brand text-on-brand',
-        tone === 'destructive' && 'border-[color-mix(in_srgb,var(--state-error),transparent_45%)] text-[var(--state-error)]',
-        tone === 'default' && 'border-border text-text-strong hover:border-border-strong',
-      )}
+      size="sm"
+      variant={tone === 'primary' ? 'primary' : tone === 'destructive' ? 'commandGoverned' : 'command'}
+      className="shrink-0 rounded-[var(--radius-sm)] px-2.5 text-xs"
     >
       {label}
-    </button>
+    </Button>
   );
 }

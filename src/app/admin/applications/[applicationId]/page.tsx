@@ -1,6 +1,7 @@
-import { PlatformEntityDetail } from '@/components/platform/details/PlatformEntityDetail';
+import { redirect } from 'next/navigation';
+import { legacyAdminEntityTarget } from '@/lib/platform/adminRoutes';
 
 export default async function AdminApplicationDetailPage({ params }: { params: Promise<{ applicationId: string }> }) {
   const { applicationId } = await params;
-  return <PlatformEntityDetail kind="application" id={decodeURIComponent(applicationId)} />;
+  redirect(legacyAdminEntityTarget('application', applicationId));
 }

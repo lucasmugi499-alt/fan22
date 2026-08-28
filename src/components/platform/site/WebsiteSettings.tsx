@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState, PlatformAdminHeader, StatusChip } from '@/components/platform/PlatformAdminPrimitives';
-import { CommandDialog } from '@/components/platform/commands/CommandDialog';
+import { ConsequenceSheet } from '@/components/platform/commands/ConsequenceSheet';
+import { PlatformCommandButton } from '@/components/platform/commands/PlatformCommandButton';
 import { usePlatformCommand } from '@/components/platform/commands/usePlatformCommand';
 import {
   DEFAULT_SITE_SETTINGS,
@@ -264,24 +265,25 @@ export function WebsiteSettings() {
             >
               Discard
             </button>
-            <button
-              type="button"
+            <PlatformCommandButton
+              commandId="site.update_settings"
+              label="Review and save"
               disabled={!changed.length || Boolean(bannerProblem)}
+              disabledReason={bannerProblem ?? (!changed.length ? 'Change at least one setting before review.' : undefined)}
               onClick={() => setConfirming(true)}
-              className="min-h-11 rounded-[var(--radius-md)] bg-brand px-4 text-sm font-semibold text-on-brand disabled:opacity-40"
-            >
-              Review and save
-            </button>
+            />
           </div>
         </div>
         {command.success ? <p className="mt-3 text-sm text-brand">{command.success}</p> : null}
         {command.error && !confirming ? <p className="mt-3 text-sm text-[var(--state-disputed)]">{command.error}</p> : null}
       </Card>
 
-      <CommandDialog
+      <ConsequenceSheet
         open={confirming}
+        commandId="site.update_settings"
+        targetId="site"
+        inputs={{ expectedVersion: saved.version, patch: Object.fromEntries(changed.map((key) => [key, patch[key as keyof SiteSettingsPatch]])) }}
         title="Save site settings"
-        description={`This changes what the public sees: ${changed.join(', ')}. The reason is written to the audit trail.`}
         submitLabel="Save settings"
         running={command.running}
         error={command.error}

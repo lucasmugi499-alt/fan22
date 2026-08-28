@@ -62,6 +62,10 @@ describe('public league admin applications route', () => {
       city: 'Jinja',
       status: 'pending',
       source: 'public_league_application',
+      normalizedLeagueName: 'public rugby league',
+      riskLevel: 'low',
+      riskFlags: [],
+      duplicateCandidates: [],
     }));
   });
 

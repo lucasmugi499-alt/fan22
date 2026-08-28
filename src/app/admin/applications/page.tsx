@@ -1,5 +1,6 @@
-import { ApplicationDirectory } from '@/components/platform/applications/ApplicationDirectory';
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function AdminApplicationsPage() {
-  return <ApplicationDirectory />;
+export default async function AdminApplicationsPage({ searchParams }: PageProps<'/admin/applications'>) {
+  redirect(legacyAdminTarget('/admin/applications', await searchParams));
 }

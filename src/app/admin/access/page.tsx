@@ -1,5 +1,6 @@
-import { AccessDirectory } from '@/components/platform/access/AccessDirectory';
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function AdminAccessPage() {
-  return <AccessDirectory />;
+export default async function AdminAccessPage({ searchParams }: PageProps<'/admin/access'>) {
+  redirect(legacyAdminTarget('/admin/access', await searchParams));
 }

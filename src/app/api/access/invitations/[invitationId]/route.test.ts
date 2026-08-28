@@ -27,9 +27,11 @@ function context(invitationId = 'invite_1') {
 }
 
 function mockDoc(collectionName: string, data: Record<string, unknown> | undefined) {
+  const update = vi.fn();
   vi.mocked(adminDb.collection).mockImplementation((requestedCollection: string) => ({
     doc: vi.fn((id: string) => ({
       id,
+      update,
       get: vi.fn(async () => ({
         id,
         exists: requestedCollection === collectionName && Boolean(data),
@@ -37,6 +39,7 @@ function mockDoc(collectionName: string, data: Record<string, unknown> | undefin
       })),
     })),
   }) as never);
+  return update;
 }
 
 describe('safe invitation preview route', () => {
@@ -50,7 +53,7 @@ describe('safe invitation preview route', () => {
   });
 
   it('returns only safe invitation fields for a matching token and email', async () => {
-    mockDoc('invitations', {
+    const update = mockDoc('invitations', {
       id: 'invite_1',
       type: 'team_admin',
       invitedEmail: 'operator@example.com',
@@ -61,7 +64,7 @@ describe('safe invitation preview route', () => {
       tokenHash: createHash('sha256').update('invite_token').digest('hex'),
       status: 'sent',
       invitedByUserId: 'league_admin_1',
-      expiresAt: '2026-08-09T00:00:00.000Z',
+      expiresAt: '2026-09-09T00:00:00.000Z',
       createdAt: '2026-08-02T00:00:00.000Z',
       updatedAt: '2026-08-02T00:00:00.000Z',
     });
@@ -77,10 +80,11 @@ describe('safe invitation preview route', () => {
       roleKey: 'team_admin',
       scopeType: 'team',
       scopeId: 'team_1',
-      status: 'sent',
+      status: 'viewed',
     });
     expect(body.tokenHash).toBeUndefined();
     expect(body.tokenVersion).toBeUndefined();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: 'viewed' }));
   });
 
   it('rejects previews for the wrong signed-in email', async () => {

@@ -23,8 +23,9 @@ const bodySchema = z.object({
  * authorization cannot see a coaching relationship, and conflict policy has no business
  * deciding who is an operator.
  *
- * Platform can always ratify. That is the escalation path when a league has no unconflicted
- * admin, which is a real situation in a league run by two people who both coach.
+ * Platform authority widens scope, never impartiality. A Platform operator who is affiliated
+ * with either club is refused by the same conflict rule as a League operator. When a league
+ * has no unconflicted admin, the escalation must go to another unconflicted Platform operator.
  */
 export async function POST(
   request: Request,
@@ -61,9 +62,9 @@ export async function POST(
     hasCapability(actor.uid, { scopeType: 'platform', scopeId: 'global' }, 'platform.trust.decide'),
   ]);
 
-  if (conflict.conflictWithMatch && !isPlatform) {
+  if (conflict.conflictWithMatch) {
     return Response.json({
-      error: 'You are involved with one of these clubs. Record a proposal instead, and another admin will decide.',
+      error: 'You are involved with one of these clubs. Record a proposal instead, and another unconflicted operator will decide.',
       conflictWithMatch: true,
       affiliatedTeamIds: conflict.affiliatedTeamIds,
     }, { status: 403 });

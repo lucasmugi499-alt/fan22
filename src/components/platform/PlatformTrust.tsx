@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, Flag, CheckCircle, XCircle, Warning, PaperPlaneTilt, Gavel, Pulse, ClockCountdown } from '@phosphor-icons/react';
-import { toast } from 'sonner';
+import { ShieldCheck, Flag, Warning, PaperPlaneTilt, Gavel, Pulse, ClockCountdown } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { openReports } from '@/lib/platform/platformContext';
 import { QueueItem } from '@/components/core/QueueItem';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Sheet } from '@/components/ui/Sheet';
-import { Button } from '@/components/ui/Button';
 import { AuditTimeline, type AuditStep } from '@/components/core/AuditTimeline';
 import { STATE } from '@/lib/statusSystem';
 import type { Report, ResultSubmission } from '@/types';
@@ -18,11 +16,14 @@ import { useAuth } from '@/context/AuthProvider';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { ChallengeWorkflow } from '@/components/core/ChallengeWorkflow';
+import { ConsequenceSheet } from '@/components/platform/commands/ConsequenceSheet';
+import { PlatformCommandButton } from '@/components/platform/commands/PlatformCommandButton';
+import { usePlatformCommand } from '@/components/platform/commands/usePlatformCommand';
 
 const SEVERITY_STATE = { Critical: STATE.disputed, High: STATE.disputed, Medium: STATE.overdue, Low: STATE.pending } as const;
 
 export function PlatformTrust() {
-  const { currentUser, userProfile, isDemoMode } = useAuth();
+  const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const { reports, leagues, matches, finalizations, adminAuditEvents, loading, retry } = useGoalPlaceData({
     collections: ['reports', 'leagues', 'matches', 'finalizations', 'adminAuditEvents'],
@@ -30,8 +31,9 @@ export function PlatformTrust() {
   });
   const list = useMemo(() => openReports(reports), [reports]);
   const [active, setActive] = useState<Report | null>(null);
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [decision, setDecision] = useState<'resolved' | 'dismissed' | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const command = usePlatformCommand('/api/admin/actions');
   const [submissions, setSubmissions] = useState<ResultSubmission[]>([]);
   const [complianceCases, setComplianceCases] = useState<ComplianceCase[]>([]);
   const [operationsError, setOperationsError] = useState<string>();
@@ -72,36 +74,6 @@ export function PlatformTrust() {
   );
   const officialMatches = matches.filter((match) => match.verificationStatus === 'verified').length;
   const playedMatches = matches.filter((match) => match.status === 'completed').length;
-
-  async function decide(decision: 'resolved' | 'dismissed') {
-    const actorUserId = currentUser?.uid ?? userProfile?.uid;
-    if (!active || !actorUserId) {
-      toast.error('Your Platform Admin account is not ready.');
-      return;
-    }
-    const decisionNote = note.trim();
-    if (decisionNote.length < 4) {
-      toast.error('Add a decision note before closing this case.');
-      return;
-    }
-    setSaving(true);
-    try {
-      await provider.resolveReport({
-        reportId: active.id,
-        actorUserId,
-        decision,
-        note: decisionNote,
-      });
-      toast.success(decision === 'resolved' ? 'Case resolved.' : 'Case dismissed.');
-      setActive(null);
-      setNote('');
-      retry();
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : 'The case decision could not be saved.');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   if (loading) {
     return <div className="space-y-3"><Skeleton className="h-8 w-48" /><Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" /><Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" /></div>;
@@ -171,16 +143,18 @@ export function PlatformTrust() {
 
       <ChallengeWorkflow scope="platform" />
 
-      {active ? (
+      {success ? <p role="status" className="text-sm text-[var(--state-success)]">{success}</p> : null}
+
+      {active && !decision ? (
         <Sheet
           open
-          onClose={() => setActive(null)}
+          onClose={() => { setActive(null); command.reset(); }}
           title="Review case"
           description={active.summary}
           footer={
             <div className="flex gap-2">
-              <Button block variant="secondary" icon={XCircle} onClick={() => decide('dismissed')} disabled={saving}>Dismiss</Button>
-              <Button block icon={CheckCircle} onClick={() => decide('resolved')} disabled={saving}>Resolve</Button>
+              <PlatformCommandButton commandId="trust.report.resolve" label="Dismiss" block onClick={() => setDecision('dismissed')} />
+              <PlatformCommandButton commandId="trust.report.resolve" label="Resolve" block onClick={() => setDecision('resolved')} />
             </div>
           }
         >
@@ -197,13 +171,31 @@ export function PlatformTrust() {
               </p>
               <AuditTimeline steps={reportProvenance(active)} />
             </div>
-            <label className="block text-xs font-semibold uppercase text-subtle">
-              Decision note
-              <textarea className="field mt-2 min-h-24 py-3 normal-case" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Reason for the decision and any follow-up." />
-            </label>
           </div>
         </Sheet>
       ) : null}
+      <ConsequenceSheet
+        open={Boolean(active && decision)}
+        commandId="trust.report.resolve"
+        targetId={active?.id}
+        inputs={{ action: 'resolve_report', reportId: active?.id, decision }}
+        title={active && decision ? `${decision === 'resolved' ? 'Resolve' : 'Dismiss'} ${active.summary}` : 'Review trust decision'}
+        submitLabel={decision === 'resolved' ? 'Resolve case' : 'Dismiss case'}
+        running={command.running}
+        error={command.error}
+        onClose={() => { setDecision(null); command.reset(); }}
+        onSubmit={async (_values, reason) => {
+          if (!active || !decision) return;
+          const label = decision === 'resolved' ? 'Case resolved.' : 'Case dismissed.';
+          const ok = await command.run({ action: 'resolve_report', reportId: active.id, decision, note: reason }, label);
+          if (ok) {
+            setSuccess(label);
+            setDecision(null);
+            setActive(null);
+            retry();
+          }
+        }}
+      />
     </div>
   );
 }

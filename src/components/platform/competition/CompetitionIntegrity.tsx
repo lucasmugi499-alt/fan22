@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useReconciliationExceptions } from '@/lib/resultSubmissionQueues';
-import { useAuth } from '@/context/AuthProvider';
 import type { ReconciliationException } from '@/types';
 import { isOfficialMatch } from '@/lib/status';
 import { disputedMatches } from '@/lib/platform/platformContext';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { DirectoryRow, EmptyState, PlatformAdminHeader, PlatformStatGrid, StatusChip } from '@/components/platform/PlatformAdminPrimitives';
+import { ConsequenceSheet } from '@/components/platform/commands/ConsequenceSheet';
+import { PlatformCommandButton } from '@/components/platform/commands/PlatformCommandButton';
+import { usePlatformCommand } from '@/components/platform/commands/usePlatformCommand';
 
 export function CompetitionIntegrity() {
   const data = useGoalPlaceData({
@@ -127,42 +129,11 @@ function ReconciliationQueue({
   leagueName: (id: string) => string;
   onChanged: () => void;
 }) {
-  const { currentUser } = useAuth();
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function transition(exceptionId: string, status: 'acknowledged' | 'escalated' | 'resolved') {
-    const note = window.prompt(
-      status === 'resolved'
-        ? 'Why is this case being closed? The sporting result is not changed by this action.'
-        : `Add a note for marking this case ${status}.`,
-    );
-    if (!note || note.trim().length < 4) return;
-    setBusyId(exceptionId);
-    setError(null);
-    try {
-      // The demo persona holds a stand-in user with no token method. Saying so plainly
-      // beats letting a TypeError surface as the case's error text.
-      if (!currentUser || typeof currentUser.getIdToken !== 'function') {
-        throw new Error('Case actions need a signed-in platform operator. The demo session cannot change a case.');
-      }
-      const token = await currentUser.getIdToken();
-      const response = await fetch('/api/platform/competition-integrity', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ exceptionId, status, note: note.trim() }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error ?? 'The case could not be updated.');
-      }
-      onChanged();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The case could not be updated.');
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const [pending, setPending] = useState<{
+    item: ReconciliationException;
+    status: 'acknowledged' | 'escalated' | 'resolved';
+  } | null>(null);
+  const command = usePlatformCommand('/api/platform/competition-integrity');
 
   return (
     <Card className="p-4">
@@ -170,7 +141,7 @@ function ReconciliationQueue({
         <h2 className="text-[15px] font-semibold text-text-strong">Reconciliation exceptions</h2>
         <span className="text-xs text-muted">Official data was not written for these</span>
       </div>
-      {error ? <p className="mb-3 text-sm text-[var(--state-disputed)]">{error}</p> : null}
+      {command.success ? <p className="mb-3 text-sm text-brand">{command.success}</p> : null}
       <div className="space-y-2.5">
         {cases.length ? cases.map((item) => (
           <div key={item.exceptionId} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
@@ -195,15 +166,15 @@ function ReconciliationQueue({
             </p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {(['acknowledged', 'escalated', 'resolved'] as const).map((next) => (
-                <button
+                <PlatformCommandButton
                   key={next}
-                  type="button"
-                  disabled={busyId === item.exceptionId || item.status === next}
-                  onClick={() => transition(item.exceptionId, next)}
-                  className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1 text-xs font-medium text-text-strong disabled:opacity-40"
-                >
-                  {next === 'acknowledged' ? 'Acknowledge' : next === 'escalated' ? 'Escalate' : 'Close case'}
-                </button>
+                  commandId="integrity.case.transition"
+                  label={next === 'acknowledged' ? 'Acknowledge' : next === 'escalated' ? 'Escalate' : 'Close case'}
+                  size="sm"
+                  disabled={item.status === next}
+                  disabledReason={item.status === next ? `This case is already ${next}.` : null}
+                  onClick={() => { command.reset(); setPending({ item, status: next }); }}
+                />
               ))}
             </div>
           </div>
@@ -213,6 +184,29 @@ function ReconciliationQueue({
           </EmptyState>
         )}
       </div>
+      <ConsequenceSheet
+        open={Boolean(pending)}
+        commandId="integrity.case.transition"
+        targetId={pending?.item.exceptionId}
+        inputs={pending ? { exceptionId: pending.item.exceptionId, status: pending.status } : {}}
+        title={pending ? `${pending.status === 'resolved' ? 'Close' : pending.status === 'escalated' ? 'Escalate' : 'Acknowledge'} ${matchLabel(pending.item.matchId)}` : undefined}
+        submitLabel={pending?.status === 'resolved' ? 'Close case' : pending?.status === 'escalated' ? 'Escalate case' : 'Acknowledge case'}
+        running={command.running}
+        error={command.error}
+        onClose={() => { setPending(null); command.reset(); }}
+        onSubmit={async (_values, reason) => {
+          if (!pending) return;
+          const ok = await command.run({
+            exceptionId: pending.item.exceptionId,
+            status: pending.status,
+            note: reason,
+          }, `Case ${pending.status}.`);
+          if (ok) {
+            setPending(null);
+            onChanged();
+          }
+        }}
+      />
     </Card>
   );
 }

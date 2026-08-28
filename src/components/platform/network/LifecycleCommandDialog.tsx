@@ -1,6 +1,6 @@
 'use client';
 
-import { CommandDialog } from '@/components/platform/commands/CommandDialog';
+import { ConsequenceSheet } from '@/components/platform/commands/ConsequenceSheet';
 import { usePlatformCommand } from '@/components/platform/commands/usePlatformCommand';
 
 /**
@@ -19,17 +19,6 @@ export type LifecycleTarget = {
   action: 'activate' | 'suspend' | 'archive' | 'restore';
 };
 
-const DESCRIPTION: Record<LifecycleTarget['action'], string> = {
-  archive:
-    'Archiving hides this from the public and keeps every record attached to it — results, athletes, payments and the audit trail. Nothing is destroyed, and it can be restored.',
-  restore:
-    'Restoring returns this to suspended rather than straight to public. Archiving is usually a response to something being wrong, so someone should look before it is visible again.',
-  suspend:
-    'Suspending takes this out of public view while leaving it operational. Use it while something is being checked.',
-  activate:
-    'Activating makes this publicly visible. For a draft, it is also the point after which it can only be archived, never deleted.',
-};
-
 export function LifecycleCommandDialog({
   target,
   onClose,
@@ -44,16 +33,13 @@ export function LifecycleCommandDialog({
   const label = target ? `${target.action[0].toUpperCase()}${target.action.slice(1)}` : 'Confirm';
 
   return (
-    <CommandDialog
+    <ConsequenceSheet
       open={Boolean(target)}
+      commandId={target ? `network.${target.kind}.${target.action}` : 'network.league.activate'}
+      targetId={target?.id}
+      inputs={target ? { kind: target.kind, id: target.id, action: target.action } : {}}
       title={target ? `${label} ${target.name}` : ''}
-      description={target ? DESCRIPTION[target.action] : ''}
       submitLabel={label}
-      destructive={target?.action === 'archive'}
-      // Typing the name is the only moment an operator is forced to confirm they are looking
-      // at the object they think they are — archive's effect is invisible on the row that
-      // triggered it.
-      confirmPhrase={target?.action === 'archive' ? target.name : undefined}
       running={command.running}
       error={command.error}
       onClose={() => { onClose(); command.reset(); }}

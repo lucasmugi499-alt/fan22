@@ -86,7 +86,7 @@ export function TeamManagement() {
       header: 'Club',
       primary: true,
       cell: (row) => (
-        <Link href={`/admin/teams/${row.team.id}`} className="font-semibold text-text-strong hover:text-brand">
+        <Link href={`/admin/network/teams/${row.team.id}`} className="font-semibold text-text-strong hover:text-brand">
           {row.team.name}
         </Link>
       ),

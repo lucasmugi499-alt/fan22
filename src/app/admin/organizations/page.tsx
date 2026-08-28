@@ -1,5 +1,6 @@
-import { OrganizationDirectory } from '@/components/platform/organizations/OrganizationDirectory';
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function AdminOrganizationsPage() {
-  return <OrganizationDirectory />;
+export default async function AdminOrganizationsPage({ searchParams }: PageProps<'/admin/organizations'>) {
+  redirect(legacyAdminTarget('/admin/organizations', await searchParams));
 }

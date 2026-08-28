@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { assessApplicationRisk, normalizeApplicationIdentity, type ApplicationRiskCandidate } from '@/lib/platform/applicationRisk';
 import { clientIpFrom, enforceRateLimit, parseJsonBody, verifyOptionalAppCheck } from '@/server/api/security';
 
 export const runtime = 'nodejs';
@@ -19,6 +20,34 @@ const schema = z.object({
   city: z.string().trim().min(2).max(120),
   evidenceNote: z.string().trim().min(10).max(1200),
 });
+
+async function riskCandidates(input: { applicantEmail: string; leagueName: string }) {
+  const normalizedName = normalizeApplicationIdentity(input.leagueName);
+  const queries = [
+    adminDb.collection('leagues').where('name', '==', input.leagueName).limit(10).get(),
+    adminDb.collection('leagues').where('normalizedName', '==', normalizedName).limit(10).get(),
+    adminDb.collection('leagueAdminApplications').where('normalizedLeagueName', '==', normalizedName).limit(10).get(),
+    adminDb.collection('leagueAdminApplications').where('applicantEmail', '==', input.applicantEmail).limit(10).get(),
+  ];
+  const snapshots = await Promise.all(queries.map((query) => query.catch(() => null)));
+  const candidates = new Map<string, ApplicationRiskCandidate>();
+  for (const [index, snapshot] of snapshots.entries()) {
+    const kind = index < 2 ? 'league' : 'application';
+    for (const document of snapshot?.docs ?? []) {
+      const data = document.data();
+      const candidate: ApplicationRiskCandidate = {
+        id: document.id,
+        kind,
+        title: String(data.name ?? data.leagueName ?? document.id),
+        ...(typeof data.city === 'string' ? { city: data.city } : {}),
+        ...(typeof data.status === 'string' ? { status: data.status } : {}),
+        ...(kind === 'application' && typeof data.applicantEmail === 'string' ? { applicantEmail: data.applicantEmail } : {}),
+      };
+      candidates.set(`${kind}:${document.id}`, candidate);
+    }
+  }
+  return [...candidates.values()];
+}
 
 export async function POST(request: Request) {
   const appCheck = await verifyOptionalAppCheck(request);
@@ -42,6 +71,18 @@ export async function POST(request: Request) {
   });
   if (limited) return limited;
 
+  const candidates = await riskCandidates({ applicantEmail: normalizedSetupEmail, leagueName: input.leagueName.trim() }).catch(() => []);
+  const risk = assessApplicationRisk({
+    application: {
+      applicantEmail: normalizedSetupEmail,
+      applicantPhone: normalizedPhone,
+      leagueName: input.leagueName.trim(),
+      city: input.city.trim(),
+      evidenceNote: input.evidenceNote.trim(),
+    },
+    candidates,
+  });
+
   const applicationRef = adminDb.collection('leagueAdminApplications').doc();
   try {
     await adminDb.runTransaction(async (transaction) => {
@@ -52,9 +93,13 @@ export async function POST(request: Request) {
         applicantEmail: normalizedSetupEmail,
         ...(normalizedPhone ? { applicantPhone: normalizedPhone } : {}),
         leagueName: input.leagueName.trim(),
+        normalizedLeagueName: normalizeApplicationIdentity(input.leagueName),
         sport: input.sport,
         city: input.city.trim(),
         evidenceNote: input.evidenceNote.trim(),
+        riskLevel: risk.riskLevel,
+        riskFlags: risk.riskFlags,
+        duplicateCandidates: risk.duplicateCandidates,
         status: 'pending',
         source: 'public_league_application',
         appCheckAppId: appCheck.appId,

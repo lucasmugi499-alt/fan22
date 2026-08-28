@@ -40,7 +40,7 @@ export function ApplicationDirectory() {
           {filtered.length ? filtered.map((application) => (
             <DirectoryRow
               key={application.id}
-              href={`/admin/applications/${application.id}`}
+              href={`/admin/network/applications/${application.id}`}
               title={application.leagueName}
               meta={`${application.city} · ${application.sport} · ${application.applicantEmail ?? 'applicant email pending'}`}
               status={application.status}

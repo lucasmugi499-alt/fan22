@@ -86,7 +86,7 @@ export function LeagueManagement() {
       header: 'League',
       primary: true,
       cell: (row) => (
-        <Link href={`/admin/leagues/${row.league.id}`} className="font-semibold text-text-strong hover:text-brand">
+        <Link href={`/admin/network/leagues/${row.league.id}`} className="font-semibold text-text-strong hover:text-brand">
           {row.league.name}
         </Link>
       ),
@@ -164,7 +164,7 @@ export function LeagueManagement() {
       <p className="text-xs text-subtle">
         Counts are derived from team and match documents. A league advertising more clubs
         than it holds is a data problem, not a display one —{' '}
-        <Link href="/admin/competition" className="text-brand hover:underline">Competition integrity</Link>{' '}
+        <Link href="/admin/integrity?tab=quality" className="text-brand hover:underline">Competition integrity</Link>{' '}
         shows results that could not be published.
       </p>
 

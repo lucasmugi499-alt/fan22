@@ -575,7 +575,58 @@ describe('trusted access route hardening', () => {
     }), expect.objectContaining({
       roleKey: 'league_owner',
       invitedEmail: 'owner@example.com',
+      status: 'queued',
     }));
+    expect(transaction.set).toHaveBeenCalledWith(expect.objectContaining({
+      collectionName: 'invitationDeliveryAttempts',
+    }), expect.objectContaining({
+      channel: 'email',
+      provider: 'resend',
+      status: 'queued',
+    }));
+  });
+
+  it('returns the existing approval result on retry without creating another organization, league, or invitation', async () => {
+    const collections: string[] = [];
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'platform_1', role: 'platform_admin' });
+    vi.mocked(adminDb.collection).mockImplementation((collectionName: string) => {
+      collections.push(collectionName);
+      return {
+        doc: vi.fn((id?: string) => ({
+          id: id ?? `${collectionName}_generated`,
+          collectionName,
+          get: vi.fn(async () => collectionName === 'leagueAdminApplications'
+            ? {
+                exists: true,
+                data: () => ({
+                  status: 'approved',
+                  organizationId: 'org_existing',
+                  leagueId: 'league_existing',
+                  invitationId: 'invite_existing',
+                  invitationActionUrl: '/invitations/access/invite_existing?token=existing',
+                }),
+              }
+            : { exists: false, data: () => undefined }),
+        })),
+      } as never;
+    });
+
+    const response = await POST(request(JSON.stringify({
+      action: 'approve_league_admin',
+      applicationId: 'application_public_1',
+    })));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      leagueId: 'league_existing',
+      invitationId: 'invite_existing',
+    });
+    expect(collections).not.toContain('organizations');
+    expect(collections).not.toContain('leagues');
+    expect(collections).not.toContain('invitations');
+    expect(adminAuth.getUser).not.toHaveBeenCalled();
+    expect(adminAuth.getUserByEmail).not.toHaveBeenCalled();
   });
 
   it('requires a separate operator email before approving a league application tied to an existing Fan account', async () => {

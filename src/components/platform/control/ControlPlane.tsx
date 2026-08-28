@@ -282,7 +282,7 @@ export function ControlPlane() {
           </dl>
           <p className="mt-3 text-xs text-subtle">
             {state.scheduledJobsNote} Open cases are listed in{' '}
-            <Link href="/admin/competition" className="text-brand hover:underline">Competition integrity</Link>.
+            <Link href="/admin/integrity?tab=escalations" className="text-brand hover:underline">Integrity escalations</Link>.
           </p>
           <div className="mt-3 border-t border-border pt-3">
             <h3 className="text-sm font-semibold text-text-strong">Activation by result source</h3>

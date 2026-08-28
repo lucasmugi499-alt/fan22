@@ -20,6 +20,7 @@ export function Sheet({
   description,
   children,
   footer,
+  mobileFullScreen = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +28,7 @@ export function Sheet({
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  mobileFullScreen?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -86,6 +88,7 @@ export function Sheet({
         className={cn(
           'relative flex max-h-[calc(100dvh-12px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[var(--radius-2xl)] border border-border bg-surface-1 bezel-core shadow-e3 pb-safe',
           'motion-safe:animate-[sheetUp_var(--dur-drawer)_var(--ease-fluid)]',
+          mobileFullScreen && 'h-dvh max-h-dvh rounded-none border-x-0 border-b-0 sm:h-auto sm:max-h-[calc(100dvh-32px)]',
           'sm:m-4 sm:max-w-md sm:rounded-[var(--radius-2xl)]'
         )}
       >

@@ -30,8 +30,12 @@ export function DesktopRail({ nav }: { nav: RoleNav }) {
         ) : (
           <>
             <RailGroup destinations={nav.primary} active={active} />
-            <div className="my-3 h-px bg-border" />
-            <RailGroup destinations={nav.more} active={active} muted />
+            {nav.more.length ? (
+              <>
+                <div className="my-3 h-px bg-border" />
+                <RailGroup destinations={nav.more} active={active} muted />
+              </>
+            ) : null}
           </>
         )}
       </nav>

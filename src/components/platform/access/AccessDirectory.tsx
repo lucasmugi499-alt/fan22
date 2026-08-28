@@ -17,6 +17,7 @@ import {
   StatusChip,
 } from '@/components/platform/PlatformAdminPrimitives';
 import type { AccessAssignmentStatus } from '@/lib/auth/access';
+import { BulkInvitationImport } from '@/components/platform/access/BulkInvitationImport';
 
 /**
  * The canonical access desk.
@@ -262,6 +263,8 @@ export function AccessDirectory() {
           )}
         </div>
       </Card>
+
+      <BulkInvitationImport />
 
       <Card className="p-4">
         <h2 className="text-[15px] font-semibold text-text-strong">Legacy records — migration diagnostics</h2>

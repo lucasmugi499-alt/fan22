@@ -1,5 +1,6 @@
-import { AthleteManagement } from '@/components/platform/network/AthleteManagement';
+import { redirect } from 'next/navigation';
+import { legacyAdminTarget } from '@/lib/platform/adminRoutes';
 
-export default function AdminAthletesPage() {
-  return <AthleteManagement />;
+export default async function AdminAthletesPage({ searchParams }: PageProps<'/admin/athletes'>) {
+  redirect(legacyAdminTarget('/admin/athletes', await searchParams));
 }
