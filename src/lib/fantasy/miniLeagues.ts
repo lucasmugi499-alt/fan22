@@ -114,12 +114,20 @@ export type HeadToHeadStanding = {
   won: number;
   drawn: number;
   lost: number;
-  pointsFor: number;
-  /** Three for a win, one for a draw. */
-  leaguePoints: number;
+  /**
+   * Fantasy points this manager scored across their head-to-head fixtures.
+   *
+   * Deliberately not `pointsFor`, and the table points below are deliberately not
+   * `leaguePoints`. Those names belong to the deprecated stored team aggregates that a
+   * sporting number must never be read from again, and a mini-league table sitting beside a
+   * real league table must not borrow their vocabulary.
+   */
+  fantasyPointsScored: number;
+  /** Three for a win, one for a draw, within this mini-league only. */
+  headToHeadPoints: number;
 };
 
-/** The head-to-head table, ordered by league points then by fantasy points scored. */
+/** The head-to-head table, ordered by table points then by fantasy points scored. */
 export function headToHeadStandings(
   fixtures: readonly (HeadToHeadFixture & { homePoints: number; awayPoints: number })[],
 ): HeadToHeadStanding[] {
@@ -128,7 +136,7 @@ export function headToHeadStandings(
     const existing = table.get(fantasyTeamId);
     if (existing) return existing;
     const created: HeadToHeadStanding = {
-      fantasyTeamId, played: 0, won: 0, drawn: 0, lost: 0, pointsFor: 0, leaguePoints: 0,
+      fantasyTeamId, played: 0, won: 0, drawn: 0, lost: 0, fantasyPointsScored: 0, headToHeadPoints: 0,
     };
     table.set(fantasyTeamId, created);
     return created;
@@ -140,16 +148,16 @@ export function headToHeadStandings(
     const result = headToHeadResult(fixture.homePoints, fixture.awayPoints);
     home.played += 1;
     away.played += 1;
-    home.pointsFor += fixture.homePoints;
-    away.pointsFor += fixture.awayPoints;
-    if (result === 'win') { home.won += 1; home.leaguePoints += 3; away.lost += 1; }
-    else if (result === 'loss') { away.won += 1; away.leaguePoints += 3; home.lost += 1; }
-    else { home.drawn += 1; away.drawn += 1; home.leaguePoints += 1; away.leaguePoints += 1; }
+    home.fantasyPointsScored += fixture.homePoints;
+    away.fantasyPointsScored += fixture.awayPoints;
+    if (result === 'win') { home.won += 1; home.headToHeadPoints += 3; away.lost += 1; }
+    else if (result === 'loss') { away.won += 1; away.headToHeadPoints += 3; home.lost += 1; }
+    else { home.drawn += 1; away.drawn += 1; home.headToHeadPoints += 1; away.headToHeadPoints += 1; }
   }
 
   return [...table.values()].sort((left, right) =>
-    right.leaguePoints - left.leaguePoints
-    || right.pointsFor - left.pointsFor
+    right.headToHeadPoints - left.headToHeadPoints
+    || right.fantasyPointsScored - left.fantasyPointsScored
     || left.fantasyTeamId.localeCompare(right.fantasyTeamId));
 }
 

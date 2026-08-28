@@ -1,5 +1,10 @@
-import { EVENT_TYPE_DEFINITIONS } from '@/kernel/definitions/sportCatalogues';
-import type { OfficialSportEvent } from '@/kernel/types';
+/*
+ * Relative, not `@/`. This module is compiled into the Cloud Functions bundle through the
+ * shared finalizer, and `tsc` emits a path alias verbatim into the CommonJS output, where
+ * Node cannot resolve it. The build stays green and the deploy dies at require time.
+ */
+import { EVENT_TYPE_DEFINITIONS } from '../../kernel/definitions/sportCatalogues';
+import type { OfficialSportEvent } from '../../kernel/types';
 
 /**
  * Statistics that are real, but are not their own captured event.

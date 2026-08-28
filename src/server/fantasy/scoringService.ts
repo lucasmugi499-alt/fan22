@@ -170,18 +170,23 @@ export async function scoreFinalizedFantasyMatch(
      * The official result, its events and the standings are untouched either way. This is
      * fantasy declining to score a match, not a sporting decision about it.
      */
+    /*
+     * Deliberately not caught. Swallowing a failure here would score the fixture as though it
+     * had no open exceptions, which is the one direction that silently produces the unfair
+     * round the gate exists to prevent. A failed read should fail the scoring job loudly and
+     * be retried, not resolve itself into a permissive answer.
+     */
     const openExceptions = await db.collection('matchOperationalExceptions')
       .where('matchId', '==', matchId)
       .where('status', 'in', ['open', 'acknowledged', 'escalated', 'pending'])
-      .get()
-      .catch(() => null);
+      .get();
     const gate = evaluateFixtureScoringGate({
       competition,
       profile,
       performances,
       conditions: {
         abandoned: match.status !== 'completed',
-        openExceptionCount: openExceptions?.size ?? 0,
+        openExceptionCount: openExceptions.size,
       },
     });
 

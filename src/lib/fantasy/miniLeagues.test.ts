@@ -116,8 +116,8 @@ describe('head-to-head results and table', () => {
     ]);
     // c took a win and a draw for four points; a took a win and a loss for three.
     expect(table.map((row) => row.fantasyTeamId)).toEqual(['c', 'a', 'd', 'b']);
-    expect(table[0]).toMatchObject({ fantasyTeamId: 'c', played: 2, won: 1, drawn: 1, leaguePoints: 4 });
-    expect(table[1]).toMatchObject({ fantasyTeamId: 'a', played: 2, won: 1, lost: 1, leaguePoints: 3, pointsFor: 90 });
+    expect(table[0]).toMatchObject({ fantasyTeamId: 'c', played: 2, won: 1, drawn: 1, headToHeadPoints: 4 });
+    expect(table[1]).toMatchObject({ fantasyTeamId: 'a', played: 2, won: 1, lost: 1, headToHeadPoints: 3, fantasyPointsScored: 90 });
   });
 
   it('separates equal league points by fantasy points scored', () => {

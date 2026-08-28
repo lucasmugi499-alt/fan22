@@ -17,9 +17,16 @@ import type { FantasyPointEvent } from '@/types/fantasy';
 
 export type BreakoutAthleteInput = {
   athleteId: string;
-  name: string;
+  /**
+   * The name the League registered, never a self-authored nickname.
+   *
+   * ADR-001 splits the athlete into a league-authored sporting record and a persona they
+   * write themselves. This board sits beside verified performance numbers, so it carries the
+   * registered identity; a bare `name` here is exactly how the two domains leak.
+   */
+  legalName: string;
   teamName: string;
-  position: string;
+  registeredPosition: string;
   /** Ownership now, as a percentage of managers. */
   ownershipPercentage: number;
   /** Ownership at the start of the round, for the rise calculation. */
@@ -28,9 +35,9 @@ export type BreakoutAthleteInput = {
 
 export type BreakoutRow = {
   athleteId: string;
-  name: string;
+  legalName: string;
   teamName: string;
-  position: string;
+  registeredPosition: string;
   points: number;
   ownershipPercentage: number;
 };
@@ -90,9 +97,9 @@ export function buildBreakoutBoard({
 
   const rows: BreakoutRow[] = athletes.map((athlete) => ({
     athleteId: athlete.athleteId,
-    name: athlete.name,
+    legalName: athlete.legalName,
     teamName: athlete.teamName,
-    position: athlete.position,
+    registeredPosition: athlete.registeredPosition,
     points: totals.get(athlete.athleteId) ?? 0,
     ownershipPercentage: athlete.ownershipPercentage,
   }));
@@ -112,9 +119,9 @@ export function buildBreakoutBoard({
       if (rise <= 0) return [];
       return [{
         athleteId: athlete.athleteId,
-        name: athlete.name,
+        legalName: athlete.legalName,
         teamName: athlete.teamName,
-        position: athlete.position,
+        registeredPosition: athlete.registeredPosition,
         points: totals.get(athlete.athleteId) ?? 0,
         ownershipPercentage: athlete.ownershipPercentage,
         previousOwnershipPercentage: previous,

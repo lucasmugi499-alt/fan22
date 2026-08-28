@@ -9,9 +9,9 @@ function athlete(
 ): BreakoutAthleteInput {
   return {
     athleteId,
-    name: `Athlete ${athleteId}`,
+    legalName: `Athlete ${athleteId}`,
     teamName: 'Kampala United',
-    position: 'Midfielder',
+    registeredPosition: 'Midfielder',
     ownershipPercentage,
     ...(previousOwnershipPercentage === undefined ? {} : { previousOwnershipPercentage }),
   };

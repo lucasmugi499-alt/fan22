@@ -1,3 +1,4 @@
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import { PLATFORM_COMMANDS, type PlatformCommandDefinition } from './commandRegistry';
 
 export type PlatformPaletteKind =
@@ -136,7 +137,7 @@ export function boundCommandPaletteItems(
 type DemoEntitySource = {
   leagues?: ReadonlyArray<{ id: string; name: string; sport?: unknown; city?: string; status?: string }>;
   teams?: ReadonlyArray<{ id: string; name: string; leagueId?: string; city?: string; sport?: unknown }>;
-  athletes?: ReadonlyArray<{ id: string; legalName?: string; name?: string; registeredPosition?: string; sport?: unknown }>;
+  athletes?: ReadonlyArray<{ id: string; legalName?: string; registeredPosition?: string; sport?: unknown }>;
   people?: ReadonlyArray<{ uid?: string; id?: string; displayName?: string; email?: string; role?: string }>;
 };
 
@@ -173,7 +174,7 @@ export function demoEntityPaletteItems(source: DemoEntitySource): PlatformPalett
     });
   }
   for (const athlete of source.athletes ?? []) {
-    const title = athlete.legalName ?? athlete.name;
+    const title = athleteLegalName(athlete);
     if (!title) continue;
     items.push({
       id: `athlete-${athlete.id}`,
