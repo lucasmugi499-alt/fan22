@@ -264,12 +264,12 @@ describe('fantasy scoring service integration', () => {
     expect(Array.from(store.keys()).filter((key) => key.startsWith('fantasyPointEvents/'))).toHaveLength(4);
     expect(Array.from(store.values())).toContainEqual(expect.objectContaining({
       fantasyTeamId: 'fantasy_rugby_fan_1',
-      totalPoints: 13.5,
+      totalPoints: 18,
       status: 'official',
     }));
     expect(store.get('fantasyLeaderboards/fantasy_rugby_fantasy_rugby_fan_1')).toMatchObject({
       rank: 1,
-      totalPoints: 13.5,
+      totalPoints: 18,
     });
     expect(store.get('fantasyLeaderboards/fantasy_rugby_fantasy_rugby_fan_1')).not.toHaveProperty('previousRank');
 
@@ -291,16 +291,122 @@ describe('fantasy scoring service integration', () => {
       previousOfficialResultVersion: 1,
       newOfficialResultVersion: 2,
       affectedFantasyTeamIds: ['fantasy_rugby_fan_1'],
-      oldTotals: { fantasy_rugby_fan_1: 13.5 },
-      newTotals: { fantasy_rugby_fan_1: 21 },
+      oldTotals: { fantasy_rugby_fan_1: 18 },
+      newTotals: { fantasy_rugby_fan_1: 28 },
     });
     expect(store.get('fantasyLeaderboards/fantasy_rugby_fantasy_rugby_fan_1')).toMatchObject({
-      totalPoints: 21,
+      totalPoints: 28,
       previousRank: 1,
     });
     expect(Array.from(store.values())).toContainEqual(expect.objectContaining({
       type: 'fantasy_score_corrected',
       userId: 'fan_1',
     }));
+  });
+});
+
+describe('fairness gate in the scoring service', () => {
+  /**
+   * The defect this prevents: two athletes play the same match, one is captured completely
+   * and one is not, and the engine quietly scores them on different rule sets.
+   */
+  function scorerOnlyPerformance(): FantasyOfficialAthletePerformance {
+    return {
+      ...performance(1, 1),
+      id: 'match_1_v1_athlete_2',
+      athleteId: 'athlete_2',
+      dataCoverage: 'scorer_only',
+      stats: { try: 1 },
+      sourceEventIds: { try: 'event_v1_try_2' },
+    };
+  }
+
+  function seed(extra: Record<string, RecordData>) {
+    return fakeDb({
+      'matches/match_1': {
+        id: 'match_1',
+        leagueId: 'league_1',
+        seasonId: 'season_1',
+        sport: 'rugby',
+        status: 'completed',
+        verificationStatus: 'verified',
+        officialResultVersion: 1,
+      },
+      'fantasyCompetitions/fantasy_rugby': competition,
+      'fantasyRounds/round_1': round,
+      [`fantasyScoringProfiles/${rugbyProfile.id}`]: rugbyProfile,
+      'fantasyTeams/fantasy_rugby_fan_1': {
+        id: 'fantasy_rugby_fan_1',
+        competitionId: competition.id,
+        userId: 'fan_1',
+        name: 'Fan XV',
+        currentLineupVersionId: lineup.id,
+      },
+      [`fantasyLineupVersions/${lineup.id}`]: { ...lineup, status: 'locked' },
+      ...extra,
+    });
+  }
+
+  it('voids a fixture whose athletes were not captured to the same standard', async () => {
+    const { db, store } = seed({
+      'officialAthleteMatchStats/match_1_v1_athlete_1': performance(1, 1),
+      'officialAthleteMatchStats/match_1_v1_athlete_2': scorerOnlyPerformance(),
+    });
+
+    const outcome = await scoreFinalizedFantasyMatch(db as never, 'match_1');
+
+    expect(outcome).toMatchObject({ fixturesVoided: 1, pointEventsWritten: 0 });
+    // Never partial: not one point event survives the void.
+    expect(Array.from(store.entries())
+      .filter(([key, data]) => key.startsWith('fantasyPointEvents/') && data.status !== 'superseded'))
+      .toHaveLength(0);
+  });
+
+  it('publishes the reason, so a short round is explained rather than silent', async () => {
+    const { db, store } = seed({
+      'officialAthleteMatchStats/match_1_v1_athlete_1': performance(1, 1),
+      'officialAthleteMatchStats/match_1_v1_athlete_2': scorerOnlyPerformance(),
+    });
+
+    await scoreFinalizedFantasyMatch(db as never, 'match_1');
+
+    const voids = Array.from(store.entries()).filter(([key]) => key.startsWith('fantasyFixtureVoids/'));
+    expect(voids).toHaveLength(1);
+    expect(voids[0][1]).toMatchObject({
+      competitionId: 'fantasy_rugby',
+      matchId: 'match_1',
+      affectedAthleteCount: 1,
+    });
+    expect(String(voids[0][1].reason)).toContain('No manager gained or lost points');
+
+    // And every manager in the round is told, not just the ones who owned the players.
+    const notifications = Array.from(store.entries())
+      .filter(([key]) => key.startsWith('notifications/'))
+      .map(([, data]) => data);
+    expect(notifications.some((entry) => entry.type === 'fantasy_fixture_voided')).toBe(true);
+  });
+
+  it('scores zero for everyone rather than leaving an earlier version\'s points standing', async () => {
+    const { db, store } = seed({
+      'officialAthleteMatchStats/match_1_v1_athlete_1': performance(1, 1),
+    });
+
+    // A first pass with uniform coverage scores normally.
+    await scoreFinalizedFantasyMatch(db as never, 'match_1');
+    expect(store.get('fantasyRoundScores/' + Array.from(store.keys())
+      .filter((key) => key.startsWith('fantasyRoundScores/'))[0].split('/')[1])).toBeDefined();
+
+    // A correction then reveals a second athlete whose capture was thin.
+    store.set('officialAthleteMatchStats/match_1_v1_athlete_2', scorerOnlyPerformance());
+    const outcome = await scoreFinalizedFantasyMatch(db as never, 'match_1');
+
+    expect(outcome.fixturesVoided).toBe(1);
+    const live = Array.from(store.entries())
+      .filter(([key, data]) => key.startsWith('fantasyPointEvents/') && data.status !== 'superseded');
+    expect(live).toHaveLength(0);
+    const scores = Array.from(store.entries())
+      .filter(([key]) => key.startsWith('fantasyRoundScores/'))
+      .map(([, data]) => data.totalPoints);
+    expect(scores.every((total) => total === 0)).toBe(true);
   });
 });

@@ -1,4 +1,6 @@
+import { budgetApplies } from './budget';
 import type {
+  FantasyCompetition,
   FantasyLineupVersion,
   FantasyPlayer,
   FantasyPlayerPrice,
@@ -12,6 +14,7 @@ export function validateFantasySquad({
   players,
   prices,
   rules,
+  competition,
   serverNow,
   deadlineAt,
 }: {
@@ -26,10 +29,16 @@ export function validateFantasySquad({
   players: FantasyPlayer[];
   prices: FantasyPlayerPrice[];
   rules: FantasySquadRules;
+  /**
+   * Omitted by callers predating budget-free, which is exactly the `credits` behaviour
+   * those callers already had.
+   */
+  competition?: Pick<FantasyCompetition, 'budgetMode'> | null;
   serverNow: string;
   deadlineAt: string;
 }): FantasySquadValidation {
   const errors: string[] = [];
+  const budgeted = budgetApplies(competition);
   const uniqueSquad = new Set(lineup.squadAthleteIds);
   const playerByAthlete = new Map(players.map((player) => [player.athleteId, player]));
   const priceByAthlete = new Map(
@@ -78,7 +87,9 @@ export function validateFantasySquad({
       errors.push(`Athlete ${athleteId} is not eligible for this competition.`);
       return [];
     }
-    if (!priceByAthlete.has(athleteId)) {
+    // A budget-free competition has no prices to be missing, so requiring one here would
+    // make every squad invalid in the mode that exists precisely because prices do not.
+    if (budgeted && !priceByAthlete.has(athleteId)) {
       errors.push(`Athlete ${athleteId} does not have a published Fantasy Credit price.`);
     }
     return [player];
@@ -107,15 +118,15 @@ export function validateFantasySquad({
     (sum, athleteId) => sum + (priceByAthlete.get(athleteId)?.credits ?? 0),
     0,
   );
-  if (creditsUsed > rules.budgetCredits) {
+  if (budgeted && creditsUsed > rules.budgetCredits) {
     errors.push(`Squad exceeds the ${rules.budgetCredits} Fantasy Credit budget.`);
   }
 
   return {
     valid: errors.length === 0,
     errors,
-    creditsUsed,
-    creditsRemaining: rules.budgetCredits - creditsUsed,
+    creditsUsed: budgeted ? creditsUsed : 0,
+    creditsRemaining: budgeted ? rules.budgetCredits - creditsUsed : 0,
   };
 }
 

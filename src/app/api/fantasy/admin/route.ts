@@ -198,11 +198,25 @@ export async function GET(request: Request) {
    * the ones they cannot see.
    */
   const competitionIds = competitions.map((competition) => String(competition.id));
-  const [players, prices, rounds] = await Promise.all([
+  const [players, prices, rounds, platformSettings] = await Promise.all([
     readByCompetition('fantasyPlayers', competitionIds),
     readByCompetition('fantasyPlayerPrices', competitionIds),
     readByCompetition('fantasyRounds', competitionIds),
+    adminDb.collection('platformSettings').doc('global').get(),
   ]);
+  /*
+   * Seasons carry the league's requested capture policy, which readiness needs to report
+   * whether a competition is eligible for fantasy at all. Read only the seasons these
+   * competitions actually reference.
+   */
+  const seasonIds = [...new Set(competitions.map((competition) => String(competition.seasonId ?? '')).filter(Boolean))];
+  const seasonSnapshots = await Promise.all(
+    seasonIds.map((seasonId) => adminDb.collection('seasons').doc(seasonId).get()),
+  );
+  const capturePolicyBySeason = new Map(
+    seasonSnapshots.map((snapshot) => [snapshot.id, snapshot.data()?.capturePolicy]),
+  );
+  const platformCapturePolicyFloor = platformSettings.data()?.capturePolicyFloor;
   const readinessByCompetition = Object.fromEntries(
     competitions.map((competition) => [
       String(competition.id),
@@ -223,6 +237,10 @@ export async function GET(request: Request) {
         rounds: rounds.filter((round) =>
           String(round.competitionId) === String(competition.id),
         ) as unknown as FantasyRound[],
+        capturePolicy: {
+          leagueRequested: capturePolicyBySeason.get(String(competition.seasonId ?? '')),
+          platformMinimum: platformCapturePolicyFloor,
+        },
       }),
     ]),
   );
@@ -392,12 +410,22 @@ export async function POST(request: Request) {
   if (!competition.exists || !['proposed', 'approved'].includes(competition.data()?.status)) {
     return Response.json({ error: 'Only a reviewed proposal may be activated.' }, { status: 409 });
   }
-  const [profileSnapshot, rulesSnapshot, playersSnapshot, pricesSnapshot, roundsSnapshot] = await Promise.all([
+  /**
+   * The competition's own capture policy, read so activation can enforce the fairness rule.
+   *
+   * The season carries what the league asked for and platform settings carry the floor;
+   * `max` of the two is what actually binds to its fixtures. Fantasy may only activate on
+   * FIELD_REQUIRED, because anything weaker admits a typed score, and a typed score cannot be
+   * scored on the same rules as a captured one.
+   */
+  const [profileSnapshot, rulesSnapshot, playersSnapshot, pricesSnapshot, roundsSnapshot, seasonSnapshot, platformSettings] = await Promise.all([
     adminDb.collection('fantasyScoringProfiles').doc(competition.data()!.scoringProfileId).get(),
     adminDb.collection('fantasySquadRules').doc(competition.data()!.squadRulesId).get(),
     adminDb.collection('fantasyPlayers').where('competitionId', '==', competition.id).get(),
     adminDb.collection('fantasyPlayerPrices').where('competitionId', '==', competition.id).get(),
     adminDb.collection('fantasyRounds').where('competitionId', '==', competition.id).get(),
+    adminDb.collection('seasons').doc(String(competition.data()!.seasonId ?? '')).get(),
+    adminDb.collection('platformSettings').doc('global').get(),
   ]);
   const readiness = validateFantasyActivation({
     competition: { id: competition.id, ...competition.data()! } as FantasyCompetition,
@@ -416,6 +444,10 @@ export async function POST(request: Request) {
     rounds: roundsSnapshot.docs.map((round) =>
       ({ id: round.id, ...round.data()! } as FantasyRound),
     ).sort((left, right) => left.number - right.number),
+    capturePolicy: {
+      leagueRequested: seasonSnapshot.data()?.capturePolicy,
+      platformMinimum: platformSettings.data()?.capturePolicyFloor,
+    },
   });
   if (!readiness.ready) {
     return Response.json({

@@ -3,7 +3,7 @@
 **Purpose.** If the agent working on this stops mid-migration, another one picks it up from
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-08-28
 **Head:** `5a9e121`+, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
@@ -425,6 +425,8 @@ Each of these was a real bug on this branch, not a hypothetical.
 | 2026-08-26 | `e09e362` | Dead stored-standings provider/read path removed; historical documents preserved; field canary allowlist cleared |
 | 2026-08-26 | `68376f5` | Sweep core deepened into the shared server module, all 1440/155/29 tests green, four commits pushed; sweep and `onMatchReportWritten` deployed separately; sweep clean/replay proven; App Hosting build 2026-08-27-001 live |
 | 2026-08-27 | `5a9e121` | Final two-axis review closed: Cloud Scheduler delivery observed directly; event payload shape published and enforced as schema 2.1.0; `onMatchReportWritten` and App Hosting redeployed from exact commit; V1 trigger untouched; all 1444/155/29 readiness tests and live gates green |
+| 2026-08-28 | Fantasy V1 working tree | **Finalizer touched, additively.** `officialAthleteMatchStats.stats` now carries derived `clean_sheet` and `goals_conceded`, computed in `src/lib/fantasy/derivation.ts` from the canonical official events plus the athlete's on-pitch window. No field manager taps these; deriving them is what makes football fantasy rich without adding touchline work. A stat line that carries either key explicitly still wins, so derivation fills a gap rather than overruling an observation, and an athlete the events cannot place on the field contributes no key at all rather than a zero that would read as a recorded fact. This slice wrote no official result, event, standing or data-quality tier, touched nothing under `src/server/matchOps`, and changed no capability or bundle. A source-level test now forbids the capture surface from importing or naming anything fantasy, so a Field Manager can never see ownership or points while recording. Unit gate: 1603/1603 green. |
+| 2026-08-27 | Platform Console V2 working tree | Added Platform application risk triage and observable invitation delivery attempts/resend/revoke/bulk operations. Initial invitation state is now `queued` and advances only from the provider/user event observed. Approval retries reuse the existing organization, league and invitation. This slice did not broaden assignment authority, change permission bundles, mutate the finalizer, or write anything under `src/server/matchOps`; Integrity only reads V2 provenance/quality and invokes the existing fenced takeover boundary. Unit gate: 1484/1484 green before release readiness. |
 
 ### Field capture canary session, in order
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { validateFantasySquad } from '@/lib/fantasy/squad';
 import type {
+  FantasyCompetition,
   FantasyLineupVersion,
   FantasyPlayer,
   FantasyPlayerPrice,
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
     players: playersSnapshot.docs.map((item) => ({ id: item.id, ...item.data()! } as FantasyPlayer)),
     prices: pricesSnapshot.docs.map((item) => ({ id: item.id, ...item.data()! } as FantasyPlayerPrice)),
     rules,
+    competition: competition.data() as Pick<FantasyCompetition, 'budgetMode'>,
     serverNow: new Date().toISOString(),
     deadlineAt: round.deadlineAt,
   });

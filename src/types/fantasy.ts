@@ -17,6 +17,34 @@ export type FantasyCompetitionStatus =
 
 export type FantasyDeadlineStrategy = 'first_round_kickoff';
 
+/**
+ * Whether squads are constrained by a credit budget.
+ *
+ * Nothing in the platform computes a price. A budget only creates interesting decisions when
+ * prices reflect something real, and prices assigned by hand from no performance history
+ * create noise that looks like a skill game and is not. `budget_free` runs the squad game on
+ * positional groups and the per-club maximum alone, which is a complete game and is how the
+ * competition can launch before a season of observed data exists. `credits` is the season-2
+ * mode, once prices are computed from observed points per appearance rather than typed by an
+ * administrator.
+ */
+export type FantasyBudgetMode = 'credits' | 'budget_free';
+
+/**
+ * Which game a competition runs.
+ *
+ * `season_squad` is the deep game: fifteen players, positional groups, transfers, a season's
+ * commitment. `pick5` is the on-ramp: five athletes, one captain, one scout slot, reset every
+ * round. They are not two scoring systems. Both consume the same point events, the same
+ * scoring profiles and the same correction pipeline; Pick 5 is a different lineup shape and a
+ * different cadence over identical points.
+ *
+ * The squad game assumes a large pool of players the fan already knows and a price history
+ * that makes a budget meaningful. Neither holds in a grassroots league at launch, which is
+ * why the smaller game is the one most people will actually play.
+ */
+export type FantasyGameMode = 'season_squad' | 'pick5';
+
 export interface FantasyScoringRule {
   id: string;
   label: string;
@@ -107,6 +135,17 @@ export interface FantasyCompetition {
   squadRulesId: string;
   dataLevel: FantasyDataLevel;
   recordedStatKeys: string[];
+  /** Absent means `credits`, which is what every record written before budget-free existed meant. */
+  budgetMode?: FantasyBudgetMode;
+  /** Absent means `season_squad`, the only game that existed before Pick 5. */
+  gameMode?: FantasyGameMode;
+  /**
+   * The ownership ceiling for a Pick 5 scout pick, as a percentage.
+   *
+   * Configured per competition rather than fixed, because five percent is a guess that only
+   * works at a particular audience size. With a few hundred managers it may need to be ten.
+   */
+  scoutOwnershipThresholdPercent?: number;
   status: FantasyCompetitionStatus;
   isFreeToPlay: true;
   creditsLabel: 'Fantasy Credits';
@@ -175,6 +214,12 @@ export interface FantasyLineupVersion {
   benchAthleteIds: string[];
   captainAthleteId: string;
   viceCaptainAthleteId: string;
+  /**
+   * The Pick 5 scout pick: an athlete owned by fewer than the competition's threshold.
+   *
+   * Absent for the season squad game, which has no scout slot.
+   */
+  scoutAthleteId?: string;
   creditsUsed: number;
   status: 'draft' | 'submitted' | 'locked' | 'superseded';
   submittedAt?: string;

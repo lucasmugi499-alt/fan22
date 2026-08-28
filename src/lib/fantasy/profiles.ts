@@ -14,7 +14,7 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
     name: 'GoalPlace Football Fantasy Lite',
     version: 1,
     status: 'approved',
-    captainMultiplier: 1.5,
+    captainMultiplier: 2,
     createdAt,
     publishedAt: createdAt,
     rules: [
@@ -25,13 +25,26 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
         ...rule('goal', 'Goal', 4, 'basic', 'goal'),
         positionPoints: { goalkeeper: 6, defender: 6, midfielder: 5, forward: 4 },
       },
-      rule('assist', 'Official assist', 3, 'standard', 'assist'),
+      // One observer cannot capture an assist while also running the clock, so the field
+      // palette does not record one. Scoring it would mean scoring a statistic that does not
+      // exist for most athletes, which is the silent unfairness this profile exists to avoid.
+      disabled(rule('assist', 'Official assist', 3, 'standard', 'assist')),
       {
         ...rule('clean_sheet', 'Clean sheet', 0, 'standard', 'clean_sheet'),
-        positionPoints: { goalkeeper: 4, defender: 4, midfielder: 1, forward: 0 },
+        /*
+         * Midfielders raised from 1 to 2 to absorb the loss of assists.
+         *
+         * Without assists a midfielder loses their main route to points and the game tilts
+         * toward forwards. The correction is to reward what is actually recorded rather than
+         * to invent a proxy statistic: position-weighted goals already make a midfielder's
+         * goal worth 5 against a forward's 4, and the clean sheet closes the rest of the gap.
+         * A game that scores fewer things accurately beats one that scores more things badly.
+         */
+        positionPoints: { goalkeeper: 4, defender: 4, midfielder: 2, forward: 0 },
       },
-      { ...rule('saves', 'Every three saves', 1, 'advanced', 'saves'), per: 3 },
-      rule('penalty_save', 'Penalty save', 5, 'advanced', 'penalty_save'),
+      // Saves and penalty saves are not in the capture palette.
+      disabled({ ...rule('saves', 'Every three saves', 1, 'advanced', 'saves'), per: 3 }),
+      disabled(rule('penalty_save', 'Penalty save', 5, 'advanced', 'penalty_save')),
       { ...rule('goals_conceded', 'Every two goals conceded', -1, 'standard', 'goals_conceded'), per: 2 },
       rule('own_goal', 'Own goal', -2, 'standard', 'own_goal'),
       rule('player_of_match', 'Player of the Match', 3, 'standard', 'player_of_match'),
@@ -47,7 +60,7 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
     name: 'GoalPlace Basketball Fantasy Lite',
     version: 1,
     status: 'approved',
-    captainMultiplier: 1.5,
+    captainMultiplier: 2,
     createdAt,
     publishedAt: createdAt,
     rules: [
@@ -55,17 +68,26 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
       rule('appearance', 'Match appearance', 2, 'basic', 'appearance'),
       { ...rule('minimum_duration', 'Plays at least 20 minutes', 1, 'standard', 'minutes_played'), minimumMinutes: 20 },
       { ...rule('points_scored', 'Every five points', 1, 'basic', 'points_scored'), per: 5 },
-      { ...rule('rebound', 'Every three rebounds', 1, 'standard', 'rebound'), per: 3 },
-      { ...rule('assist', 'Every two assists', 1, 'standard', 'assist'), per: 2 },
-      rule('steal', 'Steal', 3, 'advanced', 'steal'),
-      rule('block', 'Block', 3, 'advanced', 'block'),
+      /*
+       * Basketball's box score is the most demanding thing in the capture design: a scoring
+       * event roughly every forty seconds, with rebounds and assists happening faster than
+       * that. One observer with a phone cannot record them, so nine of the fifteen rules
+       * below would score zero for most athletes and full value for whoever happened to have
+       * a second scorer. Disabled rather than pretended.
+       */
+      disabled({ ...rule('rebound', 'Every three rebounds', 1, 'standard', 'rebound'), per: 3 }),
+      disabled({ ...rule('assist', 'Every two assists', 1, 'standard', 'assist'), per: 2 }),
+      disabled(rule('steal', 'Steal', 3, 'advanced', 'steal')),
+      disabled(rule('block', 'Block', 3, 'advanced', 'block')),
+      // Turnovers are on the palette, so this one stays.
       { ...rule('turnover', 'Every three turnovers', -1, 'advanced', 'turnover'), per: 3 },
-      rule('double_double', 'Double-double', 4, 'advanced', 'double_double'),
-      rule('triple_double', 'Triple-double', 8, 'advanced', 'triple_double'),
+      disabled(rule('double_double', 'Double-double', 4, 'advanced', 'double_double')),
+      disabled(rule('triple_double', 'Triple-double', 8, 'advanced', 'triple_double')),
       rule('player_of_match', 'Player of the Match', 3, 'standard', 'player_of_match'),
       rule('win_participation', 'Win participation', 1, 'basic', 'win_participation'),
       rule('yellow_card', 'Technical foul', -2, 'standard', 'technical_foul'),
-      rule('red_card', 'Ejection', -4, 'standard', 'ejection'),
+      // Ejections are not on the basketball palette; technical fouls are.
+      disabled(rule('red_card', 'Ejection', -4, 'standard', 'ejection')),
     ],
   },
   {
@@ -75,7 +97,7 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
     name: 'GoalPlace Rugby Fantasy Lite',
     version: 1,
     status: 'approved',
-    captainMultiplier: 1.5,
+    captainMultiplier: 2,
     createdAt,
     publishedAt: createdAt,
     rules: [
@@ -86,7 +108,7 @@ export const FANTASY_SCORING_PROFILES: FantasyScoringProfile[] = [
       rule('conversion', 'Conversion', 2, 'standard', 'conversion'),
       rule('penalty_goal', 'Penalty goal', 3, 'standard', 'penalty_goal'),
       rule('drop_goal', 'Drop goal', 3, 'standard', 'drop_goal'),
-      rule('assist', 'Official assist', 3, 'advanced', 'assist'),
+      disabled(rule('assist', 'Official assist', 3, 'advanced', 'assist')),
       rule('player_of_match', 'Player of the Match', 3, 'standard', 'player_of_match'),
       rule('win_participation', 'Win participation', 1, 'basic', 'win_participation'),
       rule('yellow_card', 'Yellow card', -1, 'basic', 'yellow_card'),
@@ -183,6 +205,19 @@ export const FANTASY_SQUAD_RULES: FantasySquadRules[] = [
     createdAt,
   },
 ];
+
+/**
+ * A rule that stays in the profile but does not score.
+ *
+ * Deleting it would lose the record that the platform considered this statistic and decided
+ * it cannot be collected honestly. Keeping it disabled means the reason travels with the
+ * profile, and re-enabling it later is a deliberate act rather than a rediscovery.
+ */
+function disabled(
+  base: FantasyScoringProfile['rules'][number],
+): FantasyScoringProfile['rules'][number] {
+  return { ...base, enabled: false };
+}
 
 function rule(
   stat: FantasyScoringProfile['rules'][number]['stat'],

@@ -51,6 +51,16 @@ const definitions = [
     squadRulesId: 'fantasy_squad_basketball_v1',
     dataLevel: 'basic' as const,
     recordedStatKeys: ['active_squad', 'appearance', 'points_scored', 'win_participation'],
+    /*
+     * Basketball demonstrates Pick 5 rather than the season squad.
+     *
+     * Its box score needs rebounds, assists, steals and blocks that one observer cannot
+     * capture while running a clock, so nine of the fifteen squad rules are dead there. Five
+     * picks scored on points, appearance, minutes and win participation is a real game and an
+     * honest one, which is exactly the distinction the demo should show.
+     */
+    gameMode: 'pick5' as const,
+    budgetMode: 'budget_free' as const,
   },
   {
     id: 'fantasy_rugby_kampala_2026',
@@ -68,6 +78,15 @@ const definitions = [
 ];
 
 export const fantasyCompetitions: FantasyCompetition[] = definitions.map((definition) => ({
+  /*
+   * Season 1 runs budget free unless a definition says otherwise.
+   *
+   * Nothing in the platform computes a price, and a budget priced by hand from no performance
+   * history creates noise rather than scarcity: the manager who wins is the one who guessed
+   * which prices were wrong. Prices arrive in season 2, computed by the server from observed
+   * points per appearance.
+   */
+  budgetMode: 'budget_free' as const,
   ...definition,
   scoringProfileVersion: 1,
   status: 'active',

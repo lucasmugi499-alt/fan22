@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { allowingRateLimitTransaction } from '@/test/rateLimitMock';
 import { POST as postAdmin } from './admin/route';
 import { POST as postMiniLeague } from './mini-leagues/route';
+import { POST as postPick5 } from './pick5/route';
 import { POST as postTeam } from './teams/route';
 import { POST as postTransfer } from './transfers/route';
 import { expectNoDomainCollectionAccess } from '@/test/firestoreAssertions';
@@ -49,6 +50,7 @@ describe('fantasy route hardening', () => {
     ['/api/fantasy/transfers', postTransfer, 'Sign in to make a fantasy transfer.'],
     ['/api/fantasy/mini-leagues', postMiniLeague, 'Sign in to manage mini-leagues.'],
     ['/api/fantasy/admin', postAdmin, 'Authentication required.'],
+    ['/api/fantasy/pick5', postPick5, 'Sign in to submit a Pick 5 lineup.'],
   ] as const)('rejects unauthenticated POST %s before body parsing or Firestore work', async (path, handler, error) => {
     const response = await handler(request(path, '{', ''));
 
@@ -63,6 +65,7 @@ describe('fantasy route hardening', () => {
     ['/api/fantasy/transfers', postTransfer, 'Choose two different eligible athletes.'],
     ['/api/fantasy/mini-leagues', postMiniLeague, 'Invalid mini-league request.'],
     ['/api/fantasy/admin', postAdmin, 'Invalid fantasy administration request.'],
+    ['/api/fantasy/pick5', postPick5, 'Invalid Pick 5 lineup.'],
   ] as const)('rejects invalid JSON for POST %s before Firestore work', async (path, handler, error) => {
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'fan_1', role: 'fan' });
 
@@ -78,6 +81,7 @@ describe('fantasy route hardening', () => {
     ['/api/fantasy/transfers', postTransfer, 'Choose two different eligible athletes.', 5 * 1024],
     ['/api/fantasy/mini-leagues', postMiniLeague, 'Invalid mini-league request.', 5 * 1024],
     ['/api/fantasy/admin', postAdmin, 'Invalid fantasy administration request.', 9 * 1024],
+    ['/api/fantasy/pick5', postPick5, 'Invalid Pick 5 lineup.', 5 * 1024],
   ] as const)('rejects oversized JSON for POST %s before Firestore work', async (path, handler, error, size) => {
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'fan_1', role: 'fan' });
 
@@ -112,6 +116,14 @@ describe('fantasy route hardening', () => {
     ['/api/fantasy/mini-leagues', postMiniLeague, {
       action: 'join',
       inviteCode: 'ABCDEF',
+    }],
+    ['/api/fantasy/pick5', postPick5, {
+      competitionId: 'competition_1',
+      roundId: 'round_1',
+      teamName: 'Scout XI',
+      squadAthleteIds: ['athlete_1'],
+      captainAthleteId: 'athlete_1',
+      scoutAthleteId: 'athlete_1',
     }],
   ] as const)('rejects operator accounts before fantasy writes for POST %s', async (path, handler, body) => {
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({

@@ -5,6 +5,10 @@ import {
   type WriteBatch,
 } from 'firebase-admin/firestore';
 import { buildFantasyCorrection } from '@/lib/fantasy/corrections';
+import {
+  buildFantasyFixtureVoid,
+  evaluateFixtureScoringGate,
+} from '@/lib/fantasy/fairness';
 import { scoreFantasyLineup } from '@/lib/fantasy/lineupScoring';
 import {
   mergeOfficialFantasyRoundEvents,
@@ -49,6 +53,8 @@ export interface FantasyScoringOutcome {
   pointEventsWritten: number;
   lineupsScored: number;
   correctionsWritten: number;
+  /** Fixtures the fairness gate refused to score. Never partially scored. */
+  fixturesVoided: number;
 }
 
 export async function lockFantasyRoundLineups(db: Firestore, roundId: string) {
@@ -113,6 +119,7 @@ export async function scoreFinalizedFantasyMatch(
     pointEventsWritten: 0,
     lineupsScored: 0,
     correctionsWritten: 0,
+    fixturesVoided: 0,
   };
 
   for (const competition of competitions) {
@@ -150,6 +157,47 @@ export async function scoreFinalizedFantasyMatch(
       asRecord<FantasyOfficialAthletePerformance>(snapshot.id, snapshot.data()),
     );
     const now = new Date().toISOString();
+
+    /**
+     * Fair or void, decided before a single point event is written.
+     *
+     * The scoring engine drops rules it cannot evaluate, which for a fixture with uneven
+     * coverage produces a quietly unfair round: some athletes scored on eleven rules, some on
+     * three, and nothing on the page says so. The gate refuses that outcome. Either every
+     * enabled rule is evaluable for every athlete in the fixture, or the fixture scores zero
+     * for everyone with a published reason.
+     *
+     * The official result, its events and the standings are untouched either way. This is
+     * fantasy declining to score a match, not a sporting decision about it.
+     */
+    const openExceptions = await db.collection('matchOperationalExceptions')
+      .where('matchId', '==', matchId)
+      .where('status', 'in', ['open', 'acknowledged', 'escalated', 'pending'])
+      .get()
+      .catch(() => null);
+    const gate = evaluateFixtureScoringGate({
+      competition,
+      profile,
+      performances,
+      conditions: {
+        abandoned: match.status !== 'completed',
+        openExceptionCount: openExceptions?.size ?? 0,
+      },
+    });
+
+    if (gate.decision === 'void') {
+      await voidFantasyFixture(db, {
+        competition,
+        round,
+        match,
+        gate,
+        now,
+      });
+      outcome.fixturesVoided += 1;
+      outcome.competitionsScored += 1;
+      continue;
+    }
+
     const replacementEvents = performances.flatMap((performance) =>
       scoreOfficialFantasyPerformance({
         competition,
@@ -363,4 +411,126 @@ async function rebuildFantasyLeaderboard(db: Firestore, competitionId: string) {
     },
   );
   await commitChunked(db, operations);
+}
+
+/**
+ * Publishes a fixture void, and removes any points that fixture had already produced.
+ *
+ * Symmetry is the whole point of voiding, so this supersedes every point event the fixture
+ * previously wrote before recording the void. Leaving them in place would mean the managers
+ * who happened to be scored under an earlier version kept their points while everyone else
+ * got nothing, which is a worse unfairness than the one voiding exists to prevent.
+ *
+ * Round scores are rebuilt from the remaining events, so a voided fixture contributes zero to
+ * every manager rather than a stale total.
+ */
+async function voidFantasyFixture(
+  db: Firestore,
+  {
+    competition,
+    round,
+    match,
+    gate,
+    now,
+  }: {
+    competition: FantasyCompetition;
+    round: FantasyRound;
+    match: Match;
+    gate: Extract<ReturnType<typeof evaluateFixtureScoringGate>, { decision: 'void' }>;
+    now: string;
+  },
+) {
+  const voidRecord = buildFantasyFixtureVoid({
+    competitionId: competition.id,
+    roundId: round.id,
+    matchId: match.id,
+    officialResultVersion: match.officialResultVersion ?? 0,
+    gate,
+    createdAt: now,
+  });
+
+  const existingSnapshots = await db.collection('fantasyPointEvents')
+    .where('competitionId', '==', competition.id)
+    .where('matchId', '==', match.id)
+    .get();
+  const superseded = existingSnapshots.docs.filter((snapshot) => snapshot.data().status !== 'superseded');
+
+  const operations: BatchOperation[] = superseded.map((snapshot) =>
+    (batch) => batch.update(snapshot.ref, { status: 'superseded', supersededAt: now }),
+  );
+  operations.push((batch) =>
+    batch.set(db.collection('fantasyFixtureVoids').doc(documentId(voidRecord.id)), voidRecord),
+  );
+  operations.push((batch) =>
+    batch.set(db.collection('fantasyAuditEvents').doc(documentId(`${voidRecord.id}:void`)), {
+      action: 'fixture_voided_for_fantasy',
+      competitionId: competition.id,
+      roundId: round.id,
+      matchId: match.id,
+      officialResultVersion: match.officialResultVersion ?? 0,
+      reason: voidRecord.reason,
+      unevaluableRuleIds: voidRecord.unevaluableRuleIds,
+      supersededPointEventCount: superseded.length,
+      createdAt: now,
+    }),
+  );
+  await commitChunked(db, operations);
+
+  /*
+   * Rescored from what remains, so the round total a manager sees never includes points from
+   * a fixture that is no longer being scored.
+   */
+  const [lineupSnapshots, roundEventSnapshots, profileSnapshot] = await Promise.all([
+    db.collection('fantasyLineupVersions')
+      .where('competitionId', '==', competition.id)
+      .where('roundId', '==', round.id)
+      .where('status', '==', 'locked')
+      .get(),
+    db.collection('fantasyPointEvents')
+      .where('competitionId', '==', competition.id)
+      .where('roundId', '==', round.id)
+      .get(),
+    db.collection('fantasyScoringProfiles').doc(competition.scoringProfileId).get(),
+  ]);
+  const profile = asRecord<FantasyScoringProfile>(profileSnapshot.id, profileSnapshot.data() ?? {});
+  const liveEvents = roundEventSnapshots.docs
+    .map((snapshot) => asRecord<FantasyPointEvent>(snapshot.id, snapshot.data()))
+    .filter((event) => event.status !== 'superseded');
+  const rescore: BatchOperation[] = lineupSnapshots.docs.map((snapshot) => {
+    const lineup = asRecord<FantasyLineupVersion>(snapshot.id, snapshot.data());
+    const score = scoreFantasyLineup({
+      competitionId: competition.id,
+      roundId: round.id,
+      fantasyTeamId: lineup.fantasyTeamId,
+      lineup,
+      pointEvents: liveEvents,
+      profile,
+      calculatedAt: now,
+    });
+    return (batch) => batch.set(db.collection('fantasyRoundScores').doc(documentId(score.id)), score);
+  });
+  await commitChunked(db, rescore);
+  await rebuildFantasyLeaderboard(db, competition.id);
+
+  /*
+   * Managers are told, with the reason. A round that is quietly short is exactly the
+   * experience the gate exists to prevent.
+   */
+  const affectedTeamIds = new Set(
+    lineupSnapshots.docs.map((snapshot) => String(snapshot.data().fantasyTeamId ?? '')).filter(Boolean),
+  );
+  for (const fantasyTeamId of affectedTeamIds) {
+    const fantasyTeam = await db.collection('fantasyTeams').doc(fantasyTeamId).get();
+    const userId = fantasyTeam.data()?.userId as string | undefined;
+    if (!userId) continue;
+    await db.collection('notifications').add({
+      userId,
+      type: 'fantasy_fixture_voided',
+      title: 'A fixture was not scored',
+      body: voidRecord.reason,
+      read: false,
+      href: `/fantasy/competitions/${competition.id}/points`,
+      createdAt: now,
+    });
+  }
 }

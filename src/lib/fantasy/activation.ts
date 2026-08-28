@@ -1,3 +1,5 @@
+import { fantasyBudgetMode } from './budget';
+import { fantasyCapturePolicyEligibility } from './fairness';
 import type {
   FantasyCompetition,
   FantasyPlayer,
@@ -6,6 +8,8 @@ import type {
   FantasyScoringProfile,
   FantasySquadRules,
 } from '@/types/fantasy';
+import type { FantasyBudgetMode } from '@/types/fantasy';
+import type { CapturePolicy } from '@/lib/capturePolicy';
 
 const DATA_LEVEL: Record<FantasyCompetition['dataLevel'], number> = {
   basic: 1,
@@ -14,6 +18,9 @@ const DATA_LEVEL: Record<FantasyCompetition['dataLevel'], number> = {
 };
 
 export type FantasyActivationSummary = {
+  budgetMode: FantasyBudgetMode;
+  /** What `max(leagueRequested, platformMinimum)` resolved to for this competition. */
+  effectiveCapturePolicy?: CapturePolicy;
   activatedRuleIds: string[];
   playerCount: number;
   pricedPlayerCount: number;
@@ -72,6 +79,7 @@ export function validateFantasyActivation({
   prices,
   rounds,
   observedCoverage,
+  capturePolicy,
 }: {
   competition: FantasyCompetition;
   scoringProfile: FantasyScoringProfile | null;
@@ -81,17 +89,41 @@ export function validateFantasyActivation({
   rounds: FantasyRound[];
   /** Omit only where no official results exist yet; absence is reported, not assumed. */
   observedCoverage?: ObservedDataCoverage;
+  /**
+   * The competition's capture policy inputs.
+   *
+   * Omitted only by callers that predate the fairness gate. Absence is reported as a blocker
+   * rather than assumed compliant: a competition whose policy nobody checked is exactly the
+   * competition that can admit a typed score.
+   */
+  capturePolicy?: { leagueRequested: unknown; platformMinimum: unknown };
 }): FantasyActivationReadiness {
   const blockers: string[] = [];
   const warnings: string[] = [];
   const positionGroupCounts: Record<string, number> = {};
   const summary: FantasyActivationSummary = {
+    budgetMode: fantasyBudgetMode(competition),
     activatedRuleIds: [],
     playerCount: players.length,
     pricedPlayerCount: 0,
     roundCount: rounds.length,
     positionGroupCounts,
   };
+
+  /**
+   * Rule 1 of the fairness model, enforced at the only moment it can be.
+   *
+   * Every performance in a FIELD_REQUIRED competition is captured to the same standard, so
+   * the coverage gap that scores two identical performances differently cannot arise. Any
+   * weaker policy admits a typed score, and a typed score cannot be scored on the same rules
+   * as a captured one.
+   */
+  const policy = fantasyCapturePolicyEligibility({
+    leagueRequested: capturePolicy?.leagueRequested,
+    platformMinimum: capturePolicy?.platformMinimum,
+  });
+  summary.effectiveCapturePolicy = policy.effectivePolicy;
+  if (!policy.eligible) blockers.push(policy.reason!);
 
   if (!scoringProfile) {
     blockers.push('Approved scoring profile is missing.');
@@ -179,6 +211,16 @@ export function validateFantasyActivation({
     }
   }
 
+  /**
+   * Budget-free competitions do not require a price per athlete.
+   *
+   * The gate used to refuse activation until every athlete carried a publishable price, and
+   * nothing in the platform computes one. That made the squad game unlaunchable except by
+   * having an administrator invent two hundred and fifty credit values from no performance
+   * history, which produces a budget that creates noise rather than scarcity. Prices are
+   * skipped here rather than faked; any price records that do exist are still validated.
+   */
+  const budgetMode = fantasyBudgetMode(competition);
   const pricesByAthlete = new Map<string, FantasyPlayerPrice[]>();
   for (const price of prices) {
     if (price.competitionId !== competition.id) blockers.push(`Price ${price.id} belongs to another competition.`);
@@ -189,11 +231,15 @@ export function validateFantasyActivation({
   summary.pricedPlayerCount = [...playerAthleteIds].filter((athleteId) =>
     (pricesByAthlete.get(athleteId) ?? []).length > 0,
   ).length;
-  for (const athleteId of playerAthleteIds) {
-    if (!pricesByAthlete.has(athleteId)) blockers.push(`Athlete ${athleteId} has no publishable price.`);
+  if (budgetMode === 'credits') {
+    for (const athleteId of playerAthleteIds) {
+      if (!pricesByAthlete.has(athleteId)) blockers.push(`Athlete ${athleteId} has no publishable price.`);
+    }
+  } else if (prices.length) {
+    warnings.push('This competition runs budget free, so published prices do not constrain squads.');
   }
   for (const [athleteId, athletePrices] of pricesByAthlete.entries()) {
-    if (!playerAthleteIds.has(athleteId)) warnings.push(`Price exists for athlete ${athleteId}, but no active player record exists.`);
+    if (budgetMode === 'credits' && !playerAthleteIds.has(athleteId)) warnings.push(`Price exists for athlete ${athleteId}, but no active player record exists.`);
     if (athletePrices.length > 1) warnings.push(`Athlete ${athleteId} has multiple price records for this competition.`);
   }
 

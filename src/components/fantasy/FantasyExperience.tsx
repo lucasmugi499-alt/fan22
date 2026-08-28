@@ -11,6 +11,7 @@ import {
   UsersThree,
 } from '@phosphor-icons/react/dist/ssr';
 import { FANTASY_SCORING_PROFILES, FANTASY_SQUAD_RULES } from '@/lib/fantasy/profiles';
+import { budgetApplies } from '@/lib/fantasy/budget';
 import type {
   FantasyCompetition,
   FantasyLeaderboardEntry,
@@ -277,7 +278,7 @@ export function FantasyCompetitionOverview({ bundle }: { bundle: FantasyCompetit
             </p>
             <dl className="mt-6 space-y-3 border-t border-border pt-4 text-sm">
               <div className="flex justify-between"><dt className="text-muted">Squad</dt><dd className="font-semibold text-text-strong">{rules.squadSize}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">Budget</dt><dd className="font-semibold text-text-strong">{rules.budgetCredits} credits</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">Budget</dt><dd className="font-semibold text-text-strong">{budgetApplies(competition) ? `${rules.budgetCredits} credits` : 'None, pick freely'}</dd></div>
               <div className="flex justify-between"><dt className="text-muted">One real team</dt><dd className="font-semibold text-text-strong">Max {rules.maxFromRealTeam}</dd></div>
               <div className="flex justify-between"><dt className="text-muted">Captain</dt><dd className="font-semibold text-text-strong">1.5×</dd></div>
             </dl>

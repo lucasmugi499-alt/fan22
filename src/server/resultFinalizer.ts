@@ -5,6 +5,11 @@ import { finalizationSourceFromResolution } from '../lib/resultSubmission';
 import { SPORT_DEFINITIONS } from '../kernel/definitions/sportCatalogues';
 import { reconstructMatchScore } from '../kernel/formulas/score';
 import { resolveAthleteParticipation } from '../kernel/projections/participation';
+import {
+  deriveDefensiveStats,
+  derivedDefensiveStatKeys,
+  observedFullTimeMinute,
+} from '../lib/fantasy/derivation';
 import type { OfficialSportEvent } from '../kernel/types';
 // Relative, like every other import in this file: it compiles into the Cloud Functions
 // bundle, where a path alias survives into the emitted CommonJS and fails at require time.
@@ -1419,6 +1424,10 @@ export async function finalizeCandidate(
        * Summing `payload.value` handles both shapes the finalizer emits — one event per goal
        * or try carrying 1, and a single basketball event carrying the point total.
        */
+      // One reading of the clock for every athlete in this match, so a late event does not
+      // give one player a longer nominal match than their team-mate.
+      const fullTimeMinute = observedFullTimeMinute(kernelEvents);
+
       const scoredFromEvents = new Map<string, number>();
       const scoringEventType = scorerEventType(fantasySport);
       for (const event of officialEvents) {
@@ -1464,7 +1473,21 @@ export async function finalizeCandidate(
           || lineStats.minutes_played
           || 0;
         const playerOfMatch = Boolean(statLine?.playerOfMatch || match.topPerformerId === athlete.id);
+        /**
+         * Clean sheets and goals conceded are derived from the canonical events rather than
+         * captured, because no field manager taps them and asking one person to keep that
+         * ledger while running the clock would produce worse data than deriving it. A stat
+         * line that carries them explicitly still wins: derivation fills a gap, it does not
+         * overrule a recorded observation.
+         */
+        const derivedDefensive = derivedDefensiveStatKeys(deriveDefensiveStats({
+          athleteId: athlete.id,
+          teamId,
+          events: kernelEvents,
+          fullTimeMinute: fullTimeMinute || undefined,
+        }));
         const richStats = {
+          ...derivedDefensive,
           ...lineStats,
           ...(minutesPlayed > 0 ? { minutes_played: minutesPlayed } : {}),
           player_of_match: playerOfMatch ? 1 : 0,

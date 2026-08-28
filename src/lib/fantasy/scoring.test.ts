@@ -67,7 +67,9 @@ describe('multi-sport fantasy scoring', () => {
       performance,
       createdAt: '2026-07-29T12:00:00.000Z',
     });
-    expect(totalOfficialFantasyPoints(events)).toBe(25);
+    // 22, not 25: the official-assist rule is disabled because one observer cannot capture
+    // an assist while running the clock, so the profile no longer scores it.
+    expect(totalOfficialFantasyPoints(events)).toBe(22);
     expect(events.every((event) => event.idempotencyKey.includes('match_1:1:athlete_1'))).toBe(true);
   });
 
@@ -245,7 +247,8 @@ describe('multi-sport fantasy scoring', () => {
       officialResultVersion: 1,
       replacementEvents: matchTwo,
     });
-    expect(totalOfficialFantasyPoints(accumulated)).toBe(50);
+    // Six points lower than before assists were disabled: one per match.
+    expect(totalOfficialFantasyPoints(accumulated)).toBe(44);
 
     const matchOneV2 = scoreOfficialFantasyPerformance({
       competition,

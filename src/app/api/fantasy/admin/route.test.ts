@@ -54,6 +54,29 @@ function getRequest() {
   });
 }
 
+/**
+ * The capture-policy inputs activation reads.
+ *
+ * Fantasy may only activate on an effective policy of FIELD_REQUIRED, so every fixture in the
+ * competition is captured to the same standard. Tests that are asserting something else still
+ * have to satisfy that rule, or they would be asserting against a competition that could
+ * never activate anyway.
+ */
+function capturePolicyStubs(seasonPolicy: string | undefined = 'FIELD_REQUIRED') {
+  return {
+    seasons: {
+      doc: (id: string) => ({
+        get: vi.fn().mockResolvedValue(doc(id, { id, capturePolicy: seasonPolicy })),
+      }),
+    },
+    platformSettings: {
+      doc: () => ({
+        get: vi.fn().mockResolvedValue(doc('global', { capturePolicyFloor: 'POST_MATCH_ALLOWED' })),
+      }),
+    },
+  };
+}
+
 describe('fantasy admin activation route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,6 +88,7 @@ describe('fantasy admin activation route', () => {
 
   it('blocks activation when competition stat coverage cannot support its active scoring rules', async () => {
     const collections: Record<string, unknown> = {
+      ...capturePolicyStubs(),
       users: {
         doc: () => ({
           get: vi.fn().mockResolvedValue(doc('platform_1', { role: 'platform_admin' })),
@@ -231,6 +255,7 @@ describe('fantasy admin activation route', () => {
       role: 'league_admin',
     });
     const collections: Record<string, unknown> = {
+      ...capturePolicyStubs(),
       users: {
         doc: () => ({
           get: vi.fn().mockResolvedValue(doc('league_user', { role: 'league_admin' })),
@@ -350,6 +375,7 @@ describe('fantasy admin activation route', () => {
     };
     vi.mocked(adminDb.bulkWriter).mockReturnValue(writer as never);
     const collections: Record<string, unknown> = {
+      ...capturePolicyStubs(),
       users: {
         doc: () => ({
           get: vi.fn().mockResolvedValue(doc('league_user', { role: 'league_admin' })),

@@ -64,7 +64,12 @@ describe('fantasy lineup scoring and corrections', () => {
       profile,
       calculatedAt: '2026-07-29T00:00:00.000Z',
     });
-    expect(score).toMatchObject({ basePoints: 9, captainBonus: 3.5, totalPoints: 12.5 });
+    /*
+     * The captain doubles rather than adding a half. In a low-event grassroots game a 1.5x
+     * captain is not a decision, it is a rounding difference; doubling creates enough swing
+     * that the one choice a manager makes each round is worth thinking about.
+     */
+    expect(score).toMatchObject({ basePoints: 9, captainBonus: 7, totalPoints: 16 });
   });
 
   it('falls back to vice-captain only when the captain did not play', () => {
@@ -77,7 +82,7 @@ describe('fantasy lineup scoring and corrections', () => {
       profile,
       calculatedAt: '2026-07-29T00:00:00.000Z',
     });
-    expect(score).toMatchObject({ basePoints: 7, captainBonus: 3.5, totalPoints: 10.5 });
+    expect(score).toMatchObject({ basePoints: 7, captainBonus: 7, totalPoints: 14 });
   });
 
   it('supersedes old events and records visible old/new totals after a correction', () => {
@@ -97,8 +102,8 @@ describe('fantasy lineup scoring and corrections', () => {
     expect(result.supersededEvents.every((item) => item.status === 'superseded')).toBe(true);
     expect(result.correction).toMatchObject({
       affectedFantasyTeamIds: ['team_1'],
-      oldTotals: { team_1: 10.5 },
-      newTotals: { team_1: 3 },
+      oldTotals: { team_1: 14 },
+      newTotals: { team_1: 4 },
     });
   });
 

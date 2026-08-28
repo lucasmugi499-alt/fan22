@@ -9,6 +9,7 @@ import { FANTASY_SQUAD_RULES } from '@/lib/fantasy/profiles';
 import type { FantasyCompetition } from '@/types/fantasy';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
+import { budgetApplies } from '@/lib/fantasy/budget';
 
 export interface FantasyPlayerCard {
   athleteId: string;
@@ -36,6 +37,9 @@ export function FantasySquadBuilder({
   deadlineAt: string;
 }) {
   const rules = FANTASY_SQUAD_RULES.find((item) => item.id === competition.squadRulesId)!;
+  // A budget-free competition has no credits to spend, so it must not display a budget
+  // counter. "0.0 credits left" reads as a broken game rather than an absent constraint.
+  const budgeted = budgetApplies(competition);
   const { currentUser, isDemoMode } = useAuth();
   const storageKey = `goalplace:fantasy-draft:${competition.id}:${roundId}`;
   const [selected, setSelected] = useState<string[]>([]);
@@ -97,7 +101,7 @@ export function FantasySquadBuilder({
     }
     if (
       selected.length >= rules.squadSize
-      || creditsUsed + player.credits > rules.budgetCredits
+      || (budgeted && creditsUsed + player.credits > rules.budgetCredits)
       || (teamCounts[player.realTeamId] ?? 0) >= rules.maxFromRealTeam
       || player.availability === 'unavailable'
       || player.availability === 'suspended'
@@ -166,7 +170,9 @@ export function FantasySquadBuilder({
 
       <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mt-6 grid grid-cols-3 border-y border-border bg-surface-0/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-md sm:border sm:bg-surface-1">
         <Stat label="Selected" value={`${selected.length}/${rules.squadSize}`} valid={selected.length === rules.squadSize} />
-        <Stat label="Credits left" value={(rules.budgetCredits - creditsUsed).toFixed(1)} valid={creditsUsed <= rules.budgetCredits} />
+        {budgeted
+          ? <Stat label="Credits left" value={(rules.budgetCredits - creditsUsed).toFixed(1)} valid={creditsUsed <= rules.budgetCredits} />
+          : <Stat label="Clubs" value={`max ${rules.maxFromRealTeam} each`} valid />}
         <Stat label="Draft" value={saved ? 'Saved' : 'Offline ready'} valid />
       </div>
 

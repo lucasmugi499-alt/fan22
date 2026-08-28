@@ -115,6 +115,12 @@ function prices(): FantasyPlayerPrice[] {
   }));
 }
 
+/**
+ * Fantasy may only activate on an effective capture policy of FIELD_REQUIRED, so every test
+ * that is asserting something else has to satisfy that rule first.
+ */
+const ELIGIBLE_POLICY = { leagueRequested: 'FIELD_REQUIRED', platformMinimum: 'POST_MATCH_ALLOWED' };
+
 const rounds: FantasyRound[] = [{
   id: 'round_1',
   competitionId: 'competition_1',
@@ -136,6 +142,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
     });
 
     expect(readiness).toMatchObject({
@@ -168,6 +175,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
     });
 
     expect(readiness.ready).toBe(false);
@@ -184,6 +192,7 @@ describe('fantasy activation readiness', () => {
       players: players().filter((player) => player.positionGroup !== 'goalkeeper'),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
     });
 
     expect(readiness.ready).toBe(false);
@@ -213,6 +222,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
     });
 
     expect(readiness.warnings).toContain(
@@ -228,6 +238,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
       observedCoverage: measureObservedCoverage([
         // Squads were recorded, but nobody was ever marked as having played.
         { matchId: 'm1', didPlay: false, stats: { active_squad: 1, goal: 1 } },
@@ -251,6 +262,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
       observedCoverage: measureObservedCoverage([
         { matchId: 'm1', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 1, win_participation: 1 } },
       ]),
@@ -268,6 +280,7 @@ describe('fantasy activation readiness', () => {
       players: players(),
       prices: prices(),
       rounds,
+      capturePolicy: ELIGIBLE_POLICY,
       observedCoverage: measureObservedCoverage([
         { matchId: 'm1', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 1, win_participation: 1, yellow_card: 1, red_card: 1 } },
         { matchId: 'm2', didPlay: true, stats: { active_squad: 1, appearance: 1, goal: 2, win_participation: 1, yellow_card: 1, red_card: 1 } },
@@ -301,5 +314,74 @@ describe('measureObservedCoverage', () => {
     expect(coverage.matchesSampled).toBe(2);
     expect(coverage.performancesSampled).toBe(4);
     expect(coverage.participationCoveragePercent).toBe(25);
+  });
+});
+
+describe('budget-free activation', () => {
+  function check(overrides: { prices: FantasyPlayerPrice[]; budgetFree?: boolean }) {
+    return validateFantasyActivation({
+      competition: overrides.budgetFree
+        ? { ...competition, budgetMode: 'budget_free' }
+        : competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: overrides.prices,
+      rounds,
+      capturePolicy: ELIGIBLE_POLICY,
+    });
+  }
+
+  it('does not require a price per athlete, which nothing in the platform computes', () => {
+    const priced = check({ prices: [] });
+    expect(priced.blockers.some((blocker) => blocker.includes('no publishable price'))).toBe(true);
+    expect(priced.summary.budgetMode).toBe('credits');
+
+    const budgetFree = check({ prices: [], budgetFree: true });
+    expect(budgetFree.blockers.some((blocker) => blocker.includes('no publishable price'))).toBe(false);
+    expect(budgetFree.summary.budgetMode).toBe('budget_free');
+  });
+
+  it('still validates any price records a budget-free competition happens to carry', () => {
+    const budgetFree = check({ prices: prices(), budgetFree: true });
+    expect(budgetFree.warnings.some((warning) => warning.includes('runs budget free'))).toBe(true);
+    const invalid = check({
+      prices: [{ ...prices()[0], credits: 0 }],
+      budgetFree: true,
+    });
+    expect(invalid.blockers.some((blocker) => blocker.includes('positive credits'))).toBe(true);
+  });
+});
+
+describe('rule 1: fantasy binds to capture policy', () => {
+  function check(capturePolicy?: { leagueRequested: unknown; platformMinimum: unknown }) {
+    return validateFantasyActivation({
+      competition,
+      scoringProfile,
+      squadRules,
+      players: players(),
+      prices: prices(),
+      rounds,
+      capturePolicy,
+    });
+  }
+
+  it('refuses a competition that still permits a typed score', () => {
+    const readiness = check({ leagueRequested: 'FIELD_PREFERRED', platformMinimum: 'POST_MATCH_ALLOWED' });
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers.some((blocker) => blocker.includes('FIELD_REQUIRED'))).toBe(true);
+    expect(readiness.summary.effectiveCapturePolicy).toBe('FIELD_PREFERRED');
+  });
+
+  it('accepts a competition the platform floor raised to FIELD_REQUIRED', () => {
+    const readiness = check({ leagueRequested: 'POST_MATCH_ALLOWED', platformMinimum: 'FIELD_REQUIRED' });
+    expect(readiness.blockers.some((blocker) => blocker.includes('FIELD_REQUIRED'))).toBe(false);
+    expect(readiness.summary.effectiveCapturePolicy).toBe('FIELD_REQUIRED');
+  });
+
+  it('fails closed when no caller supplied a policy at all', () => {
+    const readiness = check(undefined);
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers.some((blocker) => blocker.includes('FIELD_REQUIRED'))).toBe(true);
   });
 });
