@@ -215,11 +215,12 @@ export function LeagueMatches() {
             hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kampala',
           }).format(new Date(assigning.scheduledAt))
           : ''}
-        onClose={() => setAssigning(null)}
-        // The row's readiness changes the moment this succeeds, so the list is reloaded
-        // rather than patched: a stale "Not assigned" here is the one thing this screen
-        // exists to prevent.
-        onAssigned={() => window.location.reload()}
+        onClose={() => {
+          setAssigning(null);
+          // Refreshed on close rather than on success. The credentials are shown once and
+          // cannot be retrieved, so reloading as soon as the write landed threw them away.
+          window.location.reload();
+        }}
       />
     </div>
   );

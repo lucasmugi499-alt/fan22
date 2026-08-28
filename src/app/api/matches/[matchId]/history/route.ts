@@ -32,6 +32,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
     return Response.json({ error: 'You do not administer this league.' }, { status: 403 });
   }
 
+  /*
+   * The assignment travels with the history because the match page needs both and neither is
+   * client-readable. Without it the page could show a fixture it had just assigned somebody to
+   * and still say nobody was assigned.
+   */
+  const assignmentSnapshot = await adminDb.collection('fieldManagerAssignments')
+    .where('matchId', '==', matchId)
+    .limit(1)
+    .get()
+    .catch(() => null);
+  const assignmentDoc = assignmentSnapshot?.docs[0];
+  const assignmentData = assignmentDoc?.data();
+  const fieldManager = assignmentData?.fieldManagerId
+    ? await adminDb.collection('fieldManagers').doc(String(assignmentData.fieldManagerId)).get().catch(() => null)
+    : null;
+  const assignment = assignmentData
+    ? {
+      id: assignmentDoc!.id,
+      status: String(assignmentData.status ?? 'assigned'),
+      displayName: fieldManager?.exists ? String(fieldManager.data()?.displayName ?? '') : null,
+      accessStartsAt: assignmentData.accessStartsAt ?? null,
+      accessExpiresAt: assignmentData.accessExpiresAt ?? null,
+      // The last observed sync, never an assumed one.
+      lastSyncAt: assignmentData.lastSyncAt ?? assignmentData.lastHeartbeatAt ?? null,
+    }
+    : null;
+
   const snapshot = await adminDb.collection('matchScheduleChanges')
     .where('matchId', '==', matchId)
     .limit(50)
@@ -44,5 +71,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
       Date.parse(String((right as { createdAt?: string }).createdAt ?? '')) -
       Date.parse(String((left as { createdAt?: string }).createdAt ?? '')));
 
-  return Response.json({ matchId, changes }, { headers: { 'cache-control': 'private, no-store' } });
+  return Response.json({ matchId, assignment, changes }, { headers: { 'cache-control': 'private, no-store' } });
 }

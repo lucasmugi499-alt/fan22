@@ -38,9 +38,41 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
     recordLimit: 250,
   });
   const [assigning, setAssigning] = useState(false);
+  /**
+   * Assignment state, loaded from the server.
+   *
+   * The row was previously built from the match alone, so a fixture somebody had just been
+   * assigned to still read "Nobody is assigned". Assignments are not client-readable, so this
+   * has to come from the league-scoped endpoint.
+   */
+  const [assignment, setAssignment] = useState<{
+    displayName: string | null;
+    lastSyncAt: string | null;
+    status: string;
+  } | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
   const [takingOver, setTakingOver] = useState(false);
   const [enteringResult, setEnteringResult] = useState(false);
+
+  const { currentUser } = useAuth();
+  useEffect(() => {
+    if (isDemoMode || !currentUser) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`/api/matches/${encodeURIComponent(matchId)}/history`, {
+          headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const body = await response.json().catch(() => ({}));
+        if (!cancelled) setAssignment(body.assignment ?? null);
+      } catch {
+        // Operational context, not the record. A failure must not take the page down.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser, isDemoMode, matchId]);
 
   const match = detail.matches.find((entry) => entry.id === matchId);
   const row = useMemo(() => {
@@ -48,9 +80,10 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
     return matchOperationalRow({
       match,
       teams: teamsInLeague(league.id, detail.teams),
+      assignment,
       now: new Date().toISOString(),
     });
-  }, [detail.teams, league, match]);
+  }, [assignment, detail.teams, league, match]);
 
   if (catalog.loading || detail.loading) return <DetailSkeleton />;
   if (!league) return <NoAssignment kind="league" />;
@@ -209,8 +242,13 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         matchId={row.matchId}
         matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
         kickoffLabel={kickoff}
-        onClose={() => setAssigning(false)}
-        onAssigned={() => window.location.reload()}
+        onClose={() => {
+          setAssigning(false);
+          // Refreshed on close, not on success: the link and PIN are shown once and are not
+          // retrievable, so reloading the moment the write landed destroyed them before the
+          // operator could copy either one.
+          window.location.reload();
+        }}
       />
     </div>
   );
