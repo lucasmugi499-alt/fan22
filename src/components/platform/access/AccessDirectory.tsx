@@ -267,9 +267,9 @@ export function AccessDirectory() {
       <BulkInvitationImport />
 
       <Card className="p-4">
-        <h2 className="text-[15px] font-semibold text-text-strong">Legacy records — migration diagnostics</h2>
+        <h2 className="text-[15px] font-semibold text-text-strong">Legacy records · migration diagnostics</h2>
         <p className="mb-3 mt-1 text-[13px] leading-snug text-text-muted">
-          Not the current authority source. Retained for migration visibility only — Firestore
+          Not the current authority source. Retained for migration visibility only. Firestore
           Rules no longer read these, so changing one grants and removes nothing.
         </p>
         <div className="space-y-2">

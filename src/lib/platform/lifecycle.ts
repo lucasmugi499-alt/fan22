@@ -84,7 +84,7 @@ export function hardDeleteBlockers(
     blockers.push(`Only a draft can be deleted outright; this one is ${state}.`);
   }
   if (dependencies.officialMatches > 0) {
-    blockers.push(`${dependencies.officialMatches} official result(s) reference it — the sporting record cannot be rewritten.`);
+    blockers.push(`${dependencies.officialMatches} official result(s) reference it. The sporting record cannot be rewritten.`);
   }
   if (dependencies.matches > 0) {
     blockers.push(`${dependencies.matches} match(es) reference it.`);
@@ -96,7 +96,7 @@ export function hardDeleteBlockers(
     blockers.push(`${dependencies.teams} team(s) belong to it.`);
   }
   if (dependencies.payments > 0) {
-    blockers.push(`${dependencies.payments} payment record(s) reference it — money is never orphaned.`);
+    blockers.push(`${dependencies.payments} payment record(s) reference it. Money is never orphaned.`);
   }
   if (dependencies.auditEvents > 0) {
     blockers.push(`${dependencies.auditEvents} audit entr(ies) record activity on it beyond its creation.`);

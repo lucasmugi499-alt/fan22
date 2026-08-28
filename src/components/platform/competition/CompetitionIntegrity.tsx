@@ -147,7 +147,7 @@ function ReconciliationQueue({
           <div key={item.exceptionId} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-text-strong">
-                {matchLabel(item.matchId)} — {leagueName(item.leagueId)}
+                {matchLabel(item.matchId)} · {leagueName(item.leagueId)}
               </p>
               <StatusChip label={item.status} />
             </div>

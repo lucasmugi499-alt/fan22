@@ -263,7 +263,7 @@ export function buildLeagueCommand({
     if (!row.attention) continue;
     attention.push({
       id: `match:${row.matchId}`,
-      label: `${row.homeTeamName} vs ${row.awayTeamName} — ${row.attention}`,
+      label: `${row.homeTeamName} vs ${row.awayTeamName}: ${row.attention}`,
       severity: row.state === 'needs_review' || row.state === 'live' ? 'critical' : 'warning',
       href: `/league-admin/matches/${encodeURIComponent(row.matchId)}`,
     });

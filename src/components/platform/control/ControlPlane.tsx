@@ -179,7 +179,7 @@ export function ControlPlane() {
 
       {state.measured ? null : (
         <Card className="p-4">
-          <p className="text-sm text-text-strong">Demo session — nothing on this page is measured.</p>
+          <p className="text-sm text-text-strong">Demo session. Nothing on this page is measured.</p>
           <p className="mt-1 text-sm text-muted">
             Reading control-plane state needs a signed-in platform operator. The demo persona
             has no such session, so runtime readings are shown as {NOT_MEASURED} rather than
@@ -228,7 +228,7 @@ export function ControlPlane() {
                       <ul className="mt-1.5 space-y-1">
                         {item.blockers.map((blocker) => (
                           <li key={blocker} className="flex gap-2 text-sm text-muted">
-                            <span aria-hidden className="text-subtle">—</span>
+                            <span aria-hidden className="text-subtle">·</span>
                             <span>{blocker}</span>
                           </li>
                         ))}
@@ -250,8 +250,8 @@ export function ControlPlane() {
             })}
             <p className="text-xs text-subtle">
               Readiness is reported, never actioned here. Activating an environment is a
-              guarded workflow — checks, typed confirmation, approval, maintenance, routing
-              change, smoke tests, audit — and the routing step does not yet exist.
+              guarded workflow: checks, typed confirmation, approval, maintenance, routing
+              change, smoke tests, audit. The routing step does not yet exist.
             </p>
           </div>
         </Card>
@@ -299,14 +299,14 @@ export function ControlPlane() {
                     <p className="mt-1 text-xs text-subtle">
                       {entry.variable}
                       {entry.modeThisOrigin === 'canary'
-                        ? ` — ${entry.canaryAllowlistSize} allowlisted id(s) in ${entry.canaryVariable}`
+                        ? `, ${entry.canaryAllowlistSize} allowlisted id(s) in ${entry.canaryVariable}`
                         : null}
                     </p>
                     <p className="text-xs text-subtle">
                       Decided by: {entry.governedBy}
                       {entry.reachableFromThisOrigin
                         ? null
-                        : ' — not reachable from this origin, so this runtime holds no reading'}
+                        : ', not reachable from this origin, so this runtime holds no reading'}
                     </p>
                   </li>
                 ))}
@@ -340,7 +340,7 @@ export function ControlPlane() {
             'Approved by a second operator',
             'Maintenance requested',
             'Routing instruction issued',
-            'Smoke tests confirmed — blocked, no routing mechanism exists',
+            'Smoke tests confirmed. Blocked, no routing mechanism exists',
             'Completed',
           ].map((step, index) => (
             <li key={step} className="flex gap-2">

@@ -123,7 +123,7 @@ export function LeagueVerification({ compact = false }: { compact?: boolean }) {
                 state={STATE.disputed}
                 title={`${home?.name ?? 'Home'} vs ${away?.name ?? 'Away'}`}
                 subtitle={
-                  `Scoring events exceed submitted result — submitted ${submitted}, `
+                  `Scoring events exceed submitted result. Submitted ${submitted}, `
                   + `events ${reconstructed} (${gap}). Not finalized.`
                 }
                 meta={

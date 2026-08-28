@@ -177,10 +177,20 @@ export function LeagueFixtureBuilder({
                 onChange={(event) => setFormat(event.target.value as ScheduleFormat)}
                 className="field"
               >
-                <option value="single_round_robin">Single round robin — everyone plays once</option>
-                <option value="double_round_robin">Double round robin — home and away</option>
+                <option value="single_round_robin">Single round robin</option>
+                <option value="double_round_robin">Double round robin</option>
                 <option value="knockout">Knockout</option>
               </select>
+              {/*
+                The explanation sits under the control rather than inside the option text. At
+                320px the select clipped its own value mid-word, so the sentence that was meant
+                to explain the format was the part a phone could not read.
+              */}
+              <p className="mt-1.5 text-xs leading-5 text-muted">
+                {format === 'single_round_robin' ? 'Everyone plays everyone once.' : null}
+                {format === 'double_round_robin' ? 'Everyone plays everyone twice, home and away.' : null}
+                {format === 'knockout' ? 'Losers are eliminated each round.' : null}
+              </p>
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-2">

@@ -52,7 +52,7 @@ describe('object lifecycle', () => {
     ['matches', 'match(es)'],
     ['athletes', 'athlete profile'],
     ['teams', 'team(s)'],
-    ['payments', 'money is never orphaned'],
+    ['payments', 'Money is never orphaned'],
     ['auditEvents', 'beyond its creation'],
   ] as const)('refuses hard delete while %s exist', (key, phrase) => {
     const dependencies: LifecycleDependencies = { ...NO_DEPENDENCIES, [key]: 1 };

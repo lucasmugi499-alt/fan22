@@ -167,7 +167,7 @@ function oldestCaseAge(data: DeskPayload | null) {
 
 function oldestAgeLabel(data: DeskPayload | null) {
   const days = oldestCaseAge(data);
-  if (days === null) return '—';
+  if (days === null) return '·';
   return days === 0 ? 'today' : `${days}d`;
 }
 

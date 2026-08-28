@@ -34,6 +34,7 @@ export function AssignFieldManagerSheet({
   matchId,
   matchLabel,
   kickoffLabel,
+  clubs = [],
   onClose,
   onAssigned,
 }: {
@@ -41,13 +42,15 @@ export function AssignFieldManagerSheet({
   matchId: string;
   matchLabel: string;
   kickoffLabel: string;
+  /** The league's clubs, so the affiliation declaration can be tapped rather than typed. */
+  clubs?: Array<{ id: string; name: string }>;
   onClose: () => void;
   onAssigned?: () => void;
 }) {
   const { currentUser, isDemoMode } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
-  const [affiliations, setAffiliations] = useState('');
+  const [affiliations, setAffiliations] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AssignResult | null>(null);
@@ -69,10 +72,7 @@ export function AssignFieldManagerSheet({
         body: JSON.stringify({
           displayName: displayName.trim(),
           phone: phone.trim(),
-          declaredAffiliations: affiliations
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean),
+          declaredAffiliations: affiliations,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -90,7 +90,7 @@ export function AssignFieldManagerSheet({
     setResult(null);
     setDisplayName('');
     setPhone('');
-    setAffiliations('');
+    setAffiliations([]);
     setError(null);
     onClose();
   }
@@ -168,20 +168,48 @@ export function AssignFieldManagerSheet({
             />
           </label>
 
-          <label className="block text-sm font-medium text-text">
-            Clubs they are involved with
-            <span className="ml-1 font-normal text-muted">(optional)</span>
-            <input
-              value={affiliations}
-              onChange={(event) => setAffiliations(event.target.value)}
-              placeholder="Team ids, comma separated"
-              className="mt-1.5 min-h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-1 px-3 text-sm text-text-strong placeholder:text-subtle"
-            />
-            <span className="mt-1.5 block text-xs leading-5 text-muted">
-              An involved observer is not disqualified. Declaring it keeps the capture labelled
-              rather than indistinguishable from a neutral one.
-            </span>
-          </label>
+          {/*
+            Tapped, not typed. This asked for "team ids, comma separated", which meant declaring
+            a conflict of interest required knowing Firestore document ids. A declaration that is
+            that hard to make does not get made, and the labelling it exists to produce quietly
+            stops happening. Nothing is shown at all when the club list is unavailable, because
+            an empty text box is worse than no question.
+          */}
+          {clubs.length ? (
+            <fieldset>
+              <legend className="text-sm font-medium text-text">
+                Clubs they are involved with
+                <span className="ml-1 font-normal text-muted">(optional)</span>
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {clubs.map((club) => {
+                  const selected = affiliations.includes(club.id);
+                  return (
+                    <button
+                      key={club.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setAffiliations((current) => selected
+                        ? current.filter((entry) => entry !== club.id)
+                        : [...current, club.id])}
+                      className={cn(
+                        'min-h-11 max-w-full rounded-full border px-3.5 text-sm font-medium transition',
+                        selected
+                          ? 'border-[var(--state-pending)] bg-[color-mix(in_srgb,var(--state-pending),transparent_88%)] text-[var(--state-pending)]'
+                          : 'border-border text-muted hover:text-text-strong',
+                      )}
+                    >
+                      <span className="block truncate">{club.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-muted">
+                An involved observer is not disqualified. Declaring it keeps the capture labelled
+                rather than indistinguishable from a neutral one.
+              </p>
+            </fieldset>
+          ) : null}
 
           {error ? (
             <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--state-error),transparent_55%)] p-3 text-sm text-[var(--state-error)]">

@@ -52,6 +52,7 @@ function GroupedRail({
 }) {
   // From nav.ts, so a new workspace cannot appear in the config and vanish from the rail.
   const groups: readonly NavGroup[] = NAV_GROUP_ORDER;
+  const ungrouped = destinations.filter((destination) => !destination.group);
   return (
     <div className="space-y-4">
       {groups.map((group) => {
@@ -64,10 +65,16 @@ function GroupedRail({
           </div>
         );
       })}
-      <div>
-        <p className="px-3 pb-1.5 text-[10px] font-semibold tracking-[0.18em] text-subtle">ACCOUNT</p>
-        <RailGroup destinations={destinations.filter((destination) => !destination.group)} active={active} muted />
-      </div>
+      {/*
+        Guarded like every other group. League Admin puts all of its destinations in a group, so
+        this rendered an ACCOUNT heading with nothing underneath it on every league screen.
+      */}
+      {ungrouped.length ? (
+        <div>
+          <p className="px-3 pb-1.5 text-[10px] font-semibold tracking-[0.18em] text-subtle">ACCOUNT</p>
+          <RailGroup destinations={ungrouped} active={active} muted />
+        </div>
+      ) : null}
     </div>
   );
 }

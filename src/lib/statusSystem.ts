@@ -89,7 +89,7 @@ export const STATE: Record<UiStateId, StateDescriptor> = {
     tone: 'warning',
     icon: Warning,
     explanation:
-      'The 72-hour confirmation window passed with no response. Silence is not agreement — the league decides what happens next.',
+      'The 72-hour confirmation window passed with no response. Silence is not agreement. The league decides what happens next.',
     owner: 'League admin',
   },
   verified: {

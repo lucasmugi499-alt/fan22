@@ -202,9 +202,14 @@ export function LeagueTeams() {
   return (
     <div className="-mx-[var(--gutter)] md:mx-0">
       <div className="mb-4">
-        <div className="flex items-center justify-between gap-2 px-[var(--gutter)] pb-3 md:px-0">
+        {/*
+          Wraps rather than overflowing. At 320px the title and both actions did not fit on one
+          line and nothing could shrink, so "Add team" — the primary action on the screen — ran
+          off the right edge with no way to reach it.
+        */}
+        <div className="flex flex-wrap items-center gap-2 px-[var(--gutter)] pb-3 md:px-0">
           <h1 className="text-xl font-semibold text-text-strong">Teams</h1>
-          <div className="flex gap-2">
+          <div className="ml-auto flex gap-2">
             <Button size="sm" variant="secondary" icon={FileCsv} onClick={() => openOperation('import')}>Import</Button>
             <Button size="sm" icon={Plus} onClick={() => openOperation('team')}>Add team</Button>
           </div>

@@ -38,7 +38,7 @@ const STATUS_COPY: Record<PayeeStatus, { title: string; body: string; tone: 'goo
   },
   submitted: {
     title: 'Waiting to be checked',
-    body: 'Your details are with us. Someone other than whoever entered them has to confirm them before any payout can be made — that check is what protects you.',
+    body: 'Your details are with us. Someone other than whoever entered them has to confirm them before any payout can be made. That check is what protects you.',
     tone: 'neutral',
   },
   verified: {
@@ -160,7 +160,7 @@ export function PayeePortal({ athleteId }: { athleteId: string }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">Your money</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-strong">Payout details</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          Your club manages your sporting profile — your name, position and roster place. This
+          Your club manages your sporting profile: your name, position and roster place. This
           is the part only you can set.
         </p>
       </header>
@@ -173,7 +173,7 @@ export function PayeePortal({ athleteId }: { athleteId: string }) {
         <p className="mt-1.5 text-sm leading-6 text-muted">{copy.body}</p>
         {payee.hasDetailsOnFile ? (
           <p className="mt-2 text-xs text-subtle">
-            Details are on file. For your safety they are never shown again once submitted —
+            Details are on file. For your safety they are never shown again once submitted,
             not to you, not to your club, and not to GoalPlace staff.
           </p>
         ) : null}
@@ -257,7 +257,7 @@ export function PayeePortal({ athleteId }: { athleteId: string }) {
         <p className="text-sm leading-6 text-muted">
           Your club can add you to a roster and manage your sporting profile, and they can ask
           you to add your payout details. They cannot enter or change them, and neither can
-          the person at GoalPlace who checks them — those are two different people on purpose.
+          the person at GoalPlace who checks them. Those are two different people on purpose.
           It means nobody can quietly point your supporters&rsquo; money somewhere else.
         </p>
       </Card>

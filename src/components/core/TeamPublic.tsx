@@ -168,7 +168,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
             <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Club</h2>
             <div className="space-y-3">
               {/* From the same computed table shown in the sidebar, never the stored
-                  team.leaguePoints — that aggregate is not derived from any match, so
+                  team.leaguePoints. That aggregate is not derived from any match, so
                   showing it here contradicted the league table on the previous screen. */}
               <InfoRow
                 icon={Trophy}

@@ -218,7 +218,13 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
       >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-text-strong">
+          {/*
+            Wrapped rather than truncated. Beside a shrink-0 state chip on a 320px phone,
+            `truncate` left the fixture reading "Gulu Warriors v G…" — the away side, which is
+            half of what identifies the match, was the part that got cut. Two lines is the worst
+            case and it costs a row of height.
+          */}
+          <p className="line-clamp-2 font-semibold leading-6 text-text-strong">
             {row.homeTeamName} <span className="text-subtle">v</span> {row.awayTeamName}
           </p>
           <p className="mt-0.5 truncate text-xs text-muted">

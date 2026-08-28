@@ -82,7 +82,7 @@ export function LeagueRoster({
                   data-numeric
                   className="w-8 shrink-0 text-center text-sm font-bold tabular-nums text-subtle"
                 >
-                  {number ? `#${number}` : '—'}
+                  {number ? `#${number}` : '·'}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-text-strong">{athleteLegalName(athlete)}</p>

@@ -139,12 +139,12 @@ export function WebsiteSettings() {
       <PlatformAdminHeader
         eyebrow="Website & settings"
         title="Website and settings"
-        description="Public copy, registration windows and feature visibility. Everything here is reversible and visible to the public within a minute — which is exactly why the switches that are not reversible live somewhere else."
+        description="Public copy, registration windows and feature visibility. Everything here is reversible and visible to the public within a minute, which is exactly why the switches that are not reversible live somewhere else."
       />
 
       {isDemoMode ? (
         <Card className="p-4">
-          <p className="text-sm text-text-strong">Demo session — these are the defaults, not this environment&rsquo;s settings.</p>
+          <p className="text-sm text-text-strong">Demo session. These are the defaults, not this environment&rsquo;s settings.</p>
           <p className="mt-1 text-sm text-muted">
             Reading and changing site settings needs a signed-in platform operator. The values
             below are the shipped defaults so the page can be reviewed; saving is refused.
@@ -226,7 +226,7 @@ export function WebsiteSettings() {
         </div>
         <p className="mb-3 text-sm text-muted">
           These are listed so nobody goes looking for them in a config file. Each one is an
-          event with an approval workflow, not a switch — being wrong for a minute is the
+          event with an approval workflow, not a switch. Being wrong for a minute is the
           whole problem with all four.
         </p>
         <div className="space-y-2.5">

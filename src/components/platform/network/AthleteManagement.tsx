@@ -108,7 +108,7 @@ export function AthleteManagement() {
         </Link>
       ),
     },
-    { header: 'Position', cell: (row) => <span className="text-muted">{row.athlete.registeredPosition || '—'}</span> },
+    { header: 'Position', cell: (row) => <span className="text-muted">{row.athlete.registeredPosition || '·'}</span> },
     { header: 'Team', cell: (row) => <span className="text-muted">{row.teamName}</span> },
     { header: 'League', cell: (row) => <span className="text-muted">{row.leagueName}</span> },
     {
@@ -175,7 +175,7 @@ export function AthleteManagement() {
         <p className="text-sm text-muted">
           There is no payout field on this page and there will not be one. An athlete&rsquo;s payout
           identity is submitted by the athlete or their guardian through their own portal and
-          verified by a second person — never by whoever created the profile. A club official
+          verified by a second person, never by whoever created the profile. A club official
           who could both invent an athlete and name the account their supporters pay into is a
           fraud path, not a workflow.
         </p>

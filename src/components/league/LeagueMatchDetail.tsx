@@ -137,7 +137,11 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
             ? <>Recorded by <span className="font-semibold text-text-strong">{row.fieldManager.displayName}</span>.</>
             : 'Nobody is assigned to record this match.'}
         </p>
-        {row.attention ? (
+        {/*
+          The line above already says nobody is assigned, so the attention string repeats it
+          verbatim. Same suppression the match row makes, for the same reason.
+        */}
+        {row.attention && row.attention !== 'No Field Manager assigned.' ? (
           <p className="mt-1.5 text-sm leading-6 text-[var(--state-pending)]">{row.attention}</p>
         ) : null}
       </section>
@@ -241,6 +245,7 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         open={assigning}
         matchId={row.matchId}
         matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
+        clubs={league ? teamsInLeague(league.id, detail.teams).map((team) => ({ id: team.id, name: team.name })) : []}
         kickoffLabel={kickoff}
         onClose={() => {
           setAssigning(false);

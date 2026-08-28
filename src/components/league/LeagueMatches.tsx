@@ -209,6 +209,7 @@ export function LeagueMatches() {
         open={Boolean(assigning)}
         matchId={assigning?.matchId ?? ''}
         matchLabel={assigning ? `${assigning.homeTeamName} v ${assigning.awayTeamName}` : ''}
+        clubs={league ? teamsInLeague(league.id, leagueData.teams).map((team) => ({ id: team.id, name: team.name })) : []}
         kickoffLabel={assigning
           ? new Intl.DateTimeFormat('en-UG', {
             weekday: 'long', day: 'numeric', month: 'short',

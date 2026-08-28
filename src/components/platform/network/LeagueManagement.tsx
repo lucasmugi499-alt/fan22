@@ -163,7 +163,7 @@ export function LeagueManagement() {
 
       <p className="text-xs text-subtle">
         Counts are derived from team and match documents. A league advertising more clubs
-        than it holds is a data problem, not a display one —{' '}
+        than it holds is a data problem, not a display one.{' '}
         <Link href="/admin/integrity?tab=quality" className="text-brand hover:underline">Competition integrity</Link>{' '}
         shows results that could not be published.
       </p>

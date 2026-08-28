@@ -134,7 +134,7 @@ export function ApplicationWorkbench({ id, initialCommand }: { id: string; initi
       <PlatformStatGrid items={[
         { label: 'Risk flags', value: application.riskFlags.length, tone: application.riskFlags.length ? 'bad' : 'good' },
         { label: 'Duplicate candidates', value: payload.duplicateCandidates.length, tone: payload.duplicateCandidates.length ? 'warn' : 'good' },
-        { label: 'Estimated teams', value: application.estimatedTeams ?? '—' },
+        { label: 'Estimated teams', value: application.estimatedTeams ?? '·' },
         { label: 'Delivery', value: payload.invitation?.status ?? application.informationDeliveryStatus ?? 'not started', tone: payload.invitation?.status === 'failed_delivery' ? 'bad' : undefined },
       ]} />
 
@@ -184,7 +184,7 @@ export function ApplicationWorkbench({ id, initialCommand }: { id: string; initi
                 <DeliveryFailure error={payload.invitation.deliveryError} />
               ) : null}
               <div className="mt-3 space-y-2">
-                {payload.deliveryAttempts.map((attempt) => <DirectoryRow key={attempt.id} title={`Attempt ${attempt.attemptNumber ?? '—'} · ${attempt.channel ?? 'email'}`} meta={`${attempt.provider ?? 'provider'}${attempt.error ? ` · ${attempt.error}` : ''}`} status={attempt.status} statusTone={tone(attempt.status)} />)}
+                {payload.deliveryAttempts.map((attempt) => <DirectoryRow key={attempt.id} title={`Attempt ${attempt.attemptNumber ?? '·'} · ${attempt.channel ?? 'email'}`} meta={`${attempt.provider ?? 'provider'}${attempt.error ? ` · ${attempt.error}` : ''}`} status={attempt.status} statusTone={tone(attempt.status)} />)}
               </div>
             </Card>
           ) : null}
