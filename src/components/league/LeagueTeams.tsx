@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Buildings, Check, FileCsv, Plus } from '@phosphor-icons/react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
@@ -227,7 +228,14 @@ export function LeagueTeams() {
         ) : lTeams.length ? (
           <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             {lTeams.map((t) => (
-              <TeamCard key={t.id} team={t} standing={standings.find((row) => row.teamId === t.id)} />
+              /*
+                Wrapped so a club opens the league's own team page rather than the public
+                profile. A League Admin clicking a club here wants its roster, not its
+                supporter-facing page.
+              */
+              <Link key={t.id} href={`/league-admin/teams/${encodeURIComponent(t.id)}`} className="block">
+                <TeamCard team={t} standing={standings.find((row) => row.teamId === t.id)} />
+              </Link>
             ))}
           </div>
         ) : (

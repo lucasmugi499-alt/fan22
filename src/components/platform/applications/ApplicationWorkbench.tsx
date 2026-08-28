@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { diagnoseDeliveryFailure, isEnvironmentWideFailure } from '@/lib/platform/deliveryDiagnosis';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle, Copy, Envelope, WarningCircle } from '@phosphor-icons/react';
 import { ConsequenceSheet } from '@/components/platform/commands/ConsequenceSheet';
@@ -179,7 +180,9 @@ export function ApplicationWorkbench({ id, initialCommand }: { id: string; initi
             <Card className="p-4">
               <div className="flex items-center gap-2"><Envelope className="h-5 w-5 text-brand" /><h2 className="text-sm font-semibold text-text-strong">Owner invitation delivery</h2></div>
               <div className="mt-3 flex flex-wrap items-center gap-2"><StatusChip label={payload.invitation.status} tone={tone(payload.invitation.status)} /><span className="text-xs text-muted">{payload.invitation.invitedEmail}</span></div>
-              {payload.invitation.deliveryError ? <p className="mt-3 text-sm leading-6 text-[var(--state-error)]">{payload.invitation.deliveryError}</p> : null}
+              {payload.invitation.deliveryError ? (
+                <DeliveryFailure error={payload.invitation.deliveryError} />
+              ) : null}
               <div className="mt-3 space-y-2">
                 {payload.deliveryAttempts.map((attempt) => <DirectoryRow key={attempt.id} title={`Attempt ${attempt.attemptNumber ?? '—'} · ${attempt.channel ?? 'email'}`} meta={`${attempt.provider ?? 'provider'}${attempt.error ? ` · ${attempt.error}` : ''}`} status={attempt.status} statusTone={tone(attempt.status)} />)}
               </div>
@@ -231,5 +234,39 @@ export function ApplicationWorkbench({ id, initialCommand }: { id: string; initi
       <ConsequenceSheet open={invitationCommand === 'resend'} commandId="invitation.resend" targetId={payload.invitation?.id} inputs={{ invitationId: payload.invitation?.id, channel: 'email' }} title="Resend owner invitation" submitLabel="Resend by email" running={invitation.running} error={invitation.error} onClose={() => { setInvitationCommand(null); invitation.reset(); }} onSubmit={async (_values, reason) => { const ok = await invitation.run({ action: 'resend', channel: 'email', reason }, 'Invitation delivery attempted.'); if (ok) { setInvitationCommand(null); setSuccess('Invitation delivery attempted.'); setRefresh((value) => value + 1); } }} />
       <ConsequenceSheet open={invitationCommand === 'revoke'} commandId="invitation.revoke" targetId={payload.invitation?.id} inputs={{ invitationId: payload.invitation?.id }} title="Revoke owner invitation" submitLabel="Revoke invitation" running={invitation.running} error={invitation.error} onClose={() => { setInvitationCommand(null); invitation.reset(); }} onSubmit={async (_values, reason) => { const ok = await invitation.run({ action: 'revoke', reason }, 'Invitation revoked.'); if (ok) { setInvitationCommand(null); setSuccess('Invitation revoked.'); setRefresh((value) => value + 1); } }} />
     </section>
+  );
+}
+
+/**
+ * A failed delivery, explained before it is quoted.
+ *
+ * The provider's own sentence stays on the record verbatim, because that is the evidence. What
+ * it does not say is whose problem it is, or whether resending would help — and an operator
+ * reading "verify a domain" has no way to tell whether that is their task or a platform one.
+ * The diagnosis goes first, the provider text second.
+ */
+function DeliveryFailure({ error }: { error: string }) {
+  const diagnosis = diagnoseDeliveryFailure(error);
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-sm font-semibold leading-6 text-[var(--state-error)]">{diagnosis.summary}</p>
+      {diagnosis.nextStep ? (
+        <p className="text-sm leading-6 text-text">{diagnosis.nextStep}</p>
+      ) : null}
+      {!diagnosis.retryable ? (
+        <p className="text-xs leading-5 text-muted">
+          Resending will fail the same way until this is fixed.
+        </p>
+      ) : null}
+      {isEnvironmentWideFailure(diagnosis) ? (
+        <p className="text-xs leading-5 text-muted">
+          This affects every invitation from this environment, not just this one.
+        </p>
+      ) : null}
+      <details className="text-xs text-muted">
+        <summary className="min-h-11 cursor-pointer py-2">What the provider said</summary>
+        <p className="leading-5">{error}</p>
+      </details>
+    </div>
   );
 }
