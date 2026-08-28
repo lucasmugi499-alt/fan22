@@ -38,7 +38,8 @@ export function LeagueOperations({
   const [noticeType, setNoticeType] = useState<'fixture_update' | 'postponement' | 'registration' | 'verification_reminder' | 'sponsor_message' | 'emergency'>('fixture_update');
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
-  const [audience, setAudience] = useState<'public' | 'all_teams' | 'team_admins' | 'athletes'>('public');
+  // No `team_admins` audience: ADR-004 retired the account class, so it addressed nobody.
+  const [audience, setAudience] = useState<'public' | 'all_teams' | 'athletes'>('public');
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
 
   async function save() {
@@ -150,7 +151,7 @@ export function LeagueOperations({
             <Field label="Title"><input className="field" value={noticeTitle} onChange={(event) => setNoticeTitle(event.target.value)} /></Field>
             <Field label="Message"><textarea className="field min-h-28 py-3" value={noticeMessage} onChange={(event) => setNoticeMessage(event.target.value)} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Audience"><select className="field" value={audience} onChange={(event) => setAudience(event.target.value as typeof audience)}><option value="public">Public</option><option value="all_teams">All teams</option><option value="team_admins">Team Admins</option><option value="athletes">Athletes</option></select></Field>
+              <Field label="Audience"><select className="field" value={audience} onChange={(event) => setAudience(event.target.value as typeof audience)}><option value="public">Public</option><option value="all_teams">All teams</option><option value="athletes">Athletes</option></select></Field>
               <Field label="Priority"><select className="field" value={priority} onChange={(event) => setPriority(event.target.value as typeof priority)}><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select></Field>
             </div>
           </div>

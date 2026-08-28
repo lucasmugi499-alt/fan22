@@ -322,7 +322,7 @@ function seededDemoAccessAssignments() {
   }
 
   for (const team of teams) {
-    for (const userId of team.adminUserIds) {
+    for (const userId of team.adminUserIds ?? []) {
       if (userRole.get(userId) !== 'team_admin') continue;
       assignments.push(activeDemoAccessAssignment({
         id: `assignment_demo_team_${team.id}_${userId}`,
@@ -1352,8 +1352,8 @@ export const mockProvider: GoalPlaceDataProvider = {
     } else if (invitation.scopeType === 'team') {
       const team = teams.find((item) => item.id === invitation.scopeId)
         ?? readStoredItems<Team>(storedTeamsKey).find((item) => item.id === invitation.scopeId);
-      if (team && !team.adminUserIds.includes(userId)) {
-        team.adminUserIds.push(userId);
+      if (team && !(team.adminUserIds ?? []).includes(userId)) {
+        team.adminUserIds = [...(team.adminUserIds ?? []), userId];
         persistDemoTeam(team);
       }
     }

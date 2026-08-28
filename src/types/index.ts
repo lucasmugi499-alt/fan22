@@ -560,16 +560,30 @@ export interface Team {
   logoUrl?: string;
   plan: "free" | "pro";
   verified: boolean;
-  adminUserIds: string[];
+  /**
+   * @deprecated ADR-004 retired Team Admin. Authority comes from access assignments, and
+   * nothing may grant it by writing an id into this array. Optional so a team created today
+   * simply does not carry one.
+   */
+  adminUserIds?: string[];
   totalSupport: number;
   supportPool?: number;
   supportersCount: number;
-  wins: number;
+  /**
+   * Stored standings aggregates, all deprecated and all optional.
+   *
+   * They were seeded independently of any match, which is how clubs came to display a record
+   * in a competition holding no results. The official standings projection is the only
+   * authority for a sporting number; these survive only as a fallback on surfaces that have
+   * not loaded a table, and a newly created team must not be given a fabricated zero.
+   * See scripts/data/deprecated-fields-guard.ts.
+   */
+  wins?: number;
   draws?: number;
-  losses: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  leaguePoints: number;
+  losses?: number;
+  pointsFor?: number;
+  pointsAgainst?: number;
+  leaguePoints?: number;
   recentResults?: string[];
   teamAdminName?: string;
   teamAdminEmail?: string;

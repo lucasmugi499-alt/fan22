@@ -154,7 +154,7 @@ export function TeamConsoleHome() {
         <Metric label="Needs action" value={actions.length} tone={actions.length ? 'pending' : 'default'} />
         <Metric label="Squad" value={roster.length} />
         {/* Official standings projection, not the stored aggregate. */}
-        <Metric label="Points" value={standing?.points ?? team.leaguePoints} tone="brand" />
+        <Metric label="Points" value={standing?.points ?? team.leaguePoints ?? 0} tone="brand" />
       </div>
 
       {/* Support pool strip */}

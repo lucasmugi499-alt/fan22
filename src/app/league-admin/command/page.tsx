@@ -1,27 +1,11 @@
-import { MatchExceptionQueue } from '@/components/league/MatchExceptionQueue';
-
-export const metadata = { title: 'Command' };
+import { redirect } from 'next/navigation';
 
 /**
- * What needs me today.
+ * The orphaned Command page.
  *
- * The one question this surface answers on open. Everything else a League Admin does has its
- * own tab; this is the place where the platform tells them what it could not settle by
- * itself, and on a good matchday it is empty.
+ * It was never in the navigation and rendered an exception queue hardcoded to an empty array,
+ * so it could not display a case even in principle. Command is now the landing page.
  */
-export default function LeagueCommandPage() {
-  return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand">Command</p>
-        <h1 className="mt-2 text-2xl font-semibold text-text-strong">Needs attention</h1>
-      </header>
-      {/*
-        Rows are loaded by the page that mounts this in the app; the queue renders whatever it
-        is given so the conflict-before-controls ordering is a property of the component rather
-        than of one caller.
-      */}
-      <MatchExceptionQueue rows={[]} />
-    </div>
-  );
+export default function Page() {
+  redirect('/league-admin');
 }

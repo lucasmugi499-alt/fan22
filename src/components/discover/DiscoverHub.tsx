@@ -39,7 +39,9 @@ export function DiscoverHub() {
   const leagueSnapshots = useLeagueSnapshots(leagues, teams, matches, seasons);
 
   const pointsForTeam = useCallback(
-    (team: Team) => standingForTeam(team.id, leagueSnapshots)?.row.points ?? team.leaguePoints,
+    // Zero when neither the projection nor the deprecated aggregate has a number: a team
+    // with no results has no points, and sorting must not treat that as unknown.
+    (team: Team) => standingForTeam(team.id, leagueSnapshots)?.row.points ?? team.leaguePoints ?? 0,
     [leagueSnapshots],
   );
 

@@ -20,6 +20,9 @@ import {
   MapPin,
   HandHeart,
   DeviceMobile,
+  Broadcast,
+  Images,
+  PersonSimpleRun,
 } from '@phosphor-icons/react/dist/ssr';
 import type { AppRole } from '@/types';
 import type { IconComponent } from '@/lib/icons';
@@ -42,6 +45,10 @@ import type { IconComponent } from '@/lib/icons';
  */
 export const NAV_GROUP_ORDER = [
   'COMMAND',
+  // League Operations groups. Named for what a league actually runs rather than for the
+  // records behind it: an admin looks for "Competition", not for "entities".
+  'COMPETITION',
+  'LEAGUE',
   'NETWORK',
   'INTEGRITY',
   'WEBSITE & SETTINGS',
@@ -144,18 +151,27 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       ...COMMON_MORE,
     ],
   },
+  /**
+   * League Operations, in five mobile destinations and eight grouped desktop ones.
+   *
+   * `primary` is what the phone shows in its bottom bar, so it holds only what a League Admin
+   * reaches for on a matchday. The desktop rail renders primary and more together as grouped
+   * sections, which is why Competition and Settings can sit in `more` without being demoted:
+   * on a laptop they are visible at all times, and on a phone they are one tap into More.
+   */
   league_admin: {
-    workspace: 'League Desk',
+    workspace: 'League Operations',
     primary: [
-      { name: 'Overview', href: '/league-admin', icon: SquaresFour },
-      { name: 'Teams', href: '/league-admin/teams', icon: Buildings },
-      { name: 'Fixtures', href: '/league-admin/fixtures', icon: Calendar },
-      { name: 'Verification', href: '/league-admin/verification', icon: ShieldCheck },
+      { name: 'Command', href: '/league-admin', icon: Broadcast, group: 'COMMAND' },
+      { name: 'Matches', href: '/league-admin/matches', icon: Calendar, group: 'COMMAND' },
+      { name: 'Teams', href: '/league-admin/teams', icon: Buildings, group: 'COMPETITION' },
+      { name: 'Athletes', href: '/league-admin/athletes', icon: PersonSimpleRun, group: 'COMPETITION' },
     ],
     more: [
-      { name: 'Reports', href: '/league-admin/reports', icon: ChartLine },
-      { name: 'Matches', href: '/matches', icon: Calendar },
-      ...COMMON_MORE,
+      { name: 'Competition', href: '/league-admin/competition', icon: Trophy, group: 'COMPETITION' },
+      { name: 'Media', href: '/league-admin/media', icon: Images, group: 'LEAGUE' },
+      { name: 'Reports', href: '/league-admin/reports', icon: ChartLine, group: 'LEAGUE' },
+      { name: 'Settings', href: '/league-admin/settings', icon: Gear, group: 'LEAGUE' },
     ],
   },
   /** Five operator destinations. Sections are workspace tabs; commands are not navigation. */

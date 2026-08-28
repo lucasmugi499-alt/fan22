@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Buildings, Check, CheckCircle, ClipboardText, EnvelopeSimple, FileCsv, Plus, WarningCircle } from '@phosphor-icons/react';
+import { Buildings, Check, FileCsv, Plus } from '@phosphor-icons/react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
@@ -19,7 +19,6 @@ import { Sheet } from '@/components/ui/Sheet';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import type { Team } from '@/types';
-import type { DataWriteResult } from '@/data/providers/types';
 import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 
 const TABS = ['Standings', 'All teams'] as const;
@@ -41,10 +40,6 @@ export function LeagueTeams() {
   const [tab, setTab] = useState<Tab>('Standings');
   const [mode, setMode] = useState<'team' | 'import' | null>(null);
   const [saving, setSaving] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteLink, setInviteLink] = useState('');
-  const [inviteEmailDelivery, setInviteEmailDelivery] = useState<DataWriteResult['emailDelivery']>();
-  const [inviteEmailError, setInviteEmailError] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamCity, setTeamCity] = useState('');
   const [teamVenue, setTeamVenue] = useState('');
@@ -84,13 +79,8 @@ export function LeagueTeams() {
   }, [league, lTeams, matches, seasons]);
 
   function openOperation(nextMode: 'team' | 'import') {
-    setInviteLink('');
-    setInviteEmailDelivery(undefined);
-    setInviteEmailError('');
     setMode(nextMode);
   }
-
-
 
   async function saveOperation() {
     const actorUserId = currentUser?.uid ?? userProfile?.uid;
@@ -120,15 +110,16 @@ export function LeagueTeams() {
           description: `${normalizedName} competes in ${league.name}.`,
           plan: 'free',
           verified: false,
-          adminUserIds: [],
           totalSupport: 0,
           supportersCount: 0,
-          wins: 0,
-          draws: 0,
-          losses: 0,
-          pointsFor: 0,
-          pointsAgainst: 0,
-          leaguePoints: 0,
+          /*
+           * No seeded standings aggregates, and no adminUserIds.
+           *
+           * Writing wins, losses, pointsFor and leaguePoints here is how clubs came to show a
+           * record in a competition that had played no matches: these are projections of
+           * official results, and a team created today has none. The standings projection is
+           * the only authority for a sporting number.
+           */
           verificationStatus: 'pending',
           createdAt: now,
         }]);
@@ -154,15 +145,16 @@ export function LeagueTeams() {
           description: `${row.name.trim()} competes in ${league.name}.`,
           plan: 'free',
           verified: false,
-          adminUserIds: [],
           totalSupport: 0,
           supportersCount: 0,
-          wins: 0,
-          draws: 0,
-          losses: 0,
-          pointsFor: 0,
-          pointsAgainst: 0,
-          leaguePoints: 0,
+          /*
+           * No seeded standings aggregates, and no adminUserIds.
+           *
+           * Writing wins, losses, pointsFor and leaguePoints here is how clubs came to show a
+           * record in a competition that had played no matches: these are projections of
+           * official results, and a team created today has none. The standings projection is
+           * the only authority for a sporting number.
+           */
           verificationStatus: 'pending',
           createdAt: now,
         }));
@@ -293,9 +285,12 @@ export function LeagueTeams() {
               <label className="block text-xs font-semibold uppercase text-subtle">City or district<input className="field mt-2 normal-case" value={teamCity} onChange={(event) => setTeamCity(event.target.value)} placeholder={league?.city ?? 'Kampala'} /></label>
               <label className="block text-xs font-semibold uppercase text-subtle">Home venue<input className="field mt-2 normal-case" value={teamVenue} onChange={(event) => setTeamVenue(event.target.value)} placeholder="Public venue" /></label>
             </div>
-            <label className="block text-xs font-semibold uppercase text-subtle">First Team Admin email <span className="font-normal normal-case text-muted">(optional)</span><input className="field mt-2 normal-case" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="admin@example.com" /></label>
-            <p className="text-xs leading-5 text-muted">The team begins unverified with no administrator. When an email is supplied, GoalPlace256 sends an expiring call-up link and keeps a copied fallback for matchday ops.</p>
-            {inviteLink ? <InvitationLink value={inviteLink} status={inviteEmailDelivery} error={inviteEmailError} /> : null}
+            {/*
+              No administrator to invite. ADR-004 retired the account class and the server
+              refuses the action, so the field that used to sit here promised an invitation
+              that was never sent and could not have been.
+            */}
+            <p className="text-xs leading-5 text-muted">The league runs this club. Rosters, athletes and results are all managed from League Operations; nobody at the club needs an account.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -314,60 +309,3 @@ export function LeagueTeams() {
   );
 }
 
-function invitationStatusCopy(status: DataWriteResult['emailDelivery']) {
-  if (status === 'sent') return {
-    label: 'Email sent',
-    message: 'The admin has been emailed. The fallback link is copied and expires after seven days.',
-    Icon: CheckCircle,
-    className: 'border-[rgba(0,208,132,0.35)] bg-[rgba(0,208,132,0.12)] text-brand',
-  };
-  if (status === 'failed') return {
-    label: 'Email failed',
-    message: 'The invite exists, but email delivery needs attention. Share the fallback link while Resend is fixed.',
-    Icon: WarningCircle,
-    className: 'border-[rgba(255,86,86,0.35)] bg-[rgba(255,86,86,0.12)] text-[var(--state-error)]',
-  };
-  if (status === 'not_configured') return {
-    label: 'Link ready',
-    message: 'Email is not configured in this environment yet. Share the fallback link manually.',
-    Icon: ClipboardText,
-    className: 'border-[rgba(255,199,77,0.35)] bg-[rgba(255,199,77,0.12)] text-[var(--state-warning)]',
-  };
-  return {
-    label: 'Link copied',
-    message: 'The fallback link has been copied. It expires after seven days and only works for the invited email.',
-    Icon: ClipboardText,
-    className: 'border-border bg-surface-2 text-text-strong',
-  };
-}
-
-function InvitationLink({ value, status, error }: { value: string; status: DataWriteResult['emailDelivery']; error?: string }) {
-  const copy = invitationStatusCopy(status);
-  const Icon = copy.Icon;
-  return (
-    <div className="rounded-[var(--radius-md)] border border-border-strong bg-surface-1 p-3">
-      <div className="flex items-start gap-3">
-        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${copy.className}`}>
-          <Icon className="h-5 w-5" weight="duotone" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-text-strong">{copy.label}</p>
-            {status === 'sent' ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(0,208,132,0.35)] bg-[rgba(0,208,132,0.1)] px-2 py-0.5 text-[11px] font-semibold uppercase text-brand">
-                <EnvelopeSimple className="h-3.5 w-3.5" weight="bold" />
-                Resend
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-muted">{copy.message}</p>
-          {error ? <p className="mt-1 text-xs leading-5 text-[var(--state-error)]">{error}</p> : null}
-        </div>
-      </div>
-      <label className="mt-3 block text-xs font-semibold uppercase text-subtle">
-        Expiring invitation link
-        <input className="field mt-2 normal-case" readOnly value={value} onFocus={(event) => event.currentTarget.select()} />
-      </label>
-    </div>
-  );
-}
