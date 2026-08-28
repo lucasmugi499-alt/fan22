@@ -216,8 +216,15 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
         href={`/league-admin/matches/${encodeURIComponent(row.matchId)}`}
         className="block p-3.5"
       >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      {/*
+        The chip drops above the fixture at phone width instead of sitting beside it. A
+        shrink-0 chip beside the title left about 130px for the team names at 320px, which two
+        wrapped lines still could not hold: "Kyambogo Rangers v Kisenyi United" arrived
+        truncated either way. `flex-col-reverse` gives the title the full width and puts the
+        state first visually, without moving it ahead of the fixture in the DOM.
+      */}
+      <div className="flex flex-col-reverse items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="w-full min-w-0 sm:flex-1">
           {/*
             Wrapped rather than truncated. Beside a shrink-0 state chip on a 320px phone,
             `truncate` left the fixture reading "Gulu Warriors v G…" — the away side, which is
@@ -231,7 +238,7 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
             {kickoff}{row.venue ? ` · ${row.venue}` : ''}
           </p>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 sm:text-right">
           {row.score ? (
             <p data-numeric className="text-lg font-bold tabular-nums text-text-strong">
               {row.score.home}–{row.score.away}
