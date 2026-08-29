@@ -33,6 +33,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { MatchCard } from '@/components/core/MatchCard';
 import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
+import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -71,6 +72,9 @@ export function TeamConsoleHome() {
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
+  // Capability, not role — see useTeamConsoleAccess. The console stays fully readable; what
+  // it stops doing is offering an action the authority model will refuse.
+  const access = useTeamConsoleAccess(team?.id);
   const { matches, athletes, error, retry } = detail;
   const { standing } = useTeamOfficialStanding(team ?? undefined);
   const teams = catalog.teams;
@@ -144,7 +148,11 @@ export function TeamConsoleHome() {
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
       {/* Priority: the one thing that needs the admin now */}
       {top ? (
-        <PriorityCard action={top} teamById={teamById} onReview={() => setReviewMatch(top.match)} />
+        <PriorityCard
+          action={top}
+          teamById={teamById}
+          onReview={access.canSubmitResult ? () => setReviewMatch(top.match) : undefined}
+        />
       ) : (
         <AllClearCard />
       )}
@@ -234,7 +242,12 @@ function PriorityCard({
 }: {
   action: TeamAction;
   teamById: Map<string, Team>;
-  onReview: () => void;
+  /**
+   * Absent when the viewer cannot act on this match. The card still renders — knowing a
+   * result is outstanding is useful to a club whether or not they are the one who resolves
+   * it — but it stops offering a button that would be refused.
+   */
+  onReview?: () => void;
 }) {
   const copy = ACTION_COPY[action.kind];
   const Icon = action.kind === 'live' ? Broadcast : action.kind === 'disputed' ? Warning : Clock;
@@ -261,9 +274,15 @@ function PriorityCard({
           </div>
         </div>
         <div className="mt-4">
-          <Button iconTrailing={ArrowRight} block onClick={onReview}>
-            {copy.cta}
-          </Button>
+          {onReview ? (
+            <Button iconTrailing={ArrowRight} block onClick={onReview}>
+              {copy.cta}
+            </Button>
+          ) : (
+            <p className="text-sm text-muted">
+              Your league resolves this. It is shown here so your club can see what is outstanding.
+            </p>
+          )}
         </div>
       </div>
     </Bezel>

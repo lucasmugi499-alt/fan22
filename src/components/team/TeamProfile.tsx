@@ -16,6 +16,7 @@ import { NoAssignment } from '@/components/ui/NoAssignment';
 import { VerificationBadge } from '@/components/ui/StatusBadge';
 import { normalizeVerificationStatus } from '@/lib/status';
 import { Sheet } from '@/components/ui/Sheet';
+import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { ChallengeWorkflow } from '@/components/core/ChallengeWorkflow';
@@ -37,6 +38,9 @@ export function TeamProfile() {
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
+  // Capability, not role. A `team_admin` claim grants nothing since ADR-004, and a control
+  // rendered on the strength of the claim is one the server will refuse.
+  const access = useTeamConsoleAccess(team?.id);
   const { athletes, retry } = detail;
   const { standing } = useTeamOfficialStanding(team ?? undefined);
   const loading = catalog.loading || (Boolean(team) && detail.loading);
@@ -107,9 +111,11 @@ export function TeamProfile() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-text-strong">Team profile</h1>
-        <Button size="sm" variant="secondary" icon={PencilSimple} onClick={openEditor}>
-          Edit
-        </Button>
+        {access.canManage ? (
+          <Button size="sm" variant="secondary" icon={PencilSimple} onClick={openEditor}>
+            Edit
+          </Button>
+        ) : null}
       </div>
 
       {/* Identity */}
@@ -157,10 +163,22 @@ export function TeamProfile() {
           <p className="text-sm font-semibold text-text-strong">Roster</p>
           <p className="text-xs text-muted"><span className="tabular tabular-nums">{rosterCount}</span> registered athletes</p>
         </div>
-        <Link href="/team-admin/roster" className="text-sm font-medium text-brand hover:underline">Manage</Link>
+        {/* A link, not a control — but the label promised something the roster page will not
+            offer once team authority is retired. Naming the destination truthfully is the
+            same fix as removing the buttons, applied to navigation. */}
+        <Link href="/team-admin/roster" className="text-sm font-medium text-brand hover:underline">
+          {access.canManage ? 'Manage' : 'View'}
+        </Link>
       </Card>
 
-      <ChallengeWorkflow scope="team" targetId={team.id} />
+      {/*
+        Team-scoped challenge decisions are approve/reject controls with no capability check
+        of their own, and every team capability is zeroed since ADR-004 — so for a club
+        official these were three more buttons the server would refuse. Rendered only for a
+        viewer who actually holds authority over this club; the league operator who does still
+        sees them here.
+      */}
+      {access.canManage ? <ChallengeWorkflow scope="team" targetId={team.id} /> : null}
       <SupportNeedWorkflow scope="team" targetId={team.id} />
 
       <Sheet

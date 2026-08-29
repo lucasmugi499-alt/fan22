@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
 import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
 import type { Match } from '@/types';
+import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
@@ -31,6 +32,10 @@ export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
+  // Capability, not role. `team.result.submit` is zeroed since ADR-004, so a team_admin
+  // opening this sheet was always going to be refused at the rules layer — the fixture list
+  // stays fully readable, the write path does not open.
+  const access = useTeamConsoleAccess(team?.id);
   const teams = catalog.teams;
   const { matches, error, retry } = detail;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
@@ -94,7 +99,9 @@ export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
         {(fieldMode ? buckets['Needs action'] : list).length ? (
           <div className={fieldMode ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 gap-3 md:grid-cols-2'}>
             {(fieldMode ? buckets['Needs action'] : list).map((m) => {
-              const actionable = m.status !== 'scheduled' && !isOfficialMatch(m);
+              const actionable = access.canSubmitResult
+                && m.status !== 'scheduled'
+                && !isOfficialMatch(m);
               return (
                 <div key={m.id} className={fieldMode ? 'rounded-[var(--radius-lg)] border border-brand/30 bg-surface-1 p-2' : ''}>
                   <MatchCard
@@ -120,7 +127,11 @@ export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
           <EmptyState
             icon={CalendarBlank}
             title={fieldMode ? 'No active match report' : emptyTitle(tab)}
-            description={fieldMode ? 'Live, completed, and confirmation requests appear here when field action is required.' : emptyBody(tab)}
+            description={!access.canSubmitResult && fieldMode
+              ? 'Match reports are captured by the Field Manager your league assigns to each fixture.'
+              : fieldMode
+                ? 'Live, completed, and confirmation requests appear here when field action is required.'
+                : emptyBody(tab)}
           />
         )}
       </div>

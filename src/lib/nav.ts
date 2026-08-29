@@ -19,7 +19,6 @@ import {
   Info,
   MapPin,
   HandHeart,
-  DeviceMobile,
   Broadcast,
   Images,
   PersonSimpleRun,
@@ -136,17 +135,29 @@ export const ROLE_NAV: Record<string, RoleNav> = {
       ...COMMON_MORE,
     ],
   },
+  /**
+   * A club VIEW, not an operations console.
+   *
+   * ADR-004 retired Team Admin as an account class and the deployed environments run the
+   * bundles at `retired`, so nothing on these screens can be written by the person the nav is
+   * being drawn for. The label said "Team Console" and the six entries read as a set of jobs,
+   * which is what made the refusals feel like breakage rather than a boundary.
+   *
+   * The screens stay — a club official genuinely needs to see their roster, fixtures and
+   * results, and all of it is theirs to read. What is gone is `Field mode`, which was never
+   * theirs at all: field capture belongs to a Field Manager the league assigns, who works
+   * through `/m/{secret}` with a PIN and has no Firebase account.
+   */
   team_admin: {
-    workspace: 'Team Console',
+    workspace: 'My Club',
     primary: [
       { name: 'Overview', href: '/team-admin', icon: SquaresFour },
-      { name: 'Roster', href: '/team-admin/roster', icon: Users },
+      { name: 'Squad', href: '/team-admin/roster', icon: Users },
       { name: 'Fixtures', href: '/team-admin/fixtures', icon: Calendar },
       { name: 'Updates', href: '/team-admin/updates', icon: Megaphone },
     ],
     more: [
-      { name: 'Field mode', href: '/team-admin/field-mode', icon: DeviceMobile },
-      { name: 'Team profile', href: '/team-admin/profile', icon: Buildings },
+      { name: 'Club profile', href: '/team-admin/profile', icon: Buildings },
       { name: 'Matches', href: '/matches', icon: Calendar },
       ...COMMON_MORE,
     ],

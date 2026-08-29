@@ -271,12 +271,13 @@ function actionsForRole(role: AppRole | null): SearchResult[] {
   const actions: SearchResult[] = [
     { id: 'action-discover', title: 'Discover athletes and leagues', meta: 'Action', href: '/discover', icon: Wrench, terms: 'discover search browse' },
   ];
-  if (role === 'team_admin') {
-    actions.push(
-      { id: 'action-result', title: 'Submit a match result', meta: 'Team Admin action', href: '/team-admin/fixtures', icon: Wrench, terms: 'submit result match field mode' },
-      { id: 'action-roster', title: 'Manage team roster', meta: 'Team Admin action', href: '/team-admin/roster', icon: Wrench, terms: 'roster athlete manage' },
-    );
-  }
+  /**
+   * No Team Admin actions. ADR-004 retired the account class, so "Submit a match result" and
+   * "Manage team roster" both pointed at controls the authority model grants nothing for —
+   * search was offering a shortcut to a refusal. Results are entered by the league or captured
+   * by an assigned Field Manager, and rosters are managed by the league; neither is an action
+   * a club official can take, so neither belongs here.
+   */
   if (role === 'league_admin') {
     actions.push(
       { id: 'action-fixture', title: 'Create fixtures', meta: 'League Admin action', href: '/league-admin/fixtures', icon: Wrench, terms: 'fixture create generate schedule' },

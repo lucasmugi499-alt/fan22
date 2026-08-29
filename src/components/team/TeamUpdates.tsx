@@ -14,6 +14,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { uploadPublishedMedia } from '@/lib/firebase/storage';
+import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 export function TeamUpdates() {
   const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
@@ -25,6 +26,9 @@ export function TeamUpdates() {
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 50,
   });
+  // Capability, not role. A `team_admin` claim grants nothing since ADR-004, and a control
+  // rendered on the strength of the claim is one the server will refuse.
+  const access = useTeamConsoleAccess(team?.id);
   const { feedPosts, retry } = detail;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [publishing, setPublishing] = useState(false);
@@ -100,9 +104,11 @@ export function TeamUpdates() {
           <h1 className="text-xl font-semibold text-text-strong">Updates</h1>
           <p className="text-sm text-muted">News, highlights and announcements from your team.</p>
         </div>
-        <Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>
-          Publish
-        </Button>
+        {access.canManage ? (
+          <Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>
+            Publish
+          </Button>
+        ) : null}
       </div>
 
       {posts.length ? (
@@ -115,8 +121,12 @@ export function TeamUpdates() {
         <EmptyState
           icon={Megaphone}
           title="No updates yet"
-          description="Share match previews, results and athlete highlights here. Your supporters see them in their feed."
-          action={<Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>Publish your first update</Button>}
+          description={access.canManage
+            ? 'Share match previews, results and athlete highlights here. Your supporters see them in their feed.'
+            : 'Your league publishes updates for this club.'}
+          action={access.canManage
+            ? <Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>Publish your first update</Button>
+            : undefined}
         />
       )}
 

@@ -12,6 +12,18 @@ import Link from 'next/link';
  * The screens themselves stay readable. All Team-Admin-created data is retained and remains
  * attributed, and an account is offered a destination rather than silently transformed into
  * something else.
+ *
+ * This banner alone was not enough, and for a while it made things worse. The screens beneath
+ * it kept rendering every write control they always had — Create and invite, Build roster,
+ * Save profile, Publish update, Submit result — so the page said "read-only" and then offered
+ * a working Save button. A control that contradicts the notice above it is a control that
+ * lies twice, and the second lie undoes the first. Those controls now render only when
+ * `useTeamConsoleAccess` says the viewer holds the capability the server will check.
+ *
+ * Which is also why the wording no longer claims the console is read-only FOR EVERYONE. A
+ * league operator holding `league.team.manage` for this club reaches these same screens and
+ * can legitimately write here. The notice states where authority moved — a fact about the
+ * model — rather than asserting a permission the reader may not lack.
  */
 export default function TeamAdminSunsetLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,8 +35,8 @@ export default function TeamAdminSunsetLayout({ children }: { children: React.Re
         <p className="font-semibold">Team administration has moved to League Operations.</p>
         <p className="mt-1 text-amber-100/80">
           Your league now manages rosters, athlete registration and results. Everything here
-          stays visible and nothing you recorded has been removed, but this console is
-          read-only. Ask your league for access, or{' '}
+          stays visible and nothing you recorded has been removed. If you need to change
+          something, ask your league, or{' '}
           <Link href="/support" className="underline underline-offset-2">
             contact support
           </Link>

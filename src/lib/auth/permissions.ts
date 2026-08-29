@@ -70,25 +70,44 @@ export function canCreateFanPost(auth: AuthState): boolean {
   return canUseFanSystems(auth);
 }
 
-// Admin / Management
-export function canManageTeam(auth: AuthState, teamId?: string): boolean {
-  if (teamId) return canManageTeamInScope(auth.accessContext, teamId);
-  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+/*
+ * Admin / Management
+ *
+ * The scope id below is REQUIRED, and used to be optional with a bare-role fallback:
+ *
+ *   if (teamId) return canManageTeamInScope(auth.accessContext, teamId);
+ *   return hasAnyRole(auth, ['team_admin', 'league_admin', ...]);   // <- removed
+ *
+ * A helper that answers "can this user manage a team" without being told WHICH team can only
+ * answer from the role claim, and a role claim is not authority in this system — the capability
+ * index is. The fallback therefore returned true for a `team_admin` whose bundles ADR-004 had
+ * zeroed, so a control would render and the server would refuse it. Every scoped answer these
+ * functions can give is already available; the fallback existed only for callers that had not
+ * bothered to pass an id.
+ *
+ * Required, rather than defaulted to `false`, so the mistake is a type error at the call site
+ * instead of a control that silently stops rendering.
+ */
+export function canManageTeam(auth: AuthState, teamId: string): boolean {
+  return canManageTeamInScope(auth.accessContext, teamId);
 }
 
+/**
+ * Whether the club VIEW is reachable. Deliberately role-tolerant, and deliberately not a
+ * write check: since ADR-004 a club official can read their roster, fixtures and results
+ * while being able to change none of them. `useTeamConsoleAccess` decides the controls.
+ */
 export function canAccessTeamAdminDashboard(auth: AuthState): boolean {
   return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'team'))
     || hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canSubmitResult(auth: AuthState, teamId?: string, matchId = 'unknown_match'): boolean {
-  if (teamId) return canSubmitResultInScope(auth.accessContext, matchId, teamId);
-  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+export function canSubmitResult(auth: AuthState, teamId: string, matchId = 'unknown_match'): boolean {
+  return canSubmitResultInScope(auth.accessContext, matchId, teamId);
 }
 
-export function canRequestAthleteVerification(auth: AuthState, athleteId?: string): boolean {
-  if (athleteId) return canManageAthleteInScope(auth.accessContext, athleteId);
-  return hasAnyRole(auth, ['team_admin', 'league_admin', 'platform_admin', 'super_admin']);
+export function canRequestAthleteVerification(auth: AuthState, athleteId: string): boolean {
+  return canManageAthleteInScope(auth.accessContext, athleteId);
 }
 
 export function canVerifyFinalResult(auth: AuthState): boolean {
@@ -99,9 +118,8 @@ export function canApproveTeamSubmission(auth: AuthState): boolean {
   return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
 }
 
-export function canManageLeague(auth: AuthState, leagueId?: string): boolean {
-  if (leagueId) return canManageLeagueInScope(auth.accessContext, leagueId);
-  return hasAnyRole(auth, ['league_admin', 'platform_admin', 'super_admin']);
+export function canManageLeague(auth: AuthState, leagueId: string): boolean {
+  return canManageLeagueInScope(auth.accessContext, leagueId);
 }
 
 export function canCreateAthlete(auth: AuthState, teamId: string): boolean {

@@ -16,6 +16,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
+import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 export function TeamRoster() {
   const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
@@ -27,6 +28,10 @@ export function TeamRoster() {
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
+  // Not `canManageTeam(auth)`: that falls back to a bare role check when given no scope id,
+  // which is how a retired team_admin ended up looking at a full set of controls the server
+  // refuses. This asks the capability index the server itself will consult.
+  const access = useTeamConsoleAccess(team?.id);
   const teams = catalog.teams;
   const seasons = catalog.seasons;
   const { athletes, rosters, retry } = detail;
@@ -138,14 +143,20 @@ export function TeamRoster() {
             {rosterRecord ? ` / ${rosterRecord.status}` : ''}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setCreating(true)}>
-            Add athlete
-          </Button>
-          <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>
-            Manage
-          </Button>
-        </div>
+        {access.canManage || access.canCreateAthlete ? (
+          <div className="flex gap-2">
+            {access.canCreateAthlete ? (
+              <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setCreating(true)}>
+                Add athlete
+              </Button>
+            ) : null}
+            {access.canManage ? (
+              <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>
+                Manage
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {roster.length ? (
@@ -172,8 +183,12 @@ export function TeamRoster() {
         <EmptyState
           icon={UsersIcon}
           title="No athletes yet"
-          description="Add your players to build the roster. Each can then request verification to earn a verified profile."
-          action={<Button size="sm" icon={UserPlus} onClick={openRosterEditor}>Build roster</Button>}
+          description={access.canManage
+            ? 'Add your players to build the roster. Each can then request verification to earn a verified profile.'
+            : 'Your league registers athletes and manages this roster.'}
+          action={access.canManage
+            ? <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>Build roster</Button>
+            : undefined}
         />
       )}
 
