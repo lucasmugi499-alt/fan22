@@ -34,6 +34,8 @@ import {
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 // Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
 import { recomputeStandingsAfterFinalization } from './standings/projection';
+// Relative: this file compiles into the Cloud Functions bundle.
+import { leagueOperatorUserIds, notifyAll } from './notifications/notify';
 // Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
 import {
   buildCandidateFromFieldReport,
@@ -810,13 +812,26 @@ export type FinalizeOutcome =
    * The submitted score and the events that are supposed to produce it disagree in the one
    * direction that cannot be repaired by attribution. No official record was written.
    */
-  | { action: 'blocked'; reason: 'reconciliation_surplus'; exceptionId: string }
+  | {
+      action: 'blocked';
+      reason: 'reconciliation_surplus';
+      exceptionId: string;
+      /** Carried out so the caller can notify the operators who own this queue. */
+      leagueId?: string;
+      matchId?: string;
+    }
   /**
    * The submission is larger than a single finalization may safely expand. No official
    * record was written and, crucially, none will be attempted again until a human looks —
    * the alternative is a transaction that fails on its operation budget and retries forever.
    */
-  | { action: 'blocked'; reason: 'submission_too_large'; exceptionId: string };
+  | {
+      action: 'blocked';
+      reason: 'submission_too_large';
+      exceptionId: string;
+      leagueId?: string;
+      matchId?: string;
+    };
 
 /**
  * Promote a settled claim onto the official match record in one idempotent transaction.
@@ -933,7 +948,10 @@ export async function finalizeCandidate(
         exceptionId,
         at: blockedAt,
       });
-      return { action: 'blocked', reason: 'submission_too_large', exceptionId };
+      return {
+        action: 'blocked', reason: 'submission_too_large', exceptionId,
+        leagueId: candidate.leagueId || undefined, matchId,
+      };
     }
 
     const matchRef = db.collection(MATCHES).doc(matchId);
@@ -1255,7 +1273,10 @@ export async function finalizeCandidate(
           + `League review required.`,
       });
 
-      return { action: 'blocked', reason: 'reconciliation_surplus', exceptionId };
+      return {
+        action: 'blocked', reason: 'reconciliation_surplus', exceptionId,
+        leagueId: candidate.leagueId || undefined, matchId: match.id,
+      };
     }
 
     tx.update(matchRef, {
@@ -1837,14 +1858,71 @@ async function finalizeThenProject(
   outcome: Promise<FinalizeOutcome>,
 ): Promise<FinalizeOutcome> {
   const result = await outcome;
+
   if (result.action === 'finalized') {
     await recomputeStandingsAfterFinalization(db, {
       seasonId: result.seasonId,
       leagueId: result.leagueId,
       matchId: result.matchId,
     });
+    await announceFinalization(db, result);
+    return result;
   }
+
+  /**
+   * A blocked result is the one that most needs announcing.
+   *
+   * The exception queue depends entirely on somebody noticing. Nothing wrote to
+   * `notifications` outside the fantasy scoring service, so a match blocked into the queue sat
+   * there until an operator happened to open a dashboard — which grassroots volunteers do not
+   * do. The platform then looks slow when it is actually waiting.
+   */
+  if (result.action === 'blocked') {
+    await announceReconciliationException(db, result);
+  }
+
   return result;
+}
+
+/**
+ * Tell the league its result is official.
+ *
+ * Never throws and never blocks: the result is already committed, and a courtesy that can fail
+ * a finalization — or, on a retried Cloud Function trigger, fail it repeatedly — would trade a
+ * real guarantee for a cosmetic one.
+ */
+async function announceFinalization(
+  db: Firestore,
+  result: Extract<FinalizeOutcome, { action: 'finalized' }>,
+) {
+  if (!result.leagueId) return;
+  const operators = await leagueOperatorUserIds(db, result.leagueId);
+  await notifyAll(db, operators, {
+    event: 'result_finalized',
+    entityId: result.matchId,
+    title: 'Result finalized',
+    body: 'A match result has been verified and published. The league table has been updated.',
+    href: `/matches/${result.matchId}`,
+  });
+}
+
+async function announceReconciliationException(
+  db: Firestore,
+  result: Extract<FinalizeOutcome, { action: 'blocked' }>,
+) {
+  if (!result.leagueId || !result.matchId) return;
+  const operators = await leagueOperatorUserIds(db, result.leagueId);
+  await notifyAll(db, operators, {
+    event: 'result_reconciliation_exception',
+    // The exception, not the match: a second exception on a later submission version is a
+    // genuinely new thing to be told about, and keying on the match would suppress it.
+    entityId: result.exceptionId,
+    title: 'A result needs your decision',
+    body: result.reason === 'submission_too_large'
+      ? 'A submitted result was too large to publish automatically and is waiting for review.'
+      : 'A submitted result and its recorded events disagree. Nothing was published.',
+    href: `/league-admin/verification?exception=${result.exceptionId}`,
+  });
 }
 
 /**

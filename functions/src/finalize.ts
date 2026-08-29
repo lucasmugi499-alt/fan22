@@ -9,6 +9,7 @@ import {
 import { ResultSubmission } from '../../src/types';
 import { finalizeSubmission } from '../../src/server/resultFinalizer';
 import type { FinalizerActivation } from '../../src/server/finalizerActivation';
+import { leagueOperatorUserIds, notifyAll } from '../../src/server/notifications/notify';
 
 export { finalizeSubmission, finalizeFieldReport, finalizeLeagueReport } from '../../src/server/resultFinalizer';
 
@@ -192,6 +193,29 @@ export async function sweepOverdueConfirmations(db: Firestore): Promise<string[]
     await db.collection(MATCHES).doc(submission.matchId).update({
       verificationStatus: matchVerificationFor('confirmation_overdue'),
     });
+
+    /**
+     * Tell the league, because this is the moment the workflow stops moving on its own.
+     *
+     * Nothing wrote to `notifications` outside the fantasy scoring service, so a submission
+     * whose 72-hour window lapsed escalated in silence: the opposing club was never prompted
+     * to answer, and the league was never told the decision had landed with them. The
+     * platform then looks slow when it is actually waiting for a human who does not know.
+     *
+     * Deterministic ids make this safe to run on every sweep — the same overdue submission is
+     * one notification, however many times the hourly job passes it.
+     */
+    if (submission.leagueId) {
+      const operators = await leagueOperatorUserIds(db, submission.leagueId);
+      await notifyAll(db, operators, {
+        event: 'result_confirmation_overdue',
+        entityId: submission.id,
+        title: 'A result is waiting for your decision',
+        body: 'The opposing club did not answer within the confirmation window, so this result '
+          + 'is now the league\'s to settle. Non-response is not consent.',
+        href: `/league-admin/verification?match=${submission.matchId}`,
+      });
+    }
 
     escalated.push(submission.id);
   }

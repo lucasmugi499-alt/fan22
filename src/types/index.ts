@@ -1608,7 +1608,10 @@ export interface Notification {
     | "fixture_reminder"
     | "venue_changed"
     | "result_confirmation_required"
+    | "result_confirmation_overdue"
     | "result_disputed"
+    | "result_finalized"
+    | "result_reconciliation_exception"
     | "league_notice"
     | "support_need_funded"
     | "athlete_followed"
@@ -1617,6 +1620,12 @@ export interface Notification {
     | "fantasy_lineup_deadline"
     | "fantasy_athlete_unavailable"
     | "fantasy_fixture_postponed"
+    /**
+     * Added when the two fantasy writers moved onto `notify`. The scoring service was already
+     * writing this type through a raw `.add()`, so the union had been silently out of date
+     * with what the collection actually contained.
+     */
+    | "fantasy_fixture_voided"
     | "fantasy_player_active"
     | "fantasy_provisional_score"
     | "fantasy_match_pending_verification"
@@ -1628,6 +1637,14 @@ export interface Notification {
   title: string;
   body: string;
   read: boolean;
+  /**
+   * Where this notification takes the reader.
+   *
+   * Effectively required for anything new. A notification with no destination tells somebody
+   * that something happened and then makes them go and find it, which for an operator with a
+   * queue is worse than not being told. Optional only because the two fantasy writers predate
+   * `server/notifications/notify.ts`.
+   */
   href?: string;
   createdAt?: string;
 }

@@ -5,6 +5,7 @@ import {
   type WriteBatch,
 } from 'firebase-admin/firestore';
 import { buildFantasyCorrection } from '@/lib/fantasy/corrections';
+import { notify } from '@/server/notifications/notify';
 import {
   buildFantasyFixtureVoid,
   evaluateFixtureScoringGate,
@@ -326,12 +327,15 @@ export async function scoreFinalizedFantasyMatch(
         const fantasyTeam = await db.collection('fantasyTeams').doc(fantasyTeamId).get();
         const userId = fantasyTeam.data()?.userId as string | undefined;
         if (userId) {
-          await db.collection('notifications').add({
+          // `notify`, not `.add()`. Firestore triggers are retried by design, and `.add()`
+          // mints a new document every time — at-least-once delivery plus `.add()` is a
+          // duplicate generator. A deterministic id makes redelivery a no-op.
+          await notify(db, {
             userId,
-            type: 'fantasy_score_corrected',
+            event: 'fantasy_score_corrected',
+            entityId: correction.correction.id,
             title: 'Fantasy score corrected',
             body: `An official result changed your round total from ${correction.correction.oldTotals[fantasyTeamId] ?? 0} to ${correction.correction.newTotals[fantasyTeamId] ?? 0}.`,
-            read: false,
             href: `/fantasy/competitions/${competition.id}/points`,
             createdAt: now,
           });
@@ -528,12 +532,12 @@ async function voidFantasyFixture(
     const fantasyTeam = await db.collection('fantasyTeams').doc(fantasyTeamId).get();
     const userId = fantasyTeam.data()?.userId as string | undefined;
     if (!userId) continue;
-    await db.collection('notifications').add({
+    await notify(db, {
       userId,
-      type: 'fantasy_fixture_voided',
+      event: 'fantasy_fixture_voided',
+      entityId: voidRecord.id ?? `${competition.id}:${fantasyTeamId}`,
       title: 'A fixture was not scored',
       body: voidRecord.reason,
-      read: false,
       href: `/fantasy/competitions/${competition.id}/points`,
       createdAt: now,
     });
