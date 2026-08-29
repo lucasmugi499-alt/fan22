@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
           '/admin/',
           '/api/',
           '/athlete-dashboard/',
+          '/athlete/',
           '/league-admin/',
           '/notifications/',
           '/profile/',

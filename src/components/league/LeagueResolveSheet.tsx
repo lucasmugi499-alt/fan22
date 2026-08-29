@@ -204,7 +204,11 @@ export function LeagueResolveSheet({
          * is the finalizer refusing to publish a contradiction, and a slow trigger is a slow
          * trigger.
          */
-        <div className="space-y-4">
+        <div
+          className="space-y-4"
+          role="status"
+          aria-live="polite"
+        >
           {outcome.phase === 'review' ? (
             <div className="rounded-[var(--radius-md)] border border-warning/30 bg-[var(--state-warning-bg)] p-4 text-sm">
               <p className="font-semibold text-text-strong">Sent for review.</p>

@@ -122,7 +122,7 @@ export const ROLE_NAV: Record<string, RoleNav> = {
   athlete: {
     workspace: 'My Career',
     primary: [
-      { name: 'Dashboard', href: '/athlete-dashboard', icon: SquaresFour },
+      { name: 'Dashboard', href: '/athlete', icon: SquaresFour },
       { name: 'Matches', href: '/matches', icon: Calendar },
       { name: 'Payouts', href: '/athlete/payouts', icon: Wallet },
       { name: 'Account', href: '/profile', icon: User },

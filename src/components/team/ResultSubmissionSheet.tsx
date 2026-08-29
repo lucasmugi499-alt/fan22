@@ -439,7 +439,11 @@ export function ResultSubmissionSheet({
          * Both lead with the fact that the submission was SAVED, because that is what stops a
          * club submitting the same result twice. Neither is worded as a failure.
          */
-        <div className="space-y-4">
+        <div
+          className="space-y-4"
+          role="status"
+          aria-live="polite"
+        >
           {outcome.phase === 'review' ? (
             <div className="rounded-[var(--radius-md)] border border-warning/30 bg-[var(--state-warning-bg)] p-4 text-sm">
               <p className="font-semibold text-text-strong">Sent to your league for review.</p>

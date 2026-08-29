@@ -184,7 +184,7 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
     case 'fan':
       return '/home';
     case 'athlete':
-      return '/athlete-dashboard';
+      return '/athlete';
     case 'team_admin':
       return '/team-admin';
     case 'league_admin':
@@ -302,7 +302,9 @@ export function canAccessRoute(auth: AuthState, pathname: string): boolean {
     // behind it refuses anyone without payee authority over that specific athlete.
     return true;
   }
-  if (pathname.startsWith('/athlete-dashboard')) {
+  // Both, deliberately. `/athlete-dashboard` still resolves — as a redirect — and a guard
+  // that only knew the new path would refuse the request before the redirect could run.
+  if (pathname.startsWith('/athlete-dashboard') || pathname.startsWith('/athlete')) {
     return Boolean(auth.accessContext?.indexes.some((index) => index.scopeType === 'athlete'))
       || hasAnyRole(auth, ['athlete', 'platform_admin', 'super_admin']);
   }
