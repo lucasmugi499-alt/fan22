@@ -79,8 +79,9 @@ That output supplies five of the placeholders. Repeat for production.
 
 ### 4. Fill the placeholders
 
-There are 26 in total. `environment:prepare:beta` will name any you miss, so run it after each
-file rather than at the end.
+There are **24 value lines** across four files — 9 distinct values per environment, since the
+project id appears twice in each overlay. `environment:prepare:beta` names any you miss, so run
+it after each file rather than at the end.
 
 **`apphosting.beta.yaml`** — 11:
 

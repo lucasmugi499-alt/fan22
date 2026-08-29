@@ -533,8 +533,8 @@ records; it now applies to four more files, and the note is on each of them.
 
 ### Not done, and not doable from here
 
-**`GP-02` — beta and production have no Firebase projects.** 26 `REPLACE_WITH_` markers remain
-across the two overlays, `config/environments.json` and `.firebaserc`. This needs a Google
+**`GP-02` — beta and production have no Firebase projects.** 24 `REPLACE_WITH_` value lines
+remain across the two overlays, `config/environments.json` and `.firebaserc`. This needs a Google
 account with billing. `docs/ENVIRONMENT_PROVISIONING.md` is the runbook; the readiness gate and
 the deploy preflight both refuse until it is done, so a half-finished provisioning cannot ship.
 
