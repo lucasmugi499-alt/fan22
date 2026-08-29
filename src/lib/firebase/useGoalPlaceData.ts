@@ -22,6 +22,7 @@ import {
   SponsorReport,
   SponsorCampaign,
   Sponsor,
+  StoredStanding,
   SupportNeed,
   Team,
   TeamAssignment,
@@ -165,6 +166,15 @@ const initialData = {
   sponsorReports: [] as SponsorReport[],
   sponsorCampaigns: [] as SponsorCampaign[],
   leagueNotices: [] as LeagueNotice[],
+  /**
+   * The stored league table.
+   *
+   * Requested as its own collection rather than derived from `matches`, because deriving it
+   * from `matches` is the defect: a page asks for `recordLimit` matches, gets an arbitrary
+   * page of a long season, and computes a confident table from it. One row per team is
+   * bounded by how many clubs a league has, not by how long its season is.
+   */
+  standings: [] as StoredStanding[],
   finalizations: [] as FinalizationRecord[],
   supportNeeds: [] as SupportNeed[],
   leagueAdminApplications: [] as LeagueAdminApplication[],
@@ -227,6 +237,7 @@ export async function loadGoalPlaceData(
     sponsorReports,
     sponsorCampaigns,
     leagueNotices,
+    standings,
     finalizations,
     supportNeeds,
     leagueAdminApplications,
@@ -260,6 +271,12 @@ export async function loadGoalPlaceData(
     shouldLoad('leagueNotices')
       ? provider.getLeagueNotices({ ...scope, limit: recordLimit })
       : Promise.resolve([] as LeagueNotice[]),
+    // Deliberately NOT passed `recordLimit`. That limit exists to bound long collections like
+    // matches and feed posts; applying it to a table would truncate the very thing this
+    // collection was created to stop being truncated.
+    shouldLoad('standings')
+      ? provider.getStoredStandings({ leagueId: scope?.leagueId, seasonId: scope?.seasonId })
+      : Promise.resolve([] as StoredStanding[]),
     shouldLoad('finalizations')
       ? provider.getFinalizations()
       : Promise.resolve([] as FinalizationRecord[]),
@@ -295,6 +312,7 @@ export async function loadGoalPlaceData(
     sponsorReports,
     sponsorCampaigns,
     leagueNotices,
+    standings,
     finalizations,
     supportNeeds,
     leagueAdminApplications,
@@ -533,6 +551,7 @@ export function useGoalPlaceData({
       sponsorReports: items.sponsorReports,
       sponsorCampaigns: items.sponsorCampaigns,
       leagueNotices: items.leagueNotices,
+      standings: items.standings,
       finalizations: items.finalizations,
       supportNeeds: items.supportNeeds,
       leagueAdminApplications: items.leagueAdminApplications,

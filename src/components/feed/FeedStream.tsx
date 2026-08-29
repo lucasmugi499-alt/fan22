@@ -26,8 +26,8 @@ export function FeedStream() {
   const { currentUser, userProfile, isDemoMode } = useAuth();
   const { requireAuth } = useAuthGate();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const { teams, leagues, matches, seasons } = useGoalPlaceData({
-    collections: ['teams', 'leagues', 'matches', 'seasons'],
+  const { teams, leagues, matches, seasons, standings } = useGoalPlaceData({
+    collections: ['teams', 'leagues', 'matches', 'seasons', 'standings'],
     recordLimit: 1_200,
   });
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
@@ -72,8 +72,8 @@ export function FeedStream() {
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
   const leagueById = useMemo(() => new Map(leagues.map((item) => [item.id, item])), [leagues]);
   const leagueSnapshots = useMemo(() => new Map(
-    leagues.map((league) => [league.id, buildLeagueTableSnapshot(league, teams, matches, seasons)]),
-  ), [leagues, matches, seasons, teams]);
+    leagues.map((league) => [league.id, buildLeagueTableSnapshot(league, teams, matches, seasons, standings)]),
+  ), [leagues, matches, seasons, teams, standings]);
 
   const contextForPost = useCallback((post: FeedPost) => {
     const team = post.relatedTeamId ? teamById.get(post.relatedTeamId) : undefined;

@@ -813,7 +813,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /**
+     * The league table. Server-owned, publicly readable, written by nothing else.
+     *
+     * `write: if false` was already correct and is now load-bearing rather than incidental.
+     * This collection used to be seeded, publicly readable, and maintained by NOTHING — the
+     * table shown in the product was computed in the browser from whatever matches a page had
+     * loaded, which went silently wrong past roughly 120 fixtures. `server/standings/projection.ts`
+     * now rebuilds these rows from the season's official results after every finalization, so
+     * this is the published table and no client may author one.
+     */
     match /standings/{standingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    /**
+     * Points adjustments — discipline deductions and the like.
+     *
+     * Publicly readable because the table footnotes them: a club docked six points is entitled
+     * to have the reason visible next to the consequence, and a league that cannot show why a
+     * rival is below them will be asked.
+     *
+     * Server-authored only. A deduction changes a league table, so it belongs with every other
+     * decision that changes one — behind a command that re-checks capability, records who
+     * ruled and why, and writes an audit entry. There is no client write path and there should
+     * not be one, exactly as there is none for an official result.
+     */
+    match /pointsAdjustments/{adjustmentId} {
       allow read: if true;
       allow write: if false;
     }

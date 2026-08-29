@@ -1,5 +1,9 @@
-import type { Match, SportSlug, SportType } from '@/types';
-import { normalizeMatchStatus, normalizeMatchVerification } from '@/lib/status';
+// Relative, not `@/`. This module is compiled into the Cloud Functions bundle through the
+// standings projection, where a path alias survives into the emitted CommonJS and fails at
+// require time — tsc resolves the alias, it does not rewrite it. `functions/scripts/verify-bundle.mjs`
+// fails the build if one reappears.
+import type { Match, SportSlug, SportType } from '../types';
+import { normalizeMatchStatus, normalizeMatchVerification } from './status';
 
 /**
  * The single adapter for a stored match record.

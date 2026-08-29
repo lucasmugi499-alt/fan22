@@ -3,7 +3,7 @@ import 'server-only';
 import { investorDemo } from '@/data/investorDemo';
 import { adminDb } from '@/lib/firebase/admin';
 import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
-import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
+import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
 import { adaptMatch } from '@/lib/matchRecord';
 
 export type PublicCatalogueSource = 'live' | 'curated_preview' | 'configured_preview';
@@ -125,18 +125,30 @@ export async function getPublicLeagueDiscoveryData() {
     teams: investorDemo.teams,
     matches: investorDemo.matches,
     seasons: investorDemo.seasons,
+    standings: investorDemo.standings,
   });
   if (!usesFirebaseData()) return configured(fallback());
   return withSyntheticDemoFallback(
     async () => {
-      const [leagues, teams, matches, seasons] = await Promise.all([
+      const [leagues, teams, matches, seasons, standings] = await Promise.all([
         recentCollection<League>('leagues', 48),
         recentCollection<Team>('teams', 240),
         adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(700).get()
           .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
         recentCollection<Season>('seasons', 80),
+        /**
+         * Discovery ranked leagues on tables it built from a global 700-match slice shared
+         * across every league on the page — so a league's position in discovery depended on
+         * how many of ITS matches happened to fall inside a limit it shared with 47 others.
+         * Reading the projection instead makes each league's table its own.
+         *
+         * Ordered by rank so that if a deployment ever reaches this cap it drops the bottom of
+         * tables, rather than an arbitrary set of rows from the middle of several.
+         */
+        adminDb.collection('standings').orderBy('rank', 'asc').limit(1200).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<StoredStanding>(item.id, item.data()))),
       ]);
-      return { leagues, teams, matches, seasons };
+      return { leagues, teams, matches, seasons, standings };
     },
     fallback,
   );
@@ -151,11 +163,12 @@ export async function getPublicLeagueProfileData(leagueId: string) {
     athletes: investorDemo.athletes.filter((athlete) => athlete.leagueId === leagueId).slice(0, 48),
     feedPosts: investorDemo.feedPosts.filter((post) => post.relatedLeagueId === leagueId).slice(0, 12),
     leagueNotices: investorDemo.leagueNotices.filter((notice) => notice.leagueId === leagueId).slice(0, 12),
+    standings: investorDemo.standings.filter((standing) => standing.leagueId === leagueId),
   });
   if (!usesFirebaseData()) return configured(fallback());
   return withSyntheticDemoFallback(
     async () => {
-      const [league, teams, matches, seasons, athletes, feedPosts, leagueNotices] = await Promise.all([
+      const [league, teams, matches, seasons, athletes, feedPosts, leagueNotices, standings] = await Promise.all([
         adminDb.collection('leagues').doc(leagueId).get()
           .then((snapshot) => snapshot.exists ? record<League>(snapshot.id, snapshot.data()!) : undefined),
         adminDb.collection('teams').where('leagueId', '==', leagueId).limit(80).get()
@@ -170,8 +183,22 @@ export async function getPublicLeagueProfileData(leagueId: string) {
           .then((snapshot) => snapshot.docs.map((item) => record<typeof investorDemo.feedPosts[number]>(item.id, item.data()))),
         adminDb.collection('leagueNotices').where('leagueId', '==', leagueId).limit(12).get()
           .then((snapshot) => snapshot.docs.map((item) => record<typeof investorDemo.leagueNotices[number]>(item.id, item.data()))),
+        /**
+         * The stored league table, as one bounded read.
+         *
+         * This is the whole point of the standings projection. The `matches` query above is
+         * capped at 240 and carries no ordering, so a season past that cap yields an arbitrary
+         * subset — which is exactly what the browser used to compute the published table from.
+         * One row per team is bounded by the SIZE of the league rather than the LENGTH of its
+         * season, so it does not degrade as fixtures accumulate.
+         *
+         * 80, matching the team limit above. A league with more clubs than that has a larger
+         * problem than its table.
+         */
+        adminDb.collection('standings').where('leagueId', '==', leagueId).limit(80).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<StoredStanding>(item.id, item.data()))),
       ]);
-      return { league, teams, matches, seasons, athletes, feedPosts, leagueNotices };
+      return { league, teams, matches, seasons, athletes, feedPosts, leagueNotices, standings };
     },
     fallback,
   );

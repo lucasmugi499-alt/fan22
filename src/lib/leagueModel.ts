@@ -1,6 +1,10 @@
-import { League, LeagueStatus, Match, SeasonScoringRules, Team } from '@/types';
-import { isOfficialMatch } from '@/lib/status';
-import { defaultScoringFor } from '@/lib/season';
+// Relative, not `@/`. This module is compiled into the Cloud Functions bundle through the
+// standings projection, where a path alias survives into the emitted CommonJS and fails at
+// require time — tsc resolves the alias, it does not rewrite it. `functions/scripts/verify-bundle.mjs`
+// fails the build if one reappears.
+import type { League, LeagueStatus, Match, PointsAdjustment, SeasonScoringRules, Team } from '../types';
+import { isOfficialMatch } from './status';
+import { defaultScoringFor } from './season';
 
 export const leagueRankingDisclaimer =
   'GoalPlace Index helps leagues prove operational quality to sponsors, athletes, and fans. It does not affect sporting standings.';
@@ -147,7 +151,24 @@ export type LeagueStanding = {
   pointsFor: number;
   pointsAgainst: number;
   difference: number;
+  /** Match points plus `adjustment`. This is the number the table ranks on. */
   points: number;
+  /**
+   * The signed total of every points adjustment applied to this team this season, and 0 when
+   * there are none.
+   *
+   * Reported separately from `points` rather than folded silently into it, because a table
+   * that shows a deduction without saying so is a table the league will not trust. The row
+   * carries what to footnote; the caller decides how to render it.
+   */
+  adjustment: number;
+  /**
+   * How many of `played` were decided by a league ruling rather than on the field.
+   *
+   * A walkover counts in the table at full weight — it is an official result — but a club
+   * looking at "played 9" is entitled to know one of them was awarded.
+   */
+  awarded: number;
 };
 
 export type BuildStandingsOptions = {
@@ -162,6 +183,18 @@ export type BuildStandingsOptions = {
    * season's own `scoring` so a league can depart from the default without a code change.
    */
   scoring?: SeasonScoringRules;
+  /**
+   * Season-scoped points adjustments — discipline deductions and the like.
+   *
+   * Applied as a FINAL term, after every match has been counted, and never by mutating a
+   * running total mid-loop. That ordering is what keeps the computation deterministic: the
+   * same inputs in any order produce byte-identical output, which is the property the stored
+   * projection depends on to be safely recomputable at any time.
+   *
+   * Rescinded adjustments are filtered here rather than by the caller, so no caller can
+   * forget. Adjustments for other seasons or teams are ignored for the same reason.
+   */
+  adjustments?: PointsAdjustment[];
 };
 
 export function buildLeagueStandings(
@@ -183,6 +216,8 @@ export function buildLeagueStandings(
       pointsAgainst: 0,
       difference: 0,
       points: 0,
+      adjustment: 0,
+      awarded: 0,
     });
   });
 
@@ -212,6 +247,14 @@ export function buildLeagueStandings(
 
       teamA.played += 1;
       teamB.played += 1;
+      // An awarded result counts in the table exactly like a played one — it IS the official
+      // result — and is merely labelled, so a club reading "played 9" can see that one of
+      // them was a walkover. Weighting it differently would be inventing a rule no league asked
+      // for.
+      if (match.awardedResult) {
+        teamA.awarded += 1;
+        teamB.awarded += 1;
+      }
       teamA.pointsFor += teamAScore;
       teamA.pointsAgainst += teamBScore;
       teamB.pointsFor += teamBScore;
@@ -243,6 +286,28 @@ export function buildLeagueStandings(
           teamB.points += scoring.draw;
         }
       }
+    });
+
+  // Adjustments last, after every match is counted.
+  //
+  // Deliberately a separate pass rather than a term inside the match loop: the loop's
+  // per-match arithmetic must stay a pure function of the matches, so the projection can be
+  // recomputed from scratch at any time and produce identical output. Folding a season-level
+  // penalty into a per-match total would make the result depend on iteration order.
+  (options.adjustments ?? [])
+    .filter((adjustment) => (
+      !adjustment.rescindedAt
+      && (!options.seasonId || adjustment.seasonId === options.seasonId)
+      && Number.isFinite(adjustment.delta)
+    ))
+    .forEach((adjustment) => {
+      const standing = standings.get(adjustment.teamId);
+      // An adjustment for a team not in this table is silently ignored, not an error: a team
+      // can be withdrawn from a league after being docked, and a stale record must not be
+      // able to break the whole table.
+      if (!standing) return;
+      standing.adjustment += adjustment.delta;
+      standing.points += adjustment.delta;
     });
 
   return [...standings.values()]

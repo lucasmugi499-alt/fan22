@@ -1,13 +1,23 @@
 import type { LeagueStanding } from '@/lib/leagueModel';
-import { buildLeagueStandings } from '@/lib/leagueModel';
+import { resolveLeagueStandings, type StandingsSource } from '@/lib/standings/resolve';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { isOfficialMatch } from '@/lib/status';
-import type { League, Match, Season, Team } from '@/types';
+import type { League, Match, Season, StoredStanding, Team } from '@/types';
 
 export type LeagueTableSnapshot = {
   leagueId: string;
   rows: LeagueStanding[];
   officialMatches: number;
+  /**
+   * Where the rows came from, so a surface can be honest about a fallback.
+   *
+   * Discovery previously built every league's table from ONE global match slice shared across
+   * the whole page — 700 documents covering up to 48 leagues. A league's position in the feed
+   * therefore depended on how many of ITS matches happened to fall inside a limit it shared
+   * with 47 others, which is not a property of the league at all.
+   */
+  source: StandingsSource;
+  provisional: boolean;
 };
 
 export function sportLabel(sport?: string) {
@@ -32,20 +42,33 @@ export function buildLeagueTableSnapshot(
   teams: Team[],
   matches: Match[],
   seasons: Season[],
+  /**
+   * Stored rows for every league on the page. Filtered to this one here rather than by each
+   * caller, so no caller can forget and quietly fall back to the shared-slice computation.
+   */
+  storedStandings: StoredStanding[] = [],
 ): LeagueTableSnapshot {
   const leagueTeams = teams.filter((team) => team.leagueId === league.id);
   const leagueMatches = matches.filter((match) => match.leagueId === league.id);
   const season = currentSeasonFor(seasons, league.id, league.currentSeasonId);
-  const rows = buildLeagueStandings(leagueTeams, leagueMatches, {
+  const resolved = resolveLeagueStandings({
+    stored: storedStandings.filter((row) => row.leagueId === league.id),
     seasonId: season?.id,
+    teams: leagueTeams,
+    matches: leagueMatches,
     scoring: scoringForSeason(season, league.sport),
   });
   return {
     leagueId: league.id,
-    rows,
-    officialMatches: leagueMatches.filter((match) => (
-      (!season?.id || match.seasonId === season.id) && isOfficialMatch(match)
-    )).length,
+    rows: resolved.rows,
+    officialMatches: resolved.source === 'projection'
+      // From the table itself: each match appears in two rows.
+      ? resolved.rows.reduce((total, row) => total + row.played, 0) / 2
+      : leagueMatches.filter((match) => (
+        (!season?.id || match.seasonId === season.id) && isOfficialMatch(match)
+      )).length,
+    source: resolved.source,
+    provisional: resolved.provisional,
   };
 }
 

@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
-import type { Athlete, Challenge, League, Match, Season, Team } from '@/types';
+import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
 import {
   buildLeagueTableSnapshot,
   standingForTeam,
@@ -25,8 +25,8 @@ type Tab = (typeof TABS)[number];
 
 export function DiscoverHub() {
   const { userProfile } = useAuth();
-  const { athletes, teams, leagues, matches, seasons, challenges, loading } = useGoalPlaceData({
-    collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons', 'challenges'],
+  const { athletes, teams, leagues, matches, seasons, challenges, standings, loading } = useGoalPlaceData({
+    collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons', 'challenges', 'standings'],
     recordLimit: 1_200,
   });
   const [tab, setTab] = useState<Tab>('For You');
@@ -36,7 +36,7 @@ export function DiscoverHub() {
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
   const leagueById = useMemo(() => new Map(leagues.map((item) => [item.id, item])), [leagues]);
-  const leagueSnapshots = useLeagueSnapshots(leagues, teams, matches, seasons);
+  const leagueSnapshots = useLeagueSnapshots(leagues, teams, matches, seasons, standings);
 
   const pointsForTeam = useCallback(
     // Zero when neither the projection nor the deprecated aggregate has a number: a team
@@ -154,10 +154,14 @@ function useLeagueSnapshots(
   teams: Team[],
   matches: Match[],
   seasons: Season[],
+  standings: StoredStanding[],
 ) {
   return useMemo(() => new Map(
-    leagues.map((league) => [league.id, buildLeagueTableSnapshot(league, teams, matches, seasons)]),
-  ), [leagues, matches, seasons, teams]);
+    leagues.map((league) => [
+      league.id,
+      buildLeagueTableSnapshot(league, teams, matches, seasons, standings),
+    ]),
+  ), [leagues, matches, seasons, teams, standings]);
 }
 
 function followedOrTop<T extends { id: string }>(

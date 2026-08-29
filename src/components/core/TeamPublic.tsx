@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy, Heart, Handshake } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { buildLeagueStandings } from '@/lib/leagueModel';
+import { resolveLeagueStandings } from '@/lib/standings/resolve';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { clubColor } from '@/lib/clubColors';
@@ -24,6 +24,12 @@ function ugx(n: number): string {
   if (n >= 1_000) return `UGX ${(n / 1_000).toFixed(0)}k`;
   return `UGX ${n}`;
 }
+
+/**
+ * The client match limit, named so the standings resolver can tell a complete season from a
+ * page of one. See LeaguePublic for the same constant and the same reason.
+ */
+const LEAGUE_RECORD_LIMIT = 250;
 
 export function TeamPublic({ teamId }: { teamId: string }) {
   const exact = useGoalPlaceData({
@@ -52,9 +58,9 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const feedPosts = newsData.feedPosts;
   const league = useMemo(() => leagues.find((l) => l.id === team?.leagueId), [leagues, team]);
   const leagueData = useGoalPlaceData({
-    collections: ['teams', 'matches', 'seasons'],
+    collections: ['teams', 'matches', 'seasons', 'standings'],
     scope: { leagueId: league?.id ?? 'goalplace-pending' },
-    recordLimit: 250,
+    recordLimit: LEAGUE_RECORD_LIMIT,
   });
   const teams = league?.id ? leagueData.teams : exact.teams;
   const matches = league?.id ? leagueData.matches : profileMatches;
@@ -72,18 +78,30 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const needs = useMemo(() => supportNeeds.filter((need) => need.teamId === teamId), [supportNeeds, teamId]);
   const partners = useMemo(() => sponsors.filter((sponsor) => sponsor.supportedTeamIds.includes(teamId)), [sponsors, teamId]);
 
+  /**
+   * The club's league position, from the same projection the league page reads.
+   *
+   * It matters that this is the same source rather than a second computation: a club showing
+   * one record beside a league table showing another is the failure the codebase already
+   * guards against elsewhere by preferring the computed table over stored team aggregates.
+   * Two independent computations over two different match pages would reintroduce it.
+   */
   const standings = useMemo(() => {
-    if (!league) return [];
+    if (!league) return { rows: [], source: 'computed' as const, provisional: false };
     const lTeams = teams.filter((t) => t.leagueId === league.id);
     const season = currentSeasonFor(seasons, league.id, league.currentSeasonId);
-    return buildLeagueStandings(lTeams, matches.filter((m) => m.leagueId === league.id), {
+    return resolveLeagueStandings({
+      stored: leagueData.standings,
       seasonId: season?.id,
+      teams: lTeams,
+      matches: matches.filter((m) => m.leagueId === league.id),
       scoring: season ? scoringForSeason(season, league.sport) : undefined,
+      matchLoadLimit: LEAGUE_RECORD_LIMIT,
     });
-  }, [league, teams, matches, seasons]);
+  }, [league, teams, matches, seasons, leagueData.standings]);
 
   const sportOf = useMemo(() => (id: string) => teamById.get(id)?.sport as string | undefined, [teamById]);
-  const officialRecord = standings.find((row) => row.teamId === teamId);
+  const officialRecord = standings.rows.find((row) => row.teamId === teamId);
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-36 w-full rounded-[var(--radius-xl)]" /><Skeleton className="h-40 w-full rounded-[var(--radius-lg)]" /></div>;
   if (exact.error) return <ErrorState description="This team could not be loaded. Check your connection and try again." onRetry={exact.retry} />;
@@ -162,7 +180,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
         </div>
 
         <aside className="space-y-5">
-          {standings.length ? <PositionCallout rows={standings} teamId={team.id} sportById={sportOf} href={league ? `/leagues/${league.id}` : '/leagues'} /> : null}
+          {standings.rows.length ? <PositionCallout rows={standings.rows} teamId={team.id} sportById={sportOf} href={league ? `/leagues/${league.id}` : '/leagues'} /> : null}
 
           <Card className="p-4">
             <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Club</h2>

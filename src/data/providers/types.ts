@@ -24,6 +24,7 @@ import {
   Sport,
   SportSlug,
   Sponsor,
+  StoredStanding,
   SponsorCampaign,
   SponsorReport,
   SupportNeed,
@@ -64,6 +65,11 @@ export type FollowTargetType = 'athlete' | 'team' | 'league';
 
 export type DataQueryOptions = {
   leagueId?: string;
+  /**
+   * Standings are meaningless across seasons, so the one query that reads them must be able
+   * to say which season it means.
+   */
+  seasonId?: string;
   teamId?: string;
   athleteId?: string;
   matchId?: string;
@@ -248,6 +254,17 @@ export interface GoalPlaceDataProvider {
   getSponsorReports(): Promise<SponsorReport[]>;
   getSponsorCampaigns(): Promise<SponsorCampaign[]>;
   getLeagueNotices(options?: DataQueryOptions): Promise<LeagueNotice[]>;
+  /**
+   * The stored league table.
+   *
+   * A signed-in visitor reads this for the same reason an anonymous one does: so that both
+   * see the SAME table. They previously did not — the anonymous view came from the server's
+   * 240-match slice and the signed-in view from the client's 120-match slice, and past ~120
+   * fixtures the two disagreed about the same league with no indication that either was
+   * partial. One row per team, bounded by the size of the league rather than the length of
+   * its season.
+   */
+  getStoredStandings(options?: DataQueryOptions): Promise<StoredStanding[]>;
   getFinalizations(): Promise<FinalizationRecord[]>;
   getSupportNeeds(options?: DataQueryOptions): Promise<SupportNeed[]>;
   getLeagueAdminApplications(): Promise<LeagueAdminApplication[]>;

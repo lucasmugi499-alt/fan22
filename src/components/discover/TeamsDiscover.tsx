@@ -31,8 +31,8 @@ export function TeamsDiscover({
   seasons?: Season[];
 }) {
   const [activeSport, setActiveSport] = useState('All');
-  const { teams, leagues, matches, seasons, loading } = useGoalPlaceData({
-    collections: ['teams', 'leagues', 'matches', 'seasons'],
+  const { teams, leagues, matches, seasons, standings, loading } = useGoalPlaceData({
+    collections: ['teams', 'leagues', 'matches', 'seasons', 'standings'],
     recordLimit: 700,
   });
   const records = teams.length ? teams : initialTeams;
@@ -42,8 +42,8 @@ export function TeamsDiscover({
   const leagueById = useMemo(() => new Map(leagueRecords.map((league) => [league.id, league])), [leagueRecords]);
   const snapshots = useMemo(() => new Map(leagueRecords.map((league) => [
     league.id,
-    buildLeagueTableSnapshot(league, records, matchRecords, seasonRecords),
-  ])), [leagueRecords, records, matchRecords, seasonRecords]);
+    buildLeagueTableSnapshot(league, records, matchRecords, seasonRecords, standings),
+  ])), [leagueRecords, records, matchRecords, seasonRecords, standings]);
   const filtered = useMemo(
     () => records
       .filter((team) => activeSport === 'All' || sportLabel(String(team.sport)) === activeSport)

@@ -66,13 +66,41 @@ describe('loadGoalPlaceData', () => {
     expect(provider.getUsers).not.toHaveBeenCalled();
   });
 
-  it('does not read the obsolete stored standings projection', async () => {
+  /**
+   * This assertion is the inverse of what it used to be, and the reversal is the point.
+   *
+   * It previously required that the stored standings projection NOT be read — correctly, at
+   * the time. The collection was seeded, publicly readable, and maintained by nothing, so
+   * reading it would have published a table frozen at whatever the seed said. The App Hosting
+   * build of 2026-08-27 removed the last dead read of it for exactly that reason.
+   *
+   * `server/standings/projection.ts` now writes it after every finalization, so it is the
+   * live table and reading it is the fix rather than the bug: it is what makes an anonymous
+   * visitor and a signed-in one see the same rows. They previously did not — the anonymous
+   * view came from the server's 240-match slice and the signed-in view from the client's
+   * 120-match slice, and past ~120 fixtures the two disagreed with no sign that either was
+   * partial.
+   */
+  it('reads the stored standings projection rather than deriving a table from matches', async () => {
     const provider = providerWithCalls();
 
     await loadGoalPlaceData(provider, { role: 'fan' });
 
     expect((provider as GoalPlaceDataProvider & { getStoredStandings: ReturnType<typeof vi.fn> })
-      .getStoredStandings).not.toHaveBeenCalled();
+      .getStoredStandings).toHaveBeenCalled();
+  });
+
+  it('never applies the page record limit to the table', async () => {
+    // `recordLimit` bounds long collections like matches and feed posts. Applying it to a
+    // table would truncate the one thing this collection exists to stop being truncated.
+    const provider = providerWithCalls();
+
+    await loadGoalPlaceData(provider, { role: 'fan', recordLimit: 20, scope: { leagueId: 'l1' } });
+
+    const call = (provider as GoalPlaceDataProvider & { getStoredStandings: ReturnType<typeof vi.fn> })
+      .getStoredStandings.mock.calls[0][0];
+    expect(call).toEqual({ leagueId: 'l1', seasonId: undefined });
+    expect(call).not.toHaveProperty('limit', 20);
   });
 
   it('requests platform-only collections for platform admin data loads', async () => {

@@ -33,6 +33,8 @@ import {
 } from '../lib/sport/submissionLimits';
 import { decideFinalization, type FinalizerActivation } from './finalizerActivation';
 // Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
+import { recomputeStandingsAfterFinalization } from './standings/projection';
+// Relative, like every other import in this file: it compiles into the Cloud Functions bundle.
 import {
   buildCandidateFromFieldReport,
   buildCandidateFromLeagueReport,
@@ -783,7 +785,26 @@ function officialScorerEvents({
 }
 
 export type FinalizeOutcome =
-  | { action: 'finalized'; finalizationKey: string }
+  | {
+      action: 'finalized';
+      finalizationKey: string;
+      /**
+       * Which season's table this result belongs to, carried out of the transaction so the
+       * caller can rebuild it.
+       *
+       * The standings projection deliberately runs AFTER this transaction rather than inside
+       * it — see `server/standings/projection.ts`. The transaction is write-budgeted and
+       * already refuses to expand an oversized submission; adding a whole-season read and a
+       * row-per-team write would push ordinary matchdays into that refusal. Standings are
+       * derived data and can be rebuilt at any time, so they do not need the same transaction
+       * as the truth they derive from.
+       *
+       * Absent only where a source carries no season, which a field report may not.
+       */
+      seasonId?: string;
+      leagueId?: string;
+      matchId: string;
+    }
   | { action: 'skipped'; reason: string }
   /**
    * The submitted score and the events that are supposed to produce it disagree in the one
@@ -1544,7 +1565,13 @@ export async function finalizeCandidate(
       }
     }
 
-    return { action: 'finalized', finalizationKey: plan.finalizationKey };
+    return {
+      action: 'finalized',
+      finalizationKey: plan.finalizationKey,
+      seasonId: candidate.seasonId || undefined,
+      leagueId: candidate.leagueId || undefined,
+      matchId,
+    };
   });
 }
 
@@ -1793,6 +1820,34 @@ export function leagueReportLoader(db: Firestore, matchId: string): CandidateLoa
 }
 
 /**
+ * Publish the official result, then rebuild the table it belongs to.
+ *
+ * Every entry point goes through this, so no intake path can acquire an official result
+ * without the league table following it. That is the same reasoning that made
+ * `finalizeCandidate` take a loader rather than a match id: a shared step that one caller can
+ * skip is a step that will eventually be skipped.
+ *
+ * The recomputation never throws — see `recomputeStandingsAfterFinalization`. A failed
+ * projection leaves a stale table and a logged error; it must not fail a finalization that
+ * has already committed, and it must not make a Cloud Function retry a redelivery of the
+ * result itself.
+ */
+async function finalizeThenProject(
+  db: Firestore,
+  outcome: Promise<FinalizeOutcome>,
+): Promise<FinalizeOutcome> {
+  const result = await outcome;
+  if (result.action === 'finalized') {
+    await recomputeStandingsAfterFinalization(db, {
+      seasonId: result.seasonId,
+      leagueId: result.leagueId,
+      matchId: result.matchId,
+    });
+  }
+  return result;
+}
+
+/**
  * The bilateral workflow's entry point, unchanged for every existing caller.
  *
  * Kept because four call sites use it and because the signature says what it does. What
@@ -1804,7 +1859,10 @@ export async function finalizeSubmission(
   matchId: string,
   activation: FinalizerActivation,
 ): Promise<FinalizeOutcome> {
-  return finalizeCandidate(db, legacySubmissionLoader(db, matchId), activation, matchId);
+  return finalizeThenProject(
+    db,
+    finalizeCandidate(db, legacySubmissionLoader(db, matchId), activation, matchId),
+  );
 }
 
 /** The field capture entry point. Same engine, same ledger, same official records. */
@@ -1813,7 +1871,10 @@ export async function finalizeFieldReport(
   matchId: string,
   activation: FinalizerActivation,
 ): Promise<FinalizeOutcome> {
-  return finalizeCandidate(db, fieldReportLoader(db, matchId), activation, matchId);
+  return finalizeThenProject(
+    db,
+    finalizeCandidate(db, fieldReportLoader(db, matchId), activation, matchId),
+  );
 }
 
 /** The league post-match entry point. Third source, same engine. */
@@ -1822,5 +1883,8 @@ export async function finalizeLeagueReport(
   matchId: string,
   activation: FinalizerActivation,
 ): Promise<FinalizeOutcome> {
-  return finalizeCandidate(db, leagueReportLoader(db, matchId), activation, matchId);
+  return finalizeThenProject(
+    db,
+    finalizeCandidate(db, leagueReportLoader(db, matchId), activation, matchId),
+  );
 }

@@ -63,6 +63,8 @@
     "beta:seed": "tsx scripts/demo/data-lifecycle.ts --action=beta-seed",
     "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset",
     "data:guard": "tsx scripts/data/deprecated-fields-guard.ts",
+    "standings:rebuild:dry-run": "tsx --env-file=.env.local scripts/standings/rebuild.ts",
+    "standings:rebuild:apply": "tsx --env-file=.env.local scripts/standings/rebuild.ts --apply",
     "data:repair:aggregates:dry-run": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts",
     "data:repair:aggregates:apply": "tsx --env-file=.env.local scripts/data/repair-team-aggregates.ts --apply",
     "postinstall": "npm --prefix functions ci",

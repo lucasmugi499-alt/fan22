@@ -64,6 +64,7 @@ import {
   Invitation,
   AccessIndexRecord,
   Verification,
+  StoredStanding,
 } from '@/types';
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
 import { buildLeagueStandings } from '@/lib/leagueModel';
@@ -450,6 +451,17 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     if (options?.audience) constraints.push(where('audience', '==', options.audience));
     constraints.push(limitQuery(options?.limit ?? 50));
     return readCollection<LeagueNotice>('leagueNotices', constraints);
+  },
+  async getStoredStandings(options) {
+    if (!isFirebaseConfigured) return mockProvider.getStoredStandings(options);
+    const constraints: QueryConstraint[] = [];
+    if (options?.leagueId) constraints.push(where('leagueId', '==', options.leagueId));
+    if (options?.seasonId) constraints.push(where('seasonId', '==', options.seasonId));
+    // Ordered, and bounded by club count rather than fixture count. The whole reason this
+    // collection exists is that the previous table read grew with the length of a season.
+    constraints.push(orderBy('rank', 'asc'));
+    constraints.push(limitQuery(options?.limit ?? 200));
+    return readCollection<StoredStanding>('standings', constraints);
   },
   async getFinalizations() {
     return isFirebaseConfigured

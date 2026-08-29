@@ -34,6 +34,7 @@ import {
   sponsorReports,
   teamAssignments,
   verifications,
+  standings,
 } from '../mockDatabase';
 import {
   CreateCommentInput,
@@ -660,6 +661,12 @@ export const mockProvider: GoalPlaceDataProvider = {
   },
   async getSponsorCampaigns() {
     return investorDemoRuntime.sponsorCampaigns;
+  },
+  async getStoredStandings(options) {
+    return standings.filter((row) => (
+      (!options?.leagueId || row.leagueId === options.leagueId)
+      && (!options?.seasonId || row.seasonId === options.seasonId)
+    )).slice(0, options?.limit ?? 200);
   },
   async getLeagueNotices(options) {
     return take(

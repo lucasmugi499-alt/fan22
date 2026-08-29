@@ -648,6 +648,14 @@ export interface Roster {
   updatedAt?: string;
 }
 
+/**
+ * One row of a league table, as the server computed and stored it.
+ *
+ * Written only by `src/server/standings/projection.ts`, recomputed from scratch from the
+ * season's official results, and read by every table surface. Before that projection existed
+ * this collection was seeded, publicly readable, and read by nothing — see the module comment
+ * there for what the browser was doing instead and why it was wrong.
+ */
 export interface StoredStanding {
   id: string;
   leagueId: string;
@@ -662,8 +670,18 @@ export interface StoredStanding {
   pointsFor: number;
   pointsAgainst: number;
   difference: number;
+  /** Match points plus `adjustment` — the number this row is ranked on. */
   points: number;
   rank: number;
+  /**
+   * The signed total of the season's points adjustments for this team, 0 when there are none.
+   * Stored so the table can footnote a deduction without re-reading the adjustments.
+   */
+  adjustment?: number;
+  /** How many of `played` were decided by a league ruling rather than on the field. */
+  awarded?: number;
+  /** When this row was last rebuilt. Absent on rows seeded before the projection existed. */
+  recomputedAt?: string;
 }
 
 export interface Athlete {
@@ -1204,6 +1222,23 @@ export interface Match {
   teamBScore?: number;
   events: MatchEvent[];
   /**
+   * How this result came to be, when it was not played out on the field.
+   *
+   * Absent on every ordinary result, which is the overwhelming majority — a played match
+   * needs no explanation. Present only when a league RULED the outcome rather than recording
+   * one: a club that did not turn up, an ineligible player, an abandoned tie awarded to the
+   * side that was not at fault.
+   *
+   * Kept separate from `verificationStatus` on purpose. An awarded result is every bit as
+   * official as a played one and belongs in the table at full weight; what differs is its
+   * provenance, not its standing. Collapsing the two would either hide the ruling or demote
+   * the result, and grassroots leagues need both to be true at once.
+   *
+   * Only the finalizer writes this. `firestore.rules.next` denies every client path to the
+   * match document, and the score that accompanies it is set by the same ruling.
+   */
+  awardedResult?: AwardedResult;
+  /**
    * The capture policy in force when this fixture was created, resolved as
    * max(leagueRequested, platformMinimum) and frozen here.
    *
@@ -1215,6 +1250,68 @@ export interface Match {
   effectiveCapturePolicy?: CapturePolicy;
   capturePolicyBoundAt?: string;
   createdAt: string;
+}
+
+/**
+ * A result decided off the field, with the ruling that decided it.
+ *
+ * Grassroots leagues run on these constantly — a club fails to show, fields a suspended
+ * player, or a tie is abandoned and awarded. Before this existed the result model could only
+ * describe what happened ON the field, so a league awarding a 3-0 walkover had nowhere to put
+ * it: the fixture sat unresolved and GoalPlace's table stayed permanently one result behind
+ * the league's own. That is the fastest way to lose a pilot, because the league keeps its
+ * spreadsheet and the spreadsheet becomes the real table.
+ */
+export type AwardedResultReason =
+  /** A club did not field a team. The opponent is awarded the win. */
+  | 'forfeit'
+  /** The fixture was never played and is awarded without being rescheduled. */
+  | 'walkover'
+  /** Played, but the result is overturned — an ineligible player, a rule breach. */
+  | 'ruling'
+  /** Abandoned mid-match and awarded rather than replayed. */
+  | 'abandoned';
+
+export interface AwardedResult {
+  reason: AwardedResultReason;
+  /** The league's own words. Rendered beside the result, so it is written for the public. */
+  note: string;
+  /** Who ruled. A user id, never a display name — names change, accountability should not. */
+  ruledByUserId: string;
+  ruledAt: string;
+  /** The audit entry recording the ruling, so the table can be traced back to a decision. */
+  auditEventId?: string;
+}
+
+/**
+ * A points change applied to a team's season total that no match produced.
+ *
+ * Discipline deductions, administrative penalties, and the occasional restoration on appeal.
+ * Modelled as its own season-scoped record rather than a field on the team, because it is an
+ * EVENT with an author and a reason, and because standings must stay recomputable from
+ * scratch: a stored total that has been decremented in place cannot be rebuilt, and this
+ * codebase's whole standings design turns on deterministic recomputation rather than
+ * incrementing counters.
+ *
+ * `delta` is signed. A deduction is negative.
+ */
+export interface PointsAdjustment {
+  id: string;
+  leagueId: string;
+  seasonId: string;
+  teamId: string;
+  delta: number;
+  reason: string;
+  createdByUserId: string;
+  createdAt: string;
+  auditEventId?: string;
+  /**
+   * Set when an adjustment is withdrawn rather than deleted. A rescinded adjustment stops
+   * counting but stays readable, for the same reason a superseded result is archived rather
+   * than mutated: the ruling and its reversal are both part of the season's record.
+   */
+  rescindedAt?: string;
+  rescindedByUserId?: string;
 }
 
 export interface MatchEvent {

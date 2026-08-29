@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Warning, CalendarBlank, Megaphone, SealCheck, Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { teamsInLeague, matchesInLeague } from '@/lib/league/leagueContext';
-import { buildLeagueStandings } from '@/lib/leagueModel';
+import { resolveLeagueStandings } from '@/lib/standings/resolve';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { GradientBanner } from '@/components/premium/GradientBanner';
 import { RichStandings } from '@/components/premium/RichStandings';
@@ -19,7 +19,7 @@ import { MatchCard } from '@/components/core/MatchCard';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { getSportTheme } from '@/lib/sportThemes';
 import { LeagueNoticeList } from '@/components/core/LeagueNoticeList';
-import type { Athlete, FeedPost, League, LeagueNotice, Match, Season, Team } from '@/types';
+import type { Athlete, FeedPost, League, LeagueNotice, Match, Season, StoredStanding, Team } from '@/types';
 import { SnapRow } from '@/components/ui/ScrollRail';
 
 const SPORT_BANNER: Record<string, 'brand' | 'gold' | 'broadcast' | 'pitch'> = {
@@ -36,7 +36,17 @@ type InitialLeaguePublicData = {
   athletes?: Athlete[];
   feedPosts?: FeedPost[];
   leagueNotices?: LeagueNotice[];
+  standings?: StoredStanding[];
 };
+
+/**
+ * The client match limit, named rather than inlined.
+ *
+ * It is passed to the standings resolver so that a fallback computation can tell a complete
+ * season from a page of one. Previously this number silently decided how much of a league's
+ * season appeared in its published table.
+ */
+const RELATED_RECORD_LIMIT = 120;
 
 export function LeaguePublic({
   leagueId,
@@ -54,9 +64,9 @@ export function LeaguePublic({
     [exact.leagues, initialData?.league, leagueId],
   );
   const related = useGoalPlaceData({
-    collections: ['teams', 'matches', 'seasons', 'athletes', 'leagueNotices'],
+    collections: ['teams', 'matches', 'seasons', 'athletes', 'leagueNotices', 'standings'],
     scope: { leagueId, audience: 'public' },
-    recordLimit: 120,
+    recordLimit: RELATED_RECORD_LIMIT,
   });
   const newsData = useGoalPlaceData({
     collections: ['feedPosts'],
@@ -68,6 +78,7 @@ export function LeaguePublic({
   const seasons = useMemo(() => related.seasons.length ? related.seasons : initialData?.seasons ?? [], [initialData?.seasons, related.seasons]);
   const athletes = useMemo(() => related.athletes.length ? related.athletes : initialData?.athletes ?? [], [initialData?.athletes, related.athletes]);
   const leagueNotices = useMemo(() => related.leagueNotices.length ? related.leagueNotices : initialData?.leagueNotices ?? [], [initialData?.leagueNotices, related.leagueNotices]);
+  const storedStandings = useMemo(() => related.standings.length ? related.standings : initialData?.standings ?? [], [initialData?.standings, related.standings]);
   const feedPosts = useMemo(() => newsData.feedPosts.length ? newsData.feedPosts : initialData?.feedPosts ?? [], [initialData?.feedPosts, newsData.feedPosts]);
   const loading = !initialData?.league && (exact.loading || (Boolean(league) && related.loading));
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
@@ -79,18 +90,37 @@ export function LeaguePublic({
   const leaders = useMemo(() => athletes.filter((athlete) => athlete.leagueId === leagueId).sort((a, b) => b.goalPlacePoints - a.goalPlacePoints).slice(0, 4), [athletes, leagueId]);
   const notices = useMemo(() => leagueNotices.filter((notice) => notice.leagueId === leagueId).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 4), [leagueId, leagueNotices]);
   const sportTheme = getSportTheme(league?.sport);
+  /**
+   * The table, from the server projection wherever one exists.
+   *
+   * This used to compute the whole table in the browser from `matches` — which is whatever
+   * page of the season the client had loaded, at most 120 documents, replacing the 240 the
+   * server had already sent. Past roughly 120 fixtures the published table was built from an
+   * arbitrary subset, and an anonymous visitor and a signed-in one saw different tables of
+   * the same league.
+   *
+   * `resolveLeagueStandings` prefers the stored projection and falls back to computing
+   * locally when a season has no rows yet — but the fallback now says so, and says whether
+   * the match list it used had hit its limit.
+   */
   const standings = useMemo(() => {
-    if (!league) return [];
+    if (!league) {
+      return { rows: [], source: 'computed' as const, provisional: false };
+    }
     const season = currentSeasonFor(seasons, league.id, league.currentSeasonId);
-    return buildLeagueStandings(lTeams, matchesInLeague(leagueId, matches), {
+    return resolveLeagueStandings({
+      stored: storedStandings,
       seasonId: season?.id,
+      teams: lTeams,
+      matches: matchesInLeague(leagueId, matches),
       scoring: season ? scoringForSeason(season, league.sport) : undefined,
+      matchLoadLimit: RELATED_RECORD_LIMIT,
     });
-  }, [league, lTeams, matches, seasons, leagueId]);
+  }, [league, lTeams, matches, seasons, leagueId, storedStandings]);
   // The club cards below the table read from this rather than the stored aggregates, so a
   // club cannot show one points total beside a table showing another.
   const standingByTeam = useMemo(
-    () => new Map(standings.map((row) => [row.teamId, row])),
+    () => new Map(standings.rows.map((row) => [row.teamId, row])),
     [standings],
   );
 
@@ -134,9 +164,27 @@ export function LeaguePublic({
           </span>
         </div>
         <DemoDataNote />
-        {standings.length ? (
+        {standings.provisional ? (
+          /**
+           * Said out loud, because the alternative is what this whole change removes.
+           *
+           * The old path could not distinguish a complete season from a page of one, so it
+           * rendered both as fact. A table that is quietly wrong is worse than one that
+           * admits it is partial — especially for a product whose proposition is verified
+           * truth.
+           */
+          <Card className="border-warning/30 bg-[var(--state-warning-bg)] p-4 text-sm text-muted" role="status">
+            <p className="font-semibold text-text-strong">This table may be incomplete.</p>
+            <p className="mt-1">
+              It was calculated from the {standings.rows.reduce((total, row) => total + row.played, 0) / 2} results
+              loaded on this page, and this league has more fixtures than one page holds. The
+              verified table is being rebuilt and will appear here shortly.
+            </p>
+          </Card>
+        ) : null}
+        {standings.rows.length ? (
           <RichStandings
-            rows={standings}
+            rows={standings.rows}
             matches={matches}
             teamById={teamById}
             sportById={(id) => String(teamById.get(id)?.sport ?? '')}

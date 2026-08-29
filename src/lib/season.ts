@@ -1,4 +1,8 @@
-import { Season, SeasonScoringRules, SportSlug, SportType } from '@/types';
+// Relative, not `@/`. This module is compiled into the Cloud Functions bundle through the
+// standings projection, where a path alias survives into the emitted CommonJS and fails at
+// require time — tsc resolves the alias, it does not rewrite it. `functions/scripts/verify-bundle.mjs`
+// fails the build if one reappears.
+import type { Season, SeasonScoringRules, SportSlug, SportType } from '../types';
 
 /**
  * Season helpers and the per-sport scoring defaults.
