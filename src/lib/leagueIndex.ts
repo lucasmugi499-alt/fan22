@@ -3,6 +3,7 @@
 // require time. `functions/scripts/verify-bundle.mjs` fails the build if one reappears.
 import type { Athlete, League, Match, Roster, Team } from '../types';
 import { isOfficialMatch, isPlayedMatch } from './status';
+import { athleteRegisteredPosition } from './athleteIdentity';
 
 /**
  * The GoalPlace Index: what it is, and what it used to be.
@@ -134,7 +135,11 @@ export function computeLeagueIndex(inputs: LeagueIndexInputs): LeagueIndexResult
    * athlete's own persona and are nothing to do with how well the league is run.
    */
   const registered = leagueAthletes.filter((athlete) => (
-    Boolean(athlete.registeredPosition || athlete.position) && Boolean(athlete.teamId)
+    // Through the accessor, not `athlete.position`. The deprecated pre-ADR-001 field is read
+    // via `athleteRegisteredPosition`, which is what `data:guard` enforces — and the reason is
+    // the same one that matters here: a preferred position is the athlete's own and says
+    // nothing about whether the league registered them.
+    Boolean(athleteRegisteredPosition(athlete)) && Boolean(athlete.teamId)
   ));
 
   const seasonRosters = rosters.filter((roster) => (

@@ -2285,3 +2285,152 @@ describe('field capture adds no client write surface', () => {
     );
   });
 });
+
+/**
+ * The league table, and the rulings that move it.
+ *
+ * Both collections were added when standings became a server projection. They are the two
+ * places a league table can be changed, so they are the two that must not be client-writable.
+ *
+ * `standings` existed before as an unmaintained seeded artifact that nothing read. It is now
+ * the published table — rebuilt from the season's official results after every finalization —
+ * which turns `write: if false` from incidental into load-bearing.
+ */
+describe('the published league table is server-owned', () => {
+  async function seedTable() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'standings/season_001_team_a'), {
+        id: 'season_001_team_a',
+        leagueId: 'league_001',
+        seasonId: 'season_001',
+        sport: 'football',
+        teamId: 'team_a',
+        teamName: 'Kampala Stars',
+        played: 8, wins: 6, draws: 2, losses: 0,
+        pointsFor: 20, pointsAgainst: 7, difference: 13, points: 20, rank: 1,
+      });
+      await setDoc(doc(ctx.firestore(), 'pointsAdjustments/adjustment_001'), {
+        id: 'adjustment_001',
+        leagueId: 'league_001',
+        seasonId: 'season_001',
+        teamId: 'team_a',
+        delta: -3,
+        reason: 'Fielding a suspended player.',
+        createdByUserId: 'user_league',
+        createdAt: '2026-06-01T00:00:00.000Z',
+      });
+    });
+  }
+
+  it('is publicly readable, including to an anonymous visitor', async () => {
+    await seedTable();
+    // The whole point of the projection is that everyone sees the same table. An anonymous
+    // visitor previously got the server's 240-match slice and a signed-in one the client's
+    // 120-match slice, and past ~120 fixtures they disagreed.
+    await assertSucceeds(
+      getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'standings/season_001_team_a'))
+    );
+  });
+
+  it('denies a club rewriting its own row', async () => {
+    await seedTable();
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'standings/season_001_team_a'), { points: 99 }, { merge: true })
+    );
+  });
+
+  it('denies the governing league rewriting the table directly', async () => {
+    await seedTable();
+    // A league changes its table by ruling on a result or issuing an adjustment, both of
+    // which are audited commands. Editing the projection would be changing the answer
+    // without changing anything it is derived from — and the next recomputation would
+    // silently revert it.
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'standings/season_001_team_a'), { points: 99 }, { merge: true })
+    );
+  });
+
+  it('denies inventing a row for a club that is not in the league', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'standings/season_001_team_forged'), {
+        leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_forged', points: 99, rank: 1,
+      })
+    );
+  });
+
+  it('denies deleting a row, which is how a club would remove a loss', async () => {
+    await seedTable();
+    await assertFails(deleteDoc(doc(asUser(TEAM_A_ADMIN), 'standings/season_001_team_a')));
+    await assertFails(deleteDoc(doc(asUser(LEAGUE_ADMIN), 'standings/season_001_team_a')));
+  });
+});
+
+describe('points adjustments are a ruling, not a client write', () => {
+  async function seedAdjustment() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pointsAdjustments/adjustment_001'), {
+        id: 'adjustment_001',
+        leagueId: 'league_001',
+        seasonId: 'season_001',
+        teamId: 'team_a',
+        delta: -3,
+        reason: 'Fielding a suspended player.',
+        createdByUserId: 'user_league',
+        createdAt: '2026-06-01T00:00:00.000Z',
+      });
+    });
+  }
+
+  it('is publicly readable, because the table footnotes it', async () => {
+    await seedAdjustment();
+    // A club docked six points is entitled to have the reason visible beside the
+    // consequence, and a rival asked to accept the standings needs to see why.
+    await assertSucceeds(
+      getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'pointsAdjustments/adjustment_001'))
+    );
+  });
+
+  it('denies a club awarding itself points', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'pointsAdjustments/forged'), {
+        leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_a',
+        delta: 12, reason: 'A gift.', createdByUserId: TEAM_A_ADMIN,
+      })
+    );
+  });
+
+  it('denies a club docking a rival', async () => {
+    await assertFails(
+      setDoc(doc(asUser(TEAM_A_ADMIN), 'pointsAdjustments/forged_rival'), {
+        leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_b',
+        delta: -12, reason: 'Sabotage.', createdByUserId: TEAM_A_ADMIN,
+      })
+    );
+  });
+
+  it('denies the governing league writing one directly', async () => {
+    // A deduction changes a league table, so it goes through the same class of command as
+    // every other decision that changes one: capability re-checked, reason required, audit
+    // entry written. A direct write would skip all three.
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'pointsAdjustments/forged_by_league'), {
+        leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_a',
+        delta: -6, reason: 'Discipline.', createdByUserId: LEAGUE_ADMIN,
+      })
+    );
+  });
+
+  it('denies rescinding one from a browser', async () => {
+    await seedAdjustment();
+    await assertFails(
+      setDoc(doc(asUser(LEAGUE_ADMIN), 'pointsAdjustments/adjustment_001'), {
+        rescindedAt: '2026-06-08T00:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('denies deleting one, so a ruling cannot be erased', async () => {
+    await seedAdjustment();
+    await assertFails(deleteDoc(doc(asUser(LEAGUE_ADMIN), 'pointsAdjustments/adjustment_001')));
+  });
+});

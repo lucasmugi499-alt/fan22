@@ -82,9 +82,30 @@ function missingFirebase<T>(fallback: T): T {
   return fallback;
 }
 
+/**
+ * A ceiling for a collection read whose caller named none.
+ *
+ * Several loaders — `getLeagues`, `getSeasons`, `getFinalizations`, `getVerifications`,
+ * `getSponsors` — took no limit at all, so each one was a full-collection scan on every page
+ * view that touched it. That is fine at demo scale and becomes Firestore spend proportional to
+ * traffic times catalogue size as the catalogue grows.
+ *
+ * Applied here rather than at each call site so the guarantee is structural: no query can
+ * escape it by being written without a limit, which is exactly how the unbounded ones arose.
+ * A caller that genuinely needs a different bound passes its own `limitQuery`, and that wins.
+ *
+ * 500 is deliberately generous — high enough that nothing currently truncates, low enough that
+ * a runaway collection cannot become an unbounded read. It is a backstop, not a page size:
+ * paginating the surfaces that need it is separate work, and this must not disguise the need.
+ */
+const DEFAULT_COLLECTION_LIMIT = 500;
+
 async function readCollection<T>(name: FirestoreCollectionName, constraints: QueryConstraint[] = []) {
   if (!isFirebaseConfigured) return missingFirebase([] as T[]);
-  return getCollectionDocs<T>(name, constraints);
+  const bounded = constraints.some((constraint) => constraint.type === 'limit')
+    ? constraints
+    : [...constraints, limitQuery(DEFAULT_COLLECTION_LIMIT)];
+  return getCollectionDocs<T>(name, bounded);
 }
 
 async function readDoc<T>(collectionName: string, id: string) {

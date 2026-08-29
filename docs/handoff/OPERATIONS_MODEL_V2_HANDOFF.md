@@ -3,7 +3,7 @@
 **Purpose.** If the agent working on this stops mid-migration, another one picks it up from
 this file alone. It records what is done, what is left, how to do it, and the traps.
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-08-29
 **Head:** `5a9e121`+, on `main`, pushed.
 **Contract:** `docs/RESULT_ENGINE_V2_MILESTONE.md` is the deploy runbook. The Handbook is the
 architectural contract. This file is the state of the work.
@@ -253,12 +253,13 @@ Commands: `release:unreported-sweep` (dry-run unless `--apply`) and
 
 ### 4.3 Smaller things
 
-- **`apphosting.beta.yaml` and `apphosting.production.yaml` do not declare
-  `GOALPLACE_TEAM_AUTHORITY_STAGE`,** so both would run at the `frozen` default. That is the
-  correct state for environments that have not drained, and it must be a decision rather than
-  an oversight when either is promoted. `apphosting.demo.yaml` was in the same position and
-  was fixed: it is now declared in both demo files, and
-  `scripts/lib/deploymentPlanes.test.ts` fails if they disagree.
+- ~~**`apphosting.beta.yaml` and `apphosting.production.yaml` do not declare
+  `GOALPLACE_TEAM_AUTHORITY_STAGE`.**~~ **Closed 2026-08-29.** Both now declare it explicitly,
+  along with the three finalizer gates and the gateway secret flag, rather than inheriting
+  them from a base named for no environment. `scripts/lib/deploymentPlanes.test.ts` covers all
+  three overlays instead of demo alone. The base `apphosting.yaml` was also emptied of project
+  identity and now declares `GOALPLACE_ENVIRONMENT: unconfigured`, which
+  `assertSafeProductionEnvironment()` rejects at build — see §10.
 - Storage rules were not re-released this session. They are unchanged, so this is
   bookkeeping, not a gap.
 - Six of the nine deployed Functions carry older source/environment generations. None consumes
@@ -475,3 +476,92 @@ both release verifiers remained green.
 Production remains a separate decision: set the authority stage deliberately for that
 environment, rerun its drain/migration gates, and do not infer readiness from Demo. League
 post-match entry is still `off` and needs its own future canary if it is to be enabled.
+
+
+---
+
+## 10. Production audit remediation, 2026-08-29
+
+A separate adversarial audit of the whole product ran at commit `a41e2f5` and produced 24
+findings, `GP-01` to `GP-24`. It found **no P0**: no privilege escalation, no tenant bleed, no
+client-authored official result, no role-claim bypass. What it found instead was interface and
+configuration defects. This section records what that pass changed **in this repo only** —
+nothing below has been deployed to any plane, and none of it has been cloud-verified.
+
+Status vocabulary from §0 applies. Everything here is **implemented** and **tested**. Nothing
+is migrated, deployed, enabled or cloud-verified.
+
+### What changed
+
+| Finding | Change |
+|---|---|
+| `GP-01`, `GP-10` | Standings became a server projection. `standings/{seasonId}_{teamId}` is rebuilt from scratch from the season's official results after every finalization, and every table surface reads it. The browser previously computed the published table from at most 120 loaded matches, replacing the 240 the server had sent — so past ~120 fixtures the table was built from an arbitrary subset, and anonymous and signed-in visitors saw different tables of the same league. The projection runs **after** the finalization transaction, never inside it: that transaction is write-budgeted and already refuses oversized submissions. |
+| `GP-03` | The club console no longer renders write controls the authority model refuses. A sunset banner existed at the layout level and the screens beneath it kept every Save button, so the page said read-only and then offered one. Controls now gate on the projected capability index rather than the role claim, which also means a league operator holding `league.team.manage` still sees them. |
+| `GP-04` | Both result sheets resolve on any terminal outcome or a 20-second timeout, and render "sent for review" and "still processing" distinctly. They previously cleared `busy` only on a thrown error, so every non-official outcome the finalizer legitimately produces left the sheet hanging — with the decision already saved. |
+| `GP-05` | The GoalPlace Index is computed hourly in `convergeLifecycle` from four measured ratios, and the league page shows the counts behind each. It was a stored constant; every league the platform created got the literal `45`, and the seeded leagues carried 797 to 882 in +17 steps. |
+| `GP-06` | `server/notifications/notify.ts` is the one writer, with deterministic ids so a retried trigger is a no-op. Wired to finalization, reconciliation exceptions and confirmation-overdue escalation. Both fantasy `.add()` calls migrated. |
+| `GP-07` | `awardedResult` provenance on a match and a season-scoped `pointsAdjustments` collection, both behind `league.result.enter` with a required reason and an audit entry. Applied as a final term after every match is counted, so the standings computation stays order independent. |
+| `GP-08`, `GP-09` | The un-overlaid `apphosting.yaml` declares `unconfigured` and carries no project identity; `assertSafeProductionEnvironment()` rejects it at build. Every deploy preflights its resolved project against `config/environments.json`. The reset scripts assert the same way. |
+| `GP-11` | A missing scheduler credential returns 503 and logs, rather than a 401 indistinguishable from a bad secret. `/api/environment` reports which routes cannot authenticate. |
+| `GP-12`, `GP-13` | Every function declares `maxInstances`; the payment callbacks are rate limited by IP and by intent id. |
+| Phase 5 (part) | `readCollection` applies a default 500-document ceiling when a caller names none. `getLeagues`, `getSeasons`, `getFinalizations`, `getVerifications` and `getSponsors` took no limit at all, so each was a full-collection scan on every page view. A backstop, not a page size — paginating the surfaces that need it is separate work. |
+| `GP-14`, `GP-15`, `GP-17` to `GP-22` | Scoring duplication removed, `uuid` pinned under `firebase-admin` and `gaxios` (prod audit clean), `firestore.rules` renamed `.superseded`, dead client writers deleted, the stale `athletePayees` comment corrected, the demo password env var de-prefixed with a guard test, `proxy.ts` compares in constant time. |
+
+### Where the audit was wrong, and it matters
+
+Three findings did not survive checking. Recorded because the report will be read again:
+
+- **`GP-03`** said no sunset notice existed anywhere in the console. One did, at
+  `src/app/team-admin/layout.tsx`, wrapping every page. The auditor checked
+  `TeamConsoleHome.tsx`. The real defect was worse than described: the banner said read-only
+  and the screens still rendered every write control.
+- **`GP-11`** listed three routes as permanently unauthenticated-out. Only
+  `/api/payments/reconcile` is — the two fantasy routes authenticate with
+  `GOALPLACE_FANTASY_SCORING_SECRET`, which every deployed overlay backs with a Secret Manager
+  reference. And `reconcilePaymentIntents` is deliberately undeployed, so nothing is currently
+  broken by it.
+- **`GP-21`** reported zero `aria-live` regions and reduced-motion honoured once. `sonner`
+  renders `aria-live="polite"` for every toast, and `globals.css` has a comprehensive
+  `prefers-reduced-motion` block. The focus-visible count missed a global rule in `@layer base`.
+
+### The trap this pass hit
+
+**Relative imports, again.** `leagueModel.ts`, `matchRecord.ts`, `status.ts` and `season.ts`
+had never been in the Functions bundle. The standings projection pulled them in, and
+`verify-bundle` failed the build on `require("@/lib/status")`. This is the same trap §6 already
+records; it now applies to four more files, and the note is on each of them.
+
+### Not done, and not doable from here
+
+**`GP-02` — beta and production have no Firebase projects.** 26 `REPLACE_WITH_` markers remain
+across the two overlays, `config/environments.json` and `.firebaserc`. This needs a Google
+account with billing. `docs/ENVIRONMENT_PROVISIONING.md` is the runbook; the readiness gate and
+the deploy preflight both refuse until it is done, so a half-finished provisioning cannot ship.
+
+Also still open: `GP-16` (enable App Check on demo first, so beta inherits a proven config
+rather than being the first environment to enforce it), `GP-23` (image optimization awaits a
+patched `sharp`), `GP-24` (unified audit read model), and Phase 5's bounded collection reads.
+
+### Verification
+
+`tsc` clean, `eslint` 0 errors and the same 8 pre-existing warnings, **1877 unit** tests
+across 189 files (up from 1735/179), **166 Rules** (up from 155) and **29 integration**,
+functions typecheck and build with no unresolved aliases, `npm audit --omit=dev` 0 findings,
+`demo:validate` passing against a recomputed checksum.
+
+`next build` also compiles: 124 static pages, no errors. The audit declined to run it rather
+than overwrite an existing 2.4 GB `.next` during a read-only pass, which was the right call for
+an audit and the wrong one for a change of this size.
+
+One caveat worth recording: `src/rules/storage.rules.test.ts` has a case that uploads 16 MB to
+the Storage emulator, and it timed out once inside a full `deploy:ready` chain while passing in
+6.7s on its own, twice. It is timing-sensitive under load, pre-existing, and untouched by this
+work — but a `deploy:ready` that fails there is very likely that flake rather than a
+regression.
+
+The audit could not run the Rules and integration suites — its environment could not reach the
+emulator jar. This machine can: Java 21 and both jars are in `~/.cache/firebase/emulators`, so
+`npm run test:rules` and `npm run test:integration` work here and both were run. The eleven new
+Rules cases cover the two collections this pass added — that `standings` and `pointsAdjustments`
+are publicly readable, and that neither a club nor its governing league can write, rescind or
+delete either from a browser.

@@ -1,4 +1,7 @@
-import type { Athlete } from '@/types';
+// Relative, not `@/`. This module is compiled into the Cloud Functions bundle through the
+// league index projection, where a path alias survives into the emitted CommonJS and fails at
+// require time. `functions/scripts/verify-bundle.mjs` fails the build if one reappears.
+import type { Athlete } from '../types';
 
 /**
  * The athlete's registered identity, read from whichever field carries it.
