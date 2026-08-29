@@ -29,6 +29,15 @@ function statusTone(status?: User['accountStatus']) {
   return 'neutral';
 }
 
+/**
+ * The three lifecycle buttons, sized to survive a 320px grid cell.
+ *
+ * `size="sm"` carries `px-4` and a leading icon, which together need about 105px — more than a
+ * third of a phone's width, so the three buttons overlapped each other rather than shrinking.
+ * The icon is decoration next to a one-word label, so it waits for a wider screen.
+ */
+const LIFECYCLE_ACTION = 'min-w-0 px-2 [&>svg]:hidden sm:px-4 sm:[&>svg]:block';
+
 export function PeopleDirectory() {
   const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
@@ -129,14 +138,24 @@ export function PeopleDirectory() {
                     </div>
                   }
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" icon={CheckCircle} onClick={() => setAccountStatus(user, 'active')} disabled={savingUserId === user.id || accountStatus === 'active'}>
+                {/*
+                  One row of controls, not three.
+                  
+                  Wrapped, these three buttons stacked at phone width and every account became
+                  about 390px tall, which turned eighty rows into a page some 31,000px long. It
+                  also meant scrolling the directory dragged a red Disable past the thumb once
+                  per account. The audit reason above refuses an action without it, so a stray
+                  tap is bounded rather than free, but the reason stays armed until it is spent
+                  and there is no reason to make the target that large on the way past.
+                */}
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <Button size="sm" variant="secondary" className={LIFECYCLE_ACTION} icon={CheckCircle} onClick={() => setAccountStatus(user, 'active')} disabled={savingUserId === user.id || accountStatus === 'active'}>
                     Activate
                   </Button>
-                  <Button size="sm" variant="secondary" icon={Warning} onClick={() => setAccountStatus(user, 'suspended')} disabled={savingUserId === user.id || accountStatus === 'suspended'}>
+                  <Button size="sm" variant="secondary" className={LIFECYCLE_ACTION} icon={Warning} onClick={() => setAccountStatus(user, 'suspended')} disabled={savingUserId === user.id || accountStatus === 'suspended'}>
                     Suspend
                   </Button>
-                  <Button size="sm" variant="danger" icon={Prohibit} onClick={() => setAccountStatus(user, 'disabled')} disabled={savingUserId === user.id || accountStatus === 'disabled'}>
+                  <Button size="sm" variant="danger" className={LIFECYCLE_ACTION} icon={Prohibit} onClick={() => setAccountStatus(user, 'disabled')} disabled={savingUserId === user.id || accountStatus === 'disabled'}>
                     Disable
                   </Button>
                 </div>

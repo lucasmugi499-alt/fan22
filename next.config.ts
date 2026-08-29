@@ -44,18 +44,25 @@ const SHARED_DIRECTIVES = [
   "frame-src 'self' https://*.firebaseapp.com",
 ];
 
+/*
+ * `apis.google.com` is Firebase Auth, not an analytics extra.
+ *
+ * The SDK loads `apis.google.com/js/api.js` to host the auth iframe that `frame-src` above
+ * already anticipates, and the policy was allowing the frame while blocking the script that
+ * creates it. Live page loads carried the violation in the console.
+ */
 /** Applied by the browser. `unsafe-eval` is dropped in production. */
 const enforcedPolicy = [
   ...SHARED_DIRECTIVES,
   isProduction
-    ? "script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googletagmanager.com",
+    ? "script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://apis.google.com"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googletagmanager.com https://apis.google.com",
 ].join("; ");
 
 /** The next step, collected as violations before it is ever enforced. */
 const proposedPolicy = [
   ...SHARED_DIRECTIVES,
-  "script-src 'self' https://www.gstatic.com https://www.googletagmanager.com",
+  "script-src 'self' https://www.gstatic.com https://www.googletagmanager.com https://apis.google.com",
 ].join("; ");
 
 const securityHeaders = [
