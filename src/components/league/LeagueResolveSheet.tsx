@@ -10,6 +10,8 @@ import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import type { Match, ResultSubmission, Team } from '@/types';
+import { useFinalizationOutcome } from '@/lib/finalization/useFinalizationOutcome';
+import Link from 'next/link';
 
 /**
  * League adjudication of a result exception. The league decides (uphold, correct, reject);
@@ -36,13 +38,29 @@ export function LeagueResolveSheet({
   const [submission, setSubmission] = useState<ResultSubmission>();
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string>();
-  const [busy, setBusy] = useState(false);
   const [homeScore, setHomeScore] = useState('');
   const [awayScore, setAwayScore] = useState('');
   const [note, setNote] = useState('');
   const homeName = home?.name ?? 'Home';
   const awayName = away?.name ?? 'Away';
   const actorUserId = currentUser?.uid ?? userProfile?.uid;
+  /**
+   * Subscribed to the OUTCOME, not to one value of it.
+   *
+   * `busy` used to be cleared only by a thrown error, and success was inferred solely from
+   * `status === 'official'`. Finalization legitimately produces three other outcomes — an
+   * activation gate set to off or canary, a blocking reconciliation exception, an oversize
+   * refusal — and in every one of them this sheet sat at "Saving decision..." forever with no
+   * escape but closing it. The decision had already been saved, so an admin who assumed it
+   * failed and retried would act twice on the same match.
+   */
+  const outcome = useFinalizationOutcome({
+    matchId: match.id,
+    leagueId: match.leagueId,
+    status: submission?.status,
+    isDemoMode,
+  });
+  const busy = outcome.phase === 'waiting';
 
   useEffect(
     () =>
@@ -70,11 +88,11 @@ export function LeagueResolveSheet({
   );
 
   useEffect(() => {
-    if (submission?.status !== 'official' || !busy) return;
+    if (outcome.phase !== 'official') return;
     toast.success('Finalized as the official result.');
     onComplete?.();
     onClose();
-  }, [busy, onClose, onComplete, submission?.status]);
+  }, [onClose, onComplete, outcome.phase]);
 
   async function resolve(decision: 'uphold' | 'correct' | 'reject') {
     if (!actorUserId) {
@@ -94,7 +112,7 @@ export function LeagueResolveSheet({
       return;
     }
 
-    setBusy(true);
+    outcome.start();
     try {
       await provider.resolveDisputedSubmission({
         matchId: match.id,
@@ -106,6 +124,10 @@ export function LeagueResolveSheet({
         ...(note.trim() ? { note: note.trim() } : {}),
       });
       if (decision === 'reject') {
+        // Rejection is terminal on its own: nothing is finalized, so there is no outcome to
+        // wait for. Ending the wait explicitly keeps the sheet from timing out on a decision
+        // that already completed.
+        outcome.reset();
         toast('Result rejected. A fresh submission can replace it.');
         onComplete?.();
         onClose();
@@ -114,17 +136,17 @@ export function LeagueResolveSheet({
       toast('Decision recorded. GoalPlace256 is finalizing the official result.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The decision could not be saved.');
-      setBusy(false);
+      outcome.reset();
     }
   }
 
   async function retryFinalization() {
-    setBusy(true);
+    outcome.start();
     try {
       await provider.finalizeResultSubmission(match.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Finalization could not be retried.');
-      setBusy(false);
+      outcome.reset();
     }
   }
 
@@ -145,7 +167,8 @@ export function LeagueResolveSheet({
       title="Resolve result"
       description={`${homeName} vs ${awayName}`}
       footer={
-        actionable ? (
+        outcome.phase === 'review' || outcome.phase === 'pending' ? null
+        : actionable ? (
           <div className="space-y-2">
           <Button block icon={SealCheck} onClick={() => resolve('uphold')} disabled={busy}>
             {busy ? 'Saving decision...' : 'Uphold and finalize'}
@@ -172,7 +195,47 @@ export function LeagueResolveSheet({
         ) : null
       }
     >
-      {!loaded ? (
+      {outcome.phase === 'review' || outcome.phase === 'pending' ? (
+        /**
+         * The two outcomes that used to be an indefinite spinner.
+         *
+         * Both say plainly that the DECISION was saved, because that is the fact an admin
+         * needs in order not to submit it twice. Neither is worded as a failure: an exception
+         * is the finalizer refusing to publish a contradiction, and a slow trigger is a slow
+         * trigger.
+         */
+        <div className="space-y-4">
+          {outcome.phase === 'review' ? (
+            <div className="rounded-[var(--radius-md)] border border-warning/30 bg-[var(--state-warning-bg)] p-4 text-sm">
+              <p className="font-semibold text-text-strong">Sent for review.</p>
+              <p className="mt-1 text-muted">
+                Your decision was saved. GoalPlace256 could not publish an official result
+                because the recorded events and the score disagree, so the match has been
+                raised as an exception for a human to settle. Nothing was published, and you
+                do not need to decide again.
+              </p>
+              <Link
+                href={`/league-admin/verification?exception=${outcome.exceptionId ?? ''}`}
+                className="mt-3 inline-block font-medium text-brand underline underline-offset-2"
+              >
+                Open the exception
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-[var(--radius-md)] border border-border-strong bg-surface-2 p-4 text-sm">
+              <p className="font-semibold text-text-strong">Decision saved. Still finalizing.</p>
+              <p className="mt-1 text-muted">
+                The result has not been stamped official yet. This is normal when finalization
+                is queued or paused for review. Do not submit the decision again — it is
+                recorded, and the table will update on its own.
+              </p>
+            </div>
+          )}
+          <Button block variant="secondary" onClick={() => { outcome.reset(); onComplete?.(); onClose(); }}>
+            Close
+          </Button>
+        </div>
+      ) : !loaded ? (
         <p className="text-sm text-muted">Loading the submitted result...</p>
       ) : loadError ? (
         <div className="rounded-[var(--radius-md)] border border-[var(--state-error)]/30 bg-[var(--state-error-bg)] p-3 text-sm text-[var(--state-error)]">

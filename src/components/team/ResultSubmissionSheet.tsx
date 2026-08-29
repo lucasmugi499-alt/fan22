@@ -20,6 +20,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { dataProvider } from '@/data/dataProvider';
 import { mockProvider } from '@/data/providers/mockProvider';
 import { canSubmitResultFor } from '@/lib/resultSubmission';
+import { useFinalizationOutcome } from '@/lib/finalization/useFinalizationOutcome';
 import { isOfficialMatch } from '@/lib/status';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { uploadMatchEvidence } from '@/lib/firebase/storage';
@@ -31,7 +32,15 @@ import {
 } from '@/lib/offline';
 import type { AthleteStatLine, Match, ResultSubmission, ScorerEntry, SportSlug, Team } from '@/types';
 
-type Stage = 'idle' | 'saving' | 'finalizing';
+/**
+ * `finalizing` is no longer a state this component owns.
+ *
+ * It used to be set on confirm and cleared only by a thrown error, so any finalization that
+ * did not produce an official result left the sheet reading "Finalizing..." indefinitely —
+ * the same hang as the league adjudication sheet, for the same reason. The wait is now owned
+ * by `useFinalizationOutcome`, which resolves on any terminal outcome or a timeout.
+ */
+type Stage = 'idle' | 'saving';
 type Mode = 'submit' | 'respond' | 'waiting' | 'review' | 'view';
 
 /**
@@ -73,6 +82,21 @@ export function ResultSubmissionSheet({
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [queued, setQueued] = useState(false);
+  /**
+   * The wait for a finalization outcome, shared with the league adjudication sheet.
+   *
+   * Same defect, same shape: `stage === 'finalizing'` was cleared only on a thrown error, so
+   * every non-official outcome the finalizer legitimately produces — an activation gate set
+   * to off or canary, a blocking reconciliation exception, an oversize refusal, a slow
+   * trigger — left this sheet reading "Finalizing..." with no escape but closing it.
+   */
+  const outcome = useFinalizationOutcome({
+    matchId: match.id,
+    leagueId: match.leagueId,
+    status: submission?.status,
+    isDemoMode,
+  });
+  const finalizing = outcome.phase === 'waiting';
   const [online, setOnline] = useState(true);
   const { athletes } = useGoalPlaceData({
     collections: ['athletes'],
@@ -109,11 +133,11 @@ export function ResultSubmissionSheet({
   );
 
   useEffect(() => {
-    if (submission?.status !== 'official' || stage !== 'finalizing') return;
+    if (outcome.phase !== 'official') return;
     toast.success('Finalized as the official result by GoalPlace256.');
     onComplete?.();
     onClose();
-  }, [onClose, onComplete, stage, submission?.status]);
+  }, [onClose, onComplete, outcome.phase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,13 +326,13 @@ export function ResultSubmissionSheet({
       toast.error('Your account is not ready to confirm this result.');
       return;
     }
-    setStage('finalizing');
+    outcome.start();
     try {
       await provider.confirmResultSubmission(match.id, actorUserId);
       toast('Confirmed. GoalPlace256 is finalizing the official record.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The result could not be confirmed.');
-      setStage('idle');
+      outcome.reset();
     }
   }
 
@@ -334,12 +358,12 @@ export function ResultSubmissionSheet({
   }
 
   async function retryFinalization() {
-    setStage('finalizing');
+    outcome.start();
     try {
       await provider.finalizeResultSubmission(match.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Finalization could not be retried.');
-      setStage('idle');
+      outcome.reset();
     }
   }
 
@@ -369,15 +393,16 @@ export function ResultSubmissionSheet({
       title={title}
       description={`${homeName} vs ${awayName}`}
       footer={
+        outcome.phase === 'review' || outcome.phase === 'pending' ? null :
         mode === 'submit' ? (
           <div className="flex gap-2">
             {submitStep > 0 ? (
-              <Button variant="secondary" icon={ArrowLeft} onClick={() => setSubmitStep((step) => step - 1)} disabled={stage !== 'idle'}>
+              <Button variant="secondary" icon={ArrowLeft} onClick={() => setSubmitStep((step) => step - 1)} disabled={stage !== 'idle' || finalizing}>
                 Back
               </Button>
             ) : null}
             {submitStep < 5 ? (
-              <Button block iconTrailing={ArrowRight} onClick={() => setSubmitStep((step) => step + 1)} disabled={stage !== 'idle'}>
+              <Button block iconTrailing={ArrowRight} onClick={() => setSubmitStep((step) => step + 1)} disabled={stage !== 'idle' || finalizing}>
                 Continue
               </Button>
             ) : (
@@ -385,7 +410,7 @@ export function ResultSubmissionSheet({
                 block
                 icon={PaperPlaneTilt}
                 onClick={submit}
-                disabled={stage !== 'idle' || !canSubmitResultFor(match)}
+                disabled={stage !== 'idle' || finalizing || !canSubmitResultFor(match)}
               >
                 {stage === 'saving' ? 'Submitting...' : online ? 'Submit final report' : 'Save offline'}
               </Button>
@@ -393,21 +418,51 @@ export function ResultSubmissionSheet({
           </div>
         ) : mode === 'respond' ? (
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Warning} onClick={disputeResult} disabled={stage !== 'idle'}>
+            <Button variant="secondary" icon={Warning} onClick={disputeResult} disabled={stage !== 'idle' || finalizing}>
               Dispute
             </Button>
-            <Button block icon={SealCheck} onClick={confirmResult} disabled={stage !== 'idle'}>
-              {stage === 'finalizing' ? 'Finalizing...' : 'Confirm'}
+            <Button block icon={SealCheck} onClick={confirmResult} disabled={stage !== 'idle' || finalizing}>
+              {finalizing ? 'Finalizing...' : 'Confirm'}
             </Button>
           </div>
         ) : mode === 'waiting' && submission?.status === 'confirmed' ? (
-          <Button block icon={SealCheck} onClick={retryFinalization} disabled={stage !== 'idle'}>
-            {stage === 'finalizing' ? 'Finalizing...' : 'Finalize now'}
+          <Button block icon={SealCheck} onClick={retryFinalization} disabled={stage !== 'idle' || finalizing}>
+            {finalizing ? 'Finalizing...' : 'Finalize now'}
           </Button>
         ) : null
       }
     >
-      {!loaded ? (
+      {outcome.phase === 'review' || outcome.phase === 'pending' ? (
+        /**
+         * The two outcomes that used to be an indefinite "Finalizing...".
+         *
+         * Both lead with the fact that the submission was SAVED, because that is what stops a
+         * club submitting the same result twice. Neither is worded as a failure.
+         */
+        <div className="space-y-4">
+          {outcome.phase === 'review' ? (
+            <div className="rounded-[var(--radius-md)] border border-warning/30 bg-[var(--state-warning-bg)] p-4 text-sm">
+              <p className="font-semibold text-text-strong">Sent to your league for review.</p>
+              <p className="mt-1 text-muted">
+                Your submission was saved. It could not be published automatically because the
+                recorded events and the score disagree, so your league will settle it. Nothing
+                was published, and you do not need to submit it again.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-[var(--radius-md)] border border-border-strong bg-surface-2 p-4 text-sm">
+              <p className="font-semibold text-text-strong">Saved. Still finalizing.</p>
+              <p className="mt-1 text-muted">
+                The result is not official yet. This is normal when finalization is queued.
+                Do not submit again — it is recorded, and the match will update on its own.
+              </p>
+            </div>
+          )}
+          <Button block variant="secondary" onClick={() => { outcome.reset(); onComplete?.(); onClose(); }}>
+            Close
+          </Button>
+        </div>
+      ) : !loaded ? (
         <p className="text-sm text-muted">Loading the result record...</p>
       ) : loadError ? (
         <div className="rounded-[var(--radius-md)] border border-[var(--state-error)]/30 bg-[var(--state-error-bg)] p-3 text-sm text-[var(--state-error)]">
