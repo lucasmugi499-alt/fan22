@@ -58,6 +58,9 @@ export function RichStandings({
 }) {
   const columns = standingColumns(sport);
   const leader = rows[0];
+  // Footnoted under the table rather than crammed into a column, so the reason is readable
+  // and the table keeps its shape on a phone.
+  const adjusted = rows.filter((row) => Boolean(row.adjustment));
   return (
     <div className="min-w-0 max-w-full overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-1 bezel-core">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -122,6 +125,20 @@ export function RichStandings({
                     <Link href={`/teams/${r.teamId}`} className="flex min-w-0 items-center gap-1.5 hover:underline sm:gap-2.5">
                       <span className="shrink-0"><Crest name={r.teamName} sport={teamSport} size={22} /></span>
                       <span className={cn('truncate font-semibold', mine ? 'text-brand' : 'text-text-strong')}>{r.teamName}</span>
+                      {/*
+                        A points adjustment has to be visible on the row it moved, or the table
+                        is quietly wrong in the reader's eyes: a club sitting below a rival it
+                        out-scored, with nothing on screen explaining why. Marked here and
+                        footnoted below, which is how a published table does it.
+                      */}
+                      {r.adjustment ? (
+                        <sup
+                          className="shrink-0 font-bold text-[var(--state-warning)]"
+                          title={`${r.adjustment > 0 ? '+' : ''}${r.adjustment} points by league ruling`}
+                        >
+                          *
+                        </sup>
+                      ) : null}
                     </Link>
                   </td>
                   {columns.map((column) => (
@@ -158,6 +175,19 @@ export function RichStandings({
           </tbody>
         </table>
       </div>
+      {adjusted.length ? (
+        <div className="border-t border-border px-3 py-2.5 text-xs text-muted">
+          {adjusted.map((row) => (
+            <p key={row.teamId}>
+              <span className="font-bold text-[var(--state-warning)]">*</span>{' '}
+              <span className="font-medium text-text-strong">{row.teamName}</span>{' '}
+              {row.adjustment > 0 ? 'awarded' : 'deducted'}{' '}
+              <span className="tabular-nums">{Math.abs(row.adjustment)}</span>{' '}
+              {Math.abs(row.adjustment) === 1 ? 'point' : 'points'} by league ruling.
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

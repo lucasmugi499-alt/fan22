@@ -2,6 +2,7 @@ import {
   Archive,
   Circle,
   Clock,
+  Gavel,
   NotePencil,
   Scales,
   SealCheck,
@@ -29,6 +30,8 @@ export type UiStateId =
   | 'overdue'
   | 'verified'
   | 'official'
+  /** Official, but decided by league ruling rather than played out. */
+  | 'awarded'
   | 'disputed'
   | 'evidence_requested'
   | 'rejected'
@@ -108,6 +111,24 @@ export const STATE: Record<UiStateId, StateDescriptor> = {
     explanation:
       'Finalised into the official record. It counts towards standings and official statistics.',
     owner: 'Verified by GoalPlace256',
+  },
+  /**
+   * An official result the LEAGUE decided rather than one played out.
+   *
+   * A separate state rather than a variant of `official`, because the two are equally official
+   * and differ in provenance — which is exactly what a reader needs to see. A 3-0 that nobody
+   * played, presented identically to a 3-0 that somebody did, is a table entry that cannot be
+   * questioned and should be.
+   */
+  awarded: {
+    id: 'awarded',
+    label: 'Awarded',
+    tone: 'verified',
+    icon: Gavel,
+    explanation:
+      'Decided by league ruling rather than played out — a forfeit, walkover or overturned '
+      + 'result. It counts towards standings in full, exactly like a played result.',
+    owner: 'Ruled by the league',
   },
   disputed: {
     id: 'disputed',
@@ -203,11 +224,13 @@ export function stateForSubmission(status: ResultSubmissionStatus): StateDescrip
  * A live match reads as live; otherwise the verification state governs, because a played
  * match whose result is unverified must never look settled.
  */
-export function stateForMatch(match: Pick<Match, 'status' | 'verificationStatus'>): StateDescriptor {
+export function stateForMatch(
+  match: Pick<Match, 'status' | 'verificationStatus'> & Partial<Pick<Match, 'awardedResult'>>,
+): StateDescriptor {
   if (match.status === 'live') return STATE.live;
   if (match.status === 'scheduled') return STATE.draft;
   if (match.status === 'cancelled') return STATE.archived;
-  return match.verificationStatus === 'verified'
-    ? STATE.official
-    : stateForVerification(match.verificationStatus);
+  if (match.verificationStatus !== 'verified') return stateForVerification(match.verificationStatus);
+  // Provenance, not status. Both are official; only one was played.
+  return match.awardedResult ? STATE.awarded : STATE.official;
 }
