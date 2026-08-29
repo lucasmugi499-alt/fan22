@@ -363,15 +363,137 @@ async function verifySchedulerOidc(request: Request) {
   return Boolean(email && allowedEmails.includes(email));
 }
 
+/**
+ * Whether the declared scheduler auth mode actually has a credential behind it.
+ *
+ * ## The failure this makes visible
+ *
+ * `safeSecretEquals` returns false when the EXPECTED value is undefined, which is correct
+ * and deliberate — a missing secret must never authorize anything. But it means a route whose
+ * credential was never declared returns 401 to every caller, forever, and looks exactly like
+ * a caller presenting the wrong secret. The Cloud Function logs the 401 and moves on. Nothing
+ * distinguishes "somebody is probing this endpoint" from "this endpoint has been switched off
+ * by omission since the day it shipped".
+ *
+ * `GOALPLACE_RECONCILIATION_SECRET` is in precisely that state: `functions/src/index.ts`
+ * declares it with `defineSecret` on the calling side, and no App Hosting overlay declares it
+ * on the receiving side. Half of a shared credential is declared. `reconcilePaymentIntents`
+ * is deliberately undeployed today, so nothing is currently broken by it — which is exactly
+ * why it would stay unnoticed until the day that function is turned on.
+ *
+ * Fail-closed is the right behaviour. Failing closed SILENTLY is the defect.
+ *
+ * Note the two fantasy routes are NOT in this state: they authenticate with
+ * `GOALPLACE_FANTASY_SCORING_SECRET`, which every deployed overlay backs with the Secret
+ * Manager reference `goalplaceFantasyScoringSecret`.
+ */
+export type SchedulerCredentialStatus = {
+  mode: 'oidc' | 'shared_secret';
+  operation: string;
+  /** The variable that must hold the credential for this route's declared mode. */
+  credentialVariable: string;
+  configured: boolean;
+};
+
+export function schedulerCredentialStatus(
+  options: SchedulerOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): SchedulerCredentialStatus {
+  if (env.GOALPLACE_SCHEDULER_AUTH_MODE === 'oidc') {
+    // OIDC has no secret; its credential is the allowlist of service account identities.
+    // An empty allowlist makes `verifySchedulerOidc` reject everything, which is the same
+    // permanent-401 shape as an undeclared secret.
+    const allowlist = (env.GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS ?? '')
+      .split(',')
+      .map((email) => email.trim())
+      .filter(Boolean);
+    return {
+      mode: 'oidc',
+      operation: options.operation,
+      credentialVariable: 'GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS',
+      configured: allowlist.length > 0
+        && !allowlist.some((email) => email.startsWith('REPLACE_WITH_')),
+    };
+  }
+
+  const credentialVariable = options.legacySecretEnv ?? 'GOALPLACE_SCHEDULER_SECRET';
+  return {
+    mode: 'shared_secret',
+    operation: options.operation,
+    credentialVariable,
+    configured: Boolean(env[credentialVariable]),
+  };
+}
+
 export async function requireSchedulerRequest(request: Request, options: SchedulerOptions) {
-  if (process.env.GOALPLACE_SCHEDULER_AUTH_MODE === 'oidc') {
+  const credential = schedulerCredentialStatus(options);
+
+  // 503, not 401. The caller did nothing wrong and retrying will never help — this
+  // deployment cannot authenticate any scheduler at all for this operation. Returning the
+  // same 401 as a bad secret is what made this indistinguishable from ordinary noise in the
+  // logs for as long as it has been true.
+  if (!credential.configured) {
+    console.error('GoalPlace256 scheduler credential is not configured', {
+      operation: options.operation,
+      mode: credential.mode,
+      missingVariable: credential.credentialVariable,
+      reason: 'scheduler_credential_missing',
+    });
+    return jsonError(
+      `Scheduler authentication is not configured for ${options.operation}: `
+      + `${credential.credentialVariable} is not set on this deployment. `
+      + 'This is a configuration fault, not an authorization failure.',
+      503,
+    );
+  }
+
+  if (credential.mode === 'oidc') {
     if (await verifySchedulerOidc(request)) return null;
     return jsonError('Trusted scheduler identity required.', 401);
   }
 
   const secretHeader = options.legacySecretHeader ?? 'x-goalplace-scheduler-secret';
-  const secretEnv = options.legacySecretEnv ?? 'GOALPLACE_SCHEDULER_SECRET';
-  if (safeSecretEquals(request.headers.get(secretHeader), process.env[secretEnv])) return null;
+  if (safeSecretEquals(request.headers.get(secretHeader), process.env[credential.credentialVariable])) {
+    return null;
+  }
 
   return jsonError(`Trusted scheduler authorization required for ${options.operation}.`, 401);
+}
+
+/**
+ * Every scheduler-authenticated route and whether it can currently authenticate.
+ *
+ * Surfaced through `/api/environment` so the answer is read back off the running deployment
+ * rather than reasoned about from config files — the same reason the finalizer mode and the
+ * team authority stage are reported there. A configuration fault nobody can observe is a
+ * configuration fault nobody fixes.
+ */
+export const SCHEDULER_ROUTES: readonly SchedulerOptions[] = [
+  {
+    operation: 'fantasy_lineup_lock',
+    legacySecretHeader: 'x-goalplace-fantasy-secret',
+    legacySecretEnv: 'GOALPLACE_FANTASY_SCORING_SECRET',
+  },
+  {
+    operation: 'fantasy_score_finalized_match',
+    legacySecretHeader: 'x-goalplace-fantasy-secret',
+    legacySecretEnv: 'GOALPLACE_FANTASY_SCORING_SECRET',
+  },
+  {
+    operation: 'payment_reconciliation',
+    legacySecretHeader: 'x-goalplace-reconciliation-secret',
+    legacySecretEnv: 'GOALPLACE_RECONCILIATION_SECRET',
+  },
+];
+
+export function schedulerAuthDiagnostics(env: NodeJS.ProcessEnv = process.env) {
+  const routes = SCHEDULER_ROUTES.map((route) => schedulerCredentialStatus(route, env));
+  return {
+    mode: env.GOALPLACE_SCHEDULER_AUTH_MODE ?? 'shared_secret',
+    routes,
+    unconfigured: routes.filter((route) => !route.configured).map((route) => ({
+      operation: route.operation,
+      missingVariable: route.credentialVariable,
+    })),
+  };
 }

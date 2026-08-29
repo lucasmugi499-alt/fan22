@@ -47,6 +47,50 @@ export const DATABASE_ID = 'fg256';
 const db = getFirestore(DATABASE_ID);
 
 const REGION = 'us-central1';
+
+/**
+ * Concurrency ceilings, per function.
+ *
+ * Every function here previously ran on the platform default, which on Cloud Run is a very
+ * large number. Firestore triggers on high-churn collections plus no ceiling is the shape of
+ * failure that turns a migration, a backfill or a retry storm directly into spend, with
+ * nothing capping it — and Firebase cost amplification is what surprises teams at exactly
+ * this stage. The first athlete import of a real league is the likely trigger: a bulk import
+ * of 10,000 rows fans out to 10,000 search index invocations, all at once.
+ *
+ * These are ceilings, not targets. Hitting one adds latency (Cloud Run queues the overflow);
+ * it does not drop events, because Firestore triggers retry. That trade is the right way
+ * round for every job here — none of them is latency-critical, and all of them are idempotent.
+ *
+ * Sized by what the job actually does, not uniformly:
+ */
+
+/**
+ * Search indexing: low and slow on purpose.
+ *
+ * Pure fan-out work with no user waiting on it, and the single largest amplification risk in
+ * the codebase — one invocation per document on any bulk write. A backfill taking a few
+ * minutes longer is the correct outcome.
+ */
+const SEARCH_INDEX_MAX_INSTANCES = 3;
+
+/**
+ * Result finalization: real headroom.
+ *
+ * A matchday evening can finalize many results at once and each one holds a Firestore
+ * transaction. This is the one path where queueing is felt by an operator watching an
+ * adjudication sheet, so it gets the widest ceiling.
+ */
+const FINALIZATION_MAX_INSTANCES = 10;
+
+/**
+ * Scheduled sweeps: exactly one.
+ *
+ * These are already paginated and already run on a timer. A second concurrent instance of a
+ * sweep is not extra throughput, it is two passes over the same backlog — so the ceiling
+ * doubles as an overlap guard for a slow run that outlives its own schedule.
+ */
+const SCHEDULED_JOB_MAX_INSTANCES = 1;
 const paymentCallbackBaseUrl = defineString('GOALPLACE_PAYMENT_CALLBACK_BASE_URL', {
   default: '',
   description: 'Registered App Hosting HTTPS origin used by the sandbox reconciliation job.',
@@ -76,6 +120,7 @@ export const onResultSubmissionWritten = onDocumentWritten(
     document: 'resultSubmissions/{matchId}',
     database: DATABASE_ID,
     region: REGION,
+    maxInstances: FINALIZATION_MAX_INSTANCES,
   },
   async (event) => {
     const after = event.data?.after;
@@ -139,6 +184,7 @@ export const onMatchReportWritten = onDocumentWritten(
     document: 'matchReports/{matchId}',
     database: DATABASE_ID,
     region: REGION,
+    maxInstances: FINALIZATION_MAX_INSTANCES,
   },
   async (event) => {
     const after = event.data?.after;
@@ -231,6 +277,7 @@ export const onOfficialResultFinalized = onDocumentCreated(
     document: 'finalizations/{finalizationId}',
     database: DATABASE_ID,
     region: REGION,
+    maxInstances: FINALIZATION_MAX_INSTANCES,
     secrets: [fantasyScoringSecret],
   },
   async (event) => {
@@ -283,6 +330,7 @@ export const reconcileResultSubmissions = onSchedule(
   {
     schedule: 'every 60 minutes',
     region: REGION,
+    maxInstances: SCHEDULED_JOB_MAX_INSTANCES,
     timeoutSeconds: 300,
   },
   async () => {
@@ -310,6 +358,7 @@ export const sweepUnreportedMatches = onSchedule(
   {
     schedule: 'every 60 minutes',
     region: REGION,
+    maxInstances: SCHEDULED_JOB_MAX_INSTANCES,
     timeoutSeconds: 300,
   },
   async () => {
@@ -331,6 +380,7 @@ export const convergeLifecycle = onSchedule(
     // be cost without meaning.
     schedule: 'every 60 minutes',
     region: REGION,
+    maxInstances: SCHEDULED_JOB_MAX_INSTANCES,
     timeoutSeconds: 300,
   },
   async () => {
@@ -381,6 +431,7 @@ export const lockFantasyLineups = onSchedule(
   {
     schedule: 'every 5 minutes',
     region: REGION,
+    maxInstances: SCHEDULED_JOB_MAX_INSTANCES,
     timeoutSeconds: 120,
     secrets: [fantasyScoringSecret],
   },
@@ -409,6 +460,7 @@ export const reconcilePaymentIntents = onSchedule(
   {
     schedule: 'every 10 minutes',
     region: REGION,
+    maxInstances: SCHEDULED_JOB_MAX_INSTANCES,
     timeoutSeconds: 300,
     secrets: [paymentReconciliationSecret],
   },
@@ -448,6 +500,7 @@ function searchIndexTrigger(collection: string, type: SearchEntityType) {
       document: `${collection}/{entityId}`,
       database: DATABASE_ID,
       region: REGION,
+      maxInstances: SEARCH_INDEX_MAX_INSTANCES,
     },
     async (event) => {
       const entityId = event.params.entityId as string;

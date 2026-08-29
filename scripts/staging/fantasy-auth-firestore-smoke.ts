@@ -152,8 +152,7 @@ export function parseArgs(argv: string[]): CliOptions {
     password:
       valueAfter(argv, '--password') ??
       process.env.GOALPLACE_STAGING_SMOKE_PASSWORD ??
-      process.env.FIREBASE_DEMO_PASSWORD ??
-      process.env.NEXT_PUBLIC_FIREBASE_DEMO_PASSWORD,
+      process.env.FIREBASE_DEMO_PASSWORD,
     scoringSecret:
       valueAfter(argv, '--scoring-secret') ??
       process.env.GOALPLACE_FANTASY_SCORING_SECRET,

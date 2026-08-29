@@ -37,7 +37,6 @@ import {
   ApproveResultCorrectionInput,
   RecordPointsActionInput,
   ReviewSupportNeedInput,
-  SaveTargetType,
   TransitionChallengeInput,
 } from './types';
 import {
@@ -681,13 +680,6 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     }
     return writeResult(targetId, following ? 'Follow saved.' : 'Follow removed.');
   },
-  async toggleSave(userId: string, targetType: SaveTargetType, targetId: string) {
-    if (!isFirebaseConfigured) return mockProvider.toggleSave(userId, targetType, targetId);
-    const { db } = requireFirebaseClient();
-    const ref = doc(db, 'users', userId, 'saves', `${targetType}_${targetId}`);
-    await setDoc(ref, { userId, targetType, targetId, updatedAt: serverTimestamp() }, { merge: true });
-    return writeResult(ref.id);
-  },
   async updateUserProfile(userId, data) {
     const actorUserId = requireActor();
     if (data.accountStatus) {
@@ -713,15 +705,6 @@ export const firebaseProvider: GoalPlaceDataProvider = {
       }).catch(() => undefined);
     }
     return writeResult(userId, 'Profile updated.');
-  },
-  async updateAthleteProfile(athleteId, data) {
-    requireActor();
-    const { db } = requireFirebaseClient();
-    await updateDoc(doc(db, 'athletes', athleteId), {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
-    return writeResult(athleteId, 'Athlete profile updated.');
   },
   async createAthleteProfile(data) {
     const { auth } = requireFirebaseClient();

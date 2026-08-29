@@ -34,6 +34,38 @@ describe('environment guard', () => {
     expect(() => assertSafeProductionEnvironment(safeProduction)).not.toThrow();
   });
 
+  /**
+   * The un-overlaid `apphosting.yaml` declares `unconfigured`, and this is the gate that
+   * makes that declaration mean something. `next.config.ts` calls it at build time, so a
+   * backend created without naming an overlay fails to build instead of silently coming up
+   * as demo and writing to the demo database.
+   */
+  it('refuses to build an environment that named no overlay', () => {
+    expect(() => assertSafeProductionEnvironment({
+      NODE_ENV: 'production',
+      GOALPLACE_ENVIRONMENT: 'unconfigured',
+    } as NodeJS.ProcessEnv)).toThrow(/no environment overlay selected/);
+  });
+
+  it('names the overlays a backend can choose, so the error is actionable', () => {
+    expect(() => assertSafeProductionEnvironment({
+      GOALPLACE_ENVIRONMENT: 'unconfigured',
+    } as NodeJS.ProcessEnv)).toThrow(/apphosting\.beta\.yaml/);
+  });
+
+  it('still treats an unset environment as local, so dev and the suites need no configuration', () => {
+    // `unconfigured` has to be distinct from absent. If omission also tripped the gate,
+    // `next dev` and every test run would need an environment variable to start.
+    expect(goalPlaceEnvironment({} as NodeJS.ProcessEnv)).toBe('local');
+    expect(() => assertSafeProductionEnvironment({} as NodeJS.ProcessEnv)).not.toThrow();
+  });
+
+  it('recognises the sentinel as its own environment rather than falling back to local', () => {
+    expect(goalPlaceEnvironment({
+      GOALPLACE_ENVIRONMENT: 'unconfigured',
+    } as NodeJS.ProcessEnv)).toBe('unconfigured');
+  });
+
   it('reports App Hosting runtime Firebase values when public build vars are unavailable', () => {
     expect(publicEnvironment({
       GOALPLACE_ENVIRONMENT: 'demo',

@@ -1,8 +1,38 @@
 # Beta. Fill with the beta Firebase web app values before deployment.
+#
+# Every REPLACE_WITH_ marker below is a hard blocker: `npm run environment:prepare:beta`
+# refuses while any remains. See docs/ENVIRONMENT_PROVISIONING.md for the order to do it in.
 env:
   - variable: GOALPLACE_ENVIRONMENT
     value: beta
     availability: [BUILD, RUNTIME]
+
+  # Restated, not inherited. These four previously came from the apphosting.yaml base, which
+  # meant beta's finalization activation and — far worse — its team authority sunset stage
+  # were decided by a file named for no environment. An overlay that omits the stage inherits
+  # whatever the base says today, and if the base is ever edited the omission silently changes
+  # beta's authority model. scripts/lib/deploymentPlanes.test.ts requires all three overlays
+  # to declare the stage and to agree.
+  - variable: GOALPLACE_TEAM_AUTHORITY_STAGE
+    value: "retired"
+    availability: [RUNTIME]
+  # Beta starts with every finalization pipeline off and raises each one after its own canary,
+  # exactly as demo did. Inheriting `enabled` would arm a pipeline that was never proven here.
+  - variable: GOALPLACE_FINALIZER_MODE
+    value: "off"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_FIELD_CAPTURE_MODE
+    value: "off"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_LEAGUE_ENTRY_MODE
+    value: "off"
+    availability: [RUNTIME]
+  # Beta is served on its own origin during the pilot. Flip to "true" only once a gateway is
+  # actually in front of it — src/proxy.ts rejects every request when this is on and no
+  # gateway supplies the secret.
+  - variable: GOALPLACE_REQUIRE_GATEWAY_SECRET
+    value: "false"
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENVIRONMENT
     value: beta
     availability: [BUILD]

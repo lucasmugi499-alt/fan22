@@ -46,7 +46,6 @@ import {
   ResolveResultSubmissionInput,
   RecordPointsActionInput,
   ReviewSupportNeedInput,
-  SaveTargetType,
   TransitionChallengeInput,
 } from './types';
 import { investorDemoRuntime } from '../investorDemo';
@@ -88,7 +87,6 @@ import { buildAccessIndexDocuments, type AccessRoleKey, type AccessScopeType } f
 import { accountClassForRole } from '@/lib/auth/accountClass';
 
 const followed = new Set<string>();
-const saved = new Set<string>();
 const storedApplicationsKey = 'goalplace256.demo.leagueAdminApplications';
 const storedLeaguesKey = 'goalplace256.demo.leagues';
 const storedSeasonsKey = 'goalplace256.demo.seasons';
@@ -980,12 +978,6 @@ export const mockProvider: GoalPlaceDataProvider = {
     }
     return result(key, followed.has(key) ? 'Demo follow saved.' : 'Demo follow removed.');
   },
-  async toggleSave(userId: string, targetType: SaveTargetType, targetId: string) {
-    const key = `${userId}:${targetType}:${targetId}`;
-    if (saved.has(key)) saved.delete(key);
-    else saved.add(key);
-    return result(key, saved.has(key) ? 'Demo save added.' : 'Demo save removed.');
-  },
   async updateUserProfile(userId, data) {
     const user = users.find((item) => item.id === userId);
     const demoProfile = Object.values(MOCK_PROFILES).find(
@@ -1011,12 +1003,6 @@ export const mockProvider: GoalPlaceDataProvider = {
       });
     }
     return result(userId, 'Profile updated.');
-  },
-  async updateAthleteProfile(athleteId, data) {
-    const athlete = athletes.find((item) => item.id === athleteId);
-    if (!athlete) throw new Error('Athlete profile not found.');
-    Object.assign(athlete, data);
-    return result(athleteId, 'Athlete profile updated.');
   },
   async createAthleteProfile(data) {
     const team = teams.find((item) => item.id === data.teamId)

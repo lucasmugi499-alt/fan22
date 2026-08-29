@@ -166,8 +166,7 @@ export function parseArgs(argv: string[]): CliOptions {
     password:
       valueAfter(argv, '--password') ??
       process.env.GOALPLACE_STAGING_SMOKE_PASSWORD ??
-      process.env.FIREBASE_DEMO_PASSWORD ??
-      process.env.NEXT_PUBLIC_FIREBASE_DEMO_PASSWORD,
+      process.env.FIREBASE_DEMO_PASSWORD,
     runId: valueAfter(argv, '--run-id'),
     keep: argv.includes('--keep') || argv.includes('--no-cleanup'),
     allowProduction: argv.includes('--allow-production'),

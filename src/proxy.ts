@@ -1,8 +1,29 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+/**
+ * Constant-time, like every other secret comparison in this codebase.
+ *
+ * This was `supplied === expected`, which is the one string comparison in the repo that
+ * short-circuits on the first differing byte while `server/api/security.ts` uses
+ * `timingSafeEqual` for the same class of value. Remotely exploiting the difference over a
+ * network is impractical; that is not the point. A secret compared two different ways in two
+ * places is a codebase that has no rule about it, and the next person copies whichever one
+ * they happen to read.
+ *
+ * `node:crypto` is available here: Next 16 runs Proxy on the Node.js runtime, and the
+ * `runtime` segment option is not settable in a Proxy file, so it cannot be moved to Edge
+ * without this import failing loudly at build.
+ *
+ * The length check before `timingSafeEqual` is required — it throws on mismatched lengths —
+ * and leaks only the length of the supplied value, which the attacker already knows.
+ */
 function validSecret(supplied: string | null, expected: string | undefined) {
-  return Boolean(expected && supplied && supplied === expected);
+  if (!expected || !supplied) return false;
+  const left = Buffer.from(expected);
+  const right = Buffer.from(supplied);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 function isAsset(pathname: string) {

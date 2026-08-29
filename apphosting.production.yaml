@@ -1,8 +1,32 @@
 # Production. Starts clean and real-payments-disabled until a separate money launch gate.
+#
+# Every REPLACE_WITH_ marker below is a hard blocker: `npm run environment:prepare:production`
+# refuses while any remains. See docs/ENVIRONMENT_PROVISIONING.md.
 env:
   - variable: GOALPLACE_ENVIRONMENT
     value: production
     availability: [BUILD, RUNTIME]
+
+  # Restated, not inherited — see the same block in apphosting.beta.yaml for why. A safety
+  # floor that arrives by inheritance is a safety floor nobody can read off this file.
+  - variable: GOALPLACE_TEAM_AUTHORITY_STAGE
+    value: "retired"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_FINALIZER_MODE
+    value: "off"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_FIELD_CAPTURE_MODE
+    value: "off"
+    availability: [RUNTIME]
+  - variable: GOALPLACE_LEAGUE_ENTRY_MODE
+    value: "off"
+    availability: [RUNTIME]
+  # Production is gateway-only (config/environments.json directOriginPolicy). This must be
+  # "true" before GA, and can only be flipped once the gateway is deployed and sending the
+  # shared secret — see Phase 6 of the remediation roadmap.
+  - variable: GOALPLACE_REQUIRE_GATEWAY_SECRET
+    value: "false"
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENVIRONMENT
     value: production
     availability: [BUILD]

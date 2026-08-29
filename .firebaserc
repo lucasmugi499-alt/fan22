@@ -1,6 +1,8 @@
 {
   "projects": {
     "staging": "studio-534174814-9df36",
-    "demo": "manifest-quasar-479416-s7"
+    "demo": "manifest-quasar-479416-s7",
+    "beta": "REPLACE_WITH_BETA_PROJECT",
+    "production": "REPLACE_WITH_CLEAN_PRODUCTION_PROJECT"
   }
 }

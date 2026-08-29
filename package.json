@@ -41,9 +41,11 @@
     "search:index:apply": "tsx scripts/search/build-index.ts --apply",
     "clean:preview": "tsx scripts/clean-preview.ts",
     "clean:execute": "tsx scripts/clean-execute.ts",
-    "deploy:staging:candidate": "firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",
-    "deploy:staging:functions": "firebase deploy --project staging --config firebase.staging.json --only functions",
-    "deploy:prod:candidate-after-approval": "firebase deploy --project manifest-quasar-479416-s7 --config firebase.production-candidate.json --only firestore:fg256",
+    "deploy:preflight": "tsx scripts/deploy/preflight.ts",
+    "deploy:staging:candidate": "npm run deploy:preflight -- --environment=staging --project=staging --config=firebase.staging.json && firebase deploy --project staging --config firebase.staging.json --only firestore:fg256",
+    "deploy:staging:functions": "npm run deploy:preflight -- --environment=staging --project=staging --config=firebase.staging.json && firebase deploy --project staging --config firebase.staging.json --only functions",
+    "deploy:demo:candidate": "npm run deploy:preflight -- --environment=demo --project=demo --config=firebase.json && firebase deploy --project demo --config firebase.json --only firestore:fg256",
+    "deploy:prod:candidate-after-approval": "npm run deploy:preflight -- --environment=production --project=production --config=firebase.production-candidate.json && firebase deploy --project production --config firebase.production-candidate.json --only firestore:fg256",
     "deploy:prod:legacy-blocked": "node -e \"throw new Error('Legacy production deploy is blocked. Use the reviewed candidate path after explicit approval.')\"",
     "create:owner": "tsx scripts/create-owner.ts",
     "environment:status": "tsx scripts/environment/activate.ts --action=status",
@@ -126,6 +128,12 @@
     "next": {
       "sharp": "0.35.3"
     },
-    "nanoid": "^3.3.18"
+    "nanoid": "^3.3.18",
+    "firebase-admin": {
+      "uuid": "^11.1.1"
+    },
+    "gaxios": {
+      "uuid": "^11.1.1"
+    }
   }
 }

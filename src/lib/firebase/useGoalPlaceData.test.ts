@@ -47,7 +47,6 @@ function providerWithCalls() {
     createFeedPost: vi.fn(),
     createComment: vi.fn(),
     toggleFollow: vi.fn(),
-    toggleSave: vi.fn(),
   } as unknown as GoalPlaceDataProvider;
 
   return provider;

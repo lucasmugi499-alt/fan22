@@ -139,7 +139,7 @@ async function main() {
   const email = valueAfter(argv, '--email');
   const password = valueAfter(argv, '--password')
     ?? process.env.GOALPLACE_STAGING_SMOKE_PASSWORD
-    ?? process.env.NEXT_PUBLIC_FIREBASE_DEMO_PASSWORD;
+    ?? process.env.FIREBASE_DEMO_PASSWORD;
 
   if (!projectId || !apiKey) {
     throw new Error('A --project and --api-key (or the NEXT_PUBLIC_FIREBASE_* env vars) are required.');

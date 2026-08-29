@@ -1,4 +1,19 @@
-export type GoalPlaceEnvironment = 'local' | 'demo' | 'beta' | 'production' | 'maintenance';
+/**
+ * `unconfigured` is not a place anything runs. It is the value the un-overlaid
+ * `apphosting.yaml` carries so that a backend created without naming an overlay fails at
+ * build instead of silently coming up as demo and writing to the demo database.
+ *
+ * It is deliberately distinct from an unset variable, which still resolves to `local` so
+ * that `next dev` and the test suites keep working with no configuration at all. Only an
+ * explicit `GOALPLACE_ENVIRONMENT=unconfigured` trips the build gate.
+ */
+export type GoalPlaceEnvironment =
+  | 'local'
+  | 'unconfigured'
+  | 'demo'
+  | 'beta'
+  | 'production'
+  | 'maintenance';
 
 export type DataOrigin = 'synthetic_demo' | 'beta_test' | 'verified_pilot' | 'production';
 
@@ -18,11 +33,23 @@ export type PublicEnvironment = {
 
 const ENVIRONMENTS = new Set<GoalPlaceEnvironment>([
   'local',
+  'unconfigured',
   'demo',
   'beta',
   'production',
   'maintenance',
 ]);
+
+/**
+ * The overlays a backend may actually name. `local` is the no-configuration default and
+ * `unconfigured` is the refusal sentinel, so neither is deployable.
+ */
+export const DEPLOYABLE_ENVIRONMENTS: readonly GoalPlaceEnvironment[] = [
+  'demo',
+  'beta',
+  'production',
+  'maintenance',
+];
 
 export function booleanEnv(value: string | undefined) {
   return value === 'true';
@@ -63,6 +90,22 @@ export function publicEnvironment(env: NodeJS.ProcessEnv = process.env): PublicE
 
 export function assertSafeProductionEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const environment = goalPlaceEnvironment(env);
+
+  // App Hosting reads `apphosting.yaml` when a backend names no overlay. That file used to
+  // be a copy of the demo configuration, so a backend created for beta and given no overlay
+  // came up as demo and wrote to the demo database — no mistake in the beta config required,
+  // only a forgotten flag. The default now declares `unconfigured` and this refuses to
+  // build. A deploy that will not build is cheaper than one that writes to the wrong project.
+  if (environment === 'unconfigured') {
+    throw new Error(
+      'GoalPlace256 has no environment overlay selected. The default apphosting.yaml is a '
+      + 'refusal sentinel, not a runnable configuration. Create the backend against one of '
+      + `${DEPLOYABLE_ENVIRONMENTS.join(', ')} `
+      + '(apphosting.demo.yaml, apphosting.beta.yaml, apphosting.production.yaml) and set '
+      + 'GOALPLACE_ENVIRONMENT accordingly.',
+    );
+  }
+
   if (environment !== 'production') return;
 
   const flags = environmentFlags(env);

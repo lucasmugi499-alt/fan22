@@ -83,7 +83,11 @@ describe('team authority stage across deployment planes', () => {
  * Rather than guess which file wins, both declare it and both must say the same thing.
  */
 describe('team authority stage across App Hosting config files', () => {
-  const OVERLAYS = ['apphosting.demo.yaml'];
+  // All three, not just demo. Beta and production used to declare no stage at all and
+  // inherited whatever the base said — so the base being correct today was the only thing
+  // standing between a promoted environment and a re-opened team authority model. An
+  // inherited safety floor is one nobody can read off the file they are reviewing.
+  const OVERLAYS = ['apphosting.demo.yaml', 'apphosting.beta.yaml', 'apphosting.production.yaml'];
 
   it.each(OVERLAYS)('%s declares the same stage as apphosting.yaml', (overlay) => {
     const base = appHostingValue(VARIABLE);
@@ -93,6 +97,64 @@ describe('team authority stage across App Hosting config files', () => {
     );
     expect(match?.[1], `${VARIABLE} missing from ${overlay}`).toBeDefined();
     expect(match?.[1]).toBe(base);
+  });
+});
+
+/**
+ * The un-overlaid base must not be deployable, and must not name a project.
+ *
+ * `apphosting.yaml` was a copy of the demo configuration. App Hosting reads it whenever a
+ * backend names no overlay, so a backend created for beta and given no overlay came up as
+ * demo and wrote to the demo database — no mistake in the beta config required, only a
+ * forgotten flag. This is one of the two independent paths by which beta work could reach
+ * the investor demo; `firestoreTarget.test.ts` covers the other.
+ *
+ * Asserted structurally rather than by reading the environment, because the failure this
+ * prevents happens at backend-creation time on somebody else's machine.
+ */
+describe('the un-overlaid apphosting.yaml refuses to be an environment', () => {
+  const base = readFileSync(APPHOSTING, 'utf8');
+
+  it('declares the unconfigured sentinel that the build gate rejects', () => {
+    expect(appHostingValue('GOALPLACE_ENVIRONMENT')).toBe('unconfigured');
+  });
+
+  it('names no Firebase project, in any variable', () => {
+    // Substring, not an exact variable match: the demo project id appeared in
+    // GOALPLACE_ADMIN_PROJECT_ID, NEXT_PUBLIC_FIREBASE_PROJECT_ID, the auth domain, the
+    // storage bucket and the base URL. Any one of them reaching this file resurrects it.
+    expect(base).not.toContain('manifest-quasar');
+    expect(base).not.toContain('studio-534174814');
+    expect(base).not.toMatch(/PROJECT_ID\s*\n\s*value:/);
+  });
+
+  it('leaves every permissive flag off, so an overlay that forgets one inherits the strict answer', () => {
+    for (const variable of [
+      'GOALPLACE_ALLOW_DEMO_LOGIN',
+      'NEXT_PUBLIC_ENABLE_DEMO_LOGIN',
+      'GOALPLACE_ALLOW_SEEDING',
+      'GOALPLACE_ALLOW_REAL_PAYMENTS',
+      'GOALPLACE_ENABLE_INVESTOR_TOOLS',
+    ]) {
+      const match = base.match(
+        new RegExp(`-\\s*variable:\\s*${variable}\\s*\\n\\s*value:\\s*"?([a-z]+)"?`),
+      );
+      expect(match?.[1], `${variable} missing from ${APPHOSTING}`).toBe('false');
+    }
+    const appCheck = base.match(
+      /-\s*variable:\s*GOALPLACE_REQUIRE_APP_CHECK\s*\n\s*value:\s*"?([a-z]+)"?/,
+    );
+    expect(appCheck?.[1]).toBe('true');
+  });
+
+  it('leaves every finalization pipeline off, so no environment inherits an unproven activation', () => {
+    for (const variable of [
+      'GOALPLACE_FINALIZER_MODE',
+      'GOALPLACE_FIELD_CAPTURE_MODE',
+      'GOALPLACE_LEAGUE_ENTRY_MODE',
+    ]) {
+      expect(appHostingValue(variable), `${variable} missing from ${APPHOSTING}`).toBe('off');
+    }
   });
 });
 

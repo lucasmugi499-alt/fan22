@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { PLACEHOLDER_PREFIX, registeredProjectId } from '../lib/deployTarget';
+import { resolveProjectId } from '../lib/firestoreTarget';
 
 const ROOT = process.cwd();
 const MANIFEST_FILE = path.join(ROOT, 'data/demo/seed-manifest.json');
@@ -66,6 +68,55 @@ function requireResetControls(environment: 'demo' | 'beta') {
   if (missing.length) throw new Error(`Reset refused. Missing protected control input(s): ${missing.join(', ')}.`);
 }
 
+/**
+ * The environment named on the command line must be the one the ambient shell is pointed at.
+ *
+ * The confirmation phrase above already carries the environment name, so a demo reset cannot
+ * be confirmed with a beta phrase. What it could not catch is the opposite direction: the
+ * right phrase typed in a shell whose `GOALPLACE_ENVIRONMENT` or Firebase project variables
+ * were inherited from a previous session and point somewhere else. The operator types
+ * `RESET GOALPLACE256 DEMO`, means demo, and the process is looking at beta.
+ *
+ * All three environments also share the database id `fg256`, so a wrong project resolves to
+ * a database that exists under the expected name instead of failing loudly. That is the same
+ * property that made the production deploy script's demo project id survivable-looking, and
+ * it is why this refuses on disagreement rather than warning.
+ */
+function requireMatchingTarget(environment: 'demo' | 'beta') {
+  const declared = process.env.GOALPLACE_ENVIRONMENT;
+  if (declared && declared !== environment) {
+    throw new Error(
+      `Reset refused. --action names '${environment}' but GOALPLACE_ENVIRONMENT is '${declared}'. `
+      + 'Unset it or run in a shell configured for the environment you mean.',
+    );
+  }
+
+  const resolvedProject = resolveProjectId();
+  if (!resolvedProject) return; // Nothing ambient to disagree with.
+
+  let expected: string | undefined;
+  try {
+    expected = registeredProjectId(environment, ROOT);
+  } catch {
+    throw new Error('Reset refused. config/environments.json could not be read.');
+  }
+
+  if (!expected) {
+    throw new Error(
+      `Reset refused. '${environment}' is still a ${PLACEHOLDER_PREFIX} placeholder in `
+      + 'config/environments.json, so the target cannot be verified.',
+    );
+  }
+
+  if (resolvedProject !== expected) {
+    throw new Error(
+      `Reset refused. '${environment}' is registered to project '${expected}', but this shell `
+      + `resolves to '${resolvedProject}'. Every environment uses database 'fg256', so a wrong `
+      + 'project would have found a real database under the expected name.',
+    );
+  }
+}
+
 function writeReport(name: string, body: Record<string, unknown>) {
   mkdirSync(REPORT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -89,6 +140,7 @@ function exportManifest() {
 
 function protectedLifecycle(environment: 'demo' | 'beta', lifecycleAction: 'reset' | 'seed') {
   validate();
+  requireMatchingTarget(environment);
   requireResetControls(environment);
   writeReport(`${environment}-${lifecycleAction}-request`, {
     action: lifecycleAction,

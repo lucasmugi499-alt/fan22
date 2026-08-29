@@ -1315,12 +1315,18 @@ service cloud.firestore {
     // that can leak one. Every other surface asks "can this athlete be paid", which the API
     // answers from a redacted view without the details ever reaching a browser.
     //
-    // One honest caveat: Firestore evaluates every matching rule and grants on ANY allow, so
-    // the `{document=**}` super_admin read grant at the bottom of this file still reaches
-    // this collection and no deny here can override it. Closing that requires narrowing the
-    // catch-all, which in turn requires explicitly modelling the ~16 collections currently
-    // relying on it — a separate, deliberate change. Until then the super_admin path is the
-    // known residual exposure, and it is stated here rather than implied away.
+    // This deny is now absolute, and that is a change from what this comment used to say.
+    //
+    // It previously recorded a residual exposure: Firestore grants on ANY matching allow, so
+    // the `{document=**}` rule at the bottom of this file carried a blanket super_admin read
+    // that reached this collection, and no deny here could override it. That catch-all has
+    // since been narrowed to `read, write: if false` for everyone, super_admin included, so
+    // the exposure is gone.
+    //
+    // The stale wording is worth naming rather than just deleting: a security comment
+    // describing a hole that no longer exists is worse than no comment, because it is
+    // trusted. It would have sent the next reader looking for a break-glass path that is not
+    // there, or — worse — been read as permission to leave one open.
     match /athletePayees/{athleteId} {
       allow read, write: if false;
     }

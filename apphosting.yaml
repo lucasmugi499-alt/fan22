@@ -1,8 +1,51 @@
+# The un-overlaid base. NOT a deployable environment — it declares `unconfigured`.
+#
+# WHY THIS FILE IS NOT THE DEMO CONFIG ANY MORE
+#
+# App Hosting reads `apphosting.yaml` as the base and `apphosting.<environment>.yaml` on top
+# of it, and which overlay a given backend was created with is not visible from the CLI. This
+# file used to be a copy of the demo configuration — demo project id, demo API key, demo
+# login on, investor tools on, App Check off. A backend created for beta and given no overlay
+# therefore came up as demo and wrote to the demo database. That needed no mistake in the
+# beta config, only a forgotten flag at backend-creation time.
+#
+# So the base now declares `GOALPLACE_ENVIRONMENT: unconfigured`, which
+# `assertSafeProductionEnvironment()` rejects from `next.config.ts` at BUILD time. An
+# un-overlaid backend fails to build and the error names the overlays. A deploy that refuses
+# to build is cheaper than one that silently writes to the wrong database.
+#
+# WHAT STAYS HERE, AND WHY
+#
+# Because the base is merged rather than replaced, anything removed from here is inherited as
+# unset by every overlay that does not restate it — and for several of these variables
+# "unset" is not neutral, it is the unsafe value. So this file keeps exactly two categories:
+#
+#   1. Safety floors whose absent value is dangerous (the team authority sunset stage falls
+#      back to `frozen`, which un-retires team capabilities one projection at a time).
+#   2. Fail-closed defaults, so an overlay that forgets a flag inherits the strict answer
+#      rather than the permissive one.
+#
+# It keeps NO project identity at all: no Firebase project id, API key, database id, or base
+# URL. If this file ever acquires a project id again, the footgun is back.
+
 env:
-  - variable: GOALPLACE_FINALIZER_MODE
-    value: "enabled"
+  # ---------------------------------------------------------------------------
+  # 1. The refusal sentinel
+  # ---------------------------------------------------------------------------
+  - variable: GOALPLACE_ENVIRONMENT
+    value: unconfigured
     availability:
+      - BUILD
       - RUNTIME
+  - variable: NEXT_PUBLIC_GOALPLACE_ENVIRONMENT
+    value: unconfigured
+    availability:
+      - BUILD
+
+  # ---------------------------------------------------------------------------
+  # 2. Safety floors — absence here is not neutral
+  # ---------------------------------------------------------------------------
+
   # Team authority sunset stage: active | frozen | retired.
   #
   # `retired` since 2026-08-26, after the V1 drain read zero on both blocking counts. This
@@ -13,31 +56,41 @@ env:
   # quietly reopen what the migration closed.
   #
   # The Cloud Functions runtime holds its own copy in functions/.env.<project>. Both have to
-  # say `retired`, because either one can rebuild a projection.
+  # say `retired`, because either one can rebuild a projection. Every overlay now restates it
+  # rather than inheriting it, and scripts/lib/deploymentPlanes.test.ts requires agreement.
   - variable: GOALPLACE_TEAM_AUTHORITY_STAGE
     value: "retired"
     availability:
       - RUNTIME
-  - variable: GOALPLACE_ENVIRONMENT
-    value: demo
+
+  # ---------------------------------------------------------------------------
+  # 3. Fail-closed defaults — an overlay that forgets one inherits the strict answer
+  # ---------------------------------------------------------------------------
+
+  # Finalization is off by default. Demo raised each pipeline deliberately after a canary;
+  # a new environment must do the same rather than inheriting an activation it never proved.
+  - variable: GOALPLACE_FINALIZER_MODE
+    value: "off"
     availability:
-      - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_GOALPLACE_ENVIRONMENT
-    value: demo
+  - variable: GOALPLACE_FIELD_CAPTURE_MODE
+    value: "off"
     availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_GOALPLACE_ENVIRONMENT_VERSION
-    value: env-demo-2026-07-30
+      - RUNTIME
+  - variable: GOALPLACE_LEAGUE_ENTRY_MODE
+    value: "off"
     availability:
-      - BUILD
-  - variable: GOALPLACE_DATA_ORIGIN
-    value: synthetic_demo
+      - RUNTIME
+  - variable: GOALPLACE_ACCESS_ENGINE_MODE
+    value: assignments
     availability:
-      - BUILD
       - RUNTIME
   - variable: GOALPLACE_ALLOW_DEMO_LOGIN
-    value: "true"
+    value: "false"
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_ENABLE_DEMO_LOGIN
+    value: "false"
     availability:
       - BUILD
   - variable: GOALPLACE_ALLOW_SEEDING
@@ -51,93 +104,14 @@ env:
       - BUILD
       - RUNTIME
   - variable: GOALPLACE_ENABLE_INVESTOR_TOOLS
-    value: "true"
+    value: "false"
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
+    value: "false"
     availability:
       - BUILD
   - variable: GOALPLACE_REQUIRE_APP_CHECK
-    value: "false"
-    availability:
-      - RUNTIME
-  # Stage C: canonical assignments are authoritative, matching firestore.rules.next.
-    # Legacy indexes are still read so the soak keeps recording divergence.
-    # Both cutover gates read zero (npm run access:migrate:gate).
-  - variable: GOALPLACE_ACCESS_ENGINE_MODE
-    value: assignments
-    availability: [RUNTIME]
-  # The demo origin is served directly on the App Hosting default domain. Enabling this
-    # before a gateway sits in front of it would make src/proxy.ts reject every request.
-  - variable: GOALPLACE_REQUIRE_GATEWAY_SECRET
-    value: "false"
-    availability: [RUNTIME]
-  - variable: GOALPLACE_SCHEDULER_AUTH_MODE
-    value: shared_secret
-    availability:
-      - RUNTIME
-  - variable: GOALPLACE_FANTASY_SCORING_SECRET
-    secret: goalplaceFantasyScoringSecret
-    availability:
-      - RUNTIME
-  - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_DATA_MODE
-    value: firebase
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_ENABLE_DEMO_LOGIN
-    value: "true"
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyDnGSTCffXgwlI5DDwivqcVC8Iuy0aDPc8
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: manifest-quasar-479416-s7.firebaseapp.com
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: manifest-quasar-479416-s7
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: manifest-quasar-479416-s7.firebasestorage.app
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "622986074502"
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:622986074502:web:af207af8fd2d053f437407
-    availability:
-      - BUILD
-  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
-    value: fg256
-    availability:
-      - BUILD
-  - variable: GOALPLACE_ADMIN_PROJECT_ID
-    value: manifest-quasar-479416-s7
-    availability:
-      - RUNTIME
-  - variable: GOALPLACE_FIRESTORE_DATABASE_ID
-    value: fg256
-    availability:
-      - RUNTIME
-  - variable: GOALPLACE_APP_BASE_URL
-    value: https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app
-    availability:
-      - RUNTIME
-  - variable: GOALPLACE_EMAIL_FROM
-    value: "GoalPlace256 <onboarding@resend.dev>"
-    availability:
-      - RUNTIME
-  - variable: GOALPLACE_EMAIL_REPLY_TO
-    value: support@goalplace256.com
-    availability:
-      - RUNTIME
-  - variable: RESEND_API_KEY
-    secret: resendApiKey
     availability:
       - RUNTIME

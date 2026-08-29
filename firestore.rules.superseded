@@ -1,4 +1,14 @@
-// SUPERSEDED — this is not what is deployed.
+// SUPERSEDED — this is not what is deployed, and it is materially WEAKER than what is.
+//
+// Renamed from `firestore.rules` on 2026-08-29. The header below always said it was
+// superseded; the FILENAME said something else. `firestore.rules` is the path every Firebase
+// tool reaches for by default, so the one artifact in this repo that still grants a blanket
+// super_admin catch-all read, unrestricted platform-admin writes to any user document, and
+// browser deletes was sitting under the conventional name, one `firebase deploy --only
+// firestore:rules` away from a project whose firebase.json somebody had not read.
+//
+// The three configs in this repo all name `firestore.rules.next` explicitly, so nothing here
+// deployed it. The extension is defence against a command run somewhere else.
 //
 // This file is the pre-2026-08-22 production baseline, the ruleset restored during the
 // 2026-07-22 rollback (see docs/INCIDENT-2026-07-22-rules-deploy.md). On 2026-08-22

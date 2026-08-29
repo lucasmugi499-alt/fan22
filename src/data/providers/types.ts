@@ -61,7 +61,6 @@ export type DataWriteResult = {
 };
 
 export type FollowTargetType = 'athlete' | 'team' | 'league';
-export type SaveTargetType = 'athlete' | 'team' | 'league' | 'match' | 'feedPost';
 
 export type DataQueryOptions = {
   leagueId?: string;
@@ -187,11 +186,6 @@ export type EditableUserProfile = {
   platformActionReason?: string;
 };
 
-export type EditableAthleteProfile = Pick<
-  Athlete,
-  'name' | 'bio' | 'city' | 'avatarUrl' | 'coverUrl' | 'impactNeeds'
->;
-
 export type EditableTeamProfile = Pick<
   Team,
   'name' | 'city' | 'location' | 'description' | 'logoUrl' | 'teamAdminName' | 'teamAdminEmail' | 'verified' | 'verificationStatus' | 'plan'
@@ -280,9 +274,7 @@ export interface GoalPlaceDataProvider {
   createComment(data: CreateCommentInput): Promise<DataWriteResult>;
   engageFeedPost(data: FeedEngagementInput): Promise<DataWriteResult>;
   toggleFollow(userId: string, targetType: FollowTargetType, targetId: string): Promise<DataWriteResult>;
-  toggleSave(userId: string, targetType: SaveTargetType, targetId: string): Promise<DataWriteResult>;
   updateUserProfile(userId: string, data: EditableUserProfile): Promise<DataWriteResult>;
-  updateAthleteProfile(athleteId: string, data: Partial<EditableAthleteProfile>): Promise<DataWriteResult>;
   createAthleteProfile(data: {
     teamId: string;
     name: string;

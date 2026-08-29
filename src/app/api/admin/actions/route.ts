@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { effectiveCapturePolicy } from '@/lib/capturePolicy';
+import { defaultScoringFor } from '@/lib/season';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -311,11 +312,13 @@ export async function POST(request: Request) {
               status: 'registration',
               startDate: now.toISOString().slice(0, 10),
               competitionFormat: 'league',
-              scoring: body.sport === 'basketball'
-                ? { win: 2, draw: null, loss: 0 }
-                : body.sport === 'rugby'
-                  ? { win: 4, draw: 2, loss: 0 }
-                  : { win: 3, draw: 1, loss: 0 },
+              // `defaultScoringFor`, not an inline copy of DEFAULT_SCORING. The two tables
+              // agreed exactly, which is what made the duplication easy to miss: the moment a
+              // sport's league points change, or a fourth sport is added, every league created
+              // after that point carries the stale table into its season document — where it
+              // becomes authoritative and persistent, because standings read the season's own
+              // scoring in preference to the sport default.
+              scoring: defaultScoringFor(body.sport),
               createdAt: FieldValue.serverTimestamp(),
             });
             transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({

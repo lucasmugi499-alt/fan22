@@ -1,6 +1,7 @@
 import { publicEnvironment } from '@/lib/environment';
 import { activationFromEnvironment } from '@/server/finalizerActivation';
 import { currentTeamAuthorityStage } from '@/lib/auth/teamAuthorityStage';
+import { schedulerAuthDiagnostics } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -61,6 +62,19 @@ export function GET(request: Request) {
      * it, which is exactly the ambiguity worth removing. It is a stage name, not a secret.
      */
     teamAuthorityStage: currentTeamAuthorityStage(),
+    /**
+     * Whether each scheduler-authenticated route can authenticate a scheduler at all.
+     *
+     * Same reason as the two above: a variable that decides whether scheduled work runs, and
+     * which nothing could read back. `safeSecretEquals` returns false when the expected value
+     * is undefined, so a route whose credential was never declared answers 401 forever and
+     * looks identical to a caller with the wrong secret — the Cloud Function logs it and
+     * moves on, and scheduled work silently does not happen.
+     *
+     * Names variables and operations only. No secret value, and no indication of what a
+     * correct credential looks like, so it is safe on a public endpoint.
+     */
+    schedulerAuth: schedulerAuthDiagnostics(),
   }, {
     headers: {
       // Never cached: a stale identity is worse than none, since the entire purpose is
