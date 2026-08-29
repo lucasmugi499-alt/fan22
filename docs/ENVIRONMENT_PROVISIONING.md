@@ -16,7 +16,7 @@ projects the architecture describes.
 
 | Piece | State |
 |---|---|
-| `apphosting.beta.yaml`, `apphosting.production.yaml` | Written, complete in shape, **11 placeholders each** |
+| `apphosting.beta.yaml`, `apphosting.production.yaml` | Written, complete in shape, **10 placeholder lines each** |
 | `config/environments.json` | Registry written, **2 placeholders** |
 | `.firebaserc` | `beta` and `production` aliases declared, **both placeholders** |
 | Readiness gate | `environment:prepare:beta` refuses on any `REPLACE_WITH_` marker |
@@ -31,6 +31,17 @@ The guards mean a half-finished provisioning cannot ship. They do not do the pro
 
 Do these in order. Each step's output is the next step's input, and doing them out of order is
 how a project id ends up in one file and not another.
+
+### 0. Back up demo
+
+Before anything else. Demo is 1,308 users and 540 sport-correct matches built by hand, and it
+is not reproducible. Demo is never destroyed to launch beta — they are different projects, which
+is the whole point — but a verified export with a tested restore costs an hour and removes the
+question entirely.
+
+```bash
+npm run backup:firestore
+```
 
 ### 1. Create the two Firebase projects
 
@@ -83,7 +94,7 @@ There are **24 value lines** across four files — 9 distinct values per environ
 project id appears twice in each overlay. `environment:prepare:beta` names any you miss, so run
 it after each file rather than at the end.
 
-**`apphosting.beta.yaml`** — 11:
+**`apphosting.beta.yaml`** — 10 lines, 9 distinct values:
 
 | Placeholder | Source |
 |---|---|
@@ -97,7 +108,7 @@ it after each file rather than at the end.
 | `REPLACE_WITH_BETA_SCHEDULER_AUDIENCE` | the App Hosting origin, step 7 |
 | `REPLACE_WITH_BETA_SCHEDULER_SERVICE_ACCOUNT` | the scheduler service account email, step 7 |
 
-**`apphosting.production.yaml`** — the same 11, production values.
+**`apphosting.production.yaml`** — the same nine, production values.
 
 **`config/environments.json`** — `beta.firebaseProjectId` and
 `production.firebaseProjectId`.
@@ -174,13 +185,6 @@ npm run deploy:preflight -- --environment=beta --project=beta && firebase deploy
 Then seed. Note that `scripts/seed-investor-demo.ts` currently hard-refuses any project but
 staging; extending it to beta is a deliberate change to make with the beta dataset in hand, not
 a flag to flip in passing.
-
-### 11. Back up demo first
-
-Before any of this, take a Firestore export of demo. It is 1,308 users and 540 sport-correct
-matches built by hand, and it is not reproducible. Demo is never destroyed to launch beta —
-they are different projects — but a verified export with a tested restore costs an hour and
-removes the question entirely.
 
 ---
 
