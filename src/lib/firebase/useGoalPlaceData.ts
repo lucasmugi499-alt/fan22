@@ -70,16 +70,20 @@ function toAuthorType(post: FeedPost): NonNullable<FeedPost['authorType']> {
   return 'Fan';
 }
 
+/**
+ * No fallback. A league whose index has not been computed has no signals.
+ *
+ * This used to synthesise a full set when `indexSignals` was absent — 82 for athlete profile
+ * completion if the league had any athletes, 88 for admin reliability if it was verified,
+ * a flat 72 for media uploads — and the league page then rendered them as measurements. That
+ * made the breakdown behind the GoalPlace Index as invented as the index itself, and harder to
+ * notice, because a breakdown reads as evidence.
+ *
+ * `server/leagueIndex/projection.ts` writes the real signals hourly. Until it has run for a
+ * league, the interface says the league is not yet rated rather than showing plausible numbers.
+ */
 function signalsForLeague(league: League) {
-  return league.indexSignals ?? {
-    verification: league.verifiedResultsRate ?? 0,
-    matchCompletionRate: league.matchCompletionRate ?? 0,
-    athleteProfileCompletion: league.athletesCount ? 82 : 0,
-    fanEngagement: Math.min(100, Math.round((league.supportersCount ?? 0) / 8)),
-    supportActivity: Math.min(100, Math.round((league.totalSupport ?? 0) / 50000)),
-    adminReliability: league.verified ? 88 : 58,
-    mediaUploads: 72,
-  };
+  return league.indexSignals;
 }
 
 export function adaptAthlete(athlete: Athlete): Athlete {

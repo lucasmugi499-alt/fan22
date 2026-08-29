@@ -161,9 +161,15 @@ export function LeagueCard({
       </div>
       <div className="flex items-center gap-4 text-xs text-muted">
         <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> <span className="tabular tabular-nums">{league.teamsCount}</span> teams</span>
-        <span className="inline-flex items-center gap-1">
-          <span className="tabular tabular-nums font-semibold text-text-strong">{league.goalPlaceIndex}</span> index
-        </span>
+        {typeof league.goalPlaceIndex === 'number' ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="tabular tabular-nums font-semibold text-text-strong">{league.goalPlaceIndex}</span> index
+          </span>
+        ) : (
+          // Not "0 index", and not the constant 45 this replaced. A league with too little
+          // history to rate says so, rather than printing a number nothing computed.
+          <span className="inline-flex items-center gap-1 text-subtle">Not yet rated</span>
+        )}
       </div>
       <div className="mt-auto grid grid-cols-2 gap-2 border-t border-border pt-3 text-xs">
         <span>

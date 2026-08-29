@@ -19,6 +19,7 @@ import { MatchCard } from '@/components/core/MatchCard';
 import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { getSportTheme } from '@/lib/sportThemes';
 import { LeagueNoticeList } from '@/components/core/LeagueNoticeList';
+import { IndexBreakdown } from '@/components/league/IndexBreakdown';
 import type { Athlete, FeedPost, League, LeagueNotice, Match, Season, StoredStanding, Team } from '@/types';
 import { SnapRow } from '@/components/ui/ScrollRail';
 
@@ -194,6 +195,10 @@ export function LeaguePublic({
           <Card className="p-4 text-sm text-muted">Standings appear as official results are recorded.</Card>
         )}
       </section>
+
+      {/* Directly under the table, because the index is the other number this page asserts
+          about the league and it is the one that used to be a constant. */}
+      <IndexBreakdown league={league} />
 
       {upcoming.length ? (
         <section className="space-y-2.5">

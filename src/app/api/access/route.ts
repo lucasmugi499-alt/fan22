@@ -294,7 +294,10 @@ export async function POST(request: Request) {
           matchesCount: 0,
           matchCompletionRate: 0,
           verifiedResultsRate: 0,
-          goalPlaceIndex: 0,
+          // `null`, not 0. Zero is a score, and it would rank a brand-new league below a
+          // badly-run one on evidence that does not exist yet. The hourly pass fills this in
+          // once the league has enough history for the number to mean anything.
+          goalPlaceIndex: null,
           totalSupport: 0,
           supportersCount: 0,
           verificationRules: {

@@ -59,6 +59,8 @@
     "prod:assert-clean": "tsx scripts/prod/assert-clean.ts",
     "demo:export": "tsx scripts/demo/data-lifecycle.ts --action=export",
     "demo:validate": "tsx scripts/demo/data-lifecycle.ts --action=validate",
+    "demo:recompute-index": "tsx scripts/demo/recompute-index.ts",
+    "demo:recompute-index:apply": "tsx scripts/demo/recompute-index.ts --apply",
     "demo:reset": "tsx scripts/demo/data-lifecycle.ts --action=demo-reset",
     "beta:seed": "tsx scripts/demo/data-lifecycle.ts --action=beta-seed",
     "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset",

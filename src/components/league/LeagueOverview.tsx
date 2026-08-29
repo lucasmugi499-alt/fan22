@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyLeague, teamsInLeague, matchesInLeague, exceptionQueue, verifiedRate } from '@/lib/league/leagueContext';
 import { buildLeagueStandings } from '@/lib/leagueModel';
+import { indexLabel } from '@/lib/leagueIndex';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -71,7 +72,7 @@ export function LeagueOverview() {
         <Metric icon={Warning} label="Exceptions" value={exceptions.length} tone={exceptions.length ? 'pending' : 'default'} />
         <Metric icon={Buildings} label="Teams" value={lTeams.length} />
         <Metric icon={ShieldCheck} label="Verified" value={`${rate}%`} tone="verified" />
-        <Metric icon={ChartLineUp} label="Index" value={league.goalPlaceIndex} tone="brand" />
+        <Metric icon={ChartLineUp} label="Index" value={indexLabel(league.goalPlaceIndex)} tone="brand" />
       </div>
 
       <LeagueOperations league={league} season={activeSeason} onSaved={retry} />

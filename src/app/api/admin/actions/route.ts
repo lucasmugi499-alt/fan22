@@ -292,7 +292,11 @@ export async function POST(request: Request) {
               matchesCount: 0,
               matchCompletionRate: 0,
               verifiedResultsRate: 0,
-              goalPlaceIndex: 45,
+              // `null`, not 45. Every league created through this command used to be
+              // assigned the literal value 45 — a number displayed on its card and used to
+              // sort discovery, that nothing ever recomputed. A new league has no operating
+              // history, so it has no index until the hourly pass has something to measure.
+              goalPlaceIndex: null,
               ranking: 1,
               totalSupport: 0,
               supportersCount: 0,

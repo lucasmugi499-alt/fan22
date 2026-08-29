@@ -74,7 +74,10 @@ export function OrganizationDirectory() {
         matchesCount: 0,
         matchCompletionRate: 0,
         verifiedResultsRate: 0,
-        goalPlaceIndex: 45,
+        // `null`, not 45. This is the optimistic record rendered while the create command
+        // is in flight, so a literal here would flash the exact constant the index projection
+        // replaced — and a new league genuinely has no operating history to score.
+        goalPlaceIndex: null,
         totalSupport: 0,
         supportersCount: 0,
         verificationRules: {

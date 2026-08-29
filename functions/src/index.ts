@@ -20,6 +20,7 @@ import { activationSourceForReport } from '../../src/server/finalizerActivation'
 import { expireLapsedAssignments, runProjectionRepairs } from './lifecycle';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 import { sweepUnreportedMatches as runUnreportedMatchSweep } from '../../src/server/finalization/unreportedSweep';
+import { recomputeLeagueIndexes } from '../../src/server/leagueIndex/projection';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -384,6 +385,23 @@ export const convergeLifecycle = onSchedule(
     timeoutSeconds: 300,
   },
   async () => {
+    /**
+     * The GoalPlace Index, recomputed from each league's own records.
+     *
+     * It was a stored constant: displayed on every league card, used to sort discovery,
+     * described in the product copy as proof of operational quality, and computed by nothing.
+     * Every league the platform created got the literal value 45.
+     *
+     * First in the pass and deliberately not fatal — a failure here leaves yesterday's scores
+     * and a log line, while the access expiry and projection repairs below govern authority
+     * and must run regardless.
+     */
+    const indexes = await recomputeLeagueIndexes(db).catch((error) => {
+      logger.error('League index recomputation failed', { error: String(error) });
+      return undefined;
+    });
+    if (indexes) logger.info('League indexes recomputed', indexes);
+
     const expiry = await expireLapsedAssignments(db);
     const repairs = await runProjectionRepairs(
       db,

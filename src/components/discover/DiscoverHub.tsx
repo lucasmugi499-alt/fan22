@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
+import { indexSortValue } from '@/lib/leagueIndex';
 import {
   buildLeagueTableSnapshot,
   standingForTeam,
@@ -65,7 +66,11 @@ export function DiscoverHub() {
     .sort((a, b) => pointsForTeam(b) - pointsForTeam(a)), [teams, matchesFilters, pointsForTeam, verifiedOnly]);
   const filteredLeagues = useMemo(() => leagues
     .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
-    .sort((a, b) => b.goalPlaceIndex - a.goalPlaceIndex), [leagues, matchesFilters, verifiedOnly]);
+    // Unrated leagues sort last. `null` is a real state — a league with too few fixtures for
+    // the index to mean anything — and floating it to the top is the unearned prominence the
+    // old constant 45 gave every new league.
+    .sort((a, b) => indexSortValue(b.goalPlaceIndex) - indexSortValue(a.goalPlaceIndex)),
+    [leagues, matchesFilters, verifiedOnly]);
   const filteredMatches = useMemo(() => matches
     .filter((item) => {
       const home = teamById.get(item.homeTeamId);
@@ -90,7 +95,7 @@ export function DiscoverHub() {
   const forYou = {
     athletes: followedOrTop(athletes, userProfile?.followedAthletes, (item) => item.goalPlacePoints),
     teams: followedOrTop(teams, userProfile?.followedTeams, pointsForTeam),
-    leagues: followedOrTop(leagues, userProfile?.followedLeagues, (item) => item.goalPlaceIndex),
+    leagues: followedOrTop(leagues, userProfile?.followedLeagues, (item) => indexSortValue(item.goalPlaceIndex)),
   };
   const cities = [...new Set(leagues.map((item) => item.city))].sort();
 

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Card } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
+import { indexSortValue } from '@/lib/leagueIndex';
 import type { League, Match, Season, Team } from '@/types';
 import {
   buildLeagueTableSnapshot,
@@ -46,7 +47,8 @@ export function LeaguesDiscover({
   const filtered = useMemo(
     () => records
       .filter((league) => activeSport === 'All' || sportLabel(String(league.sport)) === activeSport)
-      .sort((a, b) => (b.goalPlaceIndex ?? 0) - (a.goalPlaceIndex ?? 0)),
+      // Unrated leagues sort last, not level with a league scoring zero.
+      .sort((a, b) => indexSortValue(b.goalPlaceIndex) - indexSortValue(a.goalPlaceIndex)),
     [activeSport, records],
   );
   const bySport = useMemo(() => groupBy(filtered, (league) => sportLabel(String(league.sport))), [filtered]);

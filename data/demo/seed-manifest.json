@@ -11,7 +11,7 @@
   "promotable": false,
   "content": {
     "databasePath": "data/investor-demo/database.json",
-    "databaseSha256": "92956e8b3de5cc2fa743354b159446235a82395511c2988bb97dde88f48f94f6",
+    "databaseSha256": "f163f13901b9a1fc3b5819a87dc8fedb4f0810b8559433b5fc23f39ae1a8ee3f",
     "authManifestPath": "data/demo/auth-manifest.json",
     "mediaManifestPath": "data/demo/media-manifest.json"
   },

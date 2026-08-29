@@ -451,14 +451,27 @@ export interface NotificationPreferences {
   platformOperations: boolean;
 }
 
+/**
+ * The signals behind the GoalPlace Index. Four, not seven.
+ *
+ * `adminReliability` and `mediaUploads` are gone, along with `fanEngagement` and
+ * `supportActivity`. The first two were hard-coded plausible-looking numbers — 88 for a
+ * verified league, 70 for everyone — which is the same defect as the constant index at a
+ * smaller scale, and worse for being hidden inside a breakdown where it looks like evidence.
+ * The other two measured interest rather than operations, and ranking discovery on them would
+ * have made the index a popularity score wearing an operations label.
+ *
+ * Every remaining signal is a ratio of things actually counted. See `lib/leagueIndex.ts`.
+ */
 export interface GoalPlaceIndexSignals {
+  /** Played fixtures that reached an official, verified result. */
   verification: number;
-  matchCompletionRate: number;
-  athleteProfileCompletion: number;
-  fanEngagement: number;
-  supportActivity: number;
-  adminReliability: number;
-  mediaUploads: number;
+  /** Fixtures whose date has passed and which have a recorded result. */
+  completion: number;
+  /** Athletes with a registered position and a club. */
+  athleteRegistration: number;
+  /** Clubs with a confirmed roster for the current season. */
+  rosterConfirmation: number;
 }
 
 export interface Sport {
@@ -531,12 +544,29 @@ export interface League {
   matchesCount: number;
   matchCompletionRate: number;
   verifiedResultsRate: number;
-  goalPlaceIndex: number;
+  /**
+   * Operational quality, 0-100, or `null` for a league with too little history to rate.
+   *
+   * Computed hourly by `server/leagueIndex/projection.ts` from the league's own records —
+   * results verified, fixtures completed, athletes registered, rosters confirmed. It was
+   * previously a stored constant that nothing computed, and every league the platform created
+   * was assigned the literal value 45.
+   *
+   * `null` is a real state, not a missing value: below `MIN_MATCHES_FOR_INDEX` the ratios
+   * swing on a single result, and a two-fixture league sitting at 100 would out-rank an
+   * established one. The interface shows "Not yet rated" rather than a number.
+   */
+  goalPlaceIndex: number | null;
   ranking?: number;
   logoUrl?: string;
   verifiedPercentage?: number;
   completionRate?: number;
   indexSignals?: GoalPlaceIndexSignals;
+  /** The counts behind each signal, so a breakdown can show its working rather than a percentage. */
+  indexEvidence?: Partial<Record<keyof GoalPlaceIndexSignals, { numerator: number; denominator: number }>>;
+  /** Whether the league has enough history for the score to mean anything. */
+  indexEstablished?: boolean;
+  indexComputedAt?: string;
   totalSupport: number;
   supportersCount: number;
   verificationRules: {

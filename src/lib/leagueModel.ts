@@ -2,7 +2,7 @@
 // standings projection, where a path alias survives into the emitted CommonJS and fails at
 // require time — tsc resolves the alias, it does not rewrite it. `functions/scripts/verify-bundle.mjs`
 // fails the build if one reappears.
-import type { League, LeagueStatus, Match, PointsAdjustment, SeasonScoringRules, Team } from '../types';
+import type { GoalPlaceIndexSignals, League, LeagueStatus, Match, PointsAdjustment, SeasonScoringRules, Team } from '../types';
 import { isOfficialMatch } from './status';
 import { defaultScoringFor } from './season';
 
@@ -91,52 +91,55 @@ export function getLeagueStatusMeta(status: LeagueStatus) {
   return leagueStatusMeta[status];
 }
 
+/**
+ * The breakdown behind a league's index, read from what was actually computed.
+ *
+ * This used to invent its inputs. When `league.indexSignals` was absent it fabricated a full
+ * set of plausible-looking sub-scores — `athleteProfileCompletion: 80` if the league had any
+ * athletes at all, `adminReliability: 88` if it was verified and 58 if not, `mediaUploads: 70`
+ * unconditionally — and then rendered them as though they were measurements. A fabricated
+ * breakdown is worse than a fabricated total, because it looks like evidence for the total.
+ *
+ * Now there is no fallback. A league whose index has not been computed returns no signals, and
+ * the interface says so. `server/leagueIndex/projection.ts` writes both the score and the
+ * counts behind it in the hourly pass.
+ */
 export function getGoalPlaceIndexSignals(league: League): GoalPlaceIndexSignal[] {
-  const signals = league.indexSignals ?? {
-    verification: league.verifiedResultsRate ?? 0,
-    matchCompletionRate: league.matchCompletionRate ?? 0,
-    athleteProfileCompletion: league.athletesCount ? 80 : 0,
-    fanEngagement: Math.min(100, Math.round((league.supportersCount ?? 0) / 8)),
-    supportActivity: Math.min(100, Math.round((league.totalSupport ?? 0) / 50000)),
-    adminReliability: league.verified ? 88 : 58,
-    mediaUploads: 70,
+  const signals = league.indexSignals;
+  if (!signals) return [];
+
+  const evidence = league.indexEvidence ?? {};
+  const describe = (key: keyof GoalPlaceIndexSignals) => {
+    const counts = evidence[key];
+    return counts && counts.denominator > 0
+      ? `${counts.numerator} of ${counts.denominator}`
+      : undefined;
   };
 
   return [
     {
-      label: 'Verification',
+      label: 'Results verified',
       value: signals.verification,
-      detail: 'Identity, admin, athlete, and result checks.',
+      detail: describe('verification')
+        ?? 'Played fixtures that reached an official, verified result.',
     },
     {
-      label: 'Match completion',
-      value: signals.matchCompletionRate,
-      detail: 'Published fixtures with completed results.',
+      label: 'Fixtures completed',
+      value: signals.completion,
+      detail: describe('completion')
+        ?? 'Fixtures whose date has passed and which have a recorded result.',
     },
     {
-      label: 'Athlete profiles',
-      value: signals.athleteProfileCompletion,
-      detail: 'Complete athlete records, positions, teams, and bios.',
+      label: 'Athletes registered',
+      value: signals.athleteRegistration,
+      detail: describe('athleteRegistration')
+        ?? 'Athletes with a registered position and a club.',
     },
     {
-      label: 'Fan engagement',
-      value: signals.fanEngagement,
-      detail: 'Follows, reactions, comments, and repeat participation.',
-    },
-    {
-      label: 'Support activity',
-      value: signals.supportActivity,
-      detail: 'Transparent support flowing to athletes and teams.',
-    },
-    {
-      label: 'Admin reliability',
-      value: signals.adminReliability,
-      detail: 'Timely approvals, result reviews, and moderation quality.',
-    },
-    {
-      label: 'Media uploads',
-      value: signals.mediaUploads,
-      detail: 'Matchday photos, highlights, and verified league posts.',
+      label: 'Rosters confirmed',
+      value: signals.rosterConfirmation,
+      detail: describe('rosterConfirmation')
+        ?? 'Clubs with a confirmed roster for the current season.',
     },
   ];
 }

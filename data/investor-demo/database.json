@@ -26689,19 +26689,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 797,
+      "goalPlaceIndex": 84,
       "ranking": 1,
       "logoUrl": "/demo/assets/leagues/league_football_kampala.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 89,
-        "fanEngagement": 74,
-        "supportActivity": 71,
-        "adminReliability": 90,
-        "mediaUploads": 73
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4680000,
       "supportersCount": 40,
@@ -26710,7 +26707,27 @@
         "requiresRefereeConfirmation": true,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2025-12-09T13:00:00Z"
+      "createdAt": "2025-12-09T13:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 180,
+          "denominator": 180
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     },
     {
       "id": "league_football_eastern",
@@ -26732,19 +26749,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 814,
+      "goalPlaceIndex": 84,
       "ranking": 2,
       "logoUrl": "/demo/assets/leagues/league_football_eastern.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 90,
-        "fanEngagement": 76,
-        "supportActivity": 74,
-        "adminReliability": 91,
-        "mediaUploads": 76
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4290000,
       "supportersCount": 40,
@@ -26753,7 +26767,27 @@
         "requiresRefereeConfirmation": true,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2025-12-16T12:00:00Z"
+      "createdAt": "2025-12-16T12:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 180,
+          "denominator": 180
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     },
     {
       "id": "league_basketball_kampala",
@@ -26775,19 +26809,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 831,
+      "goalPlaceIndex": 84,
       "ranking": 3,
       "logoUrl": "/demo/assets/leagues/league_basketball_kampala.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 91,
-        "fanEngagement": 78,
-        "supportActivity": 77,
-        "adminReliability": 92,
-        "mediaUploads": 79
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4200000,
       "supportersCount": 40,
@@ -26796,7 +26827,27 @@
         "requiresRefereeConfirmation": false,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2025-12-31T15:00:00Z"
+      "createdAt": "2025-12-31T15:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 120,
+          "denominator": 120
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     },
     {
       "id": "league_basketball_north",
@@ -26818,19 +26869,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 848,
+      "goalPlaceIndex": 84,
       "ranking": 4,
       "logoUrl": "/demo/assets/leagues/league_basketball_north.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 92,
-        "fanEngagement": 80,
-        "supportActivity": 80,
-        "adminReliability": 89,
-        "mediaUploads": 82
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4025000,
       "supportersCount": 40,
@@ -26839,7 +26887,27 @@
         "requiresRefereeConfirmation": false,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2026-01-07T14:00:00Z"
+      "createdAt": "2026-01-07T14:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 120,
+          "denominator": 120
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     },
     {
       "id": "league_rugby_kampala",
@@ -26861,19 +26929,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 865,
+      "goalPlaceIndex": 84,
       "ranking": 5,
       "logoUrl": "/demo/assets/leagues/league_rugby_kampala.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 88,
-        "fanEngagement": 82,
-        "supportActivity": 83,
-        "adminReliability": 90,
-        "mediaUploads": 85
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4265000,
       "supportersCount": 40,
@@ -26882,7 +26947,27 @@
         "requiresRefereeConfirmation": true,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2025-12-23T11:00:00Z"
+      "createdAt": "2025-12-23T11:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 200,
+          "denominator": 200
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     },
     {
       "id": "league_rugby_eastern",
@@ -26904,19 +26989,16 @@
       "matchesCount": 90,
       "matchCompletionRate": 49,
       "verifiedResultsRate": 91,
-      "goalPlaceIndex": 882,
+      "goalPlaceIndex": 84,
       "ranking": 6,
       "logoUrl": "/demo/assets/leagues/league_rugby_eastern.svg",
       "verifiedPercentage": 91,
       "completionRate": 49,
       "indexSignals": {
         "verification": 91,
-        "matchCompletionRate": 49,
-        "athleteProfileCompletion": 89,
-        "fanEngagement": 84,
-        "supportActivity": 86,
-        "adminReliability": 91,
-        "mediaUploads": 88
+        "completion": 49,
+        "athleteRegistration": 100,
+        "rosterConfirmation": 100
       },
       "totalSupport": 4545000,
       "supportersCount": 40,
@@ -26925,7 +27007,27 @@
         "requiresRefereeConfirmation": true,
         "allowsPerformancePledges": true
       },
-      "createdAt": "2025-12-30T10:00:00Z"
+      "createdAt": "2025-12-30T10:00:00Z",
+      "indexEvidence": {
+        "verification": {
+          "numerator": 40,
+          "denominator": 44
+        },
+        "completion": {
+          "numerator": 44,
+          "denominator": 90
+        },
+        "athleteRegistration": {
+          "numerator": 200,
+          "denominator": 200
+        },
+        "rosterConfirmation": {
+          "numerator": 10,
+          "denominator": 10
+        }
+      },
+      "indexEstablished": true,
+      "indexComputedAt": "2026-08-29T00:00:00.000Z"
     }
   ],
   "seasons": [
