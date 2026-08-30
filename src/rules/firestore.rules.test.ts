@@ -2434,3 +2434,51 @@ describe('points adjustments are a ruling, not a client write', () => {
     await assertFails(deleteDoc(doc(asUser(LEAGUE_ADMIN), 'pointsAdjustments/adjustment_001')));
   });
 });
+
+/**
+ * The invited athlete's email address and claim token were published.
+ *
+ * They were written onto `athletes/{id}`, which is `allow read: if true` because a public
+ * sporting profile has to be findable without an account. So the invited address, the token
+ * hash, and an action URL carrying the CLEARTEXT claim token in its query string sat on a
+ * document anyone could list anonymously.
+ *
+ * These now live in `athleteInvitations`, which nothing outside the server may read. There is
+ * no client that needs to: the athlete follows a link they were emailed and the server
+ * compares the token.
+ */
+describe('athlete invitations are not part of the public profile', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'athleteInvitations/athlete_001'), {
+        athleteId: 'athlete_001',
+        invitedEmail: 'invited.athlete@example.com',
+        invitationTokenHash: 'a-hash-of-the-claim-token',
+        invitationActionUrl: '/register?next=%2Fathletes%2Fathlete_001%3Fclaim%3Dcleartext',
+        invitationExpiresAt: '2026-09-30T00:00:00.000Z',
+      });
+    });
+  });
+
+  it('cannot be read anonymously', () => assertFails(
+    getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'athleteInvitations/athlete_001')),
+  ));
+
+  it('cannot be read by a signed-in user', () => assertFails(
+    getDoc(doc(asUser('some_signed_in_user'), 'athleteInvitations/athlete_001')),
+  ));
+
+  it('cannot be read by the league that issued it', () => assertFails(
+    getDoc(doc(asUser(LEAGUE_ADMIN), 'athleteInvitations/athlete_001')),
+  ));
+
+  it('cannot be written from a browser', () => assertFails(
+    setDoc(doc(asUser(LEAGUE_ADMIN), 'athleteInvitations/athlete_002'), {
+      athleteId: 'athlete_002', invitedEmail: 'x@example.com',
+    }),
+  ));
+
+  it('leaves the public athlete profile readable, which is the point of separating them', () => assertSucceeds(
+    getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'athletes/athlete_001')),
+  ));
+});

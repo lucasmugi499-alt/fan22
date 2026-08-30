@@ -327,6 +327,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /**
+     * Athlete invitations. Server only, in both directions.
+     *
+     * These fields used to live on `athletes/{id}`, which is `allow read: if true` — so the
+     * invited email address, the token hash and an action URL carrying the cleartext claim
+     * token were published on the public sporting profile. Anyone could list athletes
+     * anonymously and read them.
+     *
+     * Nothing in a browser has any reason to read an invitation: the athlete follows a link
+     * they were emailed, and the server compares the token. Denying reads outright is
+     * therefore not a restriction on anybody, and it is the only setting under which the
+     * secret is a secret.
+     */
+    match /athleteInvitations/{athleteId} {
+      allow read: if false;
+      allow write: if false;
+    }
+
     match /athleteClaims/{claimId} {
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.requesterUserId == request.auth.uid) ||

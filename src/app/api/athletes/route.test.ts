@@ -141,11 +141,39 @@ describe('athlete creation route hardening', () => {
       registeredPosition: 'Forward',
       teamId: 'team_1',
       leagueId: 'league_1',
-      invitedEmail: 'new.athlete@example.com',
-      invitationTokenHash: expect.any(String),
-      invitationActionUrl: expect.stringContaining('/register?next='),
       verificationStatus: 'pending',
     }));
+
+    /*
+     * The public sporting profile carries no part of the invitation.
+     *
+     * `athletes/{id}` is `allow read: if true`, so every one of these fields was readable by
+     * anyone — including an action URL with the cleartext claim token in its query string.
+     * Asserted as an absence rather than by checking the other document only, because the leak
+     * was that these were written HERE.
+     */
+    const athleteWrite = transaction.set.mock.calls
+      .map(([, data]) => data as Record<string, unknown>)
+      .find((data) => data?.legalName === 'New Athlete');
+    // Asserted before the absences below, so a write this test failed to find cannot pass them
+    // by being undefined.
+    expect(athleteWrite).toBeDefined();
+    for (const field of [
+      'invitedEmail', 'invitationTokenHash', 'invitationActionUrl', 'invitationExpiresAt',
+    ]) {
+      expect(athleteWrite).not.toHaveProperty(field);
+    }
+
+    // And the invitation itself is written to the server-only collection.
+    expect(transaction.set).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        athleteId: 'athletes_generated',
+        invitedEmail: 'new.athlete@example.com',
+        invitationTokenHash: expect.any(String),
+        invitationActionUrl: expect.stringContaining('/register?next='),
+      }),
+    );
     expect(sendAthleteInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: 'new.athlete@example.com',
       athleteName: 'New Athlete',

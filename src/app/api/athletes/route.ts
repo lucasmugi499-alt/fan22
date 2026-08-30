@@ -118,10 +118,6 @@ export async function POST(request: Request) {
       country: 'Uganda',
       ageGroup,
       bio: `${name} is building a verified sporting record with ${teamData.name}.`,
-      invitedEmail,
-      invitationTokenHash: tokenHash,
-      invitationActionUrl: actionUrl,
-      invitationExpiresAt: expiresAt,
       createdByUserId: actor.uid,
       verified: false,
       verificationStatus: 'pending',
@@ -130,6 +126,32 @@ export async function POST(request: Request) {
       goalPlacePoints: 0,
       stats: {},
       impactNeeds: [],
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    /**
+     * The invitation lives beside the athlete, never on it.
+     *
+     * `athletes/{id}` is `allow read: if true` — it is the public sporting profile, and it has
+     * to be, because an athlete should be findable without an account. The invitation is the
+     * opposite kind of fact: a private email address, a token hash, and an action URL that
+     * carries the CLEARTEXT claim token in its query string. Writing those onto the public
+     * document published them: anyone could list athletes anonymously and read the invited
+     * address and the link that claims the profile.
+     *
+     * A public sporting record and a private identity handshake do not belong in one document,
+     * however convenient the join is. `athleteInvitations` denies all client access in the
+     * rules, and only the two server routes that create and redeem an invitation read it.
+     */
+    transaction.set(adminDb.collection('athleteInvitations').doc(athleteRef.id), {
+      id: athleteRef.id,
+      athleteId: athleteRef.id,
+      teamId: team.id,
+      leagueId: teamData.leagueId,
+      invitedEmail,
+      invitationTokenHash: tokenHash,
+      invitationActionUrl: actionUrl,
+      invitationExpiresAt: expiresAt,
+      createdByUserId: actor.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
     transaction.set(adminDb.collection('adminAuditEvents').doc(), {
@@ -150,7 +172,9 @@ export async function POST(request: Request) {
     expiresAt,
     athleteId: athleteRef.id,
   });
-  await athleteRef.set({
+  // Delivery state is invitation state, so it goes where the invitation went. On the public
+  // athlete document it disclosed both that an invitation exists and how it fared.
+  await adminDb.collection('athleteInvitations').doc(athleteRef.id).set({
     emailProvider: 'resend',
     emailDelivery: email.status,
     ...(email.id ? {

@@ -179,10 +179,13 @@ describe('athlete claim access projection', () => {
           const document = target as ReturnType<typeof ref>;
           if (document.collectionName === 'apiRateLimits') return snapshot(undefined);
           if (document.collectionName === 'athletes') {
+            // The public sporting profile, holding no part of the invitation. It used to carry
+            // the invited address and the token hash, on a document readable by anyone.
+            return snapshot({ id: 'athlete_1', teamId: 'team_1', leagueId: 'league_1' });
+          }
+          if (document.collectionName === 'athleteInvitations') {
             return snapshot({
-              id: 'athlete_1',
-              teamId: 'team_1',
-              leagueId: 'league_1',
+              athleteId: 'athlete_1',
               invitedEmail: 'athlete@example.com',
               invitationTokenHash: createHash('sha256').update(token).digest('hex'),
               invitationExpiresAt: new Date(Date.now() + 60_000).toISOString(),

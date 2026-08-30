@@ -134,18 +134,31 @@ export async function POST(request: Request) {
         if (!athleteSnapshot.exists) throw new Error('Athlete profile not found.');
         const athlete = athleteSnapshot.data()!;
         if (athlete.userId) throw new Error('This athlete profile is already linked.');
-        const invitedEmail = normalizeEmail(athlete.invitedEmail);
-        if (!invitedEmail || !athlete.invitationTokenHash) {
+        /*
+         * Read from `athleteInvitations`, not from the athlete.
+         *
+         * The invited address and the token hash used to sit on `athletes/{id}`, which is
+         * publicly readable — so the secret this check compares against was published beside
+         * the profile it protects. The checks themselves are unchanged; only where they read
+         * from is.
+         */
+        const invitationSnapshot = await transaction.get(
+          adminDb.collection('athleteInvitations').doc(input.athleteId),
+        );
+        const invitation = invitationSnapshot.data();
+        const invitedEmail = normalizeEmail(invitation?.invitedEmail);
+        if (!invitedEmail || !invitation?.invitationTokenHash) {
           throw new Error('Ask your Team Admin for an athlete invitation link.');
         }
-        if (athlete.invitationExpiresAt && Date.parse(String(athlete.invitationExpiresAt)) <= Date.now()) {
+        if (invitation.invitationExpiresAt
+          && Date.parse(String(invitation.invitationExpiresAt)) <= Date.now()) {
           throw new Error('This athlete invitation link has expired.');
         }
         if (normalizeEmail(actor.email) !== invitedEmail) {
           throw new Error('Use the athlete account email that received this invitation.');
         }
         const tokenHash = createHash('sha256').update(input.invitationToken).digest('hex');
-        if (tokenHash !== athlete.invitationTokenHash) {
+        if (tokenHash !== invitation.invitationTokenHash) {
           throw new Error('This athlete invitation link is invalid or expired.');
         }
         const existing = await transaction.get(
