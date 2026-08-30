@@ -730,11 +730,17 @@ it and the load spreads across one document per season.
 
 ### Deploy state
 
-Firestore rules and the 22 discovery indexes are **released** to `fg256`, and all 12 Functions
-are **updated**. The App Hosting rollout for this commit **failed and did not deploy**: Google's
-Developer Connect could not mint a GitHub read token (`could not create token for installation
-140768273: context deadline exceeded`), three attempts. The backend and repository link are
-intact and demo is healthy on `build-2026-08-30-003`, so this is an outage between Google and
-GitHub rather than anything in the repo. **The App Hosting plane is therefore behind main** —
-retry `apphosting:rollouts:create`, and if it keeps failing, re-authorize the GitHub App
-connection from the Firebase console.
+All three planes are current. Firestore rules and the 22 discovery indexes are **released** to
+`fg256`, all 12 Functions are **updated**, and App Hosting is on **`build-2026-08-30-004`**.
+
+Verified on the live origin: every discovery filter combination returns results, and an
+eight-page cursor walk returned 192 items with zero duplicates. The league page still reads
+`82 / 100` with all four index signals and their counts, and still carries the *Samy* row the
+backfill added.
+
+**Worth knowing for the next deploy.** Two rollout attempts failed before the third succeeded,
+both with the same error: Google's Developer Connect could not mint a GitHub read token
+(`could not create token for installation 140768273: context deadline exceeded`). Nothing in
+the repo changed between the failures and the success. If it recurs, retry before investigating
+— and if it persists, re-authorize the GitHub App connection from the Firebase console. A
+failed rollout leaves the previous build serving, so demo stayed healthy throughout.
