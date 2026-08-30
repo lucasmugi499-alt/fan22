@@ -118,7 +118,17 @@ export type FinalizationSourceType =
   | 'field_capture'
   | 'league_post_match'
   | 'legacy_team_submission'
-  | 'platform_exception_resolution';
+  | 'platform_exception_resolution'
+  /**
+   * An adjudicated correction, from `resultCases`.
+   *
+   * A fifth SOURCE, not a fifth path. A ruling never writes a score: it builds a candidate and
+   * hands it to the same `finalizeCandidate` every other source uses, so version supersession,
+   * the idempotency ledger, the standings recomputation and the notifications are the ones
+   * that already exist. Adding a second way to write an official result is precisely what this
+   * avoids.
+   */
+  | 'result_case';
 
 /**
  * The four fields that answer "how did this become official?" without depending on anyone's

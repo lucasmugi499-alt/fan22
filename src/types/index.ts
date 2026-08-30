@@ -1696,6 +1696,8 @@ export type AccessRoleKey =
   | "league_verifier"
   | "team_owner"
   | "team_admin"
+  /** Club operations. See the note on the same key in lib/auth/access.ts for why not `team_admin`. */
+  | "club_operator"
   | "roster_manager"
   | "result_reporter"
   | "content_manager"

@@ -58,11 +58,21 @@ export const VERSION_REQUIRED_FIELDS: Record<SupportedEventSchemaVersion, readon
   '2.1.0': ['sourcePrincipal'],
 };
 
+/**
+ * The ingress provenances an official event may claim.
+ *
+ * Kept in step with `FinalizationSourceType` by hand and asserted in the test beside it, because
+ * the two are the same vocabulary read at different ends of the pipeline. A source the finalizer
+ * can produce but this set does not know refuses every event of that result — which is how a
+ * correction first failed: the ruling was sound, the candidate was sound, and the official
+ * events were rejected on the way to disk.
+ */
 const EVENT_SOURCE_TYPES = new Set([
   'field_capture',
   'league_post_match',
   'legacy_team_submission',
   'platform_exception_resolution',
+  'result_case',
 ]);
 
 export type OfficialEventShapeVerdict = {

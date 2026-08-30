@@ -16,6 +16,18 @@ export type AccessRoleKey =
   | 'league_verifier'
   | 'team_owner'
   | 'team_admin'
+  /**
+   * The restored club-operations authority.
+   *
+   * Deliberately NOT `team_admin`. `capabilitiesForAssignment` resolves a bundle by
+   * `permissionBundleId` and then FALLS BACK to the first bundle whose `roleKey` matches, so
+   * giving the new bundle the old key would hand its capabilities to any historical assignment
+   * with a missing or unrecognised bundle id — and which bundle it landed on would depend on
+   * the order of the array below. A privilege grant decided by where a block is pasted.
+   *
+   * The product still calls this person a Team Admin. This is the authority key, not the label.
+   */
+  | 'club_operator'
   | 'roster_manager'
   | 'result_reporter'
   | 'content_manager'
@@ -101,6 +113,20 @@ export type PermissionCapability =
   | 'team.result.submit'
   | 'team.result.confirm'
   | 'team.update.publish'
+  /**
+   * Club operations, restored 2026-08-30 under new spellings.
+   *
+   * Every one is a NEW name rather than an un-deprecation. `team.roster.manage` wrote athlete
+   * registration directly, and reviving that spelling would re-grant it to every historical
+   * assignment still carrying it — broader than anything below and broader than intended. The
+   * retired names stay retired forever; these mean narrower things.
+   */
+  | 'team.profile.edit'
+  | 'team.roster.propose'
+  | 'team.content.publish'
+  | 'team.media.manage'
+  | 'team.result.report'
+  | 'team.result.dispute'
   // `athlete.profile.manage` and `athlete.media.manage` were removed on 2026-08-22 when
   // athletes became managed profiles. The team that knows the athlete writes their name,
   // photo, position and roster status through team.roster.manage; an athlete no longer
@@ -423,6 +449,42 @@ export const PERMISSION_BUNDLES: PermissionBundle[] = [
     roleKey: 'roster_manager',
     label: 'Roster Only (retiring)',
     capabilities: RETIRING_TEAM_CAPABILITIES.roster_only,
+  },
+  /**
+   * Club operations, restored under ADR-005.
+   *
+   * ADR-004 retired Team Admin as an account class, and that was right about the AUTHORITY it
+   * held: a club could write its own roster, submit a result, and confirm its opponent's. What
+   * it was wrong about was the club having no operational identity at all — the pages stayed,
+   * the workflows they described did not, and a club official reading "Needs you now" beside a
+   * control that granted nothing is worse than no page.
+   *
+   * So this is narrower than what was retired, in a specific way: every capability here writes
+   * a PROPOSAL or a piece of EVIDENCE, and none of them writes anything official.
+   *
+   *   Field Manager captures. League governs. Clubs report and dispute. GoalPlace finalizes.
+   *
+   * The thing this must never become is bilateral confirmation. Two clubs agreeing is the V1
+   * workflow field capture replaced, and it is why `team.result.report` produces evidence
+   * attached to a match rather than a finalization candidate. A club's account of the match is
+   * heard; it is not counted.
+   *
+   * Not in `RETIRING_TEAM_CAPABILITIES`, so `GOALPLACE_TEAM_AUTHORITY_STAGE` does not gate it:
+   * that stage machine governs draining V1, which is a separate and finished concern.
+   */
+  {
+    id: 'club_operations',
+    version: '1.0.0',
+    roleKey: 'club_operator',
+    label: 'Club Operator',
+    capabilities: [
+      'team.profile.edit',
+      'team.roster.propose',
+      'team.content.publish',
+      'team.media.manage',
+      'team.result.report',
+      'team.result.dispute',
+    ],
   },
   {
     id: 'athlete_self',

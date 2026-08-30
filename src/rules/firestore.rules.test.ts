@@ -2546,3 +2546,65 @@ describe('a browser-created document may only carry the keys it is meant to', ()
       application({ userId: 'somebody_else' })),
   ));
 });
+
+
+/**
+ * ADR-005 restores club operations. The line it has to hold: every club capability writes a
+ * proposal or a piece of evidence, and none of them writes anything official.
+ *
+ * The specific trap is that `hasTeamOperatorCapability` lists the RETIRED V1 authority, and the
+ * rules consulting it are the rules that guarded those workflows. Extending it would have
+ * handed a Club Operator every surface the retired role had.
+ */
+describe('a Club Operator writes proposals and evidence, never the record', () => {
+  const CLUB_USER = 'user_club_operator';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), `accessIndex/team_team_a_${CLUB_USER}`),
+        accessIndexDoc(CLUB_USER, 'team', 'team_a', [
+          'team.profile.edit', 'team.roster.propose', 'team.content.publish',
+          'team.media.manage', 'team.result.report', 'team.result.dispute',
+        ]),
+      );
+    });
+  });
+
+  it('cannot write a match', () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'matches/match_001'), { score: { home: 9, away: 0 } }),
+  ));
+
+  it('cannot write a standings row', () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'standings/season_001_team_a'), { points: 99 }),
+  ));
+
+  it('cannot write a finalization', () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'finalizations/match_001'), { status: 'completed' }),
+  ));
+
+  it('cannot write a result case, so a ruling cannot be forged or its evidence removed', () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'resultCases/match_001__case1'), {
+      matchId: 'match_001', status: 'resolved_corrected',
+      ruling: { outcome: 'corrected', correctedScore: { home: 5, away: 0 } },
+    }),
+  ));
+
+  it('cannot write an athlete registration', () => assertFails(
+    // Roster is propose-only. A club that could write registration could manufacture
+    // eligibility, which is the authority ADR-004 was right to take away.
+    setDoc(doc(asUser(CLUB_USER), 'athletes/athlete_001'), { squadNumber: 7 }),
+  ));
+
+  it('does not inherit the retired V1 team authority', () => assertFails(
+    // `team.result.submit` and `team.result.confirm` are the bilateral workflow. The new
+    // capabilities must not reach the surfaces those guarded.
+    setDoc(doc(asUser(CLUB_USER), 'resultSubmissions/match_001'), {
+      matchId: 'match_001', status: 'official', homeScore: 3, awayScore: 0,
+    }),
+  ));
+
+  it('can read a result case, because a correction that happened invisibly proves nothing', () => assertSucceeds(
+    getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'resultCases/match_001__case1')),
+  ));
+});

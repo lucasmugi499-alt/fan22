@@ -150,6 +150,23 @@ service cloud.firestore {
         ]);
     }
 
+    /**
+     * Club operations, restored under ADR-005.
+     *
+     * A SEPARATE helper from `hasTeamOperatorCapability` rather than an extension of it. That
+     * one lists the retired V1 authority — a club writing its own roster and confirming its
+     * opponent's result — and the rules that consult it are the rules that guarded those
+     * workflows. Folding the new capabilities into it would silently hand a Club Operator
+     * every surface the retired role had, which is the opposite of what ADR-005 restores.
+     *
+     * Every capability here writes a proposal or a piece of evidence. None of them writes
+     * anything official, and none of them appears in a rule governing `matches`, `standings`,
+     * `finalizations` or `officialResultVersions`.
+     */
+    function hasClubOperatorCapability(teamId, capability) {
+      return hasScopeCapability('team', teamId, [capability]);
+    }
+
     /** Reading is what a platform operator legitimately does from a console. */
     function canReadLeagueById(leagueId) {
       return isPlatformAdmin() || hasLeagueOperatorCapability(leagueId);
@@ -899,6 +916,23 @@ service cloud.firestore {
      * league id, so moving a club to another league erased it from the season it actually
      * played, and adding one put a club with no games into a season that had finished.
      */
+    /**
+     * Adjudications of an official result.
+     *
+     * Publicly readable because the result is: a club or a supporter who can see that a score
+     * changed is entitled to see that it was ruled on, by whom, and why. A correction that
+     * happened invisibly is indistinguishable from a record that was quietly edited, which is
+     * the accusation this platform exists to be able to refute.
+     *
+     * Written only by the server. A ruling reaches the official record through the finalizer
+     * and nowhere else, so there is no browser write that could produce one — and a case that
+     * a client could edit would be a case whose evidence could be removed after the fact.
+     */
+    match /resultCases/{caseId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /seasonTeams/{registrationId} {
       allow read: if true;
       allow write: if false;

@@ -189,3 +189,37 @@ export function leagueReportLifecycle(input: { reportRef: DocumentReference }): 
   const base = fieldReportLifecycle(input);
   return { ...base, sourceType: 'league_post_match' };
 }
+
+/**
+ * An adjudicated correction closing out.
+ *
+ * The case is the source record, so this is where a ruling learns which official version it
+ * produced. It writes `resultingVersion` and nothing else about the sporting record: the score
+ * is the finalizer's to write, from the candidate, in the same transaction.
+ *
+ * A blocked correction stays `resolved_corrected` with the reason attached rather than reverting
+ * to an open case. The league DID rule; what failed was publishing the ruling, and reopening
+ * the case would ask them to decide something they have already decided.
+ */
+export function resultCaseLifecycle(input: { caseRef: DocumentReference }): SourceLifecycleAdapter {
+  return {
+    sourceType: 'result_case',
+
+    onFinalized(tx, { plan }) {
+      tx.update(input.caseRef, {
+        resultingVersion: plan.resultVersion,
+        finalizationKey: plan.finalizationKey,
+        finalizedAt: plan.sourceLifecycle.finalizedAt,
+        updatedAt: plan.sourceLifecycle.finalizedAt,
+      });
+    },
+
+    onBlocked(tx, { reason, exceptionId, at }) {
+      tx.update(input.caseRef, {
+        blockedReason: reason,
+        reconciliationExceptionId: exceptionId,
+        updatedAt: at,
+      });
+    },
+  };
+}

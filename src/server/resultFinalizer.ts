@@ -49,8 +49,14 @@ import { bindReportToEvents, verifyReportBinding } from '../lib/matchOps/digest'
 import { computeDataQuality } from './finalization/quality';
 import { buildResultProvenance } from './finalization/provenance';
 import {
+  buildCandidateFromResultCase,
+  type EvidenceRef,
+  type ResultCaseRuling,
+} from './results/resultCase';
+import {
   fieldReportLifecycle,
   leagueReportLifecycle,
+  resultCaseLifecycle,
   legacySubmissionLifecycle,
   type SourceLifecycleAdapter,
 } from './finalization/lifecycle';
@@ -1966,6 +1972,71 @@ export async function finalizeFieldReport(
     db,
     finalizeCandidate(db, fieldReportLoader(db, matchId), activation, matchId),
   );
+}
+
+/**
+ * An adjudicated correction. Fourth source, same engine.
+ *
+ * The point of this function is how little of it there is. A correction does not get its own
+ * transaction, its own version arithmetic, its own standings rebuild or its own notification —
+ * it gets the ones that already exist, because a second way to write an official score is the
+ * thing most likely to make two surfaces disagree about a match.
+ *
+ * The stale guard is `plan.ts`'s, unchanged: a candidate whose `resultVersion` is not ahead of
+ * the match's current one is a `noop`. So a case opened against version 1 and ruled on after
+ * somebody else published version 2 cannot roll that back, and needs no check of its own here.
+ */
+export async function finalizeResultCase(
+  db: Firestore,
+  caseId: string,
+  activation: FinalizerActivation,
+): Promise<FinalizeOutcome> {
+  return finalizeThenProject(
+    db,
+    finalizeCandidate(db, resultCaseLoader(db, caseId), activation, caseId),
+  );
+}
+
+/**
+ * Loads a ruled case as a finalization candidate.
+ *
+ * Every refusal is a `skip` rather than a throw, exactly like the other loaders: this runs
+ * inside the finalizer's transaction and on a Cloud Function retry, and a throw would make the
+ * retry replay the whole finalization rather than record that there was nothing to do.
+ */
+export function resultCaseLoader(db: Firestore, caseId: string): CandidateLoader {
+  return async (tx) => {
+    const caseRef = db.collection('resultCases').doc(caseId);
+    const snapshot = await tx.get(caseRef);
+    if (!snapshot.exists) return { skip: 'no_result_case' };
+
+    const record = { id: snapshot.id, ...snapshot.data() } as Record<string, unknown> & { id: string };
+    if (record.status !== 'resolved_corrected') return { skip: 'case_not_corrected' };
+    if (record.resultingVersion) return { skip: 'already_finalized' };
+
+    const ruling = record.ruling as ResultCaseRuling | undefined;
+    if (!ruling?.correctedScore) return { skip: 'ruling_has_no_corrected_score' };
+
+    const candidate = buildCandidateFromResultCase({
+      resultCase: {
+        id: record.id,
+        matchId: String(record.matchId ?? ''),
+        leagueId: String(record.leagueId ?? ''),
+        seasonId: String(record.seasonId ?? ''),
+        sport: String(record.sport ?? 'football'),
+        subjectVersion: Number(record.subjectVersion ?? 0),
+        evidence: Array.isArray(record.evidence) ? record.evidence as EvidenceRef[] : [],
+      },
+      ruling,
+    });
+
+    return {
+      candidate,
+      lifecycle: resultCaseLifecycle({ caseRef }),
+      oversizeShape: { scorers: candidate.scorers, athleteStatLines: [], activeSquads: {} },
+      alreadyFinalized: false,
+    };
+  };
 }
 
 /** The league post-match entry point. Third source, same engine. */

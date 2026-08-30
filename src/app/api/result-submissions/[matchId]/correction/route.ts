@@ -7,6 +7,7 @@ import { requireAuthenticatedMutation } from '@/server/api/security';
 import { hasCapability } from '@/server/access/capabilities';
 import type { AppRole, ResultSubmission } from '@/types';
 import { activationFromEnvironment } from '@/server/finalizerActivation';
+import { openResultCase } from '@/server/results/openResultCase';
 
 export const runtime = 'nodejs';
 
@@ -49,50 +50,29 @@ export async function POST(
   const submissionRef = adminDb.collection('resultSubmissions').doc(matchId);
   try {
     if (input.action === 'request') {
-      await adminDb.runTransaction(async (transaction) => {
-        const snapshot = await transaction.get(submissionRef);
-        if (!snapshot.exists) throw new Error('Result submission not found.');
-        const submission = { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
-        if (submission.status !== 'official') throw new Error('Only an official result can enter correction review.');
-        const role = typeof actor.role === 'string' ? actor.role as AppRole : 'fan';
-        const isPlatform = role === 'platform_admin' || role === 'super_admin';
-        // Canonical authority on the exact league, or on either team in the fixture. A
-        // correction is requested by someone party to the result, so the team side asks
-        // for the capability that lets them report one at all.
-        /**
-         * League or Platform only since ADR-004. The two team arms asked for
-         * `team.result.submit` on either side of the fixture, which grants nothing now, so
-         * they could only ever have contributed false.
-         *
-         * This is a real narrowing rather than a rewrite of the same rule: a club officer
-         * can no longer request a correction directly. What replaces it is the League, who
-         * they ask, and for an athlete the stat-issue route that opens a correction case.
-         */
-        const managesLeague = await hasCapability(
-          actor.uid,
-          { scopeType: 'league', scopeId: submission.leagueId },
-          'league.result.resolve',
-        );
-        if (!isPlatform && !managesLeague) {
-          throw new Error('Only the league or Platform can request a correction.');
-        }
-        transaction.update(submissionRef, {
-          correctionReason: input.reason,
-          correctionRequestedBy: actor.uid,
-          correctionRequestedAt: FieldValue.serverTimestamp(),
-        });
-        transaction.create(submissionRef.collection('events').doc(), {
-          submissionId: matchId,
-          from: 'official',
-          to: 'official',
-          // No `team_admin` arm: the refusal above means neither remaining branch can be one.
-          actor: isPlatform ? 'platform_admin' : 'league_admin',
-          actorUserId: actor.uid,
-          note: `Correction requested: ${input.reason}`,
-          createdAt: FieldValue.serverTimestamp(),
-        });
+      /**
+       * The legacy address, opening a case in the unified model.
+       *
+       * This used to write correction fields onto `resultSubmissions/{matchId}` — which is why
+       * a result that became official through V2 field capture could not be corrected at all:
+       * there is no such document for it, so the platform's own primary intake produced results
+       * the product had no way to challenge.
+       *
+       * Two correction systems would have been the same disease with more code, so this is a
+       * door into the same room rather than a second room. Older bundles keep working and land
+       * on a `resultCase` exactly as a current client does.
+       *
+       * The one thing a legacy caller loses is the stale-page check: it cannot name the version
+       * it is challenging, so the opener defaults to the match's current one.
+       */
+      const opened = await openResultCase({
+        db: adminDb,
+        matchId,
+        actorUid: actor.uid,
+        reason: input.reason,
       });
-      return Response.json({ ok: true, requested: true });
+      if (!opened.ok) return Response.json({ error: opened.error }, { status: opened.status });
+      return Response.json({ ok: true, requested: true, caseId: opened.caseId });
     }
 
     let version = 0;
