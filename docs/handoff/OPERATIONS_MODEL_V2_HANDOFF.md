@@ -665,3 +665,76 @@ and `reconcilePaymentIntents` / `lockFantasyLineups` as "not deployed, and must 
 All three were already live before this session — `functions:list` shows 12 functions, and has
 since at least 2026-08-28. The document had drifted from the plane it describes, which is the
 failure its own §0 warns about. This deploy updated all 12 rather than introducing any.
+
+
+---
+
+## 12. Scale work, 2026-08-30
+
+Prompted by a stated requirement: massive concurrent users, 10,000 leagues, the math must be
+correct and the engine must not fail. That framing found a real defect and set the priorities
+below.
+
+### The engine defect it found
+
+**Concurrent finalizations in one season could erase a verified result from the table.**
+Recomputation read a whole season and then wrote every row, with the reads outside any
+transaction:
+
+```
+A finalizes.  A's recompute reads matches   -> sees A
+B finalizes.  B's recompute reads matches   -> sees A and B
+              B writes rows(A, B)
+              A writes rows(A)              -> B is GONE
+```
+
+Last writer wins and the last writer had the stale read. Nothing errors: the table is present,
+well-formed, confidently wrong. On a matchday it is not exotic — ten fixtures kicking off
+together finish together.
+
+Closed with compare-and-swap on a per-season revision in `standingsProjections/{seasonId}`.
+Every pass reads the revision before its inputs and commits only if it has not moved; whichever
+ordering two passes take, the one committing last read after every prior write. The transaction
+reads one small document, not the season — a transaction over the matches would conflict with
+the finalizer's own writes and turn a matchday into a retry storm against the work generating it.
+
+**The first test for this was vacuous.** It ran two passes over unchanging data, so both
+computed the same table and it passed with the guard deleted. It now forces a write between one
+pass's input read and its commit, and was verified to fail with the guard disabled.
+
+### What else changed
+
+| Area | Change |
+|---|---|
+| Discovery | `/api/discover` — server-side sport/city/verified filters with a document-id cursor. The four browse tabs page through the whole catalogue instead of filtering a fixed slice of 48 leagues. 22 composite indexes, generated from the same table the query builder uses so they cannot drift. |
+| League index | Rebuilt ten at a time with a bounded worker queue, window raised 200 -> 1,000. Rotation over 10,000 leagues drops from ~50 hours to ~10. |
+| Standings resolver | A stored table is only trusted when it has a row per club. Discovery reads standings for every league at once and caps them, so past ~120 leagues a league's share of that slice is its top two rows — which was being returned as a complete, authoritative two-row table. |
+| Operator directories | The data hook reports which collections came back at their limit, and the three largest directories say so. Not pagination — that is a project — but they stop presenting 500 of 1.8 million as the whole. |
+| CI | `.github/workflows/deploy-ready.yml`. The gate chained eleven checks and nothing ran it. |
+| Client errors | `/api/client-errors` plus boundaries and window handlers, joined to the server audit trail by the `requestId` `requireAuthenticatedMutation` already mints. |
+| Spend guard | `scripts/ops/spend-guard.sh`, ready to run. Cannot be run from here: budgets need Billing Account Administrator. |
+
+### Where it stands at 10,000 leagues
+
+Correct at any scale: the standings computation is pure and per-season, the projection refuses
+rather than truncates past 2,000 matches, recomputation is deterministic so a corrupted table is
+repaired by re-running, and concurrency is now serialized.
+
+Still capped: `readCollection`'s 500 default and the twelve operator directories. Those now
+disclose the cap rather than hiding it; real pagination is the next piece of work.
+
+Known characteristic, not a defect: `standingsProjections/{seasonId}` takes one write per
+finalization, and Firestore sustains roughly one write per second per document. A single season
+finalizing many fixtures in the same few seconds contends; the compare-and-swap retries absorb
+it and the load spreads across one document per season.
+
+### Deploy state
+
+Firestore rules and the 22 discovery indexes are **released** to `fg256`, and all 12 Functions
+are **updated**. The App Hosting rollout for this commit **failed and did not deploy**: Google's
+Developer Connect could not mint a GitHub read token (`could not create token for installation
+140768273: context deadline exceeded`), three attempts. The backend and repository link are
+intact and demo is healthy on `build-2026-08-30-003`, so this is an outage between Google and
+GitHub rather than anything in the repo. **The App Hosting plane is therefore behind main** —
+retry `apphosting:rollouts:create`, and if it keeps failing, re-authorize the GitHub App
+connection from the Firebase console.
