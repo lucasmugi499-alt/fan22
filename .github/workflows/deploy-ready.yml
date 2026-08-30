@@ -1,0 +1,162 @@
+# The `deploy:ready` gate, run by a machine instead of by memory.
+#
+# `npm run deploy:ready` chains eleven checks and has to pass before a release. Nothing ran it
+# automatically, so the gate depended on somebody remembering — and the checks it protects are
+# not small: 1,888 unit tests, 166 Firestore Rules cases covering "nobody can author an official
+# result" and "the audit trail is append-only", and 29 integration tests.
+#
+# ## Why three jobs rather than one `deploy:ready`
+#
+# The chain is sequential and its slowest members are independent of its fastest. Splitting
+# gives a failing lint back in about a minute instead of behind a JVM start and a Next build,
+# and the three run in parallel. Their union is exactly `deploy:ready`, and `gate` at the bottom
+# is the single required check so nothing can be quietly dropped from the set.
+#
+# ## Nothing here needs a credential
+#
+# Every gate is offline. The guards read files, the emulator suites run against a local
+# emulator, and `next build` succeeds with no `.env.local` at all — the environment resolves to
+# `local` and `assertConfigMatchesProject` skips when there is no ambient project to compare
+# against. That is deliberate: a CI pipeline that needs a service account is one that cannot run
+# on a fork's pull request.
+
+name: deploy:ready
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push makes an in-flight run irrelevant. Cancelling reclaims a runner rather than
+# reporting on a commit nobody is waiting for — except on main, where every commit's result is
+# a record worth keeping.
+concurrency:
+  group: deploy-ready-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, unit tests, guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` at the root runs `postinstall`, which is `npm --prefix functions ci`. Both
+      # lockfiles are installed by this one step.
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # The repo's own guards, run as separate steps so a failure names itself in the job
+      # list rather than scrolling past in the middle of a chain's output.
+      - name: Demo dataset checksum
+        run: npm run demo:validate
+
+      - name: Access compatibility
+        run: npm run access:compat
+
+      - name: Legacy authority budget
+        run: npm run access:guard
+
+      - name: Deprecated field budget
+        run: npm run data:guard
+
+      - name: Dependency advisories
+        run: npm run security:audit
+
+  emulator:
+    name: Firestore Rules and integration
+    runs-on: ubuntu-latest
+    # Longer than the others: the suites start a JVM, and the Storage rules case that uploads
+    # 16 MB is slow on a shared runner.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The Firestore and Storage emulators are Java. Pinned rather than relying on whatever
+      # the runner image ships, so an image update cannot change what these suites run on.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+
+      # Cached so a run does not re-download the emulator jars every time. Keyed on the
+      # lockfile, which is what pins firebase-tools and therefore which jars get pulled.
+      - name: Cache emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-
+
+      - name: Firestore Rules suite
+        run: npm run test:rules
+
+      - name: Firestore integration suite
+        run: npm run test:integration
+
+  build:
+    name: Functions and application build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Functions type check
+        run: npm run functions:typecheck
+
+      # Also runs `verify-bundle`, which fails on an unresolved `@/` path alias in the emitted
+      # CommonJS. That trap has bitten this repo five times; it is the check that catches it.
+      - name: Functions build
+        run: npm run functions:build
+
+      # Deliberately no environment. The build must succeed with nothing configured, which is
+      # what proves it is not silently depending on a developer's `.env.local`.
+      - name: Application build
+        run: npm run build
+
+  gate:
+    name: deploy:ready
+    runs-on: ubuntu-latest
+    needs: [checks, emulator, build]
+    # Runs even when a dependency failed, so this job reports the verdict rather than being
+    # skipped into a misleading green.
+    if: always()
+    steps:
+      - name: Verify every job passed
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "deploy:ready did not pass. See the failing job above."
+            exit 1
+          fi
+          echo "deploy:ready passed."
