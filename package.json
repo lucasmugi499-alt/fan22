@@ -89,7 +89,9 @@
     "release:unreported-sweep": "tsx scripts/release/unreported-match-sweep.ts",
     "release:unreported-canary": "tsx scripts/release/unreported-match-canary.ts",
     "standings:backfill-season-teams": "tsx --env-file=.env.local scripts/standings/backfill-season-teams.ts",
-    "standings:backfill-season-teams:apply": "tsx --env-file=.env.local scripts/standings/backfill-season-teams.ts --apply"
+    "standings:backfill-season-teams:apply": "tsx --env-file=.env.local scripts/standings/backfill-season-teams.ts --apply",
+    "data:repair-scores": "tsx --env-file=.env.local scripts/data/repair-implausible-scores.ts",
+    "data:repair-scores:apply": "tsx --env-file=.env.local scripts/data/repair-implausible-scores.ts --apply"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
