@@ -18,8 +18,21 @@ function svg(markup: string): string {
   return `data:image/svg+xml,${encodeURIComponent(markup)}`;
 }
 
-function initials(name: string): string {
-  return name
+/**
+ * Two letters for a crest, from a name that might not be there.
+ *
+ * The guard is load-bearing rather than defensive habit. This threw a TypeError on
+ * `undefined.replace` and took `/athletes` down with a 500 in production: the page renders the
+ * 48 most recently created athletes, and on the demo database every one of those is a
+ * pre-ADR-001 document carrying `name` instead of `legalName`. Every caller passed
+ * `athlete.legalName` straight in.
+ *
+ * The real fix is normalizing identity at the data boundary, which
+ * `server/publicCatalogue.ts` now does. This is the second line: a crest is decoration, and a
+ * missing name should cost a blank crest, never a page.
+ */
+function initials(name: string | undefined): string {
+  return (name ?? '')
     .replace(/[^A-Za-z ]/g, '')
     .split(' ')
     .filter(Boolean)

@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { environmentFlags, goalPlaceEnvironment } from '@/lib/environment';
 import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
 import { adaptMatch } from '@/lib/matchRecord';
+import { normalizeAthleteIdentity } from '@/lib/athleteIdentity';
 
 export type PublicCatalogueSource = 'live' | 'curated_preview' | 'configured_preview';
 
@@ -93,6 +94,24 @@ function matchRecord(id: string, data: FirebaseFirestore.DocumentData): Match {
 }
 
 /**
+ * Athletes need the same identity normalization the client provider applies.
+ *
+ * Exactly the argument above, for the collection it was missed on. ADR-001 renamed `name` to
+ * `legalName` and `position` to `registeredPosition`, and `normalizeAthleteIdentity` fills the
+ * canonical fields from whichever shape a stored document has. `firebaseProvider` applies it;
+ * these server loaders did not.
+ *
+ * That asymmetry took `/athletes` down with a 500 in production. The page renders the 48 most
+ * recently created athletes, every one of which on the demo database is a pre-ADR-001
+ * document — so `athlete.legalName` was `undefined`, `initials()` called `.replace` on it, and
+ * the render threw. An anonymous visitor never gets past `initialData`, so there was no client
+ * read to repair it afterwards.
+ */
+function athleteRecord(id: string, data: FirebaseFirestore.DocumentData): Athlete {
+  return normalizeAthleteIdentity(record<Athlete>(id, data));
+}
+
+/**
  * Returns the newest records, not an arbitrary page of them. A bare `.limit()` returns
  * documents in key order, so "recent" surfaces were showing whichever records happened to
  * sort first by ID. Every collection read here carries a required `createdAt`, so ordering
@@ -101,6 +120,18 @@ function matchRecord(id: string, data: FirebaseFirestore.DocumentData): Match {
 async function recentCollection<T>(name: string, limit: number) {
   const snapshot = await adminDb.collection(name).orderBy('createdAt', 'desc').limit(limit).get();
   return snapshot.docs.map((item) => record<T>(item.id, item.data()));
+}
+
+/**
+ * The athlete equivalent, so no server loader can read the collection unadapted.
+ *
+ * A separate function rather than a flag on `recentCollection`, because "athletes are read
+ * through the identity boundary" is a rule and a boolean argument is an invitation to forget
+ * it. Every server-side athlete read in this file goes through here or `athleteRecord`.
+ */
+async function recentAthletes(limit: number): Promise<Athlete[]> {
+  const snapshot = await adminDb.collection('athletes').orderBy('createdAt', 'desc').limit(limit).get();
+  return snapshot.docs.map((item) => athleteRecord(item.id, item.data()));
 }
 
 export async function getPublicLeagues() {
@@ -178,7 +209,7 @@ export async function getPublicLeagueProfileData(leagueId: string) {
         adminDb.collection('seasons').where('leagueId', '==', leagueId).limit(20).get()
           .then((snapshot) => snapshot.docs.map((item) => record<Season>(item.id, item.data()))),
         adminDb.collection('athletes').where('leagueId', '==', leagueId).limit(48).get()
-          .then((snapshot) => snapshot.docs.map((item) => record<Athlete>(item.id, item.data()))),
+          .then((snapshot) => snapshot.docs.map((item) => athleteRecord(item.id, item.data()))),
         adminDb.collection('feedPosts').where('relatedLeagueId', '==', leagueId).limit(12).get()
           .then((snapshot) => snapshot.docs.map((item) => record<typeof investorDemo.feedPosts[number]>(item.id, item.data()))),
         adminDb.collection('leagueNotices').where('leagueId', '==', leagueId).limit(12).get()
@@ -243,7 +274,7 @@ export async function getPublicDiscoveryData() {
         recentCollection<Season>('seasons', 80),
         adminDb.collection('standings').orderBy('rank', 'asc').limit(1200).get()
           .then((snapshot) => snapshot.docs.map((item) => record<StoredStanding>(item.id, item.data()))),
-        recentCollection<Athlete>('athletes', 240),
+        recentAthletes(240),
         recentCollection<Challenge>('challenges', 60),
       ]);
       return { leagues, teams, matches, seasons, standings, athletes, challenges };
@@ -255,9 +286,42 @@ export async function getPublicDiscoveryData() {
 export async function getPublicAthletes() {
   if (!usesFirebaseData()) return configured(investorDemo.athletes.slice(0, 48));
   return withSyntheticDemoFallback(
-    () => recentCollection<Athlete>('athletes', 48),
+    () => recentAthletes(48),
     () => investorDemo.athletes.slice(0, 48),
   );
+}
+
+/**
+ * The clubs a given set of matches actually references.
+ *
+ * `/matches` paired a 700-match read with `getPublicTeams()`, which returns the 80 most
+ * recently created clubs. The demo database has 141. So 61 clubs were missing from the lookup
+ * the match cards use, and every fixture involving one rendered as "Team vs Team" — the card
+ * falls back to the literal string when the id does not resolve.
+ *
+ * Fetching by id instead of by recency makes the lookup complete by construction: it is
+ * derived from the matches on the page rather than from a limit that happens to be larger
+ * than the catalogue. It is also bounded by the page, not the club count, so it does not
+ * degrade as clubs are added.
+ *
+ * Firestore's `in` takes 30 values, hence the chunking.
+ */
+async function teamsForMatches(matches: Match[]): Promise<Team[]> {
+  const ids = [...new Set(
+    matches.flatMap((match) => [
+      match.homeTeamId, match.awayTeamId, match.teamAId, match.teamBId,
+    ]).filter((id): id is string => Boolean(id)),
+  )];
+  if (!ids.length) return [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+
+  const snapshots = await Promise.all(chunks.map((chunk) =>
+    adminDb.collection('teams').where('__name__', 'in', chunk).get()));
+
+  return snapshots.flatMap((snapshot) =>
+    snapshot.docs.map((item) => record<Team>(item.id, item.data())));
 }
 
 export async function getPublicMatches() {
@@ -271,6 +335,28 @@ export async function getPublicMatches() {
       return snapshot.docs.map((item) => matchRecord(item.id, item.data()));
     },
     () => investorDemo.matches,
+  );
+}
+
+/**
+ * Matches with exactly the clubs they reference, so no fixture renders as "Team vs Team".
+ */
+export async function getPublicMatchesWithTeams() {
+  const fallback = () => ({
+    matches: investorDemo.matches,
+    teams: investorDemo.teams,
+  });
+  if (!usesFirebaseData()) return configured(fallback());
+  return withSyntheticDemoFallback(
+    async () => {
+      const snapshot = await adminDb.collection('matches')
+        .orderBy('scheduledAt', 'desc')
+        .limit(700)
+        .get();
+      const matches = snapshot.docs.map((item) => matchRecord(item.id, item.data()));
+      return { matches, teams: await teamsForMatches(matches) };
+    },
+    fallback,
   );
 }
 
@@ -292,7 +378,7 @@ export async function getPublicLandingData() {
       const [leagues, teams, athletes, matches, challenges] = await Promise.all([
         recentCollection<League>('leagues', 12),
         recentCollection<Team>('teams', 80),
-        recentCollection<Athlete>('athletes', 24),
+        recentAthletes(24),
         adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(40).get()
           .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
         recentCollection<Challenge>('challenges', 12),
