@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Bricolage_Grotesque, Plus_Jakarta_Sans, Space_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
+import { ClientErrorReporter } from '@/components/observability/ClientErrorReporter';
 import './globals.css';
 
 import { AppShell } from '@/components/layout/AppShell';
@@ -57,6 +58,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </AuthModalProvider>
           </AuthProvider>
         </EnvironmentBoundary>
+        {/* Window-level handlers for what no React boundary sees: an unhandled rejection,
+            and a script error outside the render tree. */}
+        <ClientErrorReporter />
         <Toaster
           theme="dark"
           position="top-center"

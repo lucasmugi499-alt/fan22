@@ -166,7 +166,11 @@ export function getGoalPlaceIndexSignals(league: League): GoalPlaceIndexSignal[]
   // All four, or none. A breakdown missing half its rows does not explain the score above it,
   // and a partial explanation of a number is worse than no explanation.
   if (all.some((signal) => !signal.measured)) return [];
-  return all.map(({ measured: _measured, ...signal }) => signal);
+  return all.map((signal) => ({
+    label: signal.label,
+    value: signal.value,
+    detail: signal.detail,
+  }));
 }
 
 export type LeagueStanding = {
