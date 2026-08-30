@@ -860,3 +860,51 @@ and re-verified in the browser in both directions.
   the public catalogue's per-request read volume.
 - The seven legacy `league_005/006/007` matches carrying football scorelines on basketball
   fixtures.
+
+---
+
+## Session log — 30 August 2026 (evening): ADR-005
+
+Product decisions confirmed by the owner, then implemented. See
+`docs/ADR-005-CLUB-OPERATIONS-AND-RESULT-CASES.md` for the decision itself.
+
+**Club operations restored** under `roleKey: 'club_operator'` / `bundleId: 'club_operations'`.
+The key matters: `capabilitiesForAssignment` falls back to the first bundle whose roleKey
+matches, so reusing `team_admin` would have handed the new capabilities to any historical
+assignment with an unrecognised bundle id, decided by array order. Every capability is a new
+spelling for the same reason — reviving `team.roster.manage` would re-grant direct registration
+writes to old assignments. `GOALPLACE_TEAM_AUTHORITY_STAGE` stays `retired` and is untouched.
+
+**One result case.** `resultCases` replaces correction-per-provenance. A ruling never writes a
+score; it builds a candidate with `sourceType: 'result_case'` and goes through
+`finalizeCandidate`. Seven integration tests prove the chain on the emulator, including that a
+2-1 corrected to 1-2 moves three points across the table.
+
+**What the integration test found, and the lesson.** `validateOfficialEventShape` keeps its own
+allowlist of ingress provenances, separate from `FinalizationSourceType`. Adding a finalization
+source without adding it there produces a sound ruling, a sound candidate, and every official
+event refused on the way to disk. Nothing but a real finalization writes official events, so no
+unit test could have caught it. **If you add a `FinalizationSourceType`, add it to
+`EVENT_SOURCE_TYPES` in the same commit** — there is now a test that fails if you do not.
+
+**Legacy scores repaired.** Seven basketball matches carried football scorelines and were marked
+verified; `checkScorePlausibility` now catches the class and the guard test runs against the
+shipped seed dataset rather than a fixture of it.
+
+### Deploy state
+
+Rules, all 12 Functions and App Hosting `build-2026-08-30-015` are current. Verified live:
+`resultCases` reads allowed, browser writes 403; both result-case routes 401 unauthenticated.
+
+### Still open, and now genuinely blocked on someone
+
+- **Beta and production projects.** `.firebaserc` still holds `REPLACE_WITH_` placeholders and
+  is deliberately untouched. Needs project IDs, database and bucket names, and an App Check
+  decision from the owner.
+- **Correction UI.** `MatchDetail`'s "Request correction" reaches the new model through the
+  legacy address. It works; it should move to `/api/matches/{id}/result-cases` and grow a case
+  view so a league can rule from the product rather than by API.
+- **Club Operator surfaces.** The authority exists and nothing renders it yet. `/team-admin/*`
+  still describes the retired workflows.
+- **Fantasy and catalogue scale**, deliberately deferred: correctness and unbounded reads only
+  until after beta.
