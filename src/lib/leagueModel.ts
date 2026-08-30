@@ -108,6 +108,22 @@ export function getGoalPlaceIndexSignals(league: League): GoalPlaceIndexSignal[]
   const signals = league.indexSignals;
   if (!signals) return [];
 
+  /**
+   * A signal is only shown if it was actually measured.
+   *
+   * Documents written before the index was computed carry the OLD seven-key shape —
+   * `matchCompletionRate`, `athleteProfileCompletion`, `fanEngagement` and the two hard-coded
+   * ones. Reading the new keys off those yields `undefined`, which rendered as a bare `%` with
+   * no number: three blank rows under a heading claiming to explain the score. That was live on
+   * demo for the few minutes between the App Hosting rollout and the index recomputation.
+   *
+   * Returning only measured signals means a partially-migrated league shows nothing rather
+   * than something misleading, and `IndexBreakdown` already renders nothing when the list is
+   * empty. The window is unavoidable — the documents are rewritten by an hourly pass, not by
+   * the deploy — so the read path has to tolerate it rather than assume it away.
+   */
+  const measured = (value: unknown): value is number => typeof value === 'number';
+
   const evidence = league.indexEvidence ?? {};
   const describe = (key: keyof GoalPlaceIndexSignals) => {
     const counts = evidence[key];
@@ -116,32 +132,41 @@ export function getGoalPlaceIndexSignals(league: League): GoalPlaceIndexSignal[]
       : undefined;
   };
 
-  return [
+  const all: Array<GoalPlaceIndexSignal & { measured: boolean }> = [
     {
       label: 'Results verified',
       value: signals.verification,
       detail: describe('verification')
         ?? 'Played fixtures that reached an official, verified result.',
+      measured: measured(signals.verification),
     },
     {
       label: 'Fixtures completed',
       value: signals.completion,
       detail: describe('completion')
         ?? 'Fixtures whose date has passed and which have a recorded result.',
+      measured: measured(signals.completion),
     },
     {
       label: 'Athletes registered',
       value: signals.athleteRegistration,
       detail: describe('athleteRegistration')
         ?? 'Athletes with a registered position and a club.',
+      measured: measured(signals.athleteRegistration),
     },
     {
       label: 'Rosters confirmed',
       value: signals.rosterConfirmation,
       detail: describe('rosterConfirmation')
         ?? 'Clubs with a confirmed roster for the current season.',
+      measured: measured(signals.rosterConfirmation),
     },
   ];
+
+  // All four, or none. A breakdown missing half its rows does not explain the score above it,
+  // and a partial explanation of a number is worse than no explanation.
+  if (all.some((signal) => !signal.measured)) return [];
+  return all.map(({ measured: _measured, ...signal }) => signal);
 }
 
 export type LeagueStanding = {

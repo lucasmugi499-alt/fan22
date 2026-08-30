@@ -6,6 +6,7 @@ import {
   indexSortValue,
   publishedIndexScore,
 } from './leagueIndex';
+import { getGoalPlaceIndexSignals } from './leagueModel';
 import type { Athlete, League, Match, Roster, Team } from '@/types';
 
 /**
@@ -270,5 +271,64 @@ describe('how an unrated league sorts and reads', () => {
     expect(indexLabel(null)).toBe('Not yet rated');
     expect(indexLabel(undefined)).toBe('Not yet rated');
     expect(indexLabel(72)).toBe('72');
+  });
+});
+
+describe('a league document written before the index existed', () => {
+  /**
+   * The window between an App Hosting rollout and the first index recomputation.
+   *
+   * League documents are rewritten by an hourly pass, not by the deploy, so for up to an hour
+   * they carry the OLD seven-key `indexSignals` shape — `matchCompletionRate`,
+   * `athleteProfileCompletion`, and the two that were hard-coded. Reading the new keys off
+   * those yields `undefined`, which rendered as a bare `%` with no number: three blank rows
+   * under a heading claiming to explain the score. That was live on demo for a few minutes.
+   */
+  const legacyShape = {
+    id: 'league_1',
+    goalPlaceIndex: 797,
+    indexSignals: {
+      verification: 91,
+      matchCompletionRate: 49,
+      athleteProfileCompletion: 82,
+      fanEngagement: 40,
+      supportActivity: 12,
+      adminReliability: 88,
+      mediaUploads: 72,
+    },
+  } as unknown as League;
+
+  it('shows no breakdown at all rather than a partial one', () => {
+    // All four or none. A breakdown missing half its rows does not explain the score above
+    // it, and a partial explanation of a number is worse than no explanation.
+    expect(getGoalPlaceIndexSignals(legacyShape)).toEqual([]);
+  });
+
+  it('shows the full breakdown once every signal has been measured', () => {
+    expect(getGoalPlaceIndexSignals({
+      id: 'league_1',
+      goalPlaceIndex: 82,
+      indexSignals: {
+        verification: 91, completion: 48, athleteRegistration: 100, rosterConfirmation: 91,
+      },
+      indexEvidence: { verification: { numerator: 40, denominator: 44 } },
+    } as unknown as League).map((s) => s.label)).toEqual([
+      'Results verified', 'Fixtures completed', 'Athletes registered', 'Rosters confirmed',
+    ]);
+  });
+
+  it('shows the counts behind a signal when the evidence is stored', () => {
+    // "40 of 44" is checkable against the fixture list on the same page; "91%" is not.
+    expect(getGoalPlaceIndexSignals({
+      id: 'league_1',
+      indexSignals: {
+        verification: 91, completion: 48, athleteRegistration: 100, rosterConfirmation: 91,
+      },
+      indexEvidence: { verification: { numerator: 40, denominator: 44 } },
+    } as unknown as League)[0].detail).toBe('40 of 44');
+  });
+
+  it('shows nothing for a league whose index was never computed', () => {
+    expect(getGoalPlaceIndexSignals({ id: 'league_1' } as League)).toEqual([]);
   });
 });
