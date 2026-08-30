@@ -845,6 +845,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /**
+     * Where a rotating server projection keeps its place between passes.
+     *
+     * Denied on both sides. It is bookkeeping for a scheduled job, has no meaning to any
+     * client, and a writable cursor would let somebody stall a projection indefinitely by
+     * pinning it to one page — a quiet way to freeze every league index but one.
+     */
+    match /projectionCursors/{cursorId} {
+      allow read, write: if false;
+    }
+
+    /**
+     * Per-season projection state: the revision counter the standings rebuild compares against,
+     * and when the table was last built.
+     *
+     * Publicly readable, because "when was this table last rebuilt" is a fair question to ask
+     * of a published league table and answering it is the difference between a stale table and
+     * an unexplained one.
+     *
+     * Never client-writable. The revision is a concurrency control: a client that could move it
+     * could make every recomputation believe it had been superseded, which would freeze a
+     * league's table at whatever it said at that moment — with nothing erroring anywhere.
+     */
+    match /standingsProjections/{seasonId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /finalizations/{finalizationId} {
       allow read: if isPlatformAdmin();
       allow write: if false;

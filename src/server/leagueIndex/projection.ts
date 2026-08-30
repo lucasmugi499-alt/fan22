@@ -23,15 +23,40 @@ export type LeagueIndexProjectionResult = {
   leaguesScanned: number;
   leaguesUpdated: number;
   leaguesUnrated: number;
+  /** The whole catalogue, not just this pass. */
+  totalLeagues: number;
+  /** How many hourly passes the rotation needs to reach every league. */
+  passesToCoverAll: number;
   computedAt: string;
 };
 
 /**
- * A ceiling on one pass, so a runaway catalogue cannot turn the hourly job into an unbounded
- * scan. Well above any plausible league count for this stage; if it is ever reached the job
- * says so rather than silently doing half the work.
+ * How many leagues one pass rebuilds, and why it is a rotating window rather than a cap.
+ *
+ * This was `.limit(500)` with no ordering and no cursor, which is a bug that hides until the
+ * catalogue outgrows it: Firestore returns documents in key order, so past 500 leagues the
+ * hourly job would rebuild the SAME 500 every hour and the rest would never be rated at all.
+ * Not slowly — never. And nothing would report it, because the job would finish cleanly having
+ * done exactly what it was asked.
+ *
+ * It is now a rotating scan with a persisted cursor over document id, so every league is
+ * reached in ceil(total / window) hours regardless of how many there are.
+ *
+ * The obvious alternative — `orderBy('indexComputedAt', 'asc')` to take the least recently
+ * computed first — is wrong in a way that is easy to miss: **a Firestore `orderBy` excludes
+ * documents that do not have the field.** Every league that had never been rated would be
+ * filtered out of the query that exists to rate it, and would stay unrated forever. That is
+ * strictly worse than the bug it would be replacing. Document id is on every document by
+ * definition, which is why the cursor rides on that instead.
+ *
+ * The window exists because the work per league is four queries, and the pass shares a 300s
+ * function timeout with the access expiry and projection repairs that run after it. 200 leagues
+ * is comfortably inside that; 1,000 in one pass was not.
  */
-export const MAX_LEAGUES_PER_PASS = 500;
+export const MAX_LEAGUES_PER_PASS = 200;
+
+/** Where the rotation's position is kept between hourly passes. Server-owned. */
+const CURSOR_ID = 'leagueIndex';
 
 export async function recomputeLeagueIndexes(
   db: Firestore,
@@ -40,7 +65,29 @@ export async function recomputeLeagueIndexes(
   const now = options.now ?? new Date();
   const computedAt = now.toISOString();
 
-  const leaguesSnapshot = await db.collection('leagues').limit(MAX_LEAGUES_PER_PASS).get();
+  const cursorRef = db.collection('projectionCursors').doc(CURSOR_ID);
+  const cursor = await cursorRef.get()
+    .then((snapshot) => snapshot.data()?.lastLeagueId as string | undefined)
+    .catch(() => undefined);
+
+  // Ordered by document id, which every document has. See the note on MAX_LEAGUES_PER_PASS
+  // for why this cannot order on `indexComputedAt`.
+  const page = db.collection('leagues').orderBy('__name__').limit(MAX_LEAGUES_PER_PASS);
+  let leaguesSnapshot = await (cursor ? page.startAfter(cursor) : page).get();
+
+  // The cursor ran off the end of the catalogue, so wrap. Without this the rotation would
+  // stall permanently at the last page once it got there.
+  if (leaguesSnapshot.empty && cursor) {
+    leaguesSnapshot = await page.get();
+  }
+
+  // A league catalogue larger than one window is normal, not an error — it just means the
+  // rotation takes more than one hour to come round. Reported so the cadence is observable
+  // rather than assumed.
+  const totalLeagues = await db.collection('leagues').count().get()
+    .then((snapshot) => snapshot.data().count)
+    .catch(() => leaguesSnapshot.size);
+
   let leaguesUpdated = 0;
   let leaguesUnrated = 0;
 
@@ -93,10 +140,28 @@ export async function recomputeLeagueIndexes(
     leaguesUpdated += 1;
   }
 
+  // Advanced only after the work, so a pass that dies partway retries the same page rather
+  // than skipping it. Recomputation is deterministic, so repeating a page costs reads and
+  // changes nothing.
+  const lastId = leaguesSnapshot.docs.at(-1)?.id;
+  if (lastId) {
+    await cursorRef.set({ lastLeagueId: lastId, updatedAt: computedAt }, { merge: true })
+      .catch((error) => {
+        // A lost cursor restarts the rotation from the beginning, which is slow rather than
+        // wrong. Not worth failing a completed pass over.
+        console.warn('GoalPlace256 could not persist the league index cursor', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }
+
   return {
     leaguesScanned: leaguesSnapshot.size,
     leaguesUpdated,
     leaguesUnrated,
+    totalLeagues,
+    /** Hours for the rotation to reach every league at the current catalogue size. */
+    passesToCoverAll: Math.max(1, Math.ceil(totalLeagues / MAX_LEAGUES_PER_PASS)),
     computedAt,
   };
 }

@@ -68,7 +68,9 @@ const TEAMS = [team('team_a', 'Kampala Stars FC'), team('team_b', 'Wakiso City F
 describe('preferring the stored projection', () => {
   it('uses the stored rows when the season has them', () => {
     const resolved = resolveLeagueStandings({
-      stored: [storedRow()],
+      // A row per club. A stored set shorter than the club list is a partial slice, not a
+      // table — see the "a stored table that is only part of one" block below.
+      stored: [storedRow(), storedRow({ id: 'r2', teamId: 'team_b', teamName: 'Wakiso City FC', rank: 2 })],
       seasonId: SEASON,
       teams: TEAMS,
       // A deliberately contradictory local computation. If the resolver preferred this, the
@@ -81,7 +83,7 @@ describe('preferring the stored projection', () => {
 
   it('is never provisional when it came from the projection', () => {
     expect(resolveLeagueStandings({
-      stored: [storedRow()],
+      stored: [storedRow(), storedRow({ id: 'r2', teamId: 'team_b', teamName: 'Wakiso City FC', rank: 2 })],
       seasonId: SEASON,
       teams: TEAMS,
       matches: [],
@@ -114,14 +116,15 @@ describe('preferring the stored projection', () => {
   });
 
   it('carries the adjustment and awarded counts through, defaulting rows written before they existed', () => {
+    const second = storedRow({ id: 'r2', teamId: 'team_b', teamName: 'Wakiso City FC', rank: 2 });
     const withCounts = resolveLeagueStandings({
-      stored: [storedRow({ adjustment: -6, awarded: 2 })],
+      stored: [storedRow({ adjustment: -6, awarded: 2 }), second],
       seasonId: SEASON, teams: TEAMS, matches: [],
     });
     expect(withCounts.rows[0]).toMatchObject({ adjustment: -6, awarded: 2 });
 
     const legacy = resolveLeagueStandings({
-      stored: [storedRow()], seasonId: SEASON, teams: TEAMS, matches: [],
+      stored: [storedRow(), second], seasonId: SEASON, teams: TEAMS, matches: [],
     });
     expect(legacy.rows[0]).toMatchObject({ adjustment: 0, awarded: 0 });
   });
@@ -219,5 +222,68 @@ describe('anonymous and signed-in convergence', () => {
     expect(signedIn.rows).toEqual(anonymous.rows);
     expect(signedIn.provisional).toBe(false);
     expect(anonymous.provisional).toBe(false);
+  });
+});
+
+describe('a stored table that is only part of one', () => {
+  /**
+   * `/discover` reads standings for every league at once, ordered by rank and capped at 1,200.
+   * At 18 leagues that is every row of every table. At 1,000 leagues it is roughly the top two
+   * rows of each — so a league's "table" would be two clubs.
+   *
+   * Before this check that came back as `source: 'projection', provisional: false`: a two-row
+   * league table presented as complete and authoritative. Exactly the failure this module was
+   * written to remove, reintroduced at a different scale.
+   */
+  const twoOfTen: StoredStanding[] = [
+    storedRow({ id: 'r1', teamId: 'team_a', rank: 1 }),
+    storedRow({ id: 'r2', teamId: 'team_b', teamName: 'Wakiso City FC', rank: 2 }),
+  ];
+  const tenTeams = Array.from({ length: 10 }, (_, i) => team(`team_${i}`, `Club ${i}`));
+
+  it('does not present a partial slice as the table', () => {
+    const resolved = resolveLeagueStandings({
+      stored: twoOfTen,
+      seasonId: SEASON,
+      teams: tenTeams,
+      matches: [match('m1', 'team_0', 'team_1', 2, 0)],
+    });
+    expect(resolved.source).toBe('computed');
+  });
+
+  it('marks it provisional, because neither source is known to be complete', () => {
+    expect(resolveLeagueStandings({
+      stored: twoOfTen, seasonId: SEASON, teams: tenTeams, matches: [],
+    }).provisional).toBe(true);
+  });
+
+  it('still trusts a stored table with a row for every club', () => {
+    const complete = tenTeams.map((t, i) => storedRow({
+      id: `r${i}`, teamId: t.id, teamName: t.name, rank: i + 1,
+    }));
+    const resolved = resolveLeagueStandings({
+      stored: complete, seasonId: SEASON, teams: tenTeams, matches: [],
+    });
+    expect(resolved.source).toBe('projection');
+    expect(resolved.provisional).toBe(false);
+  });
+
+  it('catches a projection that has not caught up with a new club', () => {
+    // The same check, doing a second job: a club registered since the last recomputation has
+    // no row yet, and computing locally is the better answer until the rebuild lands.
+    const nineOfTen = tenTeams.slice(0, 9).map((t, i) => storedRow({
+      id: `r${i}`, teamId: t.id, teamName: t.name, rank: i + 1,
+    }));
+    expect(resolveLeagueStandings({
+      stored: nineOfTen, seasonId: SEASON, teams: tenTeams, matches: [],
+    }).source).toBe('computed');
+  });
+
+  it('takes stored rows at face value when the caller does not know the clubs', () => {
+    // A caller reading one league's standings by leagueId has nothing to compare against and
+    // is not the one at risk — the global-slice reader is.
+    expect(resolveLeagueStandings({
+      stored: twoOfTen, seasonId: SEASON, teams: [], matches: [],
+    }).source).toBe('projection');
   });
 });

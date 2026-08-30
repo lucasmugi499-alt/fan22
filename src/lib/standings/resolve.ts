@@ -90,7 +90,28 @@ export function resolveLeagueStandings(input: ResolveStandingsInput): ResolvedSt
     !input.seasonId || row.seasonId === input.seasonId
   ));
 
-  if (stored.length) {
+  /**
+   * A stored table is only trusted when it has a row for every club.
+   *
+   * `stored.length > 0` is not the same as "this is the table". `/discover` reads standings
+   * for every league at once, ordered by rank and capped — so past roughly 120 leagues a
+   * league's share of that slice is its top two rows, not its table. Returning those as
+   * `source: 'projection', provisional: false` would publish a two-row league table presented
+   * as complete and authoritative, which is exactly the failure this whole module was written
+   * to remove, reintroduced at a different scale.
+   *
+   * The same check also catches an honestly stale projection: a club registered since the last
+   * recomputation has no row yet, and computing locally is the better answer until the next
+   * rebuild lands.
+   *
+   * When the caller does not know the club list there is nothing to compare against, so a
+   * non-empty stored set is taken at face value — the caller that reads a single league's
+   * standings by `leagueId` is not the one at risk here.
+   */
+  const expectedRows = input.teams.length;
+  const storedIsComplete = stored.length > 0 && (expectedRows === 0 || stored.length >= expectedRows);
+
+  if (storedIsComplete) {
     return { rows: fromStored(stored), source: 'projection', provisional: false };
   }
 
@@ -106,7 +127,11 @@ export function resolveLeagueStandings(input: ResolveStandingsInput): ResolvedSt
     // `>=`, not `>`. A list exactly at its limit is the ambiguous case — Firestore returned as
     // many as it was asked for, and there is no way to know whether more existed. Treating
     // that as complete is precisely the assumption that made the old table silently wrong.
-    provisional: input.matchLoadLimit !== undefined && input.matches.length >= input.matchLoadLimit,
+    //
+    // A partial stored set also lands here, and is provisional for the same reason: the
+    // projection had rows and not enough of them, so neither source is known to be complete.
+    provisional: (input.matchLoadLimit !== undefined && input.matches.length >= input.matchLoadLimit)
+      || stored.length > 0,
     officialMatches: rows.reduce((total, row) => total + row.played, 0) / 2,
   };
 }

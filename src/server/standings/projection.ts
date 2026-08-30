@@ -75,6 +75,53 @@ export function standingDocumentId(seasonId: string, teamId: string) {
   return `${seasonId}_${teamId}`;
 }
 
+/**
+ * The per-season revision that makes concurrent recomputation safe.
+ *
+ * ## The race this closes
+ *
+ * Recomputation reads a whole season and then writes every row. Reads and writes are separate
+ * operations, so two results finalizing in the same season at nearly the same time interleave
+ * like this:
+ *
+ *   A finalizes.  A's recompute reads matches            -> sees A
+ *   B finalizes.  B's recompute reads matches            -> sees A and B
+ *                 B writes rows(A, B)
+ *                 A writes rows(A)                       -> B is GONE from the table
+ *
+ * Last writer wins, and the last writer had the stale read. The published table silently drops
+ * a verified result until something recomputes again — and on a busy matchday "something
+ * recomputes again" is another race, not a fix. This is the single most dangerous failure the
+ * projection can have, because it is invisible: the table is present, well-formed, confidently
+ * wrong, and nothing errors.
+ *
+ * ## Compare-and-swap
+ *
+ * Every recomputation reads a revision counter before it reads anything else, and commits its
+ * rows only if the counter is still what it was. If another pass committed in between, the
+ * counter moved, this pass's inputs are known-stale, and it retries from a fresh read.
+ *
+ * Whichever ordering the two passes take, the one that commits last is the one whose read
+ * happened after every prior write. That is the property that makes the result correct rather
+ * than merely eventually-correct.
+ *
+ * The transaction reads ONE small document, not the season. A transaction that read every
+ * match would conflict with the finalizer's own writes and turn a busy matchday into a retry
+ * storm — the contention would be with the very thing generating the work.
+ */
+export function projectionStateId(seasonId: string) {
+  return seasonId;
+}
+
+/**
+ * How many times a pass will retry a lost compare-and-swap before giving up.
+ *
+ * Losing means another pass committed a NEWER table, so giving up is safe: the season already
+ * has a table built from at least as much information as this pass had. The bound exists to
+ * stop a hot season starving one pass indefinitely, not to protect correctness.
+ */
+const MAX_CAS_ATTEMPTS = 5;
+
 export type StandingsProjectionResult = {
   seasonId: string;
   leagueId: string;
@@ -175,8 +222,43 @@ export async function recomputeSeasonStandings(
 ): Promise<StandingsProjectionResult | undefined> {
   if (!seasonId) return undefined;
 
+  for (let attempt = 1; attempt <= MAX_CAS_ATTEMPTS; attempt += 1) {
+    const result = await attemptRecompute(db, seasonId, options);
+    if (result.outcome === 'written') return result.result;
+    if (result.outcome === 'nothing_to_do') return undefined;
+    // `superseded`: another pass committed a newer table while this one was reading. Its
+    // inputs are known-stale, so re-read rather than write them.
+  }
+
+  // Every attempt lost the race, which means every attempt was beaten by a pass working from
+  // more recent data. The season has a table; it is simply not this pass's table. Not an error.
+  console.warn('GoalPlace256 standings recomputation was superseded on every attempt', {
+    seasonId,
+    attempts: MAX_CAS_ATTEMPTS,
+  });
+  return undefined;
+}
+
+type RecomputeAttempt =
+  | { outcome: 'written'; result: StandingsProjectionResult }
+  | { outcome: 'superseded' }
+  | { outcome: 'nothing_to_do' };
+
+async function attemptRecompute(
+  db: Firestore,
+  seasonId: string,
+  options: { leagueId?: string; now?: () => Date },
+): Promise<RecomputeAttempt> {
+  const stateRef = db.collection('standingsProjections').doc(projectionStateId(seasonId));
+
+  // Read the revision FIRST. Everything after this is the read set whose freshness the
+  // compare-and-swap is asserting, so a revision read afterwards would prove nothing.
+  const revisionBefore = await stateRef.get()
+    .then((snapshot) => Number(snapshot.data()?.revision ?? 0))
+    .catch(() => 0);
+
   const inputs = await readSeasonInputs(db, seasonId, options.leagueId);
-  if (!inputs) return undefined;
+  if (!inputs) return { outcome: 'nothing_to_do' };
 
   const { season, leagueId, sport, teams, matches, adjustments } = inputs;
   const scoring = season?.scoring ?? defaultScoringFor(sport);
@@ -190,40 +272,68 @@ export async function recomputeSeasonStandings(
   )).length;
 
   const recomputedAt = (options.now?.() ?? new Date()).toISOString();
-  const batch = db.batch();
   const keep = new Set<string>();
-
-  rows.forEach((row, index) => {
+  const writes = rows.map((row, index) => {
     const id = standingDocumentId(seasonId, row.teamId);
     keep.add(id);
-    batch.set(db.collection('standings').doc(id), {
-      ...standingDocument({ id, leagueId, seasonId, sport, row, rank: index + 1 }),
-      recomputedAt,
-    });
+    return {
+      ref: db.collection('standings').doc(id),
+      data: {
+        ...standingDocument({ id, leagueId, seasonId, sport, row, rank: index + 1 }),
+        recomputedAt,
+      },
+    };
   });
 
   // A team removed from the league mid-season leaves a row behind that nothing would ever
   // overwrite, and a stale row in a publicly readable collection is precisely the failure
   // this projection replaces. Deleting is safe because every surviving row is rewritten in
-  // the same batch from a full recomputation.
+  // the same transaction from a full recomputation.
   const existing = await db.collection('standings').where('seasonId', '==', seasonId).get();
-  let rowsRemoved = 0;
-  existing.docs.forEach((doc) => {
-    if (keep.has(doc.id)) return;
-    batch.delete(doc.ref);
-    rowsRemoved += 1;
+  const deletions = existing.docs.filter((doc) => !keep.has(doc.id)).map((doc) => doc.ref);
+
+  /**
+   * A transaction, not a batch, and it reads exactly one document.
+   *
+   * The read is the revision counter, and the whole point is that Firestore aborts the
+   * transaction if that document changed since it was read inside this transaction — which,
+   * combined with comparing it to the value taken before the inputs were read, is what proves
+   * this pass's view of the season was not overtaken.
+   *
+   * Row writes are bounded by club count, so a table plus its stale rows sits far inside the
+   * 500-operation transaction limit even for an implausibly large league.
+   */
+  const committed = await db.runTransaction(async (tx) => {
+    const current = await tx.get(stateRef);
+    const revisionNow = Number(current.data()?.revision ?? 0);
+    if (revisionNow !== revisionBefore) return false;
+
+    writes.forEach((write) => tx.set(write.ref, write.data));
+    deletions.forEach((ref) => tx.delete(ref));
+    tx.set(stateRef, {
+      seasonId,
+      leagueId,
+      revision: revisionBefore + 1,
+      rows: rows.length,
+      officialMatches,
+      recomputedAt,
+    }, { merge: true });
+    return true;
   });
 
-  await batch.commit();
+  if (!committed) return { outcome: 'superseded' };
 
   return {
-    seasonId,
-    leagueId,
-    rowsWritten: rows.length,
-    rowsRemoved,
-    officialMatches,
-    adjustmentsApplied: adjustments.filter((adjustment) => !adjustment.rescindedAt).length,
-    recomputedAt,
+    outcome: 'written',
+    result: {
+      seasonId,
+      leagueId,
+      rowsWritten: rows.length,
+      rowsRemoved: deletions.length,
+      officialMatches,
+      adjustmentsApplied: adjustments.filter((adjustment) => !adjustment.rescindedAt).length,
+      recomputedAt,
+    },
   };
 }
 

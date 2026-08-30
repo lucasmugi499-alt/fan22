@@ -411,3 +411,102 @@ describe('a correction that supersedes a result', () => {
       .toMatchObject({ points: 3, wins: 1, rank: 1 });
   });
 });
+
+describe('two results finalizing in the same season at once', () => {
+  /**
+   * The failure this closes, spelled out:
+   *
+   *   A finalizes.  A's recompute reads matches            -> sees A
+   *   B finalizes.  B's recompute reads matches            -> sees A and B
+   *                 B writes rows(A, B)
+   *                 A writes rows(A)                       -> B is GONE from the table
+   *
+   * Last writer wins and the last writer had the stale read. It is the most dangerous failure
+   * this projection can have, because nothing errors: the table is present, well-formed,
+   * confidently wrong, and stays that way until something else recomputes.
+   *
+   * On a real matchday this is not exotic. Ten fixtures kicking off together finish together,
+   * and every finalization triggers a recomputation of the same season.
+   *
+   * ## Why the interleaving is forced rather than hoped for
+   *
+   * Running two passes concurrently over UNCHANGING data proves nothing — both read the same
+   * matches and compute the same table whether or not the guard exists. Reproducing the defect
+   * needs a write to land between one pass's input read and its commit, which is what
+   * `beforeTransaction` is for. An earlier version of this test used `Promise.all` over static
+   * data and passed with the compare-and-swap deleted.
+   */
+  const teams = [team(1), team(2), team(3), team(4)];
+
+  const matchA = match({ id: 'm_a', home: 'team_01', away: 'team_02', homeScore: 3, awayScore: 0 });
+  const matchB = match({ id: 'm_b', home: 'team_03', away: 'team_04', homeScore: 2, awayScore: 1 });
+
+  /**
+   * Seeds a season holding only match A, then arranges for match B to be finalized AND
+   * projected while the first pass is between its input read and its commit.
+   */
+  function racedFixture() {
+    const fake = fakeFirestore({
+      beforeTransaction: async () => {
+        // The competing finalization: B's result lands, and B's own recomputation publishes a
+        // table containing both. The first pass is now holding inputs that predate all of it.
+        fake.seed('matches', [matchB as unknown as Record<string, unknown>]);
+        await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+      },
+    });
+    fake.seed('seasons', [{
+      id: SEASON, leagueId: LEAGUE, sport: 'football', name: '2026 Season', status: 'active',
+    }]);
+    fake.seed('teams', teams as unknown as Record<string, unknown>[]);
+    fake.seed('matches', [matchA as unknown as Record<string, unknown>]);
+    return fake;
+  }
+
+  it('does not let a stale pass drop a result the fresher pass counted', async () => {
+    const fake = racedFixture();
+
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+
+    // Four clubs, two results, every club played exactly once. The defect shows as team_03 and
+    // team_04 on played 0 — match B erased by a pass that never saw it.
+    const rows = fake.documents('standings');
+    expect(rows).toHaveLength(4);
+    expect(rows.every((row) => row.played === 1)).toBe(true);
+    expect(rows.reduce((total, row) => total + Number(row.points), 0)).toBe(6);
+  });
+
+  it('keeps the result the stale pass could not have known about', async () => {
+    const fake = racedFixture();
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+
+    // Named explicitly, because "every row played 1" would also hold if the table were
+    // rebuilt from B alone.
+    const winnerOfB = fake.documents('standings').find((row) => row.teamId === 'team_03');
+    expect(winnerOfB).toMatchObject({ played: 1, wins: 1, points: 3 });
+  });
+
+  it('records a revision that advances with each committed rebuild', async () => {
+    const fake = seeded(teams, [matchA, matchB]);
+
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+    const first = fake.documents('standingsProjections')[0];
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+    const second = fake.documents('standingsProjections')[0];
+
+    // The counter is the whole mechanism: a pass that reads revision N and finds N+1 at commit
+    // knows its inputs were overtaken.
+    expect(Number(second.revision)).toBe(Number(first.revision) + 1);
+  });
+
+  it('publishes the projection state so a stale table is diagnosable', async () => {
+    const fake = seeded(teams, [matchA, matchB]);
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON);
+
+    expect(fake.documents('standingsProjections')[0]).toMatchObject({
+      seasonId: SEASON,
+      leagueId: LEAGUE,
+      rows: 4,
+      officialMatches: 2,
+    });
+  });
+});
