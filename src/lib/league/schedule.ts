@@ -138,6 +138,15 @@ export type SchedulePreview = {
 };
 
 /**
+ * A pairing this season already holds, for the duplicate check.
+ *
+ * Only the two clubs, deliberately. A generated schedule that re-creates a pairing the season
+ * already has is a duplicate whatever date it lands on, and comparing dates as well would let
+ * a whole second season through because the generator happened to pick different Saturdays.
+ */
+export type ExistingPairing = { homeTeamId: string; awayTeamId: string };
+
+/**
  * A complete season proposal, ready to be read before anything is written.
  *
  * Every round is played on one date, which is how grassroots leagues actually run: a matchday
@@ -150,11 +159,20 @@ export function buildSchedulePreview({
   format,
   window,
   defaultVenue,
+  now,
+  existing = [],
 }: {
   teams: ReadonlyArray<{ id: string; name: string; homeVenue?: string }>;
   format: ScheduleFormat;
   window: ScheduleWindow;
   defaultVenue: string;
+  /**
+   * When "now" is, for the past-window checks. Injected rather than read from the clock so the
+   * preview is a pure function of its inputs and can be tested at a fixed date.
+   */
+  now?: string;
+  /** Fixtures the season already holds, so a generated schedule cannot duplicate them. */
+  existing?: ReadonlyArray<ExistingPairing>;
 }): SchedulePreview {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -167,6 +185,26 @@ export function buildSchedulePreview({
     blockers.push('The season ends before it starts.');
   }
   if (!window.matchDays.length) blockers.push('Choose at least one match day.');
+
+  /*
+   * A window that has already ended.
+   *
+   * The builder pre-fills its dates from the season, so a League Admin opening it against a
+   * season that finished in June gets June's dates and a working Publish button. Doing that
+   * created fifty-five fixtures dated months ago: they were written correctly, and then every
+   * screen that lists what is coming up showed nothing, because none of it was coming up.
+   *
+   * A finished window is a blocker rather than a warning. There is no reading of "schedule a
+   * season that has already ended" that is a thing somebody meant to do.
+   */
+  const nowMillis = Date.parse(now ?? new Date().toISOString());
+  const windowEnd = Date.parse(`${window.endDate}T23:59:59.999Z`);
+  if (Number.isFinite(nowMillis) && Number.isFinite(windowEnd) && windowEnd < nowMillis) {
+    blockers.push(
+      'This date window has already passed, so every fixture would be created overdue. '
+      + 'Choose dates in the future, or open a new season.',
+    );
+  }
 
   if (blockers.length) return { fixtures: [], rounds: 0, blockers, warnings };
 
@@ -189,6 +227,25 @@ export function buildSchedulePreview({
     warnings.push('An odd number of clubs means one club rests each round.');
   }
 
+  /*
+   * Pairings the season already holds.
+   *
+   * Generating a full round robin into a season that already has one does not fail and does
+   * not overwrite: it doubles the season, and the league is left with every club playing every
+   * other club twice as often as its own rules say. That is what happened here, so this refuses
+   * by name rather than warning — a warning above a working Publish button is not a stop.
+   */
+  const held = new Set(existing.map((pairing) => `${pairing.homeTeamId}|${pairing.awayTeamId}`));
+  const duplicates = pairings.filter((pairing) =>
+    held.has(`${pairing.homeTeamId}|${pairing.awayTeamId}`)).length;
+  if (duplicates) {
+    blockers.push(
+      `${duplicates} of these ${pairings.length} fixtures already exist in this season. `
+      + 'Publishing would create them a second time. Use Single fixture to add what is missing.',
+    );
+    return { fixtures: [], rounds, blockers, warnings };
+  }
+
   const nameById = new Map(teams.map((team) => [team.id, team.name]));
   const venueById = new Map(teams.map((team) => [team.id, team.homeVenue]));
 
@@ -201,6 +258,19 @@ export function buildSchedulePreview({
     scheduledAt: dates[pairing.round - 1],
     venue: venueById.get(pairing.homeTeamId) || defaultVenue,
   }));
+
+  /*
+   * A window that starts in the past but has not finished. Legitimate — a league adopting the
+   * platform mid-season backfills — so it is said rather than refused, with the count, because
+   * "some of these are overdue" and "eleven of these are overdue" are different facts.
+   */
+  const overdue = fixtures.filter((fixture) => Date.parse(fixture.scheduledAt) < nowMillis).length;
+  if (overdue) {
+    warnings.push(
+      `${overdue} of these ${fixtures.length} fixtures are dated before today and will be `
+      + 'created already overdue, so they appear under Not played rather than Upcoming.',
+    );
+  }
 
   return { fixtures, rounds, blockers, warnings };
 }

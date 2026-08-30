@@ -32,6 +32,26 @@ export function Sheet({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+
+  /**
+   * `onClose` held in a ref rather than depended on.
+   *
+   * Every caller passes an inline arrow — `onClose={() => setOpen(false)}` — which is a new
+   * function on every render of the parent. With `onClose` in the dependency array, typing one
+   * character into a field inside a sheet re-rendered the parent, changed that identity, and
+   * tore the effect down and set it up again. Teardown handed focus back to whatever had it
+   * before the sheet opened; setup moved focus to the first control in the panel. Either way
+   * focus left the field, and on a phone that closes the keyboard — so composing a post meant
+   * one keystroke, keyboard gone, tap the field, one keystroke, keyboard gone.
+   *
+   * The effect is about the sheet being open. It should run when the sheet opens and closes and
+   * at no other time, which is what this makes true.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
 
@@ -43,7 +63,7 @@ export function Sheet({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panel) return;
@@ -72,7 +92,7 @@ export function Sheet({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === 'undefined') return null;
 

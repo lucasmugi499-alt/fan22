@@ -45,20 +45,39 @@ async function canManagePublishedMedia(actor: AuthenticatedActor, ownerType: 'us
   // Every platform account holds platform.admin.manage, so this is narrower, not stricter.
   if (await hasCapability(actor.uid, PLATFORM_SCOPE, 'platform.admin.manage')) return true;
   if (ownerType === 'user') return ownerId === actor.uid;
-  // Athlete media follows athlete profile authority: the team that manages the roster owns
-  // the photo, because the athlete is a managed record rather than an account holder. The
-  // athlete-scoped `athlete.media.manage` grant this used to check no longer exists.
   if (ownerType === 'athlete') return canManageAthleteMedia(actor, ownerId);
   if (ownerType === 'team') return hasLeagueCapabilityForTeam(actor.uid, ownerId, 'league.team.manage');
   return hasCapability(actor.uid, { scopeType: 'league', scopeId: ownerId }, 'league.profile.manage');
 }
 
 /**
- * Resolved through the athlete's team rather than a stored admin list: the roster capability
- * on the team the athlete actually belongs to is the same authority that can edit the rest
- * of their profile, so a photo cannot be changed by someone who could not change the name.
+ * Who may upload a picture that belongs to an athlete.
+ *
+ * Two different people, for two different reasons.
+ *
+ * The league that manages the roster holds the same authority over the athlete's photo as over
+ * the rest of their registration, so a photo cannot be changed by someone who could not change
+ * the name.
+ *
+ * The athlete themselves holds `athlete.persona.media.manage` from the `athlete_self` bundle,
+ * which is the grant that exists precisely so a claimed athlete can publish a highlight. This
+ * check was left behind when the capability was renamed from `athlete.media.manage`: the
+ * comment recorded that the old spelling no longer existed and nothing was put in its place,
+ * so an athlete attaching a photo to their own career update was told they were not authorized
+ * to upload media for their own profile.
+ *
+ * This widens who may put a FILE in the bucket under `publishedMedia/athlete/{id}`. It does not
+ * widen who may write `athletes/{athleteId}` — invariant 06 still holds, and an athlete's own
+ * media lands on their persona and their posts, never on the sporting record.
  */
 async function canManageAthleteMedia(actor: AuthenticatedActor, athleteId: string) {
+  if (await hasCapability(
+    actor.uid,
+    { scopeType: 'athlete', scopeId: athleteId },
+    'athlete.persona.media.manage',
+  )) {
+    return true;
+  }
   return hasLeagueCapabilityForAthlete(actor.uid, athleteId, 'league.roster.manage');
 }
 

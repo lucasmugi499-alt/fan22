@@ -247,15 +247,22 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
           <StateChip state={row.state} />
         </div>
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span className="text-subtle">Field Manager</span>
-        {row.fieldManager?.displayName ? (
-          <span className="font-medium text-text">{row.fieldManager.displayName}</span>
-        ) : (
-          <span className="font-medium text-[var(--state-pending)]">Not assigned</span>
-        )}
-        {row.fieldManager ? <PresenceDot presence={row.fieldManager.presence} seconds={row.fieldManager.secondsSinceSync} /> : null}
-      </p>
+      {/*
+        Not drawn for a fixture that was never played. Who was going to record a match whose
+        kickoff was three months ago is not a live question, and "Not assigned" in amber reads
+        as something to go and fix.
+      */}
+      {row.state === 'missed' ? null : (
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="text-subtle">Field Manager</span>
+          {row.fieldManager?.displayName ? (
+            <span className="font-medium text-text">{row.fieldManager.displayName}</span>
+          ) : (
+            <span className="font-medium text-[var(--state-pending)]">Not assigned</span>
+          )}
+          {row.fieldManager ? <PresenceDot presence={row.fieldManager.presence} seconds={row.fieldManager.secondsSinceSync} /> : null}
+        </p>
+      )}
       {/*
         The Field Manager line above already says "Not assigned", so repeating it here as a
         sentence is two lines saying one thing on a card built for density.
@@ -264,7 +271,12 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
         <p className="mt-1.5 text-xs leading-5 text-[var(--state-pending)]">{row.attention}</p>
       ) : null}
       </Link>
-      {onAssign && !row.fieldManager ? (
+      {/*
+        No assign control on a missed fixture either. What that fixture needs is a decision —
+        a result, a cancellation, a reschedule — and those live on the match page the card
+        already links to.
+      */}
+      {onAssign && !row.fieldManager && row.state !== 'missed' ? (
         <div className="border-t border-border p-2">
           <button
             type="button"
@@ -307,6 +319,7 @@ const STATE_LABEL: Record<LeagueMatchRow['state'], string> = {
   awaiting_result: 'Awaiting result',
   official: 'Official',
   needs_review: 'Needs review',
+  missed: 'Not played',
   cancelled: 'Cancelled',
 };
 
@@ -318,6 +331,7 @@ export function StateChip({ state }: { state: LeagueMatchRow['state'] }) {
       state === 'needs_review' && 'border-[var(--state-error)] text-[var(--state-error)]',
       state === 'unassigned' && 'border-[var(--state-pending)] text-[var(--state-pending)]',
       state === 'awaiting_result' && 'border-[var(--state-pending)] text-[var(--state-pending)]',
+      state === 'missed' && 'border-[var(--state-pending)] text-[var(--state-pending)]',
       state === 'official' && 'border-[var(--state-verified)] text-[var(--state-verified)]',
       (state === 'ready' || state === 'draft' || state === 'cancelled') && 'border-border text-muted',
     )}>

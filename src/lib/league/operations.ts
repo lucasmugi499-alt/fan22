@@ -28,8 +28,26 @@ export type MatchOperationalState =
   | 'official'
   /** Something needs a person. */
   | 'needs_review'
+  /**
+   * Kickoff has passed and the match never started.
+   *
+   * Distinct from every other state because it is the one a fixture falls into by nobody
+   * doing anything. Without it a scheduled match whose date has gone by stays "upcoming"
+   * forever: a league with a hundred of them reads as a league with a hundred fixtures to
+   * come, and the one thing needing attention — that they were never played — is the one
+   * thing the screen does not say.
+   */
+  | 'missed'
   /** Called off. Kept distinct so it never reads as a fixture still to play. */
   | 'cancelled';
+
+/**
+ * How long after kickoff a fixture with no result becomes an exception.
+ *
+ * Long enough to cover the match itself plus a Field Manager finishing up and syncing, short
+ * enough that a fixture nobody played is flagged the same evening rather than next week.
+ */
+export const MISSED_AFTER_KICKOFF_MS = 6 * 60 * 60_000;
 
 export type FieldManagerPresence = {
   displayName: string | null;
@@ -149,6 +167,16 @@ export function matchOperationalRow({
     } else if (presence?.presence === 'offline') {
       attention = `The Field Manager has not synced for ${Math.round((presence.secondsSinceSync ?? 0) / 60)} minutes.`;
     }
+  } else if (match.status === 'scheduled'
+    && Date.parse(match.scheduledAt) + MISSED_AFTER_KICKOFF_MS < Date.parse(now)) {
+    /*
+     * Checked before the assignment branches on purpose. A fixture whose kickoff was three
+     * months ago does not need a Field Manager assigned, it needs somebody to decide what
+     * happened to it, and offering "assign a manager" for a date that has gone is a control
+     * that cannot help.
+     */
+    state = 'missed';
+    attention = 'Kickoff has passed and no result was recorded.';
   } else if (match.status === 'scheduled' && !assignment) {
     state = 'unassigned';
     attention = 'No Field Manager assigned.';
@@ -261,11 +289,24 @@ export function buildLeagueCommand({
   const attention: AttentionItem[] = [];
   for (const row of rows) {
     if (!row.attention) continue;
+    // Missed fixtures are counted below instead of listed. A season abandoned in April is a
+    // hundred of them, and a hundred identical rows would push every other item out of a list
+    // that only shows five.
+    if (row.state === 'missed') continue;
     attention.push({
       id: `match:${row.matchId}`,
       label: `${row.homeTeamName} vs ${row.awayTeamName}: ${row.attention}`,
       severity: row.state === 'needs_review' || row.state === 'live' ? 'critical' : 'warning',
       href: `/league-admin/matches/${encodeURIComponent(row.matchId)}`,
+    });
+  }
+  const missedCount = rows.filter((row) => row.state === 'missed').length;
+  if (missedCount > 0) {
+    attention.push({
+      id: 'missed',
+      label: `${missedCount} ${missedCount === 1 ? 'fixture was' : 'fixtures were'} never played`,
+      severity: 'warning',
+      href: '/league-admin/matches?filter=missed',
     });
   }
   if (registrationIssueCount > 0) {
@@ -311,19 +352,22 @@ export function buildLeagueCommand({
   };
 }
 
-export type MatchSegment = 'live' | 'upcoming' | 'completed' | 'review';
+export type MatchSegment = 'live' | 'upcoming' | 'missed' | 'completed' | 'review';
 
 /** Which segment of the Matches workspace a row belongs in. */
 export function segmentFor(row: LeagueMatchRow): MatchSegment {
   if (row.state === 'needs_review' || row.state === 'awaiting_result') return 'review';
   if (row.state === 'live') return 'live';
+  // Its own segment rather than folded into Needs review: those are results whose integrity is
+  // in question, and these are fixtures with no result at all. Mixing them buries both.
+  if (row.state === 'missed') return 'missed';
   // A cancelled fixture is finished business, not something still to play.
   if (row.state === 'official' || row.state === 'cancelled') return 'completed';
   return 'upcoming';
 }
 
 export function segmentMatches(rows: readonly LeagueMatchRow[]) {
-  const counts: Record<MatchSegment, number> = { live: 0, upcoming: 0, completed: 0, review: 0 };
+  const counts: Record<MatchSegment, number> = { live: 0, upcoming: 0, missed: 0, completed: 0, review: 0 };
   for (const row of rows) counts[segmentFor(row)] += 1;
   return counts;
 }

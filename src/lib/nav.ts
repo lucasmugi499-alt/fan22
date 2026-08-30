@@ -123,11 +123,18 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     workspace: 'My Career',
     primary: [
       { name: 'Dashboard', href: '/athlete', icon: SquaresFour },
-      { name: 'Matches', href: '/matches', icon: Calendar },
+      /*
+       * `/athlete/matches`, not `/matches`. This tab used to open the public fixture list —
+       * every live game in every sport in every league — from inside a workspace called My
+       * Career. The whole-platform list is a fan surface and stays one tap away under More;
+       * what an athlete's own Matches tab has to answer is which fixture is theirs.
+       */
+      { name: 'Matches', href: '/athlete/matches', icon: Calendar },
       { name: 'Payouts', href: '/athlete/payouts', icon: Wallet },
       { name: 'Account', href: '/profile', icon: User },
     ],
     more: [
+      { name: 'All matches', href: '/matches', icon: Calendar },
       { name: 'My support', href: '/contributions', icon: HandHeart },
       { name: 'Feed', href: '/feed', icon: ListBullets },
       { name: 'Leagues', href: '/leagues', icon: Buildings },

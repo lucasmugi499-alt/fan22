@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 const SEGMENTS: Array<{ id: MatchSegment; label: string }> = [
   { id: 'live', label: 'Live' },
   { id: 'upcoming', label: 'Upcoming' },
+  { id: 'missed', label: 'Not played' },
   { id: 'review', label: 'Needs review' },
   { id: 'completed', label: 'Completed' },
 ];
@@ -37,8 +38,17 @@ const SEGMENTS: Array<{ id: MatchSegment; label: string }> = [
  * wrong today" meant reading all of them. Segments make the question one tap, and each row
  * carries its own operational readiness rather than deferring it to a detail page.
  *
- * Segments are a scrolling rail rather than a wrapping tab row: four labels plus counts do not
+ * Segments are a scrolling rail rather than a wrapping tab row: five labels plus counts do not
  * fit across 320px, and wrapping them pushes the first match below the fold.
+ *
+ * ## Why this asks for the whole season
+ *
+ * It used to read the same three-week window the Command Centre does. A league whose season ran
+ * February to June, viewed in August, had 146 fixtures and saw every segment read zero — and
+ * publishing 55 new ones changed nothing on the screen, because they were dated inside that
+ * finished season and so outside the window too. The Command Centre is a matchday view and the
+ * window is right for it. This is where a League Admin comes to FIND a fixture, and a finder
+ * that silently holds three weeks is not one.
  */
 export function LeagueMatches() {
   const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
@@ -61,6 +71,8 @@ export function LeagueMatches() {
   });
 
   const [rows, setRows] = useState<LeagueMatchRow[] | null>(null);
+  /** True when the season read hit its cap, so the list can say it is not all of them. */
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(!isDemoMode);
   const [error, setError] = useState<string | null>(null);
   /*
@@ -69,9 +81,11 @@ export function LeagueMatches() {
    * corrected the segment after first paint would show the wrong list for a frame.
    */
   const linkedFilter = searchParams.get('filter');
-  const [segment, setSegment] = useState<MatchSegment>(
-    () => linkedFilter === 'review' ? 'review' : 'upcoming',
-  );
+  const [segment, setSegment] = useState<MatchSegment>(() => {
+    if (linkedFilter === 'review') return 'review';
+    if (linkedFilter === 'missed') return 'missed';
+    return 'upcoming';
+  });
   const [query, setQuery] = useState('');
   const [assigning, setAssigning] = useState<LeagueMatchRow | null>(null);
   const [building, setBuilding] = useState(() => searchParams.get('create') === 'fixture');
@@ -93,7 +107,7 @@ export function LeagueMatches() {
       try {
         const token = await currentUser?.getIdToken();
         if (!token) throw new Error('Sign in again to load matches.');
-        const response = await fetch(`/api/league/command?leagueId=${encodeURIComponent(league!.id)}`, {
+        const response = await fetch(`/api/league/command?leagueId=${encodeURIComponent(league!.id)}&scope=season`, {
           headers: { authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
@@ -103,6 +117,7 @@ export function LeagueMatches() {
         // Command subsets for a server that predates `rows`.
         if (!cancelled) {
           setRows(body.rows ?? [...(body.today?.rows ?? []), ...(body.next ?? [])]);
+          setTruncated(Boolean(body.truncated));
         }
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Matches are unavailable.');
@@ -190,6 +205,12 @@ export function LeagueMatches() {
           {visible.map((row) => (
             <MatchRow key={row.matchId} row={row} onAssign={() => setAssigning(row)} />
           ))}
+          {truncated ? (
+            <p className="pt-1 text-xs leading-5 text-muted">
+              This league has more fixtures than one page holds. The most recent are shown;
+              older seasons are in Competition.
+            </p>
+          ) : null}
         </div>
       ) : (
         <EmptySegment segment={segment} unassignedOnly={unassignedOnly} />
@@ -237,15 +258,20 @@ function EmptySegment({ segment, unassignedOnly }: { segment: MatchSegment; unas
       ? { title: 'No matches are live.', detail: 'Live fixtures appear here with their sync state while they are being recorded.' }
       : segment === 'review'
         ? { title: 'Nothing needs review.', detail: 'Clean Field Capture reports become official without you. Only exceptions arrive here.' }
-        : segment === 'completed'
+        : segment === 'missed'
           ? {
-            title: 'No completed matches in this window.',
-            detail: 'This workspace covers roughly three weeks either side of today. Older seasons are in Competition.',
+            title: 'No fixture has been left unplayed.',
+            detail: 'A scheduled fixture whose kickoff passes with no result recorded appears here, so it is decided rather than forgotten.',
           }
-          : {
-            title: 'No fixtures in the next three weeks.',
-            detail: 'Generate the season schedule or create a single fixture. Fixtures further out appear here as they approach.',
-          };
+          : segment === 'completed'
+            ? {
+              title: 'No completed matches yet.',
+              detail: 'A match appears here once its result is official.',
+            }
+            : {
+              title: 'No fixtures are still to come.',
+              detail: 'Generate the season schedule or create a single fixture. Anything already played is under Completed or Not played.',
+            };
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-dashed border-border p-8 text-center">

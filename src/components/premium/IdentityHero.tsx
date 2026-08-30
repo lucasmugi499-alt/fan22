@@ -1,4 +1,5 @@
 import { SealCheck } from '@phosphor-icons/react';
+import { cn } from '@/lib/utils';
 
 const SPORT_GRAD: Record<string, string> = {
   football: 'var(--grad-football)',
@@ -27,7 +28,14 @@ export function IdentityHero({
 }: {
   media: React.ReactNode;
   watermark?: React.ReactNode;
-  eyebrow?: string;
+  /**
+   * A node rather than a string, so the club page can make the league name a link.
+   *
+   * It named the competition and went nowhere, which on the one screen where "which league is
+   * this club in" is the obvious next question is a dead end in the most prominent position on
+   * the page.
+   */
+  eyebrow?: React.ReactNode;
   title: string;
   meta?: React.ReactNode;
   verified?: boolean;
@@ -45,8 +53,12 @@ export function IdentityHero({
 
       <div className="relative flex items-end gap-4 p-5">
         <div className="shrink-0">{media}</div>
-        <div className="min-w-0 flex-1 pb-1">
-          {eyebrow ? <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">{eyebrow}</p> : null}
+        {/*
+          Right padding when there is an action: the action is positioned over this column, and
+          without the clearance a long competition name ran underneath the Follow button.
+        */}
+        <div className={cn('min-w-0 flex-1 pb-1', action && 'pr-24 sm:pr-28')}>
+          {eyebrow ? <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">{eyebrow}</div> : null}
           <div className="flex items-center gap-2">
             <h1 className="font-display text-3xl font-bold leading-none tracking-tight text-white [text-shadow:0_1px_10px_rgba(0,0,0,0.3)] md:text-4xl">
               {title}

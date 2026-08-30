@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
 import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy, Heart, Handshake } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -10,7 +11,7 @@ import { clubColor } from '@/lib/clubColors';
 import { IdentityHero } from '@/components/premium/IdentityHero';
 import { NextMatchCard } from '@/components/premium/NextMatchCard';
 import { PositionCallout } from '@/components/premium/PositionCallout';
-import { PeopleCarousel } from '@/components/premium/PeopleCarousel';
+import { SquadGrid } from '@/components/premium/SquadGrid';
 import { NewsRow } from '@/components/premium/NewsRow';
 import { Crest } from '@/components/premium/Crest';
 import { MatchCard } from '@/components/core/MatchCard';
@@ -113,7 +114,14 @@ export function TeamPublic({ teamId }: { teamId: string }) {
         gradient={clubColor(team.name).gradient}
         media={<Crest name={team.name} sport={String(team.sport)} size={72} className="!bg-white/15 !border-white/40 !text-white" />}
         watermark={<span className="font-display font-black text-white">{team.name.slice(0, 3).toUpperCase()}</span>}
-        eyebrow={league?.name}
+        eyebrow={league ? (
+          <Link
+            href={`/leagues/${encodeURIComponent(league.id)}`}
+            className="underline decoration-white/40 underline-offset-4 transition hover:decoration-white"
+          >
+            {league.name}
+          </Link>
+        ) : undefined}
         title={team.name}
         verified={team.verified}
         action={<FollowButton targetType="team" targetId={team.id} label="Follow" />}
@@ -133,7 +141,35 @@ export function TeamPublic({ teamId }: { teamId: string }) {
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
-          {nextMatch ? <NextMatchCard match={nextMatch} home={teamById.get(nextMatch.homeTeamId)} away={teamById.get(nextMatch.awayTeamId)} /> : null}
+          {/*
+            An empty state rather than nothing. A club between seasons, or one whose league has
+            not published its next fixtures, rendered no next-match card at all — so the page
+            skipped straight from the banner to the results and read as though the section had
+            failed to load. Saying there is no fixture is a fact; showing nothing is a gap.
+          */}
+          {nextMatch ? (
+            <NextMatchCard match={nextMatch} home={teamById.get(nextMatch.homeTeamId)} away={teamById.get(nextMatch.awayTeamId)} />
+          ) : (
+            <Card className="p-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">
+                <CalendarBlank className="h-3.5 w-3.5" weight="bold" /> Next fixture
+              </p>
+              <p className="mt-1.5 text-sm font-semibold text-text-strong">No fixture scheduled.</p>
+              <p className="mt-0.5 text-sm leading-6 text-muted">
+                {league
+                  ? <>Fixtures appear here once {league.name} publishes them.</>
+                  : 'Fixtures appear here once the competition publishes them.'}
+              </p>
+              {league ? (
+                <Link
+                  href={`/leagues/${encodeURIComponent(league.id)}`}
+                  className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand hover:underline"
+                >
+                  See the competition
+                </Link>
+              ) : null}
+            </Card>
+          )}
 
           {results.length ? (
             <section className="space-y-2.5">
@@ -154,7 +190,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
             </section>
           ) : null}
 
-          <PeopleCarousel title="Squad" athletes={roster} />
+          <SquadGrid athletes={roster} />
 
           <NewsRow title="From the club" posts={news} badge={<Crest name={team.name} sport={String(team.sport)} size={22} />} />
           {newsData.error ? (

@@ -128,8 +128,12 @@ export function LeagueRoster({
  * Grouped as a sheet rather than inline controls because several of these are consequential —
  * a transfer is recorded against both clubs and a suspension is told to the athlete — and a
  * row of small buttons on a phone is how the wrong one gets pressed.
+ *
+ * Exported because the athlete directory needs the same operations. A League Admin who finds an
+ * athlete by searching should be able to act on them there, rather than being told to remember
+ * which club they play for and go to that page instead.
  */
-function RosterActionSheet({
+export function RosterActionSheet({
   athlete,
   leagueTeams,
   onClose,

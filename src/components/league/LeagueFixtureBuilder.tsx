@@ -58,6 +58,12 @@ export function LeagueFixtureBuilder({
   const provider = isDemoMode ? mockProvider : dataProvider;
   const [mode, setMode] = useState<Mode>('generate');
   const [publishing, setPublishing] = useState(false);
+  /*
+   * Read once rather than on every render, so the preview is stable while the League Admin is
+   * reading it. Page-load precision is ample: what this decides is whether a date window is in
+   * the past, and that is measured in weeks.
+   */
+  const [now] = useState(() => new Date().toISOString());
 
   const [format, setFormat] = useState<ScheduleFormat>('double_round_robin');
   const [startDate, setStartDate] = useState(season?.startDate?.slice(0, 10) ?? '');
@@ -72,6 +78,18 @@ export function LeagueFixtureBuilder({
 
   const policy = effectiveCapturePolicy(season?.capturePolicy, undefined);
 
+  /*
+   * Scoped to this season, not the whole league. A new season legitimately replays last
+   * season's pairings; what must not happen is generating a second copy of the schedule the
+   * season in front of you already has.
+   */
+  const seasonPairings = useMemo(
+    () => existingFixtures
+      .filter((fixture) => !season || fixture.seasonId === season.id)
+      .map((fixture) => ({ homeTeamId: fixture.homeTeamId, awayTeamId: fixture.awayTeamId })),
+    [existingFixtures, season],
+  );
+
   const preview = useMemo(() => {
     if (mode !== 'generate' || !startDate || !endDate) return null;
     return buildSchedulePreview({
@@ -79,8 +97,10 @@ export function LeagueFixtureBuilder({
       format,
       window: { startDate, endDate, matchDays, kickoffTime },
       defaultVenue: `${league.city} league ground`,
+      now,
+      existing: seasonPairings,
     });
-  }, [endDate, format, kickoffTime, league.city, matchDays, mode, startDate, teams]);
+  }, [endDate, format, kickoffTime, league.city, matchDays, mode, now, seasonPairings, startDate, teams]);
 
   const singleErrors = useMemo(() => {
     if (mode !== 'single' || !homeTeamId || !awayTeamId || !singleKickoff) return [];

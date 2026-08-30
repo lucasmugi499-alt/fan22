@@ -217,8 +217,43 @@ describe('segments', () => {
     const rows = [
       { state: 'live' }, { state: 'unassigned' }, { state: 'ready' },
       { state: 'official' }, { state: 'needs_review' }, { state: 'awaiting_result' },
+      { state: 'missed' },
     ] as Parameters<typeof segmentMatches>[0];
-    expect(segmentMatches(rows)).toEqual({ live: 1, upcoming: 2, completed: 1, review: 2 });
+    expect(segmentMatches(rows)).toEqual({
+      live: 1, upcoming: 2, missed: 1, completed: 1, review: 2,
+    });
+  });
+
+  it('keeps a fixture that was never played out of Upcoming', () => {
+    /*
+     * The failure this guards. A scheduled fixture whose kickoff has gone by used to land in
+     * Upcoming, so a league whose season ended in June read, in August, as a league with a
+     * hundred fixtures still to come.
+     */
+    const row = matchOperationalRow({
+      match: {
+        id: 'match_1', status: 'scheduled', scheduledAt: '2026-04-11T15:00:00.000Z',
+        homeTeamId: 'team_1', awayTeamId: 'team_2',
+      } as unknown as Parameters<typeof matchOperationalRow>[0]['match'],
+      teams: [],
+      now: '2026-08-30T12:00:00.000Z',
+    });
+    expect(row.state).toBe('missed');
+    expect(segmentFor(row)).toBe('missed');
+    expect(row.attention).toBe('Kickoff has passed and no result was recorded.');
+  });
+
+  it('leaves a fixture inside the grace period alone, so a match still being played is not missed', () => {
+    const row = matchOperationalRow({
+      match: {
+        id: 'match_1', status: 'scheduled', scheduledAt: '2026-08-30T12:00:00.000Z',
+        homeTeamId: 'team_1', awayTeamId: 'team_2',
+      } as unknown as Parameters<typeof matchOperationalRow>[0]['match'],
+      teams: [],
+      now: '2026-08-30T14:00:00.000Z',
+    });
+    expect(row.state).not.toBe('missed');
+    expect(segmentFor(row)).toBe('upcoming');
   });
 });
 

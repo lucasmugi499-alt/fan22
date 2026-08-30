@@ -106,10 +106,16 @@ describe('schedule preview', () => {
     matchDays: [6] as MatchDay[],
     kickoffTime: '15:00',
   };
+  /*
+   * Passed to every case rather than left to the clock. The preview now refuses a window that
+   * has already ended, so a test that relied on "2026-09-05 is in the future" would pass today
+   * and fail in December for a reason that has nothing to do with what it is testing.
+   */
+  const now = '2026-08-30T12:00:00.000Z';
 
   it('proposes a full season with one date per round', () => {
     const preview = buildSchedulePreview({
-      teams, format: 'single_round_robin', window, defaultVenue: 'League Ground',
+      teams, format: 'single_round_robin', window, defaultVenue: 'League Ground', now,
     });
     expect(preview.blockers).toEqual([]);
     expect(preview.rounds).toBe(9);
@@ -124,7 +130,7 @@ describe('schedule preview', () => {
 
   it('uses the home club venue where it has one, and the default otherwise', () => {
     const preview = buildSchedulePreview({
-      teams, format: 'single_round_robin', window, defaultVenue: 'League Ground',
+      teams, format: 'single_round_robin', window, defaultVenue: 'League Ground', now,
     });
     const atHome = preview.fixtures.find((fixture) => fixture.homeTeamId === 'team_1');
     expect(atHome?.venue).toBe('Nakivubo Stadium');
@@ -138,6 +144,7 @@ describe('schedule preview', () => {
       format: 'double_round_robin',
       window: { ...window, endDate: '2026-10-03' },
       defaultVenue: 'League Ground',
+      now,
     });
     expect(preview.fixtures).toEqual([]);
     expect(preview.blockers[0]).toContain('needs 18 match days');
@@ -146,24 +153,80 @@ describe('schedule preview', () => {
 
   it('says an odd club count means somebody rests', () => {
     const preview = buildSchedulePreview({
-      teams: teams.slice(0, 5), format: 'single_round_robin', window, defaultVenue: 'League Ground',
+      teams: teams.slice(0, 5), format: 'single_round_robin', window, defaultVenue: 'League Ground', now,
     });
     expect(preview.warnings).toContain('An odd number of clubs means one club rests each round.');
   });
 
+  /*
+   * The three cases below are one production incident.
+   *
+   * A League Admin opened the builder against a season that ran February to June, in August.
+   * The dates pre-fill from the season, the Publish button worked, and 55 fixtures were
+   * created — correctly, into the past, duplicating a schedule the season already had. Nothing
+   * refused, nothing warned, and every screen that lists what is coming up showed nothing,
+   * because none of it was coming up.
+   */
+  it('refuses a date window that has already passed', () => {
+    const preview = buildSchedulePreview({
+      teams,
+      format: 'double_round_robin',
+      window: { ...window, startDate: '2026-02-07', endDate: '2026-06-13' },
+      defaultVenue: 'League Ground',
+      now,
+    });
+    expect(preview.fixtures).toEqual([]);
+    expect(preview.blockers.join(' ')).toContain('already passed');
+  });
+
+  it('refuses to generate pairings the season already holds', () => {
+    const preview = buildSchedulePreview({
+      teams,
+      format: 'single_round_robin',
+      window,
+      defaultVenue: 'League Ground',
+      now,
+      existing: [{ homeTeamId: 'team_1', homeTeamName: '', awayTeamId: 'team_2' } as never],
+    });
+    expect(preview.fixtures).toEqual([]);
+    expect(preview.blockers.join(' ')).toContain('already exist in this season');
+  });
+
+  it('says how many fixtures are overdue when a window starts in the past', () => {
+    // A league adopting the platform mid-season backfills, so this is allowed. It is said
+    // rather than refused, with the count, because "some" and "eleven" are different facts.
+    const preview = buildSchedulePreview({
+      teams,
+      format: 'single_round_robin',
+      window: { ...window, startDate: '2026-08-01' },
+      defaultVenue: 'League Ground',
+      now,
+    });
+    expect(preview.fixtures.length).toBeGreaterThan(0);
+    expect(preview.warnings.join(' ')).toMatch(/\d+ of these \d+ fixtures are dated before today/);
+  });
+
+  it('says nothing about overdue fixtures when the whole window is ahead', () => {
+    const preview = buildSchedulePreview({
+      teams, format: 'single_round_robin', window, defaultVenue: 'League Ground', now,
+    });
+    expect(preview.warnings.join(' ')).not.toContain('overdue');
+  });
+
   it('blocks on the inputs a schedule cannot be built from', () => {
     expect(buildSchedulePreview({
-      teams: teams.slice(0, 1), format: 'single_round_robin', window, defaultVenue: 'X',
+      teams: teams.slice(0, 1), format: 'single_round_robin', window, defaultVenue: 'X', now,
     }).blockers[0]).toContain('at least two clubs');
 
     expect(buildSchedulePreview({
       teams, format: 'single_round_robin',
       window: { ...window, startDate: '2026-12-01', endDate: '2026-09-01' },
       defaultVenue: 'X',
+      now,
     }).blockers).toContain('The season ends before it starts.');
 
     expect(buildSchedulePreview({
-      teams, format: 'knockout', window, defaultVenue: 'X',
+      teams, format: 'knockout', window, defaultVenue: 'X', now,
     }).blockers[0]).toContain('Knockout scheduling is not available yet');
   });
 });
