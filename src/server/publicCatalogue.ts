@@ -204,6 +204,54 @@ export async function getPublicLeagueProfileData(leagueId: string) {
   );
 }
 
+/**
+ * Everything `/discover` needs, read once on the server instead of 1,200 times per visitor.
+ *
+ * `/discover` was a pure client component. Every visitor who opened it issued its own reads
+ * across five collections — leagues, teams, matches, athletes, challenges — and composed the
+ * whole feed in the browser. Firestore spend therefore scaled with TRAFFIC times catalogue
+ * size, on the most linked-to public page in the product.
+ *
+ * Server-rendering does not reduce the reads; it makes them cacheable. One server render, on a
+ * revalidation interval, serves every visitor who arrives inside it. That is the actual cost
+ * fix, and it is the same shape as the league and team pages, which have always worked this
+ * way — `/discover` was the outlier.
+ *
+ * Reads the standings projection rather than deriving tables from the match slice, for the
+ * reason set out in `server/standings/projection.ts`: discovery used to build every league's
+ * table from one 700-match slice shared across 48 leagues, so a league's position depended on
+ * how many of ITS matches fell inside a limit it shared with 47 others.
+ */
+export async function getPublicDiscoveryData() {
+  const fallback = () => ({
+    leagues: investorDemo.leagues,
+    teams: investorDemo.teams,
+    matches: investorDemo.matches,
+    seasons: investorDemo.seasons,
+    standings: investorDemo.standings,
+    athletes: investorDemo.athletes.slice(0, 240),
+    challenges: investorDemo.challenges.slice(0, 60),
+  });
+  if (!usesFirebaseData()) return configured(fallback());
+  return withSyntheticDemoFallback(
+    async () => {
+      const [leagues, teams, matches, seasons, standings, athletes, challenges] = await Promise.all([
+        recentCollection<League>('leagues', 48),
+        recentCollection<Team>('teams', 240),
+        adminDb.collection('matches').orderBy('scheduledAt', 'desc').limit(700).get()
+          .then((snapshot) => snapshot.docs.map((item) => matchRecord(item.id, item.data()))),
+        recentCollection<Season>('seasons', 80),
+        adminDb.collection('standings').orderBy('rank', 'asc').limit(1200).get()
+          .then((snapshot) => snapshot.docs.map((item) => record<StoredStanding>(item.id, item.data()))),
+        recentCollection<Athlete>('athletes', 240),
+        recentCollection<Challenge>('challenges', 60),
+      ]);
+      return { leagues, teams, matches, seasons, standings, athletes, challenges };
+    },
+    fallback,
+  );
+}
+
 export async function getPublicAthletes() {
   if (!usesFirebaseData()) return configured(investorDemo.athletes.slice(0, 48));
   return withSyntheticDemoFallback(

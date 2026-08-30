@@ -24,12 +24,67 @@ import {
 const TABS = ['For You', 'Athletes', 'Teams', 'Leagues', 'Matches', 'Challenges'] as const;
 type Tab = (typeof TABS)[number];
 
-export function DiscoverHub() {
+type InitialDiscoveryData = {
+  leagues?: League[];
+  teams?: Team[];
+  matches?: Match[];
+  seasons?: Season[];
+  standings?: StoredStanding[];
+  athletes?: Athlete[];
+  challenges?: Challenge[];
+};
+
+export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryData } = {}) {
   const { userProfile } = useAuth();
-  const { athletes, teams, leagues, matches, seasons, challenges, standings, loading } = useGoalPlaceData({
+  const live = useGoalPlaceData({
     collections: ['athletes', 'teams', 'leagues', 'matches', 'seasons', 'challenges', 'standings'],
     recordLimit: 1_200,
   });
+
+  /**
+   * Server data first, live data when it arrives.
+   *
+   * The same pattern the league and team pages use. It matters most for an anonymous visitor,
+   * who has no client Firestore read available at all and for whom `initialData` is the entire
+   * page — that was the gap that left `/discover` blank-ish for signed-out users while the
+   * league page rendered fine.
+   */
+  //
+  // Each is memoised rather than computed inline. The `?? []` in a conditional produces a NEW
+  // array reference on every render, which invalidates every downstream `useMemo` that depends
+  // on it — and this page's downstream work is the filtering and league-table composition for
+  // four entity grids. Inline, the memos would recompute on every keystroke in the search box.
+  const athletes = useMemo(
+    () => (live.athletes.length ? live.athletes : initialData?.athletes ?? []),
+    [live.athletes, initialData?.athletes],
+  );
+  const teams = useMemo(
+    () => (live.teams.length ? live.teams : initialData?.teams ?? []),
+    [live.teams, initialData?.teams],
+  );
+  const leagues = useMemo(
+    () => (live.leagues.length ? live.leagues : initialData?.leagues ?? []),
+    [live.leagues, initialData?.leagues],
+  );
+  const matches = useMemo(
+    () => (live.matches.length ? live.matches : initialData?.matches ?? []),
+    [live.matches, initialData?.matches],
+  );
+  const seasons = useMemo(
+    () => (live.seasons.length ? live.seasons : initialData?.seasons ?? []),
+    [live.seasons, initialData?.seasons],
+  );
+  const challenges = useMemo(
+    () => (live.challenges.length ? live.challenges : initialData?.challenges ?? []),
+    [live.challenges, initialData?.challenges],
+  );
+  const standings = useMemo(
+    () => (live.standings.length ? live.standings : initialData?.standings ?? []),
+    [live.standings, initialData?.standings],
+  );
+  // Server data means there is something to show immediately, so the skeleton is only for a
+  // client-only load with nothing rendered yet.
+  const loading = live.loading && !initialData?.leagues?.length;
   const [tab, setTab] = useState<Tab>('For You');
   const [sport, setSport] = useState('all');
   const [city, setCity] = useState('all');
