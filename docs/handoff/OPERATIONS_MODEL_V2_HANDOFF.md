@@ -577,7 +577,9 @@ The remediation in §10 was deployed to Demo. Three planes, each verified on its
 |---|---|
 | Firestore Rules | **Released** to `fg256` from `firestore.rules.next`, with indexes. Adds the `pointsAdjustments` block. One pre-existing index in the project is still absent from `firestore.indexes.json`; untouched, as before. |
 | Cloud Functions | **All 12 updated.** Read back with `functions:list --json`: every one reports `TEAM_AUTHORITY_STAGE=retired`, `FINALIZER_MODE=enabled`, `FIELD_CAPTURE_MODE=enabled`, `LEAGUE_ENTRY_MODE=off`. |
-| App Hosting | **Rolled out** from exact commit — see below for the first attempt, which failed. |
+| App Hosting | **`build-2026-08-30-003`**, from exact commit `68c44d2`. The live origin reports `environment: demo`, `finalizerMode: enabled`, `teamAuthorityStage: retired`. Two earlier attempts: `-002` succeeded, and the first failed — see below. |
+| Standings projection | **Backfilled.** 8 seasons, **61 rows written, 60 stale removed**. |
+| League index | **Recomputed.** 18 leagues, 12 correctly unrated (no fixtures). |
 
 ### The rollout that failed, and what it proved
 
@@ -623,3 +625,43 @@ backup was from 5 August: the safe operation was the one that did not work. The 
 is now derived from `CONFIRM_PHRASES`, so an environment cannot be accepted without a
 confirmation phrase. Verified by taking the backup it unblocked: **13,124 documents, 328
 collection files**, in `backups/firestore/demo/`.
+
+
+### What the backfill found
+
+`standings:rebuild:apply` wrote 61 rows and removed 60. The extra row is the point:
+`season_football_01_2026` has **11 clubs on demo and 10 rows in the seeded standings**. A club
+named *Samy* had been registered to the league after the seed was written, and the seeded
+projection — maintained by nothing, which is GP-10 exactly — never gained a row for it. It now
+sits at rank 11 with P0 Pts0, and the other ten reproduce the seeded values exactly.
+
+The live league page reads `82 / 100` where the seed file computes `84`. Also correct: demo has
+91 fixtures and 11 clubs against the seed's 90 and 10, so `rosterConfirmation` is 10 of 11
+rather than 10 of 10. The number differs because the data differs, which is what a computed
+index is supposed to do.
+
+### One defect this rollout introduced, and closed
+
+Between the App Hosting rollout and the index recomputation, the league page rendered three
+blank rows under the GoalPlace Index heading. League documents are rewritten by the hourly
+pass rather than by the deploy, so they still carried the old seven-key `indexSignals` shape,
+and the new keys read as `undefined`.
+
+`getGoalPlaceIndexSignals` now returns all four signals or none, so a partially-migrated league
+shows no breakdown instead of a misleading one. `npm run league-index:rebuild` closes the
+window directly rather than waiting up to an hour.
+
+### Read back on the live origin
+
+`/api/environment` now reports `schedulerAuth`, and it immediately earned its place:
+`payment_reconciliation` reads **`configured: false`, `missingVariable:
+GOALPLACE_RECONCILIATION_SECRET`**. That is GP-11 visible on the running deployment instead of
+silent — the credential is declared on the calling side (`functions/src/index.ts`
+`defineSecret`) and on no App Hosting overlay. `reconcilePaymentIntents` is deployed and will
+keep getting 503s from that route until the secret is declared.
+
+**Correction to §2 of this handoff.** It records `reconcileResultSubmissions` as "not deployed"
+and `reconcilePaymentIntents` / `lockFantasyLineups` as "not deployed, and must stay that way".
+All three were already live before this session — `functions:list` shows 12 functions, and has
+since at least 2026-08-28. The document had drifted from the plane it describes, which is the
+failure its own §0 warns about. This deploy updated all 12 rather than introducing any.
