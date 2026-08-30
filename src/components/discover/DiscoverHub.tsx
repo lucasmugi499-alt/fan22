@@ -9,12 +9,13 @@ import { AthleteCard, LeagueCard, TeamCard } from '@/components/core/EntityCards
 import { MatchCard } from '@/components/core/MatchCard';
 import { GradientBanner } from '@/components/premium/GradientBanner';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
 import { indexSortValue } from '@/lib/leagueIndex';
+import { useDiscoveryPage, type DiscoveryEntity } from '@/lib/discovery/useDiscoveryPage';
 import {
   buildLeagueTableSnapshot,
   standingForTeam,
@@ -23,6 +24,14 @@ import {
 
 const TABS = ['For You', 'Athletes', 'Teams', 'Leagues', 'Matches', 'Challenges'] as const;
 type Tab = (typeof TABS)[number];
+
+/** Which tabs browse the catalogue, and therefore page through the server. */
+const TAB_ENTITY: Partial<Record<Tab, DiscoveryEntity>> = {
+  Athletes: 'athletes',
+  Teams: 'teams',
+  Leagues: 'leagues',
+  Matches: 'matches',
+};
 
 type InitialDiscoveryData = {
   leagues?: League[];
@@ -94,6 +103,24 @@ export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryDat
   const leagueById = useMemo(() => new Map(leagues.map((item) => [item.id, item])), [leagues]);
   const leagueSnapshots = useLeagueSnapshots(leagues, teams, matches, seasons, standings);
 
+  /**
+   * The four browse tabs page through the server; For You and Challenges do not.
+   *
+   * For You is a personalised set drawn from what this user follows — bounded by their own
+   * follow list, not by the catalogue — and Challenges is a small curated collection. Neither
+   * grows with league count, so neither needs paging. The four that do are the four that were
+   * showing a fixed slice of an unbounded catalogue.
+   *
+   * `enabled` keeps a tab from fetching until it is looked at. Opening Discover should cost
+   * one query, not five.
+   */
+  const browseEntity = TAB_ENTITY[tab];
+  const page = useDiscoveryPage(
+    browseEntity ?? 'leagues',
+    { sport, city, verified: verifiedOnly },
+    { enabled: Boolean(browseEntity) },
+  );
+
   const pointsForTeam = useCallback(
     // Zero when neither the projection nor the deprecated aggregate has a number: a team
     // with no results has no points, and sorting must not treat that as unknown.
@@ -101,42 +128,6 @@ export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryDat
     [leagueSnapshots],
   );
 
-  const matchesFilters = useCallback((item: { sport: unknown; city: string; name?: string }) =>
-    (sport === 'all' || String(item.sport).toLowerCase() === sport) &&
-    (city === 'all' || item.city === city) &&
-    (!query || (item.name ?? '').toLowerCase().includes(query.toLowerCase())), [city, query, sport]);
-
-  const filteredAthletes = useMemo(() => athletes
-    .filter((item) => {
-      const team = teamById.get(item.teamId);
-      const league = leagueById.get(item.leagueId);
-      const haystack = `${item.name} ${item.position} ${item.city} ${item.sport} ${team?.name ?? ''} ${league?.name ?? ''}`.toLowerCase();
-      return matchesFilters(item) &&
-        (!query || haystack.includes(query.toLowerCase())) &&
-        (!verifiedOnly || item.verified);
-    })
-    .sort((a, b) => b.goalPlacePoints - a.goalPlacePoints), [athletes, leagueById, matchesFilters, query, teamById, verifiedOnly]);
-  const filteredTeams = useMemo(() => teams
-    .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
-    .sort((a, b) => pointsForTeam(b) - pointsForTeam(a)), [teams, matchesFilters, pointsForTeam, verifiedOnly]);
-  const filteredLeagues = useMemo(() => leagues
-    .filter((item) => matchesFilters(item) && (!verifiedOnly || item.verified))
-    // Unrated leagues sort last. `null` is a real state — a league with too few fixtures for
-    // the index to mean anything — and floating it to the top is the unearned prominence the
-    // old constant 45 gave every new league.
-    .sort((a, b) => indexSortValue(b.goalPlaceIndex) - indexSortValue(a.goalPlaceIndex)),
-    [leagues, matchesFilters, verifiedOnly]);
-  const filteredMatches = useMemo(() => matches
-    .filter((item) => {
-      const home = teamById.get(item.homeTeamId);
-      const away = teamById.get(item.awayTeamId);
-      const haystack = `${home?.name ?? ''} ${away?.name ?? ''} ${item.venue}`.toLowerCase();
-      return (sport === 'all' || String(item.sport).toLowerCase() === sport) &&
-        (city === 'all' || item.city === city) &&
-        (!query || haystack.includes(query.toLowerCase())) &&
-        (!verifiedOnly || item.verificationStatus === 'verified');
-    })
-    .sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)), [matches, city, query, sport, teamById, verifiedOnly]);
   const filteredChallenges = useMemo(() => challenges
     .filter((item) => {
       const athlete = athletes.find((candidate) => candidate.id === item.athleteId);
@@ -199,12 +190,103 @@ export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryDat
         {tab === 'For You' ? (
           <ForYou athletes={forYou.athletes} teams={forYou.teams} leagues={forYou.leagues} leagueById={leagueById} leagueSnapshots={leagueSnapshots} />
         ) : null}
-        {tab === 'Athletes' ? <AthleteGrid items={filteredAthletes} /> : null}
-        {tab === 'Teams' ? <TeamGrid items={filteredTeams} leagueById={leagueById} leagueSnapshots={leagueSnapshots} /> : null}
-        {tab === 'Leagues' ? <LeagueGrid items={filteredLeagues} leagueSnapshots={leagueSnapshots} /> : null}
-        {tab === 'Matches' ? <MatchGrid items={filteredMatches} teamById={teamById} /> : null}
+        {browseEntity ? (
+          <BrowseResults page={page} query={query}>
+            {tab === 'Athletes' ? <AthleteGrid items={onPage<Athlete>(page.items, query, athleteText)} /> : null}
+            {tab === 'Teams' ? <TeamGrid items={onPage<Team>(page.items, query, nameText)} leagueById={leagueById} leagueSnapshots={leagueSnapshots} /> : null}
+            {tab === 'Leagues' ? <LeagueGrid items={onPage<League>(page.items, query, nameText)} leagueSnapshots={leagueSnapshots} /> : null}
+            {tab === 'Matches' ? <MatchGrid items={onPage<Match>(page.items, query, venueText)} teamById={teamById} /> : null}
+          </BrowseResults>
+        ) : null}
         {tab === 'Challenges' ? <ChallengeGrid items={filteredChallenges} athletes={athletes} leagueById={leagueById} /> : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Narrow the loaded page by the text box.
+ *
+ * Deliberately page-local, and `BrowseResults` says so on screen. Firestore cannot do
+ * substring matching, and `/api/search` already answers text queries against the server-built
+ * `searchIndex` — the only structure in this database that can. Reimplementing that here would
+ * mean a second, worse search that disagrees with the first, so the text box refines what is
+ * loaded and the page points at real search for the rest of the catalogue.
+ */
+function onPage<T>(items: unknown[], query: string, text: (item: T) => string): T[] {
+  const typed = items as T[];
+  if (!query.trim()) return typed;
+  const needle = query.toLowerCase();
+  return typed.filter((item) => text(item).toLowerCase().includes(needle));
+}
+
+const nameText = (item: { name?: string; city?: string }) => `${item.name ?? ''} ${item.city ?? ''}`;
+const athleteText = (item: Athlete) =>
+  `${item.legalName ?? item.name ?? ''} ${item.registeredPosition ?? item.position ?? ''} ${item.city ?? ''}`;
+const venueText = (item: Match) => `${item.venue ?? ''} ${item.city ?? ''}`;
+
+/**
+ * The states a paged browse tab can be in, in one place.
+ *
+ * Every one of them is a real state a visitor reaches, and the old page had none of them: it
+ * rendered a grid over a fixed slice and had no way to be loading, empty because of a filter,
+ * broken, or partway through a catalogue.
+ */
+function BrowseResults({
+  page,
+  query,
+  children,
+}: {
+  page: ReturnType<typeof useDiscoveryPage>;
+  query: string;
+  children: React.ReactNode;
+}) {
+  if (page.loading) return <DiscoverSkeleton />;
+
+  if (page.error) {
+    return (
+      <ErrorState
+        description={page.error}
+        onRetry={page.retry}
+      />
+    );
+  }
+
+  if (!page.items.length) {
+    return (
+      <EmptyState
+        icon={MagnifyingGlass}
+        title="Nothing matches those filters"
+        description="Try a different sport or region, or clear the filters to see everything."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {children}
+
+      {query.trim() ? (
+        // Said plainly rather than implied. Filtering the loaded page and presenting it as a
+        // catalogue search is the same class of quiet wrongness as a truncated league table.
+        <p className="text-xs text-muted" role="status">
+          Filtering the {page.items.length} results loaded here.{' '}
+          <Link href={`/search?q=${encodeURIComponent(query)}`} className="text-brand underline underline-offset-2">
+            Search the full catalogue
+          </Link>
+          .
+        </p>
+      ) : null}
+
+      {page.hasMore ? (
+        <div className="flex justify-center pt-1">
+          <Button variant="secondary" onClick={page.loadMore} disabled={page.loadingMore}>
+            {page.loadingMore ? 'Loading...' : 'Load more'}
+          </Button>
+        </div>
+      ) : (
+        <p className="pt-1 text-center text-xs text-subtle">That is everything matching these filters.</p>
+      )}
     </div>
   );
 }

@@ -67,6 +67,8 @@
     "beta:reset": "tsx scripts/demo/data-lifecycle.ts --action=beta-reset",
     "data:guard": "tsx scripts/data/deprecated-fields-guard.ts",
     "league-index:rebuild": "tsx --env-file=.env.local scripts/leagueIndex/rebuild.ts",
+    "firestore:discovery-indexes": "tsx scripts/firestore/discovery-indexes.ts",
+    "firestore:discovery-indexes:apply": "tsx scripts/firestore/discovery-indexes.ts --apply",
     "standings:verify": "tsx --env-file=.env.local scripts/standings/verify-demo.ts",
     "standings:rebuild:dry-run": "tsx --env-file=.env.local scripts/standings/rebuild.ts",
     "standings:rebuild:apply": "tsx --env-file=.env.local scripts/standings/rebuild.ts --apply",
