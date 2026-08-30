@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertConfigMatchesProject,
   assertExplicitAccessEngineMode,
   assertSafeProductionEnvironment,
   goalPlaceEnvironment,
@@ -35,10 +36,12 @@ describe('environment guard', () => {
   });
 
   /**
-   * The un-overlaid `apphosting.yaml` declares `unconfigured`, and this is the gate that
-   * makes that declaration mean something. `next.config.ts` calls it at build time, so a
-   * backend created without naming an overlay fails to build instead of silently coming up
-   * as demo and writing to the demo database.
+   * The sentinel is still supported, and is no longer the default.
+   *
+   * `apphosting.yaml` briefly declared `unconfigured` so an un-overlaid backend would fail to
+   * build. That broke the demo backend, which is itself un-overlaid — see the project-match
+   * block at the bottom of this file for what replaced it. The value remains recognised, so a
+   * backend that genuinely wants to refuse rather than inherit can still declare it.
    */
   it('refuses to build an environment that named no overlay', () => {
     expect(() => assertSafeProductionEnvironment({
@@ -140,5 +143,79 @@ describe('access engine mode configuration', () => {
       GOALPLACE_ENVIRONMENT: 'demo',
       GOALPLACE_ACCESS_ENGINE_MODE: 'canonical',
     } as NodeJS.ProcessEnv)).toThrow(/not a supported access engine mode/);
+  });
+});
+
+/**
+ * The check that actually closes GP-08.
+ *
+ * The first attempt made the un-overlaid `apphosting.yaml` declare `unconfigured` and fail the
+ * build. The demo rollout on 2026-08-29 disproved it in about four minutes: the live demo
+ * backend is itself un-overlaid, so the sentinel failed the one backend legitimately relying
+ * on the default. "Names no overlay" is not the same thing as "is misconfigured".
+ *
+ * What is dangerous is narrower: a build whose configuration names a DIFFERENT project than
+ * the one it is running against. That is the beta-backend-inherits-demo case exactly, and it
+ * is checkable without assuming anything about how the config was selected.
+ */
+describe('the configuration must belong to the project being built', () => {
+  it('allows a build whose config names the project it is running against', () => {
+    expect(() => assertConfigMatchesProject({
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
+      GCLOUD_PROJECT: 'manifest-quasar-479416-s7',
+    } as NodeJS.ProcessEnv)).not.toThrow();
+  });
+
+  it('refuses a beta backend that inherited the demo configuration', () => {
+    // GP-08, verbatim: no mistake in the beta config, only a forgotten flag at
+    // backend-creation time, so the backend reads apphosting.yaml and comes up as demo.
+    expect(() => assertConfigMatchesProject({
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
+      GCLOUD_PROJECT: 'goalplace-beta',
+    } as NodeJS.ProcessEnv)).toThrow(/running against project 'goalplace-beta'/);
+  });
+
+  it('names both projects, so the error says which way round the mistake is', () => {
+    expect(() => assertConfigMatchesProject({
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
+      GCLOUD_PROJECT: 'goalplace-prod',
+    } as NodeJS.ProcessEnv)).toThrow(/manifest-quasar-479416-s7/);
+  });
+
+  it('falls back to the public project id when the admin one is build-time absent', () => {
+    // GOALPLACE_ADMIN_PROJECT_ID is declared RUNTIME-only in every overlay, so at BUILD time
+    // the public variable is the one available. Without this fallback the check would be
+    // inert during exactly the build it exists to guard.
+    expect(() => assertConfigMatchesProject({
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'manifest-quasar-479416-s7',
+      GCLOUD_PROJECT: 'goalplace-beta',
+    } as NodeJS.ProcessEnv)).toThrow(/goalplace-beta/);
+  });
+
+  it('skips when there is no ambient project to compare against', () => {
+    // next dev, a local next build, and CI have no GCLOUD_PROJECT. Failing closed on its
+    // absence would break every build not running on Google infrastructure.
+    expect(() => assertConfigMatchesProject({
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
+    } as NodeJS.ProcessEnv)).not.toThrow();
+    expect(() => assertConfigMatchesProject({} as NodeJS.ProcessEnv)).not.toThrow();
+  });
+
+  it('leaves an unfilled placeholder to the readiness gate', () => {
+    // environment:prepare:beta owns REPLACE_WITH_ markers and reports them all together.
+    // Throwing here would report one at a time, from a check about something else.
+    expect(() => assertConfigMatchesProject({
+      GOALPLACE_ADMIN_PROJECT_ID: 'REPLACE_WITH_BETA_PROJECT_ID',
+      GCLOUD_PROJECT: 'goalplace-beta',
+    } as NodeJS.ProcessEnv)).not.toThrow();
+  });
+
+  it('runs as part of the build gate, not only on demand', () => {
+    // assertSafeProductionEnvironment is what next.config.ts calls.
+    expect(() => assertSafeProductionEnvironment({
+      GOALPLACE_ENVIRONMENT: 'demo',
+      GOALPLACE_ADMIN_PROJECT_ID: 'manifest-quasar-479416-s7',
+      GCLOUD_PROJECT: 'goalplace-beta',
+    } as NodeJS.ProcessEnv)).toThrow(/configuration in force names/);
   });
 });

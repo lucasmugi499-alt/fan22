@@ -501,7 +501,7 @@ is migrated, deployed, enabled or cloud-verified.
 | `GP-05` | The GoalPlace Index is computed hourly in `convergeLifecycle` from four measured ratios, and the league page shows the counts behind each. It was a stored constant; every league the platform created got the literal `45`, and the seeded leagues carried 797 to 882 in +17 steps. |
 | `GP-06` | `server/notifications/notify.ts` is the one writer, with deterministic ids so a retried trigger is a no-op. Wired to finalization, reconciliation exceptions and confirmation-overdue escalation. Both fantasy `.add()` calls migrated. |
 | `GP-07` | `awardedResult` provenance on a match and a season-scoped `pointsAdjustments` collection, both behind `league.result.enter` with a required reason and an audit entry. Applied as a final term after every match is counted, so the standings computation stays order independent. |
-| `GP-08`, `GP-09` | The un-overlaid `apphosting.yaml` declares `unconfigured` and carries no project identity; `assertSafeProductionEnvironment()` rejects it at build. Every deploy preflights its resolved project against `config/environments.json`. The reset scripts assert the same way. |
+| `GP-08`, `GP-09` | `assertConfigMatchesProject()` refuses a build whose configuration names a different project than the one it is running against — see §11 for the first attempt at this and why it was wrong. Every deploy preflights its resolved project against `config/environments.json`. The reset scripts assert the same way. |
 | `GP-11` | A missing scheduler credential returns 503 and logs, rather than a 401 indistinguishable from a bad secret. `/api/environment` reports which routes cannot authenticate. |
 | `GP-12`, `GP-13` | Every function declares `maxInstances`; the payment callbacks are rate limited by IP and by intent id. |
 | Phase 5 (part) | `readCollection` applies a default 500-document ceiling when a caller names none. `getLeagues`, `getSeasons`, `getFinalizations`, `getVerifications` and `getSponsors` took no limit at all, so each was a full-collection scan on every page view. A backstop, not a page size — paginating the surfaces that need it is separate work. |
@@ -565,3 +565,61 @@ emulator jar. This machine can: Java 21 and both jars are in `~/.cache/firebase/
 Rules cases cover the two collections this pass added — that `standings` and `pointsAdjustments`
 are publicly readable, and that neither a club nor its governing league can write, rescind or
 delete either from a browser.
+
+
+---
+
+## 11. Demo rollout, 2026-08-29
+
+The remediation in §10 was deployed to Demo. Three planes, each verified on its own revision.
+
+| Plane | State |
+|---|---|
+| Firestore Rules | **Released** to `fg256` from `firestore.rules.next`, with indexes. Adds the `pointsAdjustments` block. One pre-existing index in the project is still absent from `firestore.indexes.json`; untouched, as before. |
+| Cloud Functions | **All 12 updated.** Read back with `functions:list --json`: every one reports `TEAM_AUTHORITY_STAGE=retired`, `FINALIZER_MODE=enabled`, `FIELD_CAPTURE_MODE=enabled`, `LEAGUE_ENTRY_MODE=off`. |
+| App Hosting | **Rolled out** from exact commit — see below for the first attempt, which failed. |
+
+### The rollout that failed, and what it proved
+
+The first `apphosting:rollouts:create` **failed at build**, on a commit whose `next build` passed
+locally. The cause was this repo's own new gate: `apphosting.yaml` had been made a refusal
+sentinel declaring `GOALPLACE_ENVIRONMENT: unconfigured`, and `next.config.ts` threw on it.
+
+**The demo backend is itself un-overlaid.** It builds from `apphosting.yaml`. So the sentinel
+failed the one backend that legitimately depends on the default.
+
+This is worth recording rather than quietly fixing, because it *confirmed* GP-08's premise
+while refuting its remedy. The audit was right that an un-overlaid backend inherits whatever
+the base says — the demo backend is proof. It was wrong to conclude that the base should
+therefore refuse to build, because "names no overlay" is not the same thing as "is
+misconfigured", and the only backend that exists is in the first category.
+
+What replaced it is narrower and catches more: `assertConfigMatchesProject()` refuses when the
+project named by the configuration in force disagrees with the project the build is running
+against. A beta backend inheriting demo's config declares `manifest-quasar-479416-s7` while
+Cloud Build reports `goalplace-beta`, and the build stops — whether or not an overlay was
+named. It skips when no ambient project is discoverable, because `GCLOUD_PROJECT` is absent for
+`next dev`, a local build and CI, and failing closed there would break every build not running
+on Google infrastructure.
+
+`apphosting.yaml` is demo's configuration again, and a test now asserts the base and the demo
+overlay agree on every declared variable.
+
+### Two things the failure did not do
+
+**No outage.** A failed App Hosting rollout leaves the previous build serving. `/api/health`
+returned 200 throughout and `/api/environment` continued reporting
+`fan22-build-2026-08-29-001`.
+
+**No partial state.** Rules and Functions had already deployed successfully and are independent
+of the App Hosting build. Nothing needed rolling back.
+
+### Also fixed en route
+
+`backup:firestore` could not back up demo. `demo` had been added to `Environment`, to
+`CONFIRM_PHRASES` and to `buildProjectMap`, but `validate()` still hardcoded `staging` or
+`production` — so the demo project could be MAPPED and never NAMED. That is why the most recent
+backup was from 5 August: the safe operation was the one that did not work. The accepted list
+is now derived from `CONFIRM_PHRASES`, so an environment cannot be accepted without a
+confirmation phrase. Verified by taking the backup it unblocked: **13,124 documents, 328
+collection files**, in `backups/firestore/demo/`.

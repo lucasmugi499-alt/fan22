@@ -101,76 +101,70 @@ describe('team authority stage across App Hosting config files', () => {
 });
 
 /**
- * The un-overlaid base must not be deployable, and must not name a project.
+ * The base is demo's configuration, and the guard that makes that safe lives elsewhere.
  *
- * `apphosting.yaml` was a copy of the demo configuration. App Hosting reads it whenever a
- * backend names no overlay, so a backend created for beta and given no overlay came up as
- * demo and wrote to the demo database — no mistake in the beta config required, only a
- * forgotten flag. This is one of the two independent paths by which beta work could reach
- * the investor demo; `firestoreTarget.test.ts` covers the other.
+ * This block used to assert the opposite — that `apphosting.yaml` declared `unconfigured` and
+ * named no project. That was the first attempt at closing GP-08, and the demo rollout on
+ * 2026-08-29 disproved it in about four minutes: **the live demo backend is itself
+ * un-overlaid.** It builds from `apphosting.yaml`, so a refusal sentinel there fails the one
+ * backend that legitimately depends on the default.
  *
- * Asserted structurally rather than by reading the environment, because the failure this
- * prevents happens at backend-creation time on somebody else's machine.
+ * The hazard GP-08 identified is real — an un-overlaid beta backend does inherit whatever is
+ * here — but "names no overlay" is not the same thing as "is misconfigured". The check that
+ * catches the real case is `assertConfigMatchesProject()`, which refuses when the project the
+ * configuration names disagrees with the project the build is running against. What this
+ * block asserts now is that the base stays coherent WITH demo, so the two cannot drift.
  */
-describe('the un-overlaid apphosting.yaml refuses to be an environment', () => {
+/** Declared values only. Never the surrounding prose — see the note in the project test. */
+function declaredValue(text: string, variable: string): string | undefined {
+  const match = text.match(
+    new RegExp(`-\\s*variable:\\s*${variable}\\s*\\n\\s*value:\\s*"?([^"\\n]+)"?`),
+  );
+  return match?.[1].trim();
+}
+
+describe('the base configuration is demo, and stays in step with the demo overlay', () => {
   const base = readFileSync(APPHOSTING, 'utf8');
+  const demo = readFileSync('apphosting.demo.yaml', 'utf8');
 
-  it('declares the unconfigured sentinel that the build gate rejects', () => {
-    expect(appHostingValue('GOALPLACE_ENVIRONMENT')).toBe('unconfigured');
+  it('declares demo, not a sentinel', () => {
+    expect(appHostingValue('GOALPLACE_ENVIRONMENT')).toBe('demo');
   });
 
-  it('names no Firebase project, in any variable', () => {
-    // Substring, not an exact variable match: the demo project id appeared in
-    // GOALPLACE_ADMIN_PROJECT_ID, NEXT_PUBLIC_FIREBASE_PROJECT_ID, the auth domain, the
-    // storage bucket and the base URL. Any one of them reaching this file resurrects it.
-    expect(base).not.toContain('manifest-quasar');
-    expect(base).not.toContain('studio-534174814');
-    expect(base).not.toMatch(/PROJECT_ID\s*\n\s*value:/);
-  });
-
-  it('leaves every permissive flag off, so an overlay that forgets one inherits the strict answer', () => {
-    for (const variable of [
-      'GOALPLACE_ALLOW_DEMO_LOGIN',
-      'NEXT_PUBLIC_ENABLE_DEMO_LOGIN',
-      'GOALPLACE_ALLOW_SEEDING',
-      'GOALPLACE_ALLOW_REAL_PAYMENTS',
-      'GOALPLACE_ENABLE_INVESTOR_TOOLS',
-    ]) {
-      const match = base.match(
-        new RegExp(`-\\s*variable:\\s*${variable}\\s*\\n\\s*value:\\s*"?([a-z]+)"?`),
-      );
-      expect(match?.[1], `${variable} missing from ${APPHOSTING}`).toBe('false');
-    }
-    const appCheck = base.match(
-      /-\s*variable:\s*GOALPLACE_REQUIRE_APP_CHECK\s*\n\s*value:\s*"?([a-z]+)"?/,
-    );
-    expect(appCheck?.[1]).toBe('true');
-  });
-
-  it('leaves every finalization pipeline off, so no environment inherits an unproven activation', () => {
-    for (const variable of [
-      'GOALPLACE_FINALIZER_MODE',
-      'GOALPLACE_FIELD_CAPTURE_MODE',
-      'GOALPLACE_LEAGUE_ENTRY_MODE',
-    ]) {
-      expect(appHostingValue(variable), `${variable} missing from ${APPHOSTING}`).toBe('off');
+  it('names the demo project, in the variables that carry a project id', () => {
+    // Asserted against parsed VALUES, not the raw file. Matching the file text catches the
+    // prose in the header comment above — which names the other projects while explaining
+    // why they must not appear as values. That is the same mistake `publicEnvNames.test.ts`
+    // was written to avoid, made one file over.
+    //
+    // The specific failure GP-08 describes is a beta backend inheriting THIS project id. It
+    // has to be here for the demo backend; `assertConfigMatchesProject` is what stops another
+    // environment building against it.
+    for (const variable of ['GOALPLACE_ADMIN_PROJECT_ID', 'NEXT_PUBLIC_FIREBASE_PROJECT_ID']) {
+      expect(declaredValue(base, variable), `${variable} missing`).toBe('manifest-quasar-479416-s7');
     }
   });
-});
 
-describe('finalizer gates on the Functions plane', () => {
-  it('gives field capture its own declared mode', () => {
-    expect(functionsEnvValue('GOALPLACE_FIELD_CAPTURE_MODE')).toBeDefined();
-    expect(['off', 'canary', 'enabled']).toContain(functionsEnvValue('GOALPLACE_FIELD_CAPTURE_MODE'));
-  });
+  it('agrees with the demo overlay on every declared variable', () => {
+    // Two files that both describe demo and disagree is the failure mode this whole test file
+    // exists for. Which of the two a backend reads is not visible from the CLI.
+    const values = (text: string) => {
+      const found = new Map<string, string>();
+      for (const match of text.matchAll(/-\s*variable:\s*([A-Z0-9_]+)\s*\n\s*value:\s*"?([^"\n]+)"?/g)) {
+        found.set(match[1], match[2].trim());
+      }
+      return found;
+    };
+    const baseValues = values(base);
+    const demoValues = values(demo);
 
-  it('keeps the legacy mode separate from it', () => {
-    expect(functionsEnvValue('GOALPLACE_FINALIZER_MODE')).toBeDefined();
-  });
-
-  it('leaves the field capture canary allowlist declared, even when empty', () => {
-    // Populated-empty on purpose: narrowing to one fixture is then a one-line change rather
-    // than a new variable somebody has to remember the exact name of under pressure.
-    expect(functionsEnvValue('GOALPLACE_FIELD_CAPTURE_CANARY_MATCH_IDS')).toBeDefined();
+    const disagreements: string[] = [];
+    for (const [variable, value] of baseValues) {
+      const other = demoValues.get(variable);
+      if (other !== undefined && other !== value) {
+        disagreements.push(`${variable}: base=${value} demo=${other}`);
+      }
+    }
+    expect(disagreements).toEqual([]);
   });
 });

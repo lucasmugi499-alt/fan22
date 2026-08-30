@@ -91,20 +91,16 @@ export function publicEnvironment(env: NodeJS.ProcessEnv = process.env): PublicE
 export function assertSafeProductionEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const environment = goalPlaceEnvironment(env);
 
-  // App Hosting reads `apphosting.yaml` when a backend names no overlay. That file used to
-  // be a copy of the demo configuration, so a backend created for beta and given no overlay
-  // came up as demo and wrote to the demo database — no mistake in the beta config required,
-  // only a forgotten flag. The default now declares `unconfigured` and this refuses to
-  // build. A deploy that will not build is cheaper than one that writes to the wrong project.
   if (environment === 'unconfigured') {
     throw new Error(
-      'GoalPlace256 has no environment overlay selected. The default apphosting.yaml is a '
-      + 'refusal sentinel, not a runnable configuration. Create the backend against one of '
+      'GoalPlace256 has no environment overlay selected. GOALPLACE_ENVIRONMENT is the '
+      + '`unconfigured` sentinel, which is not a runnable configuration. Build against one of '
       + `${DEPLOYABLE_ENVIRONMENTS.join(', ')} `
-      + '(apphosting.demo.yaml, apphosting.beta.yaml, apphosting.production.yaml) and set '
-      + 'GOALPLACE_ENVIRONMENT accordingly.',
+      + '(apphosting.demo.yaml, apphosting.beta.yaml, apphosting.production.yaml).',
     );
   }
+
+  assertConfigMatchesProject(env);
 
   if (environment !== 'production') return;
 
@@ -140,6 +136,54 @@ export function assertSafeProductionEnvironment(env: NodeJS.ProcessEnv = process
   if (problems.length) {
     throw new Error(`Unsafe GoalPlace256 production configuration: ${problems.join('; ')}.`);
   }
+}
+
+/**
+ * The configuration in force must belong to the project it is being built for.
+ *
+ * ## What this replaces, and why
+ *
+ * App Hosting reads `apphosting.yaml` when a backend names no overlay, and that file was a
+ * copy of the demo configuration — demo project id, demo API key, demo login on. So a backend
+ * created for beta and given no overlay came up as DEMO and wrote to the demo database. That
+ * needed no mistake in the beta config, only a forgotten flag at backend-creation time.
+ *
+ * The first attempt at closing this made the base declare `unconfigured` and fail the build.
+ * That was the wrong shape, and the demo rollout proved it within minutes: **the live demo
+ * backend is itself un-overlaid.** It builds from `apphosting.yaml`, so a sentinel there
+ * fails the one backend that legitimately relies on the default. The premise was right — an
+ * un-overlaid backend does inherit whatever the base says — and the conclusion was wrong,
+ * because "names no overlay" is not the same thing as "is misconfigured".
+ *
+ * What actually matters is narrower and checkable: does the configuration in force name the
+ * SAME project this build is running against? A beta backend reading demo's config declares
+ * `manifest-quasar-479416-s7` while Cloud Build reports `goalplace-beta`. That mismatch is the
+ * failure itself rather than a proxy for it, and it catches the case whether or not an overlay
+ * was named.
+ *
+ * ## Why it skips when the ambient project is unknown
+ *
+ * `GCLOUD_PROJECT` is set by App Hosting and Cloud Build; it is not set for `next dev`, a
+ * local `next build`, or CI. Failing closed on its absence would break every build that is not
+ * on Google infrastructure, which is not a trade worth making for a check whose whole purpose
+ * is to catch a deploy-time mistake. When there is nothing to compare against, there is no
+ * disagreement to report.
+ */
+export function assertConfigMatchesProject(env: NodeJS.ProcessEnv = process.env) {
+  const declared = env.GOALPLACE_ADMIN_PROJECT_ID ?? env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const ambient = env.GCLOUD_PROJECT ?? env.GOOGLE_CLOUD_PROJECT;
+
+  // Nothing to compare. See the note above: absence is not evidence of a mismatch.
+  if (!declared || !ambient) return;
+  if (declared.startsWith('REPLACE_WITH_')) return; // The readiness gate owns placeholders.
+  if (declared === ambient) return;
+
+  throw new Error(
+    `Unsafe GoalPlace256 configuration: this build is running against project '${ambient}', but `
+    + `the App Hosting configuration in force names '${declared}'. That is what happens when a `
+    + 'backend is built without selecting its overlay — it inherits apphosting.yaml, which '
+    + 'belongs to a different environment. Build with the matching apphosting.<environment>.yaml.',
+  );
 }
 
 /**
