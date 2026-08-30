@@ -5,6 +5,8 @@ import { requireFirebaseClient } from './client';
 type UploadSessionResponse = {
   uploadUrl: string;
   storagePath: string;
+  /** Signed into the URL, so Cloud Storage refuses the PUT without it. */
+  contentLengthRange?: string;
   downloadUrl?: string;
 };
 
@@ -27,11 +29,19 @@ async function requestUploadSession(body: Record<string, unknown>) {
   return data as UploadSessionResponse;
 }
 
-async function putSignedObject(uploadUrl: string, file: File) {
-  const response = await fetch(uploadUrl, {
+async function putSignedObject(session: UploadSessionResponse, file: File) {
+  const response = await fetch(session.uploadUrl, {
     method: 'PUT',
     headers: {
       'content-type': file.type,
+      /*
+       * Sent verbatim because it is part of the signature. Cloud Storage enforces the range
+       * and rejects a PUT that omits the header, which is what makes the size limit a
+       * property of the URL rather than of a confirmation step the caller can skip.
+       */
+      ...(session.contentLengthRange
+        ? { 'x-goog-content-length-range': session.contentLengthRange }
+        : {}),
     },
     body: file,
   });
@@ -67,7 +77,7 @@ export async function uploadMatchEvidence({
       contentType: file.type,
       size: file.size,
     });
-    await putSignedObject(session.uploadUrl, file);
+    await putSignedObject(session, file);
     refs.push(session.storagePath);
   }
   return refs;
@@ -100,6 +110,6 @@ export async function uploadPublishedMedia({
     contentType: file.type,
     size: file.size,
   });
-  await putSignedObject(session.uploadUrl, file);
+  await putSignedObject(session, file);
   return session.downloadUrl ?? session.storagePath;
 }

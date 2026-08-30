@@ -5,6 +5,7 @@ import { gateMatchReport } from './matchReports';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 import {
   finalizeSubmission,
@@ -22,6 +23,7 @@ import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 import { sweepUnreportedMatches as runUnreportedMatchSweep } from '../../src/server/finalization/unreportedSweep';
 import { recomputeLeagueIndexes } from '../../src/server/leagueIndex/projection';
 import { recomputeSeasonStandings, standingsAreConverged } from '../../src/server/standings/projection';
+import { sweepUnconfirmedUploads } from '../../src/server/uploads/orphanSweep';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -443,6 +445,25 @@ export const convergeLifecycle = onSchedule(
         return entity.exists === projection.exists;
       },
     );
+    /*
+     * Objects uploaded under an authorization that was never confirmed.
+     *
+     * Confirmation is where an upload is checked against what it was authorized to be, and
+     * calling it is the caller's move — so an object that skips it is unreferenced, unreachable
+     * and unbilled to anyone but us. Never fatal: this is housekeeping, and the access expiry
+     * and projection repairs above govern authority.
+     */
+    const uploads = await sweepUnconfirmedUploads(db, async (storagePath) => {
+      const file = getStorage().bucket().file(storagePath);
+      const [exists] = await file.exists();
+      if (!exists) return false;
+      await file.delete();
+      return true;
+    }).catch((error) => {
+      logger.error('Unconfirmed upload sweep failed', { error: String(error) });
+      return undefined;
+    });
+
     logger.info('Lifecycle convergence complete', {
       lapsedFound: expiry.lapsedFound,
       assignmentsExpired: expiry.transitioned,
@@ -455,6 +476,9 @@ export const convergeLifecycle = onSchedule(
       repairsRetryScheduled: repairs.retryScheduled,
       repairsVerificationFailed: repairs.verificationFailed,
       repairsDeadLettered: repairs.deadLettered,
+      uploadsExamined: uploads?.examined ?? 0,
+      uploadObjectsDeleted: uploads?.objectsDeleted ?? 0,
+      uploadSweepErrors: uploads?.errors.length ?? 0,
     });
   }
 );

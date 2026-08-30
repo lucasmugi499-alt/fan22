@@ -96,6 +96,28 @@ async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string
     || await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.resolve');
 }
 
+/**
+ * The ceiling any single upload may reach, enforced by Cloud Storage rather than by us.
+ *
+ * Matches the schema's own maximum, so a request that got this far has already declared a size
+ * under it. This is the second lock: the declared size was checked on the REQUEST and bound
+ * nothing about the upload, so a caller who was authorized to put a 200KB photo could put a
+ * 4GB object at the same URL.
+ */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+/**
+ * A signed URL that binds the size as well as the type.
+ *
+ * `x-goog-content-length-range` is part of the v4 signature, so Cloud Storage rejects a PUT
+ * whose body falls outside the range and rejects one that omits the header — the caller cannot
+ * drop it without invalidating the signature they were given.
+ *
+ * Before this, size was checked only if the caller chose to call `confirm`, and nothing made
+ * them. From an attacker's point of view verification was optional: mint a session, upload
+ * something enormous, never confirm, repeat to the rate limit. The object stayed in the
+ * bucket, unreferenced and unbilled to anyone but us.
+ */
 async function signedWriteUrl(path: string, contentType: string) {
   const bucket = adminStorage.bucket();
   const file = bucket.file(path);
@@ -104,10 +126,12 @@ async function signedWriteUrl(path: string, contentType: string) {
     action: 'write',
     expires: Date.now() + 10 * 60 * 1000,
     contentType,
+    extensionHeaders: { 'x-goog-content-length-range': `0,${MAX_UPLOAD_BYTES}` },
   });
   return {
     uploadUrl,
     bucketName: bucket.name,
+    contentLengthRange: `0,${MAX_UPLOAD_BYTES}`,
   };
 }
 
@@ -170,6 +194,9 @@ export async function POST(request: Request) {
     sessionId,
     uploadUrl: signed.uploadUrl,
     storagePath,
+    // Part of the signature, so the client must send it back verbatim as a request header.
+    // Returned rather than assumed, so the limit lives in one place.
+    contentLengthRange: signed.contentLengthRange,
     expiresInSeconds: SESSION_TTL_SECONDS,
     // Deliberately no download URL. A published address is issued only after the upload
     // is confirmed against its authorization and passes moderation.
