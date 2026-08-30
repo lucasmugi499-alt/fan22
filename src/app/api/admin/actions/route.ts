@@ -13,6 +13,7 @@ import type {
 } from '@/lib/auth/access';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
 import { assertLeagueKeepsAnAdmin } from '@/server/access/lastAdmin';
+import { seasonRegistrationId } from '@/server/standings/seasonMembership';
 import { normalizeAccessAssignment, readScopeProjection, rebuildUserProjections } from '@/server/access/projector';
 
 export const runtime = 'nodejs';
@@ -655,6 +656,9 @@ export async function POST(request: Request) {
                 throw new Error(`Team ${teamIds[index]} does not belong to this league.`);
               }
             });
+            // Read with the teams, because every read in a transaction must precede its writes.
+            const registrationSnapshots = await Promise.all(teamIds.map((teamId) =>
+              transaction.get(adminDb.collection('seasonTeams').doc(seasonRegistrationId(seasonId, teamId)))));
 
             /**
              * Bound at fixture creation, not resolved at result time.
@@ -669,6 +673,36 @@ export async function POST(request: Request) {
               season.data()?.capturePolicy,
               platformMinimum,
             );
+
+            /**
+             * Entering a fixture IS entering the season.
+             *
+             * A season's table used to be rebuilt from every club currently carrying the
+             * league id, so moving a club to another league erased it from the season it
+             * actually played. `seasonTeams` records who competed; this is where that becomes
+             * true, because creating a fixture is the moment a club is committed to a season.
+             *
+             * Written in the same transaction as the fixtures, so a season can never hold a
+             * fixture for a club it has no registration for. Never overwritten: a club already
+             * registered keeps the name it registered under, and a rebrand does not rewrite
+             * the table of a season played under the old one.
+             */
+            teamIds.forEach((teamId, index) => {
+              // Already registered: keep the name it entered under. A rebrand must not rewrite
+              // the table of a season played under the old one.
+              if (registrationSnapshots[index].exists) return;
+              transaction.set(
+                adminDb.collection('seasonTeams').doc(seasonRegistrationId(seasonId, teamId)),
+                {
+                  id: seasonRegistrationId(seasonId, teamId),
+                  seasonId,
+                  leagueId,
+                  teamId,
+                  teamName: String(teamSnapshots[index].data()?.name ?? teamId),
+                  registeredAt: new Date().toISOString(),
+                },
+              );
+            });
 
             body.fixtures.forEach((fixture, index) => {
               transaction.set(fixtureRefs[index], {

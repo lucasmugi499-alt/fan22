@@ -7,6 +7,7 @@ import { buildLeagueStandings, type LeagueStanding } from '../../lib/leagueModel
 import { defaultScoringFor } from '../../lib/season';
 import { adaptMatch } from '../../lib/matchRecord';
 import { isOfficialMatch } from '../../lib/status';
+import { readSeasonMembership } from './seasonMembership';
 import type {
   Match,
   PointsAdjustment,
@@ -125,8 +126,15 @@ const MAX_CAS_ATTEMPTS = 5;
 export type StandingsProjectionResult = {
   seasonId: string;
   leagueId: string;
-  /** Rows written, one per team registered to the league. */
+  /** Rows written, one per club registered to the SEASON. See seasonMembership. */
   rowsWritten: number;
+  /**
+   * True when the club list came from current league membership because this season has no
+   * registrations, which is how every season written before `seasonTeams` existed still
+   * builds. Reported rather than hidden: a table computed this way is correct today and will
+   * change shape if the league's clubs change, and an operator should be able to count them.
+   */
+  membershipFromLeague?: boolean;
   /** Stale rows removed — a team withdrawn from the league mid-season. */
   rowsRemoved: number;
   /** Official matches the table was computed from. */
@@ -163,6 +171,12 @@ type SeasonInputs = {
   teams: Team[];
   matches: Match[];
   adjustments: PointsAdjustment[];
+  /**
+   * True when the club list came from current league membership because the season has no
+   * registrations. Carried through to the result so a caller can count how many seasons are
+   * still computed the old way rather than assuming none are.
+   */
+  membershipFromLeague: boolean;
 };
 
 async function readSeasonInputs(
@@ -178,8 +192,17 @@ async function readSeasonInputs(
   const leagueId = season?.leagueId ?? leagueIdHint;
   if (!leagueId) return undefined;
 
-  const [teamsSnapshot, matchesSnapshot, adjustmentsSnapshot] = await Promise.all([
-    db.collection('teams').where('leagueId', '==', leagueId).get(),
+  const [membership, matchesSnapshot, adjustmentsSnapshot] = await Promise.all([
+    /*
+     * Who competed in THIS season, not who is in the league today.
+     *
+     * The old query asked `teams where leagueId == leagueId`, which is a question about now
+     * asked of a record about then: move a club to another league and it vanished from the
+     * season it actually played; add a new club and it appeared in that season's table having
+     * played nothing. A completed season's table is a historical fact and must not change
+     * shape because a league's roster of clubs did.
+     */
+    readSeasonMembership(db, seasonId, leagueId),
     // By season, not by league. A league's matches span seasons and a table is meaningless
     // across them; scoping the query is also what keeps this bounded as a league ages.
     db.collection('matches')
@@ -197,7 +220,8 @@ async function readSeasonInputs(
     season,
     leagueId,
     sport: (season?.sport ?? 'football') as SportSlug,
-    teams: teamsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)),
+    teams: membership.teams,
+    membershipFromLeague: membership.fellBackToLeagueMembership,
     // Adapted exactly as the client and the public catalogue adapt them. Legacy-shaped
     // matches (`status: 'verified'`, no `teamAScore`) fail both `isOfficialMatch` and the
     // score check when read raw, which is what once left ten leagues with an empty table.
@@ -332,6 +356,7 @@ async function attemptRecompute(
       rowsRemoved: deletions.length,
       officialMatches,
       adjustmentsApplied: adjustments.filter((adjustment) => !adjustment.rescindedAt).length,
+      ...(inputs.membershipFromLeague ? { membershipFromLeague: true } : {}),
       recomputedAt,
     },
   };

@@ -87,7 +87,9 @@
     "release:evidence": "tsx scripts/release/migration-evidence.ts",
     "release:canary": "tsx scripts/release/field-capture-canary.ts",
     "release:unreported-sweep": "tsx scripts/release/unreported-match-sweep.ts",
-    "release:unreported-canary": "tsx scripts/release/unreported-match-canary.ts"
+    "release:unreported-canary": "tsx scripts/release/unreported-match-canary.ts",
+    "standings:backfill-season-teams": "tsx --env-file=.env.local scripts/standings/backfill-season-teams.ts",
+    "standings:backfill-season-teams:apply": "tsx --env-file=.env.local scripts/standings/backfill-season-teams.ts --apply"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

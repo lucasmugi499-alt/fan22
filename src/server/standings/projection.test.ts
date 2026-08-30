@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { fakeFirestore } from './fakeFirestore';
+import { registerSeasonTeams, seasonRegistrationId } from './seasonMembership';
 import {
   MAX_SEASON_MATCHES,
   recomputeSeasonStandings,
@@ -570,5 +571,110 @@ describe('proving a repaired table actually converged', () => {
       seasonId: SEASON, teamId: 'team_01', points: 99,
     });
     expect(await standingsAreConverged(fake.db as Firestore, SEASON)).toBe(false);
+  });
+});
+
+/**
+ * A season's table was rebuilt from every team CURRENTLY carrying the league id. That is a
+ * question about today asked of a record about last year: move a club to another league and it
+ * vanished from the season it actually played, add a new club and it appeared in that season's
+ * table having played nothing. A completed season's table is supposed to be a historical fact.
+ */
+describe('who a season belongs to', () => {
+  function withRegistrations(teams: Team[], matches: Match[], registered: Team[]) {
+    const fake = seeded(teams, matches);
+    fake.seed('seasonTeams', registered.map((entry) => ({
+      id: seasonRegistrationId(SEASON, entry.id),
+      seasonId: SEASON,
+      leagueId: LEAGUE,
+      teamId: entry.id,
+      teamName: entry.name,
+      registeredAt: '2026-01-01T00:00:00.000Z',
+    })));
+    return fake;
+  }
+
+  it('builds the table from the clubs registered to the season', async () => {
+    const teams = [team(1), team(2), team(3)];
+    // A club joined the league AFTER this season: present in `teams`, not registered.
+    const fake = withRegistrations(teams, [
+      match({ id: 'm1', home: 'team_01', away: 'team_02', homeScore: 2, awayScore: 1 }),
+    ], [team(1), team(2)]);
+
+    const result = await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+
+    expect(result?.rowsWritten).toBe(2);
+    expect(fake.documents('standings').map((row) => row.teamId).sort())
+      .toEqual(['team_01', 'team_02']);
+  });
+
+  it('keeps a club that has since left the league', async () => {
+    // The failure in the other direction: its results are part of the season everybody else
+    // competed in, and dropping it changes their table without changing their points.
+    const stillHere = [team(1)];
+    const fake = withRegistrations(stillHere, [
+      match({ id: 'm1', home: 'team_01', away: 'team_02', homeScore: 0, awayScore: 3 }),
+    ], [team(1), team(2)]);
+
+    const result = await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+
+    expect(result?.rowsWritten).toBe(2);
+    const departed = fake.documents('standings').find((row) => row.teamId === 'team_02');
+    expect(departed).toMatchObject({ points: 3, rank: 1 });
+  });
+
+  it('uses the name the club was registered under, not the name it has now', async () => {
+    const renamed = [{ ...team(1), name: 'Rebranded FC' } as Team];
+    const fake = withRegistrations(renamed, [], [{ ...team(1), name: 'Original United' } as Team]);
+
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+
+    expect(fake.documents('standings')[0]).toMatchObject({ teamName: 'Original United' });
+  });
+
+  it('falls back to league membership for a season with no registrations, and says so', async () => {
+    // Every season written before `seasonTeams` existed. Refusing to build their tables would
+    // take down every historical table on the platform to fix a subtler problem.
+    const fake = seeded([team(1), team(2)], [
+      match({ id: 'm1', home: 'team_01', away: 'team_02', homeScore: 1, awayScore: 0 }),
+    ]);
+    const result = await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+
+    expect(result?.rowsWritten).toBe(2);
+    expect(result?.membershipFromLeague).toBe(true);
+  });
+
+  it('does not claim a fallback when the season is registered', async () => {
+    const fake = withRegistrations([team(1), team(2)], [], [team(1), team(2)]);
+    const result = await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+    expect(result?.membershipFromLeague).toBeUndefined();
+  });
+});
+
+describe('registering the clubs a season is played by', () => {
+  it('writes one registration per club', async () => {
+    const fake = fakeFirestore();
+    const report = await registerSeasonTeams(fake.db as Firestore, {
+      seasonId: SEASON,
+      leagueId: LEAGUE,
+      teams: [{ id: 'team_01', name: 'Kisenyi United' }, { id: 'team_02', name: 'Makindye City' }],
+    });
+    expect(report).toEqual({ registered: 2, alreadyRegistered: 0 });
+    expect(fake.documents('seasonTeams')).toHaveLength(2);
+  });
+
+  it('never restates an existing registration', async () => {
+    // The point of the record is that it says what was true when the season began, so a later
+    // pass must not quietly rewrite it with today's club name.
+    const fake = fakeFirestore();
+    await registerSeasonTeams(fake.db as Firestore, {
+      seasonId: SEASON, leagueId: LEAGUE, teams: [{ id: 'team_01', name: 'Original United' }],
+    });
+    const report = await registerSeasonTeams(fake.db as Firestore, {
+      seasonId: SEASON, leagueId: LEAGUE, teams: [{ id: 'team_01', name: 'Rebranded FC' }],
+    });
+
+    expect(report).toEqual({ registered: 0, alreadyRegistered: 1 });
+    expect(fake.documents('seasonTeams')[0]).toMatchObject({ teamName: 'Original United' });
   });
 });

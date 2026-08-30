@@ -847,6 +847,22 @@ service cloud.firestore {
     }
 
     /**
+     * Which clubs competed in a season.
+     *
+     * Publicly readable for the same reason the table is: a season's table is a historical
+     * record, and who was in it is half of what makes it one. Written only by the trusted
+     * fixture command, which registers a club at the moment it is committed to a season.
+     *
+     * This exists because the table used to be rebuilt from every club CURRENTLY carrying the
+     * league id, so moving a club to another league erased it from the season it actually
+     * played, and adding one put a club with no games into a season that had finished.
+     */
+    match /seasonTeams/{registrationId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    /**
      * Points adjustments — discipline deductions and the like.
      *
      * Publicly readable because the table footnotes them: a club docked six points is entitled
