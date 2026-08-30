@@ -121,7 +121,12 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <>
             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {team.city}</span>
             <span className="opacity-50">|</span>
-            <span className="tabular tabular-nums">{officialRecord ? `${officialRecord.wins}-${officialRecord.draws}-${officialRecord.losses}` : '0-0-0'}</span>
+            {/*
+              `0-0-0` is a record. A club with no official results does not have one, and
+              printing zeros claims it played and drew nothing — which is why this and the
+              Club card below must fall back the same way rather than to two different sources.
+            */}
+            <span className="tabular tabular-nums">{officialRecord ? `${officialRecord.wins}-${officialRecord.draws}-${officialRecord.losses}` : 'No record yet'}</span>
           </>
         }
       />
@@ -185,13 +190,24 @@ export function TeamPublic({ teamId }: { teamId: string }) {
           <Card className="p-4">
             <h2 className="mb-3 text-[15px] font-semibold text-text-strong">Club</h2>
             <div className="space-y-3">
-              {/* From the same computed table shown in the sidebar, never the stored
-                  team.leaguePoints. That aggregate is not derived from any match, so
-                  showing it here contradicted the league table on the previous screen. */}
+              {/*
+                From the standings projection, and from nothing else.
+                
+                The comment here used to say "never the stored team.leaguePoints" while the
+                code fell back to exactly that with `?? team.leaguePoints`. The intent was
+                right and the `??` defeated it: when a club has no projection row, the banner
+                above falls back to `0-0-0` and this fell back to the seeded aggregate, so one
+                screen showed a club with no record AND six league points. Reported from the
+                live demo, on Mbarara Warriors.
+                
+                That aggregate derives from no match and is maintained by nothing, which is why
+                `data:guard` exists to stop new reads of it. A club with no official results has
+                no points — saying so is the honest answer, and it agrees with the banner.
+              */}
               <InfoRow
                 icon={Trophy}
                 label="League points"
-                value={String(officialRecord?.points ?? team.leaguePoints)}
+                value={officialRecord ? String(officialRecord.points) : 'No official results yet'}
                 accent="text-brand"
               />
               <InfoRow icon={Users} label="Supporters" value={String(team.supportersCount)} />

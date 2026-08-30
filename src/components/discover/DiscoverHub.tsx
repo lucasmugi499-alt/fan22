@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
-import { MagnifyingGlass, Target, TrendUp } from '@phosphor-icons/react';
+import { CaretRight, MagnifyingGlass, Target, TrendUp } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { AthleteCard, LeagueCard, TeamCard } from '@/components/core/EntityCards';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import type { Athlete, Challenge, League, Match, Season, StoredStanding, Team } from '@/types';
 import { indexSortValue } from '@/lib/leagueIndex';
 import { useDiscoveryPage, type DiscoveryEntity } from '@/lib/discovery/useDiscoveryPage';
+import { useCatalogueSearch, type SearchableEntity } from '@/lib/discovery/useCatalogueSearch';
 import {
   buildLeagueTableSnapshot,
   standingForTeam,
@@ -31,6 +32,19 @@ const TAB_ENTITY: Partial<Record<Tab, DiscoveryEntity>> = {
   Teams: 'teams',
   Leagues: 'leagues',
   Matches: 'matches',
+};
+
+/**
+ * Which tabs the search index can answer a text query for.
+ *
+ * `searchIndex` holds athletes, teams, leagues and seasons — not matches. So the Matches tab
+ * keeps filtering its loaded page and says so, rather than offering a search that would
+ * silently cover less than the others.
+ */
+const TAB_SEARCH: Partial<Record<Tab, SearchableEntity>> = {
+  Athletes: 'athlete',
+  Teams: 'team',
+  Leagues: 'league',
 };
 
 type InitialDiscoveryData = {
@@ -115,6 +129,16 @@ export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryDat
    * one query, not five.
    */
   const browseEntity = TAB_ENTITY[tab];
+  /**
+   * A text query searches the whole catalogue, not the loaded page.
+   *
+   * The box used to filter the 24 or 48 records that happened to be loaded. Typing "Mbarara
+   * United" — a club that exists twice and appears on the fixtures list two screens away —
+   * returned "No teams found", because a search box that only searches what is on screen
+   * cannot tell "no such club" from "not on this page".
+   */
+  const search = useCatalogueSearch(query, TAB_SEARCH[tab]);
+  const searching = Boolean(TAB_SEARCH[tab]) && query.trim().length >= 2;
   const page = useDiscoveryPage(
     browseEntity ?? 'leagues',
     { sport, city, verified: verifiedOnly },
@@ -190,7 +214,9 @@ export function DiscoverHub({ initialData }: { initialData?: InitialDiscoveryDat
         {tab === 'For You' ? (
           <ForYou athletes={forYou.athletes} teams={forYou.teams} leagues={forYou.leagues} leagueById={leagueById} leagueSnapshots={leagueSnapshots} />
         ) : null}
-        {browseEntity ? (
+        {searching ? (
+          <CatalogueResults search={search} query={query} />
+        ) : browseEntity ? (
           <BrowseResults page={page} query={query}>
             {tab === 'Athletes' ? <AthleteGrid items={onPage<Athlete>(page.items, query, athleteText)} /> : null}
             {tab === 'Teams' ? <TeamGrid items={onPage<Team>(page.items, query, nameText)} leagueById={leagueById} leagueSnapshots={leagueSnapshots} /> : null}
@@ -232,6 +258,64 @@ const venueText = (item: Match) => `${item.venue ?? ''} ${item.city ?? ''}`;
  * rendered a grid over a fixed slice and had no way to be loading, empty because of a filter,
  * broken, or partway through a catalogue.
  */
+/**
+ * Results from the catalogue search, rather than from the loaded page.
+ *
+ * A deliberately plain list. The search index carries a title, a meta line and an href — not
+ * the full entity — so this cannot render the rich cards the browse grids use, and inventing a
+ * card from a partial record would show a club with no crest, no record and no points beside
+ * cards that have all three.
+ */
+function CatalogueResults({
+  search,
+  query,
+}: {
+  search: ReturnType<typeof useCatalogueSearch>;
+  query: string;
+}) {
+  if (search.loading) return <DiscoverSkeleton />;
+
+  if (search.error) {
+    return <EmptyState icon={MagnifyingGlass} title="Search is unavailable" description={search.error} />;
+  }
+
+  if (!search.results.length) {
+    return (
+      <EmptyState
+        icon={MagnifyingGlass}
+        title={`Nothing matches "${query}"`}
+        description="Search covers the whole catalogue, so this is not on the platform under that name. Check the spelling, or browse with the filters instead."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Said plainly, because the filters above are still on screen and still set. */}
+      <p className="text-xs text-muted" role="status">
+        {search.results.length} {search.results.length === 1 ? 'result' : 'results'} from the whole
+        catalogue. Sport and region filters apply to browsing, not to search.
+      </p>
+      <ul className="grid gap-2">
+        {search.results.map((result) => (
+          <li key={`${result.type}-${result.entityId}`}>
+            <Link
+              href={result.href ?? '#'}
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-border bg-surface-1 px-4 py-3 transition-colors hover:border-border-strong"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-text-strong">{result.title}</span>
+                <span className="block truncate text-xs text-muted">{result.meta}</span>
+              </span>
+              <CaretRight className="h-4 w-4 shrink-0 text-subtle" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function BrowseResults({
   page,
   query,
