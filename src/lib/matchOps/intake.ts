@@ -18,6 +18,15 @@ import type { LiveMatchEvent } from '@/types';
  * loses real observations from the only person who was watching. Auto-merging trusts two
  * contradictory clocks. Quarantine puts the decision in front of the League with both streams
  * visible, which is what exception-driven governance is for.
+ *
+ * **A supersession may only reach an event of the same match.** `supersedesEventId` is a
+ * document id chosen by the client, and the write it caused named that document directly. A
+ * Field Manager holding a valid session for one match could therefore mark an event of ANY
+ * other match superseded — removing a goal from a match they had no authority over, in a
+ * league they had no relationship with, and corrupting its official reconstruction. The
+ * session check upstream authorizes the ROUTE's match; it says nothing about a document id in
+ * the body. This is where that gap closes, because `existing` is already the set of events
+ * belonging to this match and nothing else.
  */
 
 export type IncomingEvent = {
@@ -43,12 +52,20 @@ export type IntakeVerdict = {
   missingSequences: number[];
   /** True when anything in this batch came from a superseded session. */
   quarantined: boolean;
+  /**
+   * Events refused outright, each naming why.
+   *
+   * Distinct from a duplicate, which is a success — the observation is recorded, just not
+   * twice. A rejection means the batch asked for something the server will not do, and the
+   * client is told rather than left believing it landed.
+   */
+  rejected: { clientEventId: string; reason: string }[];
 };
 
 export function planEventIntake(input: {
   incoming: IncomingEvent[];
   /** Everything already stored for this match. */
-  existing: Pick<LiveMatchEvent, 'clientEventId' | 'clientSequence' | 'status'>[];
+  existing: Pick<LiveMatchEvent, 'eventId' | 'clientEventId' | 'clientSequence' | 'status'>[];
   /** The generation the submitting session holds. */
   submittedGeneration: number;
   /** The generation the match is currently on. */
@@ -68,8 +85,14 @@ export function planEventIntake(input: {
   const status: LiveMatchEvent['status'] = quarantined ? 'quarantined' : 'active';
 
   const seen = new Set(existing.map((event) => event.clientEventId));
+  /*
+   * The only document ids a supersession in this batch may name. Built from this match's own
+   * events, so an id belonging to another match is not in it and cannot be.
+   */
+  const supersedable = new Set(existing.map((event) => event.eventId).filter(Boolean));
   const duplicates: string[] = [];
   const accepted: IntakeVerdict['accepted'] = [];
+  const rejected: IntakeVerdict['rejected'] = [];
   const batchSeen = new Set<string>();
 
   for (const event of incoming) {
@@ -77,6 +100,13 @@ export function planEventIntake(input: {
     // can legitimately send the same entry twice in one request.
     if (seen.has(event.clientEventId) || batchSeen.has(event.clientEventId)) {
       duplicates.push(event.clientEventId);
+      continue;
+    }
+    if (event.supersedesEventId && !supersedable.has(event.supersedesEventId)) {
+      rejected.push({
+        clientEventId: event.clientEventId,
+        reason: 'The event being corrected does not belong to this match.',
+      });
       continue;
     }
     batchSeen.add(event.clientEventId);
@@ -93,7 +123,7 @@ export function planEventIntake(input: {
     if (!sequences.has(sequence)) missingSequences.push(sequence);
   }
 
-  return { accepted, duplicates, missingSequences, quarantined };
+  return { accepted, duplicates, missingSequences, quarantined, rejected };
 }
 
 /**

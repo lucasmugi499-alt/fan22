@@ -16,6 +16,16 @@ function incoming(clientEventId: string, clientSequence: number) {
 
 const sameGeneration = { submittedGeneration: 1, currentGeneration: 1 };
 
+/** Stored events carry the document id the write path assigns: `${matchId}_${clientEventId}`. */
+function stored(matchId: string, clientEventId: string, clientSequence: number) {
+  return {
+    eventId: `${matchId}_${clientEventId}`,
+    clientEventId,
+    clientSequence,
+    status: 'active' as const,
+  };
+}
+
 describe('event intake', () => {
   it('accepts a clean batch', () => {
     const verdict = planEventIntake({
@@ -109,5 +119,77 @@ describe('event intake', () => {
 
     expect(isWithinUndoWindow('2026-08-24T15:00:05.000Z', now)).toBe(true);
     expect(isWithinUndoWindow('2026-08-24T14:59:00.000Z', now)).toBe(false);
+  });
+});
+
+/**
+ * The cross-match supersession hole.
+ *
+ * `supersedesEventId` is a document id chosen by whoever is posting, and the write it caused
+ * named that document directly. The session check authorizes the ROUTE's match and says
+ * nothing about an id in the body, so a Field Manager holding a valid session for one match
+ * could mark an event of any other match superseded — deleting a goal from a league they had
+ * no relationship with, out of a match they were never assigned to.
+ */
+describe('supersession may only reach this match', () => {
+  it("refuses an id belonging to another match", () => {
+    const verdict = planEventIntake({
+      incoming: [{ ...incoming('attack', 2), supersedesEventId: 'match_B_victim_goal' }],
+      existing: [stored('match_A', 'a', 1)],
+      ...sameGeneration,
+    });
+
+    expect(verdict.accepted).toEqual([]);
+    expect(verdict.rejected).toEqual([
+      { clientEventId: 'attack', reason: 'The event being corrected does not belong to this match.' },
+    ]);
+  });
+
+  it('refuses an id that names nothing at all', () => {
+    // A merging set would have CREATED this document, minting a stray event carrying only a
+    // status. Refusing here is what makes the route's `update` safe to fail loudly.
+    const verdict = planEventIntake({
+      incoming: [{ ...incoming('attack', 2), supersedesEventId: 'no_such_document' }],
+      existing: [stored('match_A', 'a', 1)],
+      ...sameGeneration,
+    });
+    expect(verdict.accepted).toEqual([]);
+    expect(verdict.rejected).toHaveLength(1);
+  });
+
+  it('allows a genuine correction of this match', () => {
+    const verdict = planEventIntake({
+      incoming: [{ ...incoming('fix', 2), supersedesEventId: 'match_A_a' }],
+      existing: [stored('match_A', 'a', 1)],
+      ...sameGeneration,
+    });
+    expect(verdict.accepted).toHaveLength(1);
+    expect(verdict.rejected).toEqual([]);
+  });
+
+  it('leaves an ordinary event without a supersession alone', () => {
+    const verdict = planEventIntake({
+      incoming: [incoming('b', 2)],
+      existing: [stored('match_A', 'a', 1)],
+      ...sameGeneration,
+    });
+    expect(verdict.accepted).toHaveLength(1);
+    expect(verdict.rejected).toEqual([]);
+  });
+
+  it('rejects only the offending event, keeping the rest of the batch', () => {
+    // A Field Manager syncing forty minutes of real observations must not lose them because
+    // one entry in the batch was malformed.
+    const verdict = planEventIntake({
+      incoming: [
+        incoming('good_1', 2),
+        { ...incoming('bad', 3), supersedesEventId: 'match_B_victim' },
+        incoming('good_2', 4),
+      ],
+      existing: [stored('match_A', 'a', 1)],
+      ...sameGeneration,
+    });
+    expect(verdict.accepted.map((entry) => entry.event.clientEventId)).toEqual(['good_1', 'good_2']);
+    expect(verdict.rejected.map((entry) => entry.clientEventId)).toEqual(['bad']);
   });
 });

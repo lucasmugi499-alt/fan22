@@ -89,14 +89,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
       status,
     }, { merge: false });
 
-    // A superseding event marks its predecessor rather than removing it. The original keeps
-    // its sequence number and its place, so the record shows what was observed, that it was
-    // corrected, and in what order.
+    /*
+     * A superseding event marks its predecessor rather than removing it. The original keeps
+     * its sequence number and its place, so the record shows what was observed, that it was
+     * corrected, and in what order.
+     *
+     * `update`, not `set(..., { merge: true })`. A merging set CREATES the document when it is
+     * absent, so an id naming nothing at all used to mint a stray event document carrying only
+     * a status. An update fails instead, and `planEventIntake` has already refused any id that
+     * is not one of this match's own events — so by the time this runs the document is known
+     * to exist and known to belong here.
+     */
     if (event.supersedesEventId) {
-      batch.set(
+      batch.update(
         adminDb.collection('liveMatchEvents').doc(event.supersedesEventId),
         { status: 'superseded', updatedAtServer: FieldValue.serverTimestamp() },
-        { merge: true },
       );
     }
   }
@@ -158,5 +165,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
     duplicates: verdict.duplicates,
     missingSequences: verdict.missingSequences,
     quarantined: verdict.quarantined,
+    // Told, not swallowed. A client whose correction was refused must not go on believing the
+    // original event is gone.
+    rejected: verdict.rejected,
   });
 }

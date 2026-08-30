@@ -22,6 +22,7 @@ const CODE_LABELS: Record<string, string> = {
   takeover_occurred: 'Capture moved to a second device',
   affiliated_observer: 'The observer is involved with one of these clubs',
   result_never_reported: 'Nobody reported this match',
+  capture_incomplete: 'The match clock never reached full time',
 };
 
 /**

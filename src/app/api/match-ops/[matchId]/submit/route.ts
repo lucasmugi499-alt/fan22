@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody } from '@/server/api/security';
 import { requireMatchOpsSession } from '@/server/matchOps/session';
 import { hasClockAnomaly } from '@/lib/matchOps/clock';
+import { capturesACompletedMatch, reportRefusal } from '@/lib/matchOps/reportGate';
 import { bindReportToEvents } from '@/lib/matchOps/digest';
 import { reconcileBasketballBoxScore, reconstructMatchScore } from '@/kernel/formulas/score';
 import { SPORT_DEFINITIONS } from '@/kernel/definitions/sportCatalogues';
@@ -44,6 +45,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
   ]);
   if (!matchSnapshot.exists) return Response.json({ error: 'Match not found.' }, { status: 404 });
   const match = { id: matchSnapshot.id, ...matchSnapshot.data() } as Match;
+
+  /**
+   * A report has to be about a match that could have been played.
+   *
+   * Everything below this point is a CONSISTENCY check — does the declared score match the
+   * reconstruction, are there sequence gaps, did a replaced device sync late. Consistency is
+   * not evidence. An empty event stream reconciles perfectly with a declared 0-0, so a report
+   * attested before kickoff passed every gate and was eligible for automatic finalization as an
+   * official draw, on a fixture nobody had played.
+   *
+   * These two are lifecycle facts rather than quality signals, so they refuse rather than
+   * attach an exception. There is no reading of "report a match that has not started" or
+   * "report a match that was called off" that is a thing somebody meant to do, and recording
+   * such a report as a claim to be reviewed would still put it in front of a League Admin as
+   * though it were a result.
+   */
+  const refusal = reportRefusal({
+    status: String(match.status),
+    scheduledAt: String(match.scheduledAt),
+    now: Date.now(),
+  });
+  if (refusal) return Response.json({ error: refusal }, { status: 409 });
 
   const allEvents = eventsSnapshot.docs.map((doc) => doc.data() as LiveMatchEvent);
   const active = allEvents.filter((event) => event.status === 'active');
@@ -118,6 +141,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
   if (input.abandoned) exceptions.push('match_abandoned');
 
   const clock = clockSnapshot.exists ? (clockSnapshot.data() as MatchClockState) : null;
+  /**
+   * The evidence that a match was played, rather than that a form was filled in.
+   *
+   * `full_time` is written by the clock route when the Field Manager ends the match, and it is
+   * the one signal in the whole capture flow that is about the match having happened rather
+   * than about the report agreeing with itself. A missing clock, a clock that never started and
+   * a clock stopped at half time all mean the same thing here: whatever this report says, it is
+   * not the record of a completed match, and it must not become official without a person
+   * looking at it.
+   *
+   * Blocking rather than refusing, because there are real matches behind some of these — a
+   * phone that died before full time, a session recovered by takeover — and those are exactly
+   * what the League review queue is for.
+   */
+  if (!capturesACompletedMatch(clock)) exceptions.push('capture_incomplete');
   if (clock && hasClockAnomaly(clock)) exceptions.push('clock_anomaly');
   if (clock && clock.sessionGeneration > 1) exceptions.push('takeover_occurred');
   if (allEvents.some((event) => event.correctionReason)) exceptions.push('post_window_correction');
@@ -228,6 +266,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
 
 /** Exceptions that stop auto-finalization. The rest attach as quality signals. */
 const BLOCKING = new Set<MatchExceptionCode>([
+  'capture_incomplete',
   'declared_score_mismatch',
   'event_sequence_gap',
   'unsynced_events_at_submit',

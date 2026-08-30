@@ -1066,7 +1066,18 @@ export type MatchExceptionCode =
   | 'post_window_correction'
   | 'takeover_occurred'
   | 'affiliated_observer'
-  | 'result_never_reported';
+  | 'result_never_reported'
+  /**
+   * The capture does not show a match that finished.
+   *
+   * A field report reconstructed from an empty event stream reconciles perfectly: nothing was
+   * captured, nothing disagrees, and a declared 0-0 matches it exactly. Every other gate the
+   * finalizer has is a CONSISTENCY gate, and consistency is not evidence — so a report attested
+   * before a ball was kicked passed all of them and became an official 0-0 draw.
+   *
+   * The clock is the evidence that a match was played. This is raised when it does not say so.
+   */
+  | 'capture_incomplete';
 
 /** The League's review queue. Distinct from reconciliationExceptions, which Platform owns. */
 export interface MatchOperationalException {
