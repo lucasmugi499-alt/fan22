@@ -7,7 +7,8 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { isUpcomingMatch } from '@/lib/status';
+import { isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 
 function positionFor(value: string) {
   let hash = 0;
@@ -16,6 +17,7 @@ function positionFor(value: string) {
 }
 
 export function VenueMap() {
+  const now = useNow();
   const { matches, teams, leagues, loading } = useGoalPlaceData({
     collections: ['matches', 'teams', 'leagues'],
     recordLimit: 100,
@@ -25,8 +27,8 @@ export function VenueMap() {
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
   const leagueById = useMemo(() => new Map(leagues.map((league) => [league.id, league])), [leagues]);
   const upcoming = useMemo(
-    () => matches.filter(isUpcomingMatch).filter((match) => city === 'All' || match.city === city).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 20),
-    [city, matches],
+    () => matches.filter((m) => isStillToPlay(m, now)).filter((match) => city === 'All' || match.city === city).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 20),
+    [city, matches, now],
   );
 
   if (loading) return <div className="space-y-3"><Skeleton className="h-10 w-64" /><Skeleton className="aspect-[16/8] w-full rounded-[var(--radius-lg)]" /></div>;

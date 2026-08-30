@@ -103,8 +103,34 @@ export function isPlayedMatch(match: Pick<Match, 'status'>): boolean {
   return match.status === 'completed';
 }
 
+/**
+ * Not yet played, as a question about STATUS.
+ *
+ * Answers "should this be drawn as a fixture or as a result", which is what a card needs to
+ * know. It is not the right question for a list called Upcoming — see `isStillToPlay`.
+ */
 export function isUpcomingMatch(match: Pick<Match, 'status'>): boolean {
   return match.status === 'scheduled' || match.status === 'live';
+}
+
+/**
+ * Still to play, as a question about TIME.
+ *
+ * A scheduled fixture whose kickoff has passed is not upcoming. It was never played, and a
+ * list sorted earliest-first put those at the very top — so a club's "Next Match" was a
+ * fixture from February, and every Upcoming list on the platform led with matches that had
+ * already been missed.
+ *
+ * A live match is always still to play whatever its kickoff time says, because it is being
+ * played right now.
+ */
+export function isStillToPlay(match: Pick<Match, 'status' | 'scheduledAt'>, now: number): boolean {
+  if (match.status === 'live') return true;
+  if (match.status !== 'scheduled') return false;
+  const kickoff = Date.parse(match.scheduledAt);
+  // An unparseable date is treated as still to play: a fixture with a broken date is a data
+  // problem, and hiding it from every list is how it stays one.
+  return !Number.isFinite(kickoff) || kickoff >= now;
 }
 
 const VERIFICATION_LABELS: Record<VerificationStatus, string> = {

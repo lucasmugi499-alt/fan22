@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Broadcast, CaretRight, Fire, MapPin, SlidersHorizontal, Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useAuth } from '@/context/AuthProvider';
-import { isUpcomingMatch } from '@/lib/status';
+import { isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
 import { GradientBanner } from '@/components/premium/GradientBanner';
@@ -28,6 +29,7 @@ function dayLabel(iso: string): string {
 }
 
 export function FanHome() {
+  const now = useNow();
   const { userProfile } = useAuth();
   const [onboardingOpen, setOnboardingOpen] = useState(
     () => Boolean(userProfile && !userProfile.onboardingCompletedAt),
@@ -61,8 +63,8 @@ export function FanHome() {
 
   const live = useMemo(() => matches.filter((m) => m.status === 'live' && preferredMatch(m)), [matches, preferredMatch]);
   const upcoming = useMemo(
-    () => matches.filter(isUpcomingMatch).filter((m) => m.status !== 'live' && preferredMatch(m)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 6),
-    [matches, preferredMatch]
+    () => matches.filter((m) => isStillToPlay(m, now)).filter((m) => m.status !== 'live' && preferredMatch(m)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 6),
+    [matches, now, preferredMatch]
   );
   const topAthletes = useMemo(() => {
     const followed = athletes.filter((athlete) => followedAthleteIds.includes(athlete.id));

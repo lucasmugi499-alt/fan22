@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyLeague, matchesInLeague } from '@/lib/league/leagueContext';
-import { isUpcomingMatch } from '@/lib/status';
+import { isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { MatchCard } from '@/components/core/MatchCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -25,6 +26,7 @@ const TABS = ['Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LeagueFixtures() {
+  const now = useNow();
   const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
   const catalog = useGoalPlaceData({ collections: ['leagues', 'seasons'] });
@@ -52,10 +54,10 @@ export function LeagueFixtures() {
     if (!league) return { Upcoming: [], Results: [] } as Record<Tab, Match[]>;
     const all = matchesInLeague(league.id, matches);
     return {
-      Upcoming: all.filter(isUpcomingMatch).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
+      Upcoming: all.filter((m) => isStillToPlay(m, now)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
       Results: all.filter((m) => m.status === 'completed').sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)),
     } as Record<Tab, Match[]>;
-  }, [league, matches]);
+  }, [league, matches, now]);
   const season = league ? currentSeasonFor(seasons, league.id, league.currentSeasonId) : undefined;
   const leagueTeams = useMemo(
     () => league ? teamsInLeague(league.id, teams) : [],

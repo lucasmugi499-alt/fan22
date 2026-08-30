@@ -8,7 +8,8 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { athletePhoto } from '@/lib/media';
 import { clubColor } from '@/lib/clubColors';
 import { useAuthGate } from '@/components/auth/AuthRequiredModal';
-import { isUpcomingMatch } from '@/lib/status';
+import { isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { IdentityHero, sportGradient } from '@/components/premium/IdentityHero';
 import { NextMatchCard } from '@/components/premium/NextMatchCard';
 import { PeopleCarousel } from '@/components/premium/PeopleCarousel';
@@ -30,6 +31,7 @@ function ugx(n: number): string {
 }
 
 export function AthleteProfile({ athleteId }: { athleteId: string }) {
+  const now = useNow();
   const searchParams = useSearchParams();
   const exact = useGoalPlaceData({
     collections: ['athletes'],
@@ -55,8 +57,8 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const teammates = useMemo(() => athletes.filter((a) => a.teamId === athlete?.teamId && a.id !== athleteId).slice(0, 10), [athletes, athlete, athleteId]);
   const nextMatch = useMemo(
-    () => matches.filter((m) => (m.homeTeamId === athlete?.teamId || m.awayTeamId === athlete?.teamId) && isUpcomingMatch(m)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0],
-    [matches, athlete]
+    () => matches.filter((m) => (m.homeTeamId === athlete?.teamId || m.awayTeamId === athlete?.teamId) && isStillToPlay(m, now)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0],
+    [matches, athlete, now]
   );
   const news = useMemo(() => feedPosts.filter((p) => p.relatedTeamId === athlete?.teamId || p.relatedAthleteId === athleteId), [feedPosts, athlete, athleteId]);
   const league = useMemo(() => leagues.find((item) => item.id === athlete?.leagueId), [athlete, leagues]);

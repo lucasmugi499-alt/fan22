@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   challengeLabel,
   isOfficialMatch,
+  isStillToPlay,
+  isUpcomingMatch,
   matchLabel,
   normalizeChallengeStatus,
   normalizeMatchStatus,
@@ -112,5 +114,44 @@ describe('labels', () => {
     expect(matchLabel('completed')).toBe('Completed');
     expect(verificationLabel('verified')).toBe('Verified');
     expect(challengeLabel('in_progress')).toBe('In progress');
+  });
+});
+
+describe('still to play, as a question about time', () => {
+  const now = Date.parse('2026-08-30T12:00:00.000Z');
+
+  it('excludes a scheduled fixture whose kickoff has passed', () => {
+    // The failure this guards. Every Upcoming list on the platform sorts earliest-first, so a
+    // season abandoned in April put its oldest missed fixture at the top of "what is next".
+    expect(isStillToPlay({ status: 'scheduled', scheduledAt: '2026-04-11T15:00:00.000Z' }, now))
+      .toBe(false);
+  });
+
+  it('includes a scheduled fixture still ahead', () => {
+    expect(isStillToPlay({ status: 'scheduled', scheduledAt: '2026-09-05T15:00:00.000Z' }, now))
+      .toBe(true);
+  });
+
+  it('includes a live match whatever its kickoff says', () => {
+    expect(isStillToPlay({ status: 'live', scheduledAt: '2026-04-04T15:00:00.000Z' }, now))
+      .toBe(true);
+  });
+
+  it('excludes anything already played or called off', () => {
+    expect(isStillToPlay({ status: 'completed', scheduledAt: '2026-09-05T15:00:00.000Z' }, now))
+      .toBe(false);
+    expect(isStillToPlay({ status: 'cancelled', scheduledAt: '2026-09-05T15:00:00.000Z' }, now))
+      .toBe(false);
+  });
+
+  it('keeps a fixture with an unreadable date visible', () => {
+    // A broken date is a data problem. Hiding it from every list is how it stays one.
+    expect(isStillToPlay({ status: 'scheduled', scheduledAt: 'not a date' }, now)).toBe(true);
+  });
+
+  it('still answers the status question separately', () => {
+    // isUpcomingMatch has not changed meaning: a card still needs to know whether to draw a
+    // fixture or a result, and a missed fixture is still not a result.
+    expect(isUpcomingMatch({ status: 'scheduled' })).toBe(true);
   });
 });

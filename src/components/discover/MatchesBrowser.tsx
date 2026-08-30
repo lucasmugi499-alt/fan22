@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarBlank } from '@phosphor-icons/react';
 import { adaptMatch, adaptTeam } from '@/lib/firebase/useGoalPlaceData';
 import { dataProvider } from '@/data/dataProvider';
-import { isUpcomingMatch } from '@/lib/status';
+import { isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { sportDisplayName, sportKey, type SportKey } from '@/lib/sportPresentation';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ScrollRail } from '@/components/ui/ScrollRail';
@@ -27,6 +28,7 @@ export function MatchesBrowser({
   initialMatches?: Match[];
   initialTeams?: Team[];
 }) {
+  const now = useNow();
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [loading, setLoading] = useState(!initialMatches.length);
@@ -67,10 +69,10 @@ export function MatchesBrowser({
   const buckets = useMemo(() => {
     return {
       Live: matches.filter((m) => m.status === 'live'),
-      Upcoming: matches.filter(isUpcomingMatch).filter((m) => m.status !== 'live').sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
+      Upcoming: matches.filter((m) => isStillToPlay(m, now)).filter((m) => m.status !== 'live').sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
       Results: matches.filter((m) => m.status === 'completed').sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)),
     } as Record<Tab, Match[]>;
-  }, [matches]);
+  }, [matches, now]);
 
   const [tab, setTab] = useState<Tab>(buckets.Live.length ? 'Live' : 'Upcoming');
   const sportCounts = useMemo(() => {

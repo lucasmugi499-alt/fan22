@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { LeagueStanding } from '@/lib/leagueModel';
 import type { Match, Team } from '@/types';
-import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { isOfficialMatch, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { Crest } from '@/components/premium/Crest';
 import { cn } from '@/lib/utils';
 import { sportDisplayName, standingCellValue, standingColumns, standingZoneFor } from '@/lib/sportPresentation';
@@ -22,9 +23,9 @@ function formFor(teamId: string, matches: Match[]): FormResult[] {
     });
 }
 
-function nextFor(teamId: string, matches: Match[], teamById: Map<string, Team>): Team | undefined {
+function nextFor(teamId: string, matches: Match[], teamById: Map<string, Team>, now: number): Team | undefined {
   const next = matches
-    .filter((m) => (m.homeTeamId === teamId || m.awayTeamId === teamId) && isUpcomingMatch(m))
+    .filter((m) => (m.homeTeamId === teamId || m.awayTeamId === teamId) && isStillToPlay(m, now))
     .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0];
   if (!next) return undefined;
   return teamById.get(next.homeTeamId === teamId ? next.awayTeamId : next.homeTeamId);
@@ -56,6 +57,7 @@ export function RichStandings({
   sport?: string;
   highlightTeamId?: string;
 }) {
+  const now = useNow();
   const columns = standingColumns(sport);
   const leader = rows[0];
   // Footnoted under the table rather than crammed into a column, so the reason is readable
@@ -101,7 +103,7 @@ export function RichStandings({
               const mine = r.teamId === highlightTeamId;
               const teamSport = sportById?.(r.teamId);
               const form = formFor(r.teamId, matches);
-              const next = nextFor(r.teamId, matches, teamById);
+              const next = nextFor(r.teamId, matches, teamById, now);
               // A published table marks a zone with a rule across the boundary, not a
               // coloured tag on every row in it. The rule sits under the last row of the
               // band, so it reads as a division rather than a decoration.

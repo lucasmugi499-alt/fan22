@@ -6,7 +6,8 @@ import { MapPin, Warning, CalendarBlank, Coins, Users, Trophy, Heart, Handshake 
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveLeagueStandings } from '@/lib/standings/resolve';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
-import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { isOfficialMatch, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { clubColor } from '@/lib/clubColors';
 import { IdentityHero } from '@/components/premium/IdentityHero';
 import { NextMatchCard } from '@/components/premium/NextMatchCard';
@@ -33,6 +34,7 @@ function ugx(n: number): string {
 const LEAGUE_RECORD_LIMIT = 250;
 
 export function TeamPublic({ teamId }: { teamId: string }) {
+  const now = useNow();
   const exact = useGoalPlaceData({
     collections: ['teams'],
     scope: { teamId },
@@ -72,7 +74,7 @@ export function TeamPublic({ teamId }: { teamId: string }) {
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const roster = useMemo(() => athletes.filter((a) => a.teamId === teamId), [athletes, teamId]);
   const teamMatches = useMemo(() => matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId), [matches, teamId]);
-  const nextMatch = useMemo(() => teamMatches.filter(isUpcomingMatch).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0], [teamMatches]);
+  const nextMatch = useMemo(() => teamMatches.filter((m) => isStillToPlay(m, now)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0], [teamMatches, now]);
   const results = useMemo(() => teamMatches.filter(isOfficialMatch).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
   const pendingResults = useMemo(() => teamMatches.filter((m) => m.status === 'completed' && !isOfficialMatch(m)).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)).slice(0, 3), [teamMatches]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedTeamId === teamId), [feedPosts, teamId]);

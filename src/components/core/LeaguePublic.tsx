@@ -16,7 +16,8 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { DemoDataNote } from '@/components/ui/DemoDataNote';
 import { FollowButton } from '@/components/core/FollowButton';
 import { MatchCard } from '@/components/core/MatchCard';
-import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { isOfficialMatch, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { getSportTheme } from '@/lib/sportThemes';
 import { LeagueNoticeList } from '@/components/core/LeagueNoticeList';
 import { IndexBreakdown } from '@/components/league/IndexBreakdown';
@@ -56,6 +57,7 @@ export function LeaguePublic({
   leagueId: string;
   initialData?: InitialLeaguePublicData;
 }) {
+  const now = useNow();
   const exact = useGoalPlaceData({
     collections: ['leagues'],
     scope: { leagueId },
@@ -86,7 +88,7 @@ export function LeaguePublic({
   const lTeams = useMemo(() => teamsInLeague(leagueId, teams), [teams, leagueId]);
   const news = useMemo(() => feedPosts.filter((p) => p.relatedLeagueId === leagueId), [feedPosts, leagueId]);
   const leagueMatches = useMemo(() => matchesInLeague(leagueId, matches), [leagueId, matches]);
-  const upcoming = useMemo(() => leagueMatches.filter(isUpcomingMatch).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 4), [leagueMatches]);
+  const upcoming = useMemo(() => leagueMatches.filter((m) => isStillToPlay(m, now)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 4), [leagueMatches, now]);
   const official = useMemo(() => leagueMatches.filter(isOfficialMatch).sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt)), [leagueMatches]);
   const leaders = useMemo(() => athletes.filter((athlete) => athlete.leagueId === leagueId).sort((a, b) => b.goalPlacePoints - a.goalPlacePoints).slice(0, 4), [athletes, leagueId]);
   const notices = useMemo(() => leagueNotices.filter((notice) => notice.leagueId === leagueId).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 4), [leagueId, leagueNotices]);
