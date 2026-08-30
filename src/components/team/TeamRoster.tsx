@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import { Check, Copy, UserPlus, Users as UsersIcon } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
@@ -167,7 +168,7 @@ export function TeamRoster() {
               <li key={a.id}>
                 <Card className="flex items-center gap-3 p-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-3 text-xs font-bold text-muted">
-                    {a.legalName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                    {athleteLegalName(a).split(' ').map((n) => n[0]).slice(0, 2).join('')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text-strong">{a.legalName}</p>

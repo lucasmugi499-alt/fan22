@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import { TruncatedListNotice } from '@/components/platform/TruncatedListNotice';
 import Link from 'next/link';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -85,7 +86,7 @@ export function AthleteManagement() {
       }))
       .filter((row) => !needle
         || `${row.athlete.legalName} ${row.teamName} ${row.leagueName} ${row.athlete.registeredPosition}`.toLowerCase().includes(needle))
-      .sort((a, b) => a.athlete.legalName.localeCompare(b.athlete.legalName));
+      .sort((a, b) => athleteLegalName(a.athlete).localeCompare(athleteLegalName(b.athlete)));
   }, [data.athletes, data.teams, data.leagues, query]);
 
   const teamOptions = useMemo(

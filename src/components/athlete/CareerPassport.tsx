@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import {
   CalendarCheck,
   DownloadSimple,
@@ -227,7 +228,7 @@ function ShareAthleteCard({
     context.fillText('Official statistics only. Support never changes rank.', 96, 1175);
 
     const link = document.createElement('a');
-    link.download = `${athlete.legalName.toLowerCase().replace(/\s+/g, '-')}-goalplace256.png`;
+    link.download = `${athleteLegalName(athlete).toLowerCase().replace(/\s+/g, '-')}-goalplace256.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     const userId = currentUser?.uid ?? userProfile?.uid;

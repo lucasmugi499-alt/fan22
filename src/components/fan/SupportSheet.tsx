@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import { toast } from 'sonner';
 import { HandHeart, Coins, DeviceMobile, SpinnerGap } from '@phosphor-icons/react';
 import { Sheet } from '@/components/ui/Sheet';
@@ -45,7 +46,7 @@ export function SupportSheet({
   const userId = currentUser?.uid ?? userProfile?.uid ?? userProfile?.id ?? 'guest';
   const chosen = custom !== '' ? Number(custom) : amount;
   const quote = Number.isSafeInteger(chosen) && chosen > 0 ? contributionQuote(chosen) : null;
-  const firstName = athlete.legalName.split(' ')[0];
+  const firstName = athleteLegalName(athlete).split(' ')[0];
 
   const valid = Number.isFinite(chosen) && chosen >= 1_000;
   const paymentsAvailable = isDemoMode || process.env.NEXT_PUBLIC_PAYMENTS_MODE === 'psp';

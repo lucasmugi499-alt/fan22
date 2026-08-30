@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { athleteLegalName } from '@/lib/athleteIdentity';
 import { useSearchParams } from 'next/navigation';
 import { HandHeart, Warning, MapPin } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
@@ -86,7 +87,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photo} alt={athlete.legalName} className="h-20 w-20 rounded-[var(--radius-lg)] border-2 border-white/40 object-cover" loading="lazy" />
         }
-        watermark={<span className="font-display font-black text-white">{athlete.legalName.split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>}
+        watermark={<span className="font-display font-black text-white">{athleteLegalName(athlete).split(' ').map((w) => w[0]).slice(0, 2).join('')}</span>}
         eyebrow={team?.name}
         title={athlete.legalName}
         verified={athlete.verified}
@@ -144,7 +145,7 @@ export function AthleteProfile({ athleteId }: { athleteId: string }) {
 
       <div className="sticky bottom-[calc(var(--nav-h)+var(--safe-bottom)+8px)] md:static">
         <Button block icon={HandHeart} onClick={() => requireAuth(() => setSupporting(true), 'Sign in to back this athlete.')}>
-          Back {athlete.legalName.split(' ')[0]}
+          Back {athleteLegalName(athlete).split(' ')[0]}
         </Button>
       </div>
 
