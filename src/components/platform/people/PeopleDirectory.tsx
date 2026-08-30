@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { TruncatedListNotice } from '@/components/platform/TruncatedListNotice';
 import { CheckCircle, Prohibit, Warning } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
@@ -41,7 +42,7 @@ const LIFECYCLE_ACTION = 'min-w-0 px-2 [&>svg]:hidden sm:px-4 sm:[&>svg]:block';
 export function PeopleDirectory() {
   const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const { users, teamAssignments, loading, retry } = useGoalPlaceData({
+  const { users, teamAssignments, loading, retry, truncated } = useGoalPlaceData({
     collections: ['users', 'teamAssignments'],
     recordLimit: 700,
   });
@@ -89,6 +90,7 @@ export function PeopleDirectory() {
         title="People"
         description="Search platform accounts by class, review operational status, and perform audited account lifecycle actions."
       />
+      <TruncatedListNotice truncated={truncated} label="accounts" />
 
       <PlatformStatGrid items={[
         { label: 'Fan accounts', value: users.filter((item) => item.accountClass === 'fan' || item.role === 'fan').length },

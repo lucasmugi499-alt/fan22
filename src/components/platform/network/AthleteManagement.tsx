@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { TruncatedListNotice } from '@/components/platform/TruncatedListNotice';
 import Link from 'next/link';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { Card } from '@/components/ui/Card';
@@ -148,6 +149,7 @@ export function AthleteManagement() {
         description="Athletes are managed profiles. Their club or Platform writes the sporting record; an athlete does not need an account to exist in it."
         action={<CommandButton label="Create athlete" tone="primary" onClick={() => setPending({ kind: 'create' })} />}
       />
+      <TruncatedListNotice truncated={data.truncated} label="athletes" />
 
       <PlatformStatGrid items={[
         { label: 'Athletes', value: rows.length },

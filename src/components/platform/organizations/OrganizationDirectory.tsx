@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type FormEvent } from 'react';
+import { TruncatedListNotice } from '@/components/platform/TruncatedListNotice';
 import { PlusCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { dataProvider } from '@/data/dataProvider';
@@ -26,7 +27,7 @@ const inputClass = 'h-11 w-full rounded-[var(--radius-md)] border border-border 
 export function OrganizationDirectory() {
   const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const { leagues, teams, seasons, athletes, matches, teamAssignments, loading, retry } = useGoalPlaceData({
+  const { leagues, teams, seasons, athletes, matches, teamAssignments, loading, retry, truncated } = useGoalPlaceData({
     collections: ['leagues', 'teams', 'seasons', 'athletes', 'matches', 'teamAssignments'],
     recordLimit: 700,
   });
@@ -108,6 +109,7 @@ export function OrganizationDirectory() {
         title="Organizations"
         description="Search leagues and teams, inspect the operating tree, and create new league records through trusted platform commands."
       />
+      <TruncatedListNotice truncated={truncated} label="leagues and clubs" />
 
       <PlatformStatGrid items={[
         { label: 'Leagues', value: leagues.length },

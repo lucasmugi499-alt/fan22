@@ -194,6 +194,23 @@ export const ALL_GOALPLACE_COLLECTIONS = Object.freeze(
   Object.keys(initialData) as GoalPlaceDataCollection[]
 );
 
+/**
+ * The collections whose result count reached the limit they were loaded under.
+ *
+ * Returned as a set of names rather than a boolean, so a screen showing three lists can say
+ * which one is short instead of disclaiming all of them.
+ */
+export function truncatedCollections(
+  items: Record<string, unknown>,
+  recordLimit: number | undefined,
+): GoalPlaceDataCollection[] {
+  if (!recordLimit) return [];
+  return (Object.keys(items) as GoalPlaceDataCollection[]).filter((name) => {
+    const value = items[name];
+    return Array.isArray(value) && value.length >= recordLimit;
+  });
+}
+
 export function canReadPlatformCollections(role?: AppRole | null) {
   return role === 'platform_admin' || role === 'super_admin';
 }
@@ -569,8 +586,20 @@ export function useGoalPlaceData({
       source: dataMode,
       offline,
       cachedAt,
+      /**
+       * Which collections came back full, and are therefore probably not all of them.
+       *
+       * `>=`, not `>`. A list exactly at its limit is the ambiguous case: Firestore returned as
+       * many documents as it was asked for and there is no way to know whether more existed.
+       * Treating that as complete is the assumption that made the league table silently wrong,
+       * and every capped list on an operator surface has the same shape — a platform admin
+       * looking at 500 of 1.8 million athletes currently has nothing telling them so.
+       *
+       * This does not paginate those surfaces. It stops them lying while they do not.
+       */
+      truncated: truncatedCollections(items, recordLimit),
     };
-  }, [items, loading, error, retry, offline, cachedAt, isDemoMode, demo]);
+  }, [items, loading, error, retry, offline, cachedAt, isDemoMode, demo, recordLimit]);
 }
 
 export function useUserNotifications(userId?: string | null) {
