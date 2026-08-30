@@ -272,6 +272,27 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
     }
 
+    /**
+     * The keys a browser-created document may carry, and nothing else.
+     *
+     * Several creates here validated the fields that MATTER — ownership, a zeroed counter, a
+     * starting status — and said nothing about the fields that do not exist. A document is
+     * accepted up to a megabyte, so a caller who satisfied the ownership check could attach an
+     * arbitrary payload of their own invention to a public record, or pad one collection until
+     * it costs real money to read. Authentication was never the gap; shape was.
+     *
+     * An allowlist rather than a denylist, because the failure mode of a denylist is a field
+     * nobody thought of.
+     */
+    function createdKeysWithin(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    /** A free-text field a person typed. Long enough for a paragraph, not for a payload. */
+    function shortText(value, max) {
+      return !(value is string) || value.size() <= max;
+    }
+
     match /sports/{sportId} {
       allow read: if true;
       allow write: if false;
@@ -738,9 +759,30 @@ service cloud.firestore {
     }
 
     match /leagueAdminApplications/{applicationId} {
+      /*
+       * The applicant's own fields, and only those.
+       *
+       * This checked ownership and a starting status and nothing else, so any signed-in
+       * account could create documents of arbitrary shape and near-arbitrary size in a
+       * collection the platform review desk reads. Everything a REVIEWER writes — leagueId,
+       * organizationId, invitationId, risk flags, duplicate candidates — is deliberately
+       * absent: those arrive through the audited platform command, and an applicant who could
+       * set them on the way in could pre-declare their own risk level.
+       */
       allow create: if signedIn() &&
         request.resource.data.userId == request.auth.uid &&
-        request.resource.data.status == 'pending';
+        request.resource.data.status == 'pending' &&
+        createdKeysWithin([
+          'id', 'userId', 'status', 'applicantName', 'applicantEmail', 'applicantPhone',
+          'leagueName', 'sport', 'country', 'region', 'city', 'estimatedTeams',
+          'estimatedAthletes', 'competitionFormat', 'currentOperations', 'evidenceNote',
+          'createdAt', 'updatedAt',
+        ]) &&
+        shortText(request.resource.data.get('evidenceNote', ''), 4000) &&
+        shortText(request.resource.data.get('currentOperations', ''), 4000) &&
+        shortText(request.resource.data.get('leagueName', ''), 200) &&
+        shortText(request.resource.data.get('applicantName', ''), 200) &&
+        shortText(request.resource.data.get('city', ''), 120);
       allow read: if isPlatformAdmin() ||
         (signedIn() && resource.data.userId == request.auth.uid);
       // Reviewed through the audited platform command, which carries the capability, the

@@ -2482,3 +2482,67 @@ describe('athlete invitations are not part of the public profile', () => {
     getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'athletes/athlete_001')),
   ));
 });
+
+
+/**
+ * Several browser-writable creates validated the fields that MATTER — ownership, a zeroed
+ * counter, a starting status — and said nothing about the fields that do not exist. Firestore
+ * accepts a document up to a megabyte, so an account that satisfied the ownership check could
+ * attach an arbitrary payload to a public record, or pad a collection the platform review desk
+ * reads until it costs real money to open. Authentication was never the gap; shape was.
+ */
+describe('a browser-created document may only carry the keys it is meant to', () => {
+  const APPLICANT = 'user_applicant';
+
+  function application(extra: Record<string, unknown> = {}) {
+    return {
+      id: 'application_shape',
+      userId: APPLICANT,
+      status: 'pending',
+      applicantName: 'Aisha Nakato',
+      applicantEmail: 'aisha@example.com',
+      leagueName: 'Gulu Community League',
+      sport: 'football',
+      city: 'Gulu',
+      evidenceNote: 'We run eight clubs across two districts.',
+      ...extra,
+    };
+  }
+
+  it('accepts an application with exactly the applicant fields', () => assertSucceeds(
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'), application()),
+  ));
+
+  it('refuses a field the applicant invented', () => assertFails(
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ arbitraryPayload: 'x'.repeat(500) })),
+  ));
+
+  it('refuses an applicant setting their own risk level', () => assertFails(
+    // A reviewer writes this through the audited platform command. An applicant who could set
+    // it on the way in could pre-declare themselves low risk.
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ riskLevel: 'low' })),
+  ));
+
+  it('refuses an applicant attaching themselves to a league', () => assertFails(
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ leagueId: 'league_001' })),
+  ));
+
+  it('refuses a free-text field used as a payload', () => assertFails(
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ evidenceNote: 'x'.repeat(4001) })),
+  ));
+
+  it('still accepts a long but plausible evidence note', () => assertSucceeds(
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ evidenceNote: 'x'.repeat(3999) })),
+  ));
+
+  it('still refuses an application submitted for somebody else', () => assertFails(
+    // The check that was already there, kept honest: the shape rules must not have replaced it.
+    setDoc(doc(asUser(APPLICANT), 'leagueAdminApplications/application_shape'),
+      application({ userId: 'somebody_else' })),
+  ));
+});

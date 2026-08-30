@@ -744,3 +744,119 @@ both with the same error: Google's Developer Connect could not mint a GitHub rea
 the repo changed between the failures and the success. If it recurs, retry before investigating
 — and if it persists, re-authorize the GitHub App connection from the Firebase console. A
 failed rollout leaves the previous build serving, so demo stayed healthy throughout.
+
+---
+
+## Session log — 30 August 2026 (afternoon): eight field reports and an external audit
+
+### The single defect behind most of the visible breakage
+
+`getStoredStandings` filters on `leagueId` and orders by `rank`. There was no composite index
+for it, so every **client-side** standings read on `fg256` failed with `FAILED_PRECONDITION` —
+and because the whole `useGoalPlaceData` batch fails together, a club page lost its record, its
+table, its fixtures and its results at once. It rendered "No record yet", which is a claim about
+the league rather than about the read.
+
+The league page was unaffected: its server loader filters `standings` **without** an `orderBy`,
+so it needs no composite index. That asymmetry is exactly why a club page showing `0-0-0` sat
+beside a league table showing real numbers, and why it looked like a data problem rather than an
+infrastructure one.
+
+Three `standings` indexes added and released. **`scripts/firestore/queryIndexCoverage.ts` now
+makes this class of bug a failing test** — it reads query shapes out of the source and requires
+a declared index for each. Getting it to see the real query took three corrections, and each is
+a fact worth keeping:
+
+- A conjunction of equality filters needs **no** composite index. Verified against the live
+  database, not assumed: `standings` filtered on `leagueId` and `seasonId` together answers 200
+  with no index declared for that pair.
+- The query that broke is built from a `QueryConstraint[]` handed to `readCollection`, so the
+  collection name and its filters never appear in one expression. A chained-builder parser sees
+  neither half.
+- An **optional** filter makes several queries, and Firestore matches an index by PREFIX. So
+  `[leagueId, seasonId, rank]` does not serve `where(leagueId) + orderBy(rank)`, and a
+  three-field index sat in the file looking like coverage for a query it could not answer.
+
+It found two more live gaps: `mediaRecords [moderationStatus, createdAt]` (the platform
+moderation queue) and `uploadSessions [status, expiresAt]`. Both released.
+
+### Fixtures that were published and then invisible
+
+A League Admin published 55 fixtures. All 55 wrote correctly. Three defects hid them:
+
+1. The builder pre-fills its window from the season, and that season had ended, so the defaults
+   were a finished window with a working Publish button. `buildSchedulePreview` now refuses a
+   window that has passed and counts overdue fixtures when one merely starts in the past.
+2. The generated set duplicated the schedule the season already held. It now refuses by name.
+3. `/api/league/command` windows to ±21 days. Right for the Command Centre, wrong for the
+   Matches workspace, which showed zero across all four segments for a league with 146 fixtures.
+   The route takes a `scope`; Matches asks for `season`.
+
+Underneath all three, a scheduled fixture whose kickoff had passed had no state and sat in
+"Upcoming" forever. There is now a `missed` state and a **Not played** segment, and
+`isStillToPlay(match, now)` separates the TIME question from the STATUS question that
+`isUpcomingMatch` answers. Nine surfaces were asking the wrong one.
+
+The 55 duplicates were deleted after re-checking each at delete time. `season_football_01_2026_r0_m1`
+was left alone: created two days earlier with a Field Manager assigned, so it was a deliberate test.
+
+### Audit P0s, both confirmed and closed
+
+**An unplayed match could become an official draw.** Every gate on a field report is a
+CONSISTENCY check, and an empty capture is perfectly consistent: no events reconstruct to 0-0, a
+declared 0-0 agrees, no sequence to have gaps in, no clock to raise an anomaly. `reportRefusal`
+now refuses a report before kickoff or on a cancelled match; `capture_incomplete` blocks when the
+clock never reached `full_time`, which is the only signal in the flow about the match having
+happened rather than about the report agreeing with itself.
+
+**One match's operator could delete another match's goal.** `supersedesEventId` named a document
+directly with no check it belonged to the match. `planEventIntake` now validates it against this
+match's own events, and the write is an `update` rather than a merging `set` — which had been
+creating stray event documents for ids naming nothing.
+
+### Other P1s closed
+
+| Finding | What changed |
+|---|---|
+| Public athlete invitations | `invitedEmail`, the token hash and an action URL carrying the **cleartext** claim token were on `athletes/{id}`, which is `allow read: if true`. Moved to `athleteInvitations`, denied to every client. No rotation needed: all 1,120 athlete documents were seeded, never invited, so the leak was live in code and never in data. |
+| Report concurrency | Report and assignment now commit in one transaction. The correction endpoint also advances `eventStreamVersion` and invalidates an attested report, which it never did — so attest at 17:00, correct at 17:04, and the finalizer would take a report bound to a digest that no longer matched. |
+| Standings repair | A failed projection was a log line. It now enqueues into `projectionRepairJobs` (same claim, backoff and dead-letter budget as search) and `convergeLifecycle` drains it, proving convergence by requiring every row to carry a recomputation stamp. The finalized-result notification no longer claims the table updated when it did not. |
+| Season membership | `seasonTeams` records who entered a season; the projection reads it instead of asking who is in the league today. Names snapshotted, withdrawn clubs kept, and a season with no registrations falls back **and says so** in the result. Backfilled 6 seasons / 61 registrations from each season's own matches. |
+| Upload abuse | `x-goog-content-length-range` is now part of the v4 signature, so Cloud Storage enforces the size and refuses a PUT that omits the header. `convergeLifecycle` sweeps unconfirmed sessions past expiry, object first. |
+| Seed safety | `seed:firebase` and `seed:demo` refuse unless the project is named, is in `.firebaserc`, is not production, and is confirmed with a phrase carrying its own environment name. Production has no phrase at all. `seed:demo` also wrote to `(default)` rather than `fg256`. |
+| Document shape | `leagueAdminApplications` create validated ownership and status and nothing else. It now carries a key allowlist and length caps, so an applicant cannot attach a payload or pre-declare their own risk level. |
+
+### Role surfaces
+
+The League Admin athlete directory's rows opened nothing, so "Needs review" filtered a list and
+then offered no way to act on any of it. Rows now open the roster operations, and the badge
+states the real verification state rather than sorting the world into verified and not —
+verification is a **platform** decision (`verificationStatus` is in `ROSTER_FORBIDDEN_FIELDS`),
+and the screen now says so.
+
+The league's own club page was a name, a city and a squad list, less than the public page
+carries. It now shows standing, unresolved fixtures, results and registration state, with
+fixtures linking into League Operations.
+
+The athlete workspace pointed Matches at the public list of every live game in every sport.
+`/athlete/matches` shows their club's fixtures, and their own official record for a match only
+where the finalizer recorded it.
+
+`Sheet` held `onClose` in its focus-effect dependencies. Every caller passes an inline arrow, so
+a sheet whose text state lives in the parent tore its focus effect down and rebuilt it on every
+keystroke, moving focus to the Close button — which on a phone closes the keyboard. Reproduced
+and re-verified in the browser in both directions.
+
+### Still open
+
+- **GP-007** V2 correction/reopen workflow. The public correction UI operates on legacy
+  `resultSubmissions/{matchId}`; a V2 field report may have nothing for it to update. Needs a
+  provenance-independent result case model, and a design decision before code.
+- **GP-010** beta and production projects are still `REPLACE_WITH_` placeholders. Needs GCP
+  provisioning that cannot be done from here.
+- **Team Admin.** ADR-004 retired the authority; the pages remain. Launch as league-operated, or
+  restore narrowly scoped club capabilities. A product decision, not an engineering one.
+- **GP-012** scale: fantasy whole-competition rescoring, platform desk in-memory pagination, and
+  the public catalogue's per-request read volume.
+- The seven legacy `league_005/006/007` matches carrying football scorelines on basketball
+  fixtures.
