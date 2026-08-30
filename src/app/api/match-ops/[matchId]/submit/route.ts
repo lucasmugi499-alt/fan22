@@ -162,17 +162,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
 
   const now = new Date().toISOString();
   const reportRef = adminDb.collection('matchReports').doc(matchId);
-  const existing = await reportRef.get();
-  const previousStatus = String(existing.data()?.status ?? '');
-  /**
-   * Re-attestation is permitted; re-reporting a settled match is not.
-   *
-   * `requires_re_attestation` is exactly the state a late event puts a report into, and refusing
-   * it here would leave the Field Manager holding a match they can neither finalize nor correct.
-   */
-  if (existing.exists && !['submitted', 'ready_for_finalization', 'requires_re_attestation'].includes(previousStatus)) {
-    return Response.json({ error: 'This match has already been reported.' }, { status: 409 });
-  }
 
   /**
    * The exact set being attested to, bound into the report.
@@ -193,42 +182,86 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
     Number(matchSnapshot.data()?.eventStreamVersion ?? allEvents.length),
   );
 
-  // Attesting again over a changed set produces the next version rather than amending this one.
-  const reportVersion = Number(existing.data()?.reportVersion ?? 0) + 1;
+  /**
+   * One transaction over the report AND the assignment.
+   *
+   * The report was read, then written, then the assignment was committed separately. Two
+   * consequences, both real. Two submissions arriving together each read `reportVersion: 1`
+   * and each wrote 2, so one attestation silently replaced the other and the version number
+   * said nothing had happened. And a failure between the two commits left a report that says
+   * submitted beside an assignment that says still capturing, with nothing to reconcile them.
+   *
+   * Firestore retries a contended transaction, so the loser re-reads and writes the version
+   * after the winner rather than over it.
+   */
+  const outcome = await adminDb.runTransaction(async (transaction) => {
+    const existing = await transaction.get(reportRef);
+    const previousStatus = String(existing.data()?.status ?? '');
+    /**
+     * Re-attestation is permitted; re-reporting a settled match is not.
+     *
+     * `requires_re_attestation` is exactly the state a late event puts a report into, and
+     * refusing it here would leave the Field Manager holding a match they can neither finalize
+     * nor correct.
+     */
+    if (existing.exists && !['submitted', 'ready_for_finalization', 'requires_re_attestation'].includes(previousStatus)) {
+      return 'already_reported' as const;
+    }
 
-  await reportRef.set({
-    id: matchId,
-    matchId,
-    leagueId: match.leagueId,
-    assignmentId: auth.session.assignmentId,
-    sessionId: auth.session.sessionId,
-    attestedByMatchSessionId: auth.session.sessionId,
-    reportVersion,
-    eventDigest: binding.eventDigest,
-    eventStreamVersion: binding.eventStreamVersion,
-    source: 'field_capture',
-    declaredHomeScore: input.declaredHomeScore,
-    declaredAwayScore: input.declaredAwayScore,
-    reconstructedHomeScore: trace.home,
-    reconstructedAwayScore: trace.away,
-    eventCount: binding.eventCount,
-    // Over the active events only, so a superseded observation cannot change the hash of what
-    // was actually attested to.
-    payloadHash: createHash('sha256')
-      .update(JSON.stringify(active.map((event) => event.eventId).sort()))
-      .digest('hex'),
-    ...(lineupSnapshot.exists ? { lineupSnapshotId: matchId } : {}),
-    clockAdjustments: clock?.adjustments ?? [],
-    attestedAt: now,
-    attestationText: input.attestationText,
-    exceptions,
-    // Never `official` from here. A report is a claim; the finalizer decides.
-    status: exceptions.some((code) => BLOCKING.has(code)) ? 'league_review' : 'submitted',
-    resultVersion: 1,
-    createdAt: now,
-    updatedAt: now,
-  }, { merge: true });
+    // Attesting again over a changed set produces the next version rather than amending this one.
+    const reportVersion = Number(existing.data()?.reportVersion ?? 0) + 1;
 
+    transaction.set(reportRef, {
+      id: matchId,
+      matchId,
+      leagueId: match.leagueId,
+      assignmentId: auth.session.assignmentId,
+      sessionId: auth.session.sessionId,
+      attestedByMatchSessionId: auth.session.sessionId,
+      reportVersion,
+      eventDigest: binding.eventDigest,
+      eventStreamVersion: binding.eventStreamVersion,
+      source: 'field_capture',
+      declaredHomeScore: input.declaredHomeScore,
+      declaredAwayScore: input.declaredAwayScore,
+      reconstructedHomeScore: trace.home,
+      reconstructedAwayScore: trace.away,
+      eventCount: binding.eventCount,
+      // Over the active events only, so a superseded observation cannot change the hash of what
+      // was actually attested to.
+      payloadHash: createHash('sha256')
+        .update(JSON.stringify(active.map((event) => event.eventId).sort()))
+        .digest('hex'),
+      ...(lineupSnapshot.exists ? { lineupSnapshotId: matchId } : {}),
+      clockAdjustments: clock?.adjustments ?? [],
+      attestedAt: now,
+      attestationText: input.attestationText,
+      exceptions,
+      // Never `official` from here. A report is a claim; the finalizer decides.
+      status: exceptions.some((code) => BLOCKING.has(code)) ? 'league_review' : 'submitted',
+      resultVersion: 1,
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+
+    transaction.update(adminDb.collection('fieldManagerAssignments').doc(auth.session.assignmentId), {
+      status: 'submitted',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return { reportVersion };
+  });
+
+  if (outcome === 'already_reported') {
+    return Response.json({ error: 'This match has already been reported.' }, { status: 409 });
+  }
+
+  /*
+   * Exceptions are written after the report rather than inside its transaction. They are
+   * derived from it — one document per code, keyed by code, so a retry rewrites the same
+   * documents — and putting them in would put a dozen more contended writes in the way of the
+   * one that has to be atomic.
+   */
   const batch = adminDb.batch();
   for (const code of new Set(exceptions)) {
     const exceptionId = `${matchId}_${code}`;
@@ -249,15 +282,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
       updatedAt: now,
     }, { merge: true });
   }
-  batch.update(adminDb.collection('fieldManagerAssignments').doc(auth.session.assignmentId), {
-    status: 'submitted',
-    updatedAt: FieldValue.serverTimestamp(),
-  });
   await batch.commit();
 
   return Response.json({
     ok: true,
     matchId,
+    reportVersion: outcome.reportVersion,
     reconstructed: { home: trace.home, away: trace.away },
     exceptions,
     underReview: exceptions.some((code) => BLOCKING.has(code)),

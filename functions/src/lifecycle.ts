@@ -256,8 +256,14 @@ function backoffMinutes(attempt: number) {
  */
 export async function runProjectionRepairs(
   db: Firestore,
-  repair: (entityType: string, entityId: string) => Promise<unknown>,
-  verify: (entityType: string, entityId: string) => Promise<boolean>,
+  /**
+   * `projectionType` is passed through because one queue now serves more than one projection.
+   * Search repairs and standings repairs have different repairers and different proofs of
+   * convergence, and the queue is deliberately shared: they want the same claim, the same
+   * backoff and the same dead-letter budget.
+   */
+  repair: (entityType: string, entityId: string, projectionType: string) => Promise<unknown>,
+  verify: (entityType: string, entityId: string, projectionType: string) => Promise<boolean>,
   { maxAttempts = 5, dryRun = false }: { maxAttempts?: number; dryRun?: boolean } = {},
 ): Promise<RepairReport> {
   const nowIso = new Date().toISOString();
@@ -276,6 +282,7 @@ export async function runProjectionRepairs(
     const attemptCount = Number(data.attemptCount ?? data.attempts ?? 0);
     const entityType = String(data.entityType ?? '');
     const entityId = String(data.entityId ?? '');
+    const projectionType = String(data.projectionType ?? 'searchIndex');
 
     // Not yet due for another attempt.
     if (data.nextAttemptAt && String(data.nextAttemptAt) > nowIso) continue;
@@ -321,8 +328,8 @@ export async function runProjectionRepairs(
     report.claimed += 1;
 
     try {
-      await repair(entityType, entityId);
-      const converged = await verify(entityType, entityId);
+      await repair(entityType, entityId, projectionType);
+      const converged = await verify(entityType, entityId, projectionType);
 
       if (!converged) {
         // The projector finished and the projection still disagrees. Treated as a failure,

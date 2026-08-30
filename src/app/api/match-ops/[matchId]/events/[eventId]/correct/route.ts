@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody } from '@/server/api/security';
@@ -64,8 +65,36 @@ export async function POST(
   }
 
   const correctionRef = adminDb.collection('liveMatchEvents').doc(`${matchId}_${input.clientEventId}`);
-  const batch = adminDb.batch();
-  batch.set(correctionRef, {
+  const matchRef = adminDb.collection('matches').doc(matchId);
+  const reportRef = adminDb.collection('matchReports').doc(matchId);
+
+  /**
+   * One transaction, because a correction changes what the report is a report OF.
+   *
+   * This ran as a batch that appended the correction and superseded the original, and stopped
+   * there. Generic event intake does two more things — it advances `eventStreamVersion` and
+   * it invalidates an already-attested report — and this path did neither, even though it is
+   * the path that exists specifically for changing an event after the fact.
+   *
+   * So the sequence that broke it was: attest at 17:00, correct a goal at 17:04. The report
+   * still read `ready_for_finalization`, still carried the digest of the events as they were
+   * at 17:00, and the finalizer would take it. A report is a claim that a particular set of
+   * events was the match; changing that set does not amend the claim, it retires it.
+   *
+   * The original is re-read inside the transaction rather than trusted from the check above,
+   * so two corrections racing on the same event cannot both win.
+   */
+  const outcome = await adminDb.runTransaction(async (transaction) => {
+    const current = await transaction.get(originalRef);
+    if (!current.exists) return 'not_found' as const;
+    const currentData = current.data() as LiveMatchEvent;
+    if (currentData.matchId !== matchId) return 'not_found' as const;
+    if (currentData.status === 'superseded') return 'already_corrected' as const;
+
+    const report = await transaction.get(reportRef);
+    const reportStatus = String(report.data()?.status ?? '');
+
+    transaction.set(correctionRef, {
     eventId: correctionRef.id,
     matchId,
     leagueId: existing.leagueId,
@@ -87,32 +116,55 @@ export async function POST(
     createdAtServer: now.toISOString(),
     supersedesEventId: eventId,
     ...(input.reason?.trim() ? { correctionReason: input.reason.trim() } : {}),
-    status: 'active',
-  });
-  batch.update(originalRef, { status: 'superseded' });
+      status: 'active',
+    });
+    transaction.update(originalRef, { status: 'superseded' });
 
-  if (!withinWindow) {
-    const exceptionId = `${matchId}_post_window_correction`;
-    batch.set(adminDb.collection('matchOperationalExceptions').doc(exceptionId), {
-      id: exceptionId,
-      matchId,
-      leagueId: existing.leagueId,
-      code: 'post_window_correction',
-      // Non-blocking. A Field Manager who notices a mistake ten minutes later and fixes it is
-      // producing a better record, not a worse one. It lowers confidence; it does not refuse.
-      blocking: false,
-      detail: { correctedEventId: eventId, reason: input.reason },
-      status: 'open',
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    }, { merge: true });
+    // The stream moved, so anything bound to its previous length is bound to a different match.
+    transaction.set(matchRef, { eventStreamVersion: FieldValue.increment(1) }, { merge: true });
+
+    if (['submitted', 'ready_for_finalization'].includes(reportStatus)) {
+      transaction.update(reportRef, {
+        status: 'requires_re_attestation',
+        reAttestationReason: 'An event was corrected after this report was attested.',
+        updatedAt: now.toISOString(),
+      });
+    }
+
+    if (!withinWindow) {
+      const exceptionId = `${matchId}_post_window_correction`;
+      transaction.set(adminDb.collection('matchOperationalExceptions').doc(exceptionId), {
+        id: exceptionId,
+        matchId,
+        leagueId: currentData.leagueId,
+        code: 'post_window_correction',
+        // Non-blocking. A Field Manager who notices a mistake ten minutes later and fixes it is
+        // producing a better record, not a worse one. It lowers confidence; it does not refuse.
+        blocking: false,
+        detail: { correctedEventId: eventId, reason: input.reason },
+        status: 'open',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      }, { merge: true });
+    }
+
+    return { reAttestationRequired: ['submitted', 'ready_for_finalization'].includes(reportStatus) };
+  });
+
+  if (outcome === 'not_found') {
+    return Response.json({ error: 'That event was not found.' }, { status: 404 });
   }
-  await batch.commit();
+  if (outcome === 'already_corrected') {
+    return Response.json({ error: 'That event has already been corrected.' }, { status: 409 });
+  }
 
   return Response.json({
     ok: true,
     supersededEventId: eventId,
     correctionEventId: correctionRef.id,
     withinUndoWindow: withinWindow,
+    // Told, because the Field Manager has to attest again and would otherwise believe the
+    // match was already reported.
+    reAttestationRequired: outcome.reAttestationRequired,
   });
 }

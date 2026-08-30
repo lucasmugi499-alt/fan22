@@ -1860,12 +1860,13 @@ async function finalizeThenProject(
   const result = await outcome;
 
   if (result.action === 'finalized') {
-    await recomputeStandingsAfterFinalization(db, {
+    const projection = await recomputeStandingsAfterFinalization(db, {
       seasonId: result.seasonId,
       leagueId: result.leagueId,
       matchId: result.matchId,
     });
-    await announceFinalization(db, result);
+    // What the announcement may claim depends on what actually happened. See below.
+    await announceFinalization(db, result, Boolean(projection));
     return result;
   }
 
@@ -1894,6 +1895,15 @@ async function finalizeThenProject(
 async function announceFinalization(
   db: Firestore,
   result: Extract<FinalizeOutcome, { action: 'finalized' }>,
+  /**
+   * Whether the table was actually rebuilt.
+   *
+   * This notification said "The league table has been updated" unconditionally, including when
+   * the projection had just failed and left the table stale. A courtesy message that asserts
+   * something untrue about the record is worse than one that says nothing: the League Admin it
+   * reaches is the person who would otherwise have gone and looked.
+   */
+  tableUpdated: boolean,
 ) {
   if (!result.leagueId) return;
   const operators = await leagueOperatorUserIds(db, result.leagueId);
@@ -1901,7 +1911,10 @@ async function announceFinalization(
     event: 'result_finalized',
     entityId: result.matchId,
     title: 'Result finalized',
-    body: 'A match result has been verified and published. The league table has been updated.',
+    body: tableUpdated
+      ? 'A match result has been verified and published. The league table has been updated.'
+      : 'A match result has been verified and published. The league table has not caught up yet '
+        + 'and is being rebuilt.',
     href: `/matches/${result.matchId}`,
   });
 }

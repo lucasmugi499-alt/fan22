@@ -6,6 +6,7 @@ import {
   recomputeSeasonStandings,
   recomputeStandingsAfterFinalization,
   standingDocumentId,
+  standingsAreConverged,
 } from './projection';
 import { buildLeagueStandings } from '../../lib/leagueModel';
 import type { Match, Team } from '../../types';
@@ -376,6 +377,41 @@ describe('recomputing after a finalization', () => {
     expect(fake.documents('standings')).toEqual([]);
   });
 
+  it('leaves a durable repair job when the rebuild fails', async () => {
+    /*
+     * Swallowing the error is right; swallowing it into a log is not. The result was official,
+     * the table stayed stale, the log scrolled away, and nothing brought them back together
+     * until a person noticed a league table disagreeing with its own results.
+     */
+    const written: Record<string, unknown>[] = [];
+    const broken = {
+      collection: (name: string) => {
+        if (name === 'projectionRepairJobs') {
+          return { doc: () => ({ set: async (data: Record<string, unknown>) => { written.push(data); } }) };
+        }
+        throw new Error('firestore is down');
+      },
+    };
+    await recomputeStandingsAfterFinalization(broken as unknown as Firestore, {
+      seasonId: SEASON, leagueId: LEAGUE, matchId: 'match_1',
+    });
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({
+      projectionType: 'standings',
+      entityType: 'season',
+      entityId: SEASON,
+      status: 'pending',
+    });
+  });
+
+  it('still never throws when even the repair queue is unwritable', async () => {
+    // A thrown error here would make a Cloud Function retry the finalization itself.
+    const broken = { collection: () => { throw new Error('firestore is down'); } };
+    await expect(recomputeStandingsAfterFinalization(broken as unknown as Firestore, {
+      seasonId: SEASON, leagueId: LEAGUE, matchId: 'match_1',
+    })).resolves.toBeUndefined();
+  });
+
   it('rebuilds the table for the season the result belongs to', async () => {
     const teams = [team(1), team(2)];
     const fake = seeded(teams, [
@@ -508,5 +544,31 @@ describe('two results finalizing in the same season at once', () => {
       rows: 4,
       officialMatches: 2,
     });
+  });
+});
+
+
+describe('proving a repaired table actually converged', () => {
+  it('is not converged when the season has no table at all', async () => {
+    const fake = seeded([team(1), team(2)], []);
+    expect(await standingsAreConverged(fake.db as Firestore, SEASON)).toBe(false);
+  });
+
+  it('is converged once every row carries a recomputation stamp', async () => {
+    const fake = seeded([team(1), team(2)], [
+      match({ id: 'm1', home: 'team_01', away: 'team_02', homeScore: 2, awayScore: 1 }),
+    ]);
+    await recomputeSeasonStandings(fake.db as Firestore, SEASON, { leagueId: LEAGUE });
+    expect(await standingsAreConverged(fake.db as Firestore, SEASON)).toBe(true);
+  });
+
+  it('is not converged while a seeded row has never been rebuilt', async () => {
+    // "The repairer did not throw" is not the property anyone wanted. A table of rows that no
+    // projection has ever written is exactly the state being repaired.
+    const fake = seeded([team(1), team(2)], []);
+    fake.db.collection('standings').doc('seeded_row').set({
+      seasonId: SEASON, teamId: 'team_01', points: 99,
+    });
+    expect(await standingsAreConverged(fake.db as Firestore, SEASON)).toBe(false);
   });
 });

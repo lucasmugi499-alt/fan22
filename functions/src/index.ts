@@ -21,6 +21,7 @@ import { expireLapsedAssignments, runProjectionRepairs } from './lifecycle';
 import type { SearchEntityType } from '../../src/lib/search/searchProjection';
 import { sweepUnreportedMatches as runUnreportedMatchSweep } from '../../src/server/finalization/unreportedSweep';
 import { recomputeLeagueIndexes } from '../../src/server/leagueIndex/projection';
+import { recomputeSeasonStandings, standingsAreConverged } from '../../src/server/standings/projection';
 
 /**
  * GoalPlace256 trusted finalizer.
@@ -405,7 +406,19 @@ export const convergeLifecycle = onSchedule(
     const expiry = await expireLapsedAssignments(db);
     const repairs = await runProjectionRepairs(
       db,
-      async (entityType, entityId) => {
+      async (entityType, entityId, projectionType) => {
+        /*
+         * A league table that failed to rebuild after a result became official.
+         *
+         * The recomputation is deliberately never allowed to fail a finalization — the result
+         * is the truth and is already committed — but until this existed the failure was a log
+         * line, so the table simply stayed wrong. Same recompute the finalizer calls, so a
+         * repair cannot derive a different table from the thing that already diverged.
+         */
+        if (projectionType === 'standings') {
+          await recomputeSeasonStandings(db, entityId);
+          return;
+        }
         const snapshot = await db.collection(`${entityType}s`).doc(entityId).get();
         // The same projector the trigger uses; a repair that re-derived the projection
         // differently would be a second implementation of the thing that already drifted.
@@ -421,7 +434,8 @@ export const convergeLifecycle = onSchedule(
        * present when the entity exists, absent when it does not. A projector that returns
        * without throwing has not proven convergence, and convergence is the whole job.
        */
-      async (entityType, entityId) => {
+      async (entityType, entityId, projectionType) => {
+        if (projectionType === 'standings') return standingsAreConverged(db, entityId);
         const [entity, projection] = await Promise.all([
           db.collection(`${entityType}s`).doc(entityId).get(),
           db.collection('searchIndex').doc(`${entityType}_${entityId}`).get(),

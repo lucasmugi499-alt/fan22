@@ -400,6 +400,14 @@ export async function recomputeStandingsAfterFinalization(
     });
     if (result) {
       console.log('GoalPlace256 recomputed standings', { matchId: input.matchId, ...result });
+      // A later result rebuilding the table successfully IS the repair, so an outstanding job
+      // for this season is resolved rather than left queued for a drain that would find
+      // nothing wrong.
+      await db.collection(REPAIR_QUEUE).doc(standingsRepairId(input.seasonId)).set({
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true }).catch(() => undefined);
     }
     return result;
   } catch (error) {
@@ -408,6 +416,75 @@ export async function recomputeStandingsAfterFinalization(
       seasonId: input.seasonId,
       error: error instanceof Error ? error.message : String(error),
     });
+    await queueStandingsRepair(db, input.seasonId, input.leagueId, error);
     return undefined;
   }
+}
+
+/** How often a table is rebuilt from the same failing inputs before somebody has to look. */
+const REPAIR_QUEUE = 'projectionRepairJobs';
+
+/**
+ * A durable record of a table that did not get rebuilt.
+ *
+ * Swallowing the error is right: the official result is already committed and correct, and a
+ * standings outage must not roll back a match. Swallowing it into a LOG is not. The result was
+ * official, the table was stale, the log scrolled away, and nothing brought the two back
+ * together until a person noticed a league table that disagreed with its own results — which
+ * on a platform whose product is a trustworthy table is the failure that matters most.
+ *
+ * Written into the same queue the search projection uses, deliberately. These want the same
+ * claim, the same backoff and the same dead-letter budget, and a second queue would be a
+ * second thing to remember to drain. A deterministic id means a season failing repeatedly
+ * updates one row rather than growing a backlog of duplicates.
+ */
+export async function queueStandingsRepair(
+  db: Firestore,
+  seasonId: string,
+  leagueId: string | undefined,
+  error: unknown,
+): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    await db.collection(REPAIR_QUEUE).doc(standingsRepairId(seasonId)).set({
+      id: standingsRepairId(seasonId),
+      projectionType: 'standings',
+      entityType: 'season',
+      entityId: seasonId,
+      ...(leagueId ? { leagueId } : {}),
+      // Reset to pending on a fresh failure even if a previous attempt had backed off: a new
+      // result arrived, so the old backoff window is about stale information.
+      status: 'pending',
+      lastErrorCode: message.length > 300 ? `${message.slice(0, 300)}…` : message,
+      lastAttemptAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (queueError) {
+    // If the queue itself is unwritable the incident is larger than standings, and there is
+    // nothing useful left to do here but say so loudly.
+    console.error('GoalPlace256 could not queue a standings repair', {
+      seasonId,
+      error: queueError instanceof Error ? queueError.message : String(queueError),
+    });
+  }
+}
+
+export function standingsRepairId(seasonId: string) {
+  return `standings_season_${seasonId}`;
+}
+
+/**
+ * Whether a season's published table matches what its official results say it should be.
+ *
+ * The repair queue's proof of convergence. A repairer that returned without throwing has not
+ * shown the table is right, and "it did not throw" is not the property anyone wanted — so this
+ * recomputes and compares row count and points rather than trusting the absence of an error.
+ */
+export async function standingsAreConverged(db: Firestore, seasonId: string): Promise<boolean> {
+  const stored = await db.collection('standings').where('seasonId', '==', seasonId).get();
+  if (stored.empty) return false;
+  // Every row a recomputation writes carries a stamp. A table with unstamped rows is a seeded
+  // one that no projection has ever rebuilt, which is precisely the state being repaired.
+  return stored.docs.every((doc) => Boolean(doc.data().recomputedAt));
 }

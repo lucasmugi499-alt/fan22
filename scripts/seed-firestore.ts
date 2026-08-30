@@ -1,3 +1,4 @@
+import { requireSeedTarget } from './lib/requireSeedTarget';
 import { adminDb } from '../src/lib/firebase/admin';
 import { mockDatabase } from '../src/data/mockDatabase';
 
@@ -109,6 +110,15 @@ export async function seedFirestoreFromMock() {
 }
 
 async function main() {
+  /*
+   * Refuses before it writes anything.
+   *
+   * This command writes every document in the mock database — demo users, fabricated balances,
+   * invented career statistics — and it used to do so against whichever Admin credentials were
+   * in the environment, with no project named and nothing to confirm. The credentials in this
+   * repository's `.env.local` are real.
+   */
+  requireSeedTarget();
   try {
     await seedFirestoreFromMock();
     process.exit(0);

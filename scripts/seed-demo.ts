@@ -1,6 +1,8 @@
 import { cert, getApps, initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { requireSeedTarget } from './lib/requireSeedTarget';
+import { GOALPLACE_DATABASE_ID } from './lib/firestoreTarget';
 
 type DemoRole = 'fan' | 'athlete' | 'team_admin' | 'league_admin' | 'sponsor' | 'platform_admin' | 'super_admin';
 type DemoAccountClass = 'fan' | 'athlete' | 'organization_operator' | 'platform_operator';
@@ -72,7 +74,7 @@ async function ensureUser(user: DemoUser, password: string) {
 
 async function seedDemoUsers(password: string) {
   const auth = getAuth();
-  const db = getFirestore();
+  const db = demoDb();
   const ids: Record<DemoRole, string> = {} as Record<DemoRole, string>;
 
   for (const demoUser of demoUsers) {
@@ -112,7 +114,7 @@ async function seedDemoUsers(password: string) {
 }
 
 async function seedCollections(ids: Record<DemoRole, string>) {
-  const db = getFirestore();
+  const db = demoDb();
   const leagueAdminIds = [ids.league_admin, ids.platform_admin, ids.super_admin].filter(Boolean);
   const teamAdminIds = [ids.team_admin, ids.platform_admin, ids.super_admin].filter(Boolean);
 
@@ -411,7 +413,24 @@ async function seedCollections(ids: Record<DemoRole, string>) {
   await batch.commit();
 }
 
+/**
+ * The named database, always.
+ *
+ * `getFirestore()` with no id asks for `(default)`. GoalPlace stores everything in `fg256` and
+ * has no `(default)` on the demo project, so this seed was writing to a database that does not
+ * exist there — and on any project that DOES have one it would have succeeded silently into a
+ * database no surface queries.
+ */
+function demoDb() {
+  return getFirestore(GOALPLACE_DATABASE_ID);
+}
+
 export async function seedDemoData() {
+  /*
+   * Refuses before it creates a single account. This seed makes seven demo logins with known
+   * passwords and fabricated wallet balances, and it used to take no project argument at all.
+   */
+  requireSeedTarget();
   initAdmin();
 
   const password = process.env.FIREBASE_DEMO_PASSWORD;
