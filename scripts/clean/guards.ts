@@ -25,6 +25,26 @@ export const CONFIRM_PHRASES: Record<Environment, string> = {
   demo: 'RESET-GOALPLACE-DEMO',
 };
 
+/**
+ * Derived from the confirmation phrases rather than restated, because they drifted apart once
+ * already.
+ *
+ * `validate` used to hardcode `staging` or `production` here. `demo` was added to
+ * `Environment`, to `CONFIRM_PHRASES` and to `buildProjectMap` when it became a first-class
+ * environment — and this one check was missed, so the demo project could be MAPPED but never
+ * NAMED. `backup:firestore` against demo was refused outright, which is how a three-week-old
+ * backup happens: the safe operation was the one that did not work.
+ *
+ * Deriving it means the next environment added to `CONFIRM_PHRASES` is accepted here
+ * automatically, and cannot be accepted without one — a destructive command against an
+ * environment with no confirmation phrase is exactly what the phrases exist to prevent.
+ */
+const ENVIRONMENTS = Object.keys(CONFIRM_PHRASES) as Environment[];
+
+function isEnvironment(value: string): value is Environment {
+  return (ENVIRONMENTS as string[]).includes(value);
+}
+
 /** Placeholder left in .firebaserc until a real staging project exists. */
 export const STAGING_PLACEHOLDER = 'REPLACE-WITH-STAGING-PROJECT-ID';
 
@@ -112,7 +132,7 @@ export function validate(
 
   if (!args.project) problems.push('--project is required (no project is ever inferred).');
   if (!args.database) problems.push('--database is required (for example: --database fg256).');
-  if (!args.env) problems.push('--env is required and must be "staging" or "production".');
+  if (!args.env) problems.push(`--env is required and must be one of: ${ENVIRONMENTS.join(', ')}.`);
 
   if (problems.length) throw new GuardError(problems.join('\n'));
 
@@ -120,8 +140,10 @@ export function validate(
   const databaseId = args.database as string;
   const declaredEnv = args.env as string;
 
-  if (declaredEnv !== 'staging' && declaredEnv !== 'production') {
-    throw new GuardError(`--env must be "staging" or "production", received "${declaredEnv}".`);
+  if (!isEnvironment(declaredEnv)) {
+    throw new GuardError(
+      `--env must be one of ${ENVIRONMENTS.join(', ')}, received "${declaredEnv}".`,
+    );
   }
 
   const knownEnv = projectMap[projectId];

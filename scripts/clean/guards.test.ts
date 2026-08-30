@@ -150,3 +150,57 @@ describe('preview mode', () => {
     expect(plan.preserveUids).toEqual(['owner-uid']);
   });
 });
+
+/**
+ * `demo` became a first-class environment and this check did not follow.
+ *
+ * It was added to `Environment`, to `CONFIRM_PHRASES` and to `buildProjectMap`, but `validate`
+ * still hardcoded `staging` or `production` — so the demo project could be MAPPED and never
+ * NAMED. `npm run backup:firestore` against demo was refused outright, which is how a
+ * three-week-old backup happens: the safe operation was the one that did not work.
+ */
+describe('every environment with a confirmation phrase is nameable', () => {
+  const demoMap = { 'manifest-quasar-479416-s7': 'demo' as const };
+
+  it('accepts --env demo', () => {
+    expect(
+      validate(
+        { project: 'manifest-quasar-479416-s7', database: 'fg256', env: 'demo' },
+        demoMap,
+        { requireConfirm: false },
+      ).environment,
+    ).toBe('demo');
+  });
+
+  it('still refuses an environment that has no confirmation phrase', () => {
+    // The derivation is the guard: an environment cannot be accepted here without a phrase,
+    // and a destructive command against one with no phrase is what the phrases prevent.
+    expect(() =>
+      validate(
+        { project: 'manifest-quasar-479416-s7', database: 'fg256', env: 'sandbox' },
+        demoMap,
+        { requireConfirm: false },
+      ),
+    ).toThrow(/--env must be one of/);
+  });
+
+  it('requires the demo confirmation phrase for a destructive run', () => {
+    expect(() =>
+      validate(
+        { project: 'manifest-quasar-479416-s7', database: 'fg256', env: 'demo' },
+        demoMap,
+        { requireConfirm: true },
+      ),
+    ).toThrow(/RESET-GOALPLACE-DEMO/);
+  });
+
+  it('still refuses --env demo pointed at a project the alias map calls production', () => {
+    expect(() =>
+      validate(
+        { project: 'other-project', database: 'fg256', env: 'demo' },
+        { 'other-project': 'production' as const },
+        { requireConfirm: false },
+      ),
+    ).toThrow(/maps "other-project" to production, but --env says demo/);
+  });
+});
