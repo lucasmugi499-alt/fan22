@@ -49,11 +49,50 @@ export type LeagueIndexProjectionResult = {
  * strictly worse than the bug it would be replacing. Document id is on every document by
  * definition, which is why the cursor rides on that instead.
  *
- * The window exists because the work per league is four queries, and the pass shares a 300s
- * function timeout with the access expiry and projection repairs that run after it. 200 leagues
- * is comfortably inside that; 1,000 in one pass was not.
+ * The window exists because the pass shares a 300s function timeout with the access expiry and
+ * projection repairs that run after it, and each league costs four queries.
+ *
+ * 1,000, not 200, because the leagues are now processed with bounded concurrency rather than
+ * one at a time. Sequentially, four round trips per league put 1,000 leagues well past the
+ * timeout; at ten in flight the same work is a fraction of it. At 10,000 leagues the rotation
+ * comes round in ten hours rather than fifty.
  */
-export const MAX_LEAGUES_PER_PASS = 200;
+export const MAX_LEAGUES_PER_PASS = 1000;
+
+/**
+ * How many leagues are computed at once.
+ *
+ * Bounded rather than unbounded: `Promise.all` over a thousand leagues would open four
+ * thousand concurrent Firestore queries, which is a self-inflicted load spike on the database
+ * the rest of the product is trying to serve. Ten keeps the pass fast without the hourly job
+ * becoming the reason a matchday feels slow.
+ */
+const LEAGUE_CONCURRENCY = 10;
+
+/**
+ * Map with a fixed number of workers.
+ *
+ * Deliberately not `Promise.all` over chunks: a chunked version runs at the speed of the
+ * slowest league in each chunk, and league cost varies by an order of magnitude between a
+ * two-fixture league and a full season. Workers pulling from a shared queue keep every slot
+ * busy until the work runs out.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  }));
+  return results;
+}
 
 /** Where the rotation's position is kept between hourly passes. Server-owned. */
 const CURSOR_ID = 'leagueIndex';
@@ -88,57 +127,14 @@ export async function recomputeLeagueIndexes(
     .then((snapshot) => snapshot.data().count)
     .catch(() => leaguesSnapshot.size);
 
-  let leaguesUpdated = 0;
-  let leaguesUnrated = 0;
+  const outcomes = await mapWithConcurrency(
+    leaguesSnapshot.docs,
+    LEAGUE_CONCURRENCY,
+    (leagueDoc) => rebuildOneLeague(db, leagueDoc, now, computedAt),
+  );
 
-  for (const leagueDoc of leaguesSnapshot.docs) {
-    const league = { id: leagueDoc.id, ...leagueDoc.data() } as League;
-
-    // Per league rather than one global read, so each league's score depends only on its own
-    // records. A shared slice across leagues is exactly what made the old discovery tables
-    // depend on how many of a league's matches happened to fall inside someone else's limit.
-    const [matchesSnapshot, teamsSnapshot, athletesSnapshot, rostersSnapshot] = await Promise.all([
-      db.collection('matches').where('leagueId', '==', league.id).limit(2000).get(),
-      db.collection('teams').where('leagueId', '==', league.id).limit(200).get(),
-      db.collection('athletes').where('leagueId', '==', league.id).limit(3000).get(),
-      db.collection('rosters').where('leagueId', '==', league.id).limit(400).get(),
-    ]);
-
-    const result = computeLeagueIndex({
-      league,
-      seasonId: league.currentSeasonId,
-      // Adapted like every other match read, or legacy-shaped documents fail `isOfficialMatch`
-      // and the verification signal reads low for records that are perfectly fine.
-      matches: matchesSnapshot.docs.map((doc) => adaptMatch({ id: doc.id, ...doc.data() } as Match)),
-      teams: teamsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)),
-      athletes: athletesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Athlete)),
-      rosters: rostersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Roster)),
-      now,
-    });
-
-    const published = publishedIndexScore(result);
-    if (published === null) leaguesUnrated += 1;
-
-    await leagueDoc.ref.set({
-      // `null` for a league with too little history. Not 0, which would rank it below a
-      // badly-run league, and emphatically not the 45 this replaced.
-      goalPlaceIndex: published,
-      indexSignals: Object.fromEntries(result.signals.map((signal) => [signal.key, signal.value])),
-      /**
-       * The counts behind each signal, so the league page can show "38 of 40 verified" rather
-       * than only "95". A breakdown that shows percentages alone is only marginally more
-       * defensible than the constant was.
-       */
-      indexEvidence: Object.fromEntries(result.signals.map((signal) => [
-        signal.key,
-        { numerator: signal.numerator, denominator: signal.denominator },
-      ])),
-      indexEstablished: result.established,
-      indexComputedAt: computedAt,
-    }, { merge: true });
-
-    leaguesUpdated += 1;
-  }
+  const leaguesUpdated = outcomes.length;
+  const leaguesUnrated = outcomes.filter((outcome) => !outcome.rated).length;
 
   // Advanced only after the work, so a pass that dies partway retries the same page rather
   // than skipping it. Recomputation is deterministic, so repeating a page costs reads and
@@ -164,4 +160,64 @@ export async function recomputeLeagueIndexes(
     passesToCoverAll: Math.max(1, Math.ceil(totalLeagues / MAX_LEAGUES_PER_PASS)),
     computedAt,
   };
+}
+
+/**
+ * One league's index, from that league's own records.
+ *
+ * Extracted from the pass so the concurrency wrapper reads as what it is — a scheduler — and
+ * the per-league work reads as the computation. It also means a single league can be rebuilt
+ * on its own without going through the rotation.
+ */
+async function rebuildOneLeague(
+  db: Firestore,
+  leagueDoc: FirebaseFirestore.QueryDocumentSnapshot,
+  now: Date,
+  computedAt: string,
+): Promise<{ rated: boolean }> {
+  const league = { id: leagueDoc.id, ...leagueDoc.data() } as League;
+
+  // Per league rather than one global read, so each league's score depends only on its own
+  // records. A shared slice across leagues is exactly what made the old discovery tables
+  // depend on how many of a league's matches happened to fall inside someone else's limit.
+  const [matchesSnapshot, teamsSnapshot, athletesSnapshot, rostersSnapshot] = await Promise.all([
+    db.collection('matches').where('leagueId', '==', league.id).limit(2000).get(),
+    db.collection('teams').where('leagueId', '==', league.id).limit(200).get(),
+    db.collection('athletes').where('leagueId', '==', league.id).limit(3000).get(),
+    db.collection('rosters').where('leagueId', '==', league.id).limit(400).get(),
+  ]);
+
+  const result = computeLeagueIndex({
+    league,
+    seasonId: league.currentSeasonId,
+    // Adapted like every other match read, or legacy-shaped documents fail `isOfficialMatch`
+    // and the verification signal reads low for records that are perfectly fine.
+    matches: matchesSnapshot.docs.map((doc) => adaptMatch({ id: doc.id, ...doc.data() } as Match)),
+    teams: teamsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)),
+    athletes: athletesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Athlete)),
+    rosters: rostersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Roster)),
+    now,
+  });
+
+  const published = publishedIndexScore(result);
+
+  await leagueDoc.ref.set({
+    // `null` for a league with too little history. Not 0, which would rank it below a
+    // badly-run league, and emphatically not the 45 this replaced.
+    goalPlaceIndex: published,
+    indexSignals: Object.fromEntries(result.signals.map((signal) => [signal.key, signal.value])),
+    /**
+     * The counts behind each signal, so the league page can show "38 of 40 verified" rather
+     * than only "95". A breakdown that shows percentages alone is only marginally more
+     * defensible than the constant was.
+     */
+    indexEvidence: Object.fromEntries(result.signals.map((signal) => [
+      signal.key,
+      { numerator: signal.numerator, denominator: signal.denominator },
+    ])),
+    indexEstablished: result.established,
+    indexComputedAt: computedAt,
+  }, { merge: true });
+
+  return { rated: published !== null };
 }
