@@ -16,7 +16,7 @@
     },
     "beta": {
       "label": "Beta",
-      "firebaseProjectId": "REPLACE_WITH_BETA_PROJECT",
+      "firebaseProjectId": "goalplace256-beta",
       "firestoreDatabaseId": "fg256",
       "appHostingConfig": "apphosting.beta.yaml",
       "expectedDataOrigin": "beta_test",

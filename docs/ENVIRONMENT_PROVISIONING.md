@@ -1,13 +1,51 @@
 # Provisioning beta and production
 
-**Status: not done.** Beta and production have no Firebase projects. Every `REPLACE_WITH_`
-marker below is a real blocker, and no amount of code closes them — they need a Google account
-with billing, which is why this is a runbook rather than a script.
+**Status: beta is part-provisioned; production has no project.** The beta Firebase project
+exists and its web config is wired in — see the section below for exactly what is done and what
+is still owed. Production is still a `REPLACE_WITH_` placeholder.
 
-This is the hard gate in front of every other beta task. Nothing else in the beta plan can
-start until it is finished.
+Every remaining `REPLACE_WITH_` marker is a real blocker, and no amount of code closes them:
+they need a Google account with billing and console access, which is why this is a runbook
+rather than a script.
 
 ---
+
+## Beta status — 30 August 2026
+
+The beta Firebase project **exists**: `goalplace256-beta`. Its web app is registered and its
+config is wired into the repo, so the repo side of steps 1, 3 and 4 is done for beta.
+
+| Wired | Value |
+|---|---|
+| `.firebaserc` beta alias | `goalplace256-beta` |
+| `config/environments.json` | `firebaseProjectId: goalplace256-beta` |
+| Web API key, auth domain, project id, storage bucket, sender id, app id | filled in `apphosting.beta.yaml` |
+
+`npm run environment:prepare:beta` **still refuses**, by design, on three placeholders:
+
+| Placeholder | What produces it | Step |
+|---|---|---|
+| `REPLACE_WITH_BETA_APP_CHECK_SITE_KEY` | the reCAPTCHA site key from registering App Check on the beta web app | 6 |
+| `REPLACE_WITH_BETA_SCHEDULER_AUDIENCE` | the App Hosting backend origin, so the backend has to exist first | 7, 9 |
+| `REPLACE_WITH_BETA_SCHEDULER_SERVICE_ACCOUNT` | the scheduler service account email | 7 |
+
+**Unverified from this repo.** The credentials in `.env.local` belong to the demo project and
+are refused by beta with a 403, so none of the following has been confirmed and all of it is
+still owed:
+
+- that the **named `fg256` database** exists in beta (step 2). This is the one most likely to
+  be missed and the most expensive to miss: nothing fails loudly, scripts just read an empty
+  `(default)` and report success.
+- that the storage bucket exists and rules are deployed to it;
+- that an App Hosting backend exists for beta;
+- that Firestore rules and indexes have been deployed to beta.
+
+Beta is now a first-class environment in the destructive-command guards, so
+`backup:firestore --project goalplace256-beta --env beta` works and the seed commands accept
+`--confirm SEED-GOALPLACE-BETA`. Both were previously refused outright, which is how an
+environment ends up with no backups.
+
+Nothing has been deployed to or seeded into beta from here.
 
 ## What is already true
 
@@ -46,7 +84,7 @@ npm run backup:firestore
 ### 1. Create the two Firebase projects
 
 ```bash
-firebase projects:create goalplace-beta --display-name "GoalPlace256 Beta"
+firebase projects:create goalplace256-beta --display-name "GoalPlace256 Beta"
 ```
 
 ```bash
@@ -69,7 +107,7 @@ gets zero rows back and reports success. `scripts/lib/firestoreTarget.ts` docume
 failure at length.
 
 ```bash
-firebase firestore:databases:create fg256 --project goalplace-beta --location nam5
+firebase firestore:databases:create fg256 --project goalplace256-beta --location nam5
 ```
 
 ```bash
@@ -79,11 +117,11 @@ firebase firestore:databases:create fg256 --project goalplace-prod --location na
 ### 3. Register a web app in each, and read back its config
 
 ```bash
-firebase apps:create WEB "GoalPlace256 Beta" --project goalplace-beta
+firebase apps:create WEB "GoalPlace256 Beta" --project goalplace256-beta
 ```
 
 ```bash
-firebase apps:sdkconfig WEB --project goalplace-beta
+firebase apps:sdkconfig WEB --project goalplace256-beta
 ```
 
 That output supplies five of the placeholders. Repeat for production.
@@ -100,7 +138,7 @@ it after each file rather than at the end.
 |---|---|
 | `REPLACE_WITH_BETA_WEB_API_KEY` | step 3 `apiKey` |
 | `REPLACE_WITH_BETA_AUTH_DOMAIN` | step 3 `authDomain` |
-| `REPLACE_WITH_BETA_PROJECT_ID` | `goalplace-beta` (appears **twice** — public and admin) |
+| `REPLACE_WITH_BETA_PROJECT_ID` | `goalplace256-beta` (appears **twice** — public and admin) |
 | `REPLACE_WITH_BETA_STORAGE_BUCKET` | step 3 `storageBucket` |
 | `REPLACE_WITH_BETA_SENDER_ID` | step 3 `messagingSenderId` |
 | `REPLACE_WITH_BETA_APP_ID` | step 3 `appId` |
@@ -122,11 +160,11 @@ these two must match `config/environments.json` exactly.
 App Hosting reads these from Secret Manager, not from the config file.
 
 ```bash
-firebase apphosting:secrets:set resendApiKey --project goalplace-beta
+firebase apphosting:secrets:set resendApiKey --project goalplace256-beta
 ```
 
 ```bash
-firebase apphosting:secrets:set goalplaceFantasyScoringSecret --project goalplace-beta
+firebase apphosting:secrets:set goalplaceFantasyScoringSecret --project goalplace256-beta
 ```
 
 Also declare `GOALPLACE_RECONCILIATION_SECRET`, which is currently declared on the **calling**
@@ -168,7 +206,7 @@ Both refuse while any placeholder remains, and the messages name what is missing
 ### 9. Create the backend against the right overlay
 
 ```bash
-firebase apphosting:backends:create --project goalplace-beta --config apphosting.beta.yaml
+firebase apphosting:backends:create --project goalplace256-beta --config apphosting.beta.yaml
 ```
 
 **Naming the overlay is not optional.** A backend created without `--config` reads

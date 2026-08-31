@@ -204,3 +204,50 @@ describe('every environment with a confirmation phrase is nameable', () => {
     ).toThrow(/maps "other-project" to production, but --env says demo/);
   });
 });
+
+/**
+ * Beta was provisioned on 30 August 2026, and the failure this guards against is the one that
+ * already happened with demo: an environment can be MAPPED but never NAMED, so `validate`
+ * refuses it and the operation that stops working is `backup:firestore` — the one
+ * destructive-adjacent command an operator runs on a healthy day. The safe operation being the
+ * broken one is how a three-week-old backup happens.
+ */
+describe('beta is a first-class environment', () => {
+  const BETA = 'goalplace256-beta';
+  const aliases = {
+    demo: 'manifest-quasar-479416-s7',
+    beta: BETA,
+    production: 'REPLACE_WITH_CLEAN_PRODUCTION_PROJECT',
+  };
+
+  it('maps the beta alias to the beta environment', () => {
+    expect(buildProjectMap(aliases)[BETA]).toBe('beta');
+  });
+
+  it('has a confirmation phrase carrying its own name', () => {
+    // Asserted on the value rather than the wording, so this cannot pass by matching prose.
+    expect(CONFIRM_PHRASES.beta.toLowerCase()).toContain('beta');
+  });
+
+  it('accepts a named, confirmed beta target', () => {
+    const plan = validate(
+      { project: BETA, database: 'fg256', env: 'beta', confirm: CONFIRM_PHRASES.beta },
+      buildProjectMap(aliases),
+      { requireConfirm: true, credentialProjectId: BETA },
+    );
+    expect(plan).toMatchObject({ projectId: BETA, databaseId: 'fg256', environment: 'beta' });
+  });
+
+  it("refuses another environment's phrase against beta", () => {
+    expect(() => validate(
+      { project: BETA, database: 'fg256', env: 'beta', confirm: CONFIRM_PHRASES.demo },
+      buildProjectMap(aliases),
+      { requireConfirm: true, credentialProjectId: BETA },
+    )).toThrow();
+  });
+
+  it('never maps a project that has not been provisioned', () => {
+    // Without this, `--project REPLACE_WITH_CLEAN_PRODUCTION_PROJECT` validates as production.
+    expect(buildProjectMap(aliases)['REPLACE_WITH_CLEAN_PRODUCTION_PROJECT']).toBeUndefined();
+  });
+});

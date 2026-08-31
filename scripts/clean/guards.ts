@@ -17,12 +17,22 @@
  * asked them to type RESET-GOALPLACE-PRODUCTION before wiping a demo. The alias is now
  * `demo`, and no `prod` alias exists until a real production project does.
  */
-export type Environment = 'production' | 'staging' | 'demo';
+export type Environment = 'production' | 'staging' | 'demo' | 'beta';
 
 export const CONFIRM_PHRASES: Record<Environment, string> = {
   production: 'RESET-GOALPLACE-PRODUCTION',
   staging: 'RESET-GOALPLACE-STAGING',
   demo: 'RESET-GOALPLACE-DEMO',
+  /**
+   * Added when the beta project was provisioned, 30 August 2026.
+   *
+   * Not optional housekeeping. `validate` refuses a project it cannot name, so an environment
+   * missing from here can be MAPPED but never TARGETED — and the operation that stops working
+   * is `backup:firestore`, because a backup is the one destructive-adjacent command an
+   * operator runs on a healthy day. That exact failure already happened once with demo: the
+   * safe operation was the one that did not work, and a three-week-old backup was the result.
+   */
+  beta: 'RESET-GOALPLACE-BETA',
 };
 
 /**
@@ -110,10 +120,13 @@ export function parseArgs(argv: string[]): CleanupArgs {
 export function buildProjectMap(aliases: Record<string, string>): ProjectMap {
   const map: ProjectMap = {};
   for (const [alias, projectId] of Object.entries(aliases)) {
-    if (!projectId || projectId === STAGING_PLACEHOLDER) continue;
+    // A placeholder names no project. `.firebaserc` carries them for environments that have
+    // not been provisioned, and mapping one would let `--project REPLACE_WITH_...` validate.
+    if (!projectId || projectId === STAGING_PLACEHOLDER || projectId.startsWith('REPLACE_WITH')) continue;
     if (alias === 'prod' || alias === 'production') map[projectId] = 'production';
     else if (alias === 'staging' || alias === 'stage') map[projectId] = 'staging';
     else if (alias === 'demo') map[projectId] = 'demo';
+    else if (alias === 'beta') map[projectId] = 'beta';
   }
   return map;
 }

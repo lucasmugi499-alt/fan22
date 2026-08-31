@@ -80,22 +80,22 @@ env:
     value: "false"
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: REPLACE_WITH_BETA_WEB_API_KEY
+    value: AIzaSyBu_cWUe_PkAfMwpocE_Z-WcBWVtszh-1U
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: REPLACE_WITH_BETA_AUTH_DOMAIN
+    value: goalplace256-beta.firebaseapp.com
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: REPLACE_WITH_BETA_PROJECT_ID
+    value: goalplace256-beta
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: REPLACE_WITH_BETA_STORAGE_BUCKET
+    value: goalplace256-beta.firebasestorage.app
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: REPLACE_WITH_BETA_SENDER_ID
+    value: 221739064798
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: REPLACE_WITH_BETA_APP_ID
+    value: 1:221739064798:web:061d93b09e28c24136d14f
     availability: [BUILD]
   - variable: NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY
     value: REPLACE_WITH_BETA_APP_CHECK_SITE_KEY
@@ -104,7 +104,7 @@ env:
     value: fg256
     availability: [BUILD]
   - variable: GOALPLACE_ADMIN_PROJECT_ID
-    value: REPLACE_WITH_BETA_PROJECT_ID
+    value: goalplace256-beta
     availability: [RUNTIME]
   - variable: GOALPLACE_FIRESTORE_DATABASE_ID
     value: fg256
