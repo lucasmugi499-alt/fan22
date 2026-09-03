@@ -84,6 +84,19 @@ env:
   - variable: GOALPLACE_FANTASY_SCORING_SECRET
     secret: goalplaceFantasyScoringSecret
     availability: [RUNTIME]
+  # The receiving half of the payment-reconciliation credential.
+  #
+  # `functions/src/index.ts` declares this secret on the CALLING side, and no overlay declared
+  # it here — so `reconcilePaymentIntents` called an endpoint whose expected secret was
+  # undefined, `safeSecretEquals` correctly refused, and the scheduled job answered 503 every
+  # ten minutes and did no work. Half a shared credential fails closed, which is right, and
+  # silently, which is not.
+  #
+  # It references the SAME Secret Manager secret the function does rather than a copy of it.
+  # Two secrets that have to hold equal values is a rotation that half-lands.
+  - variable: GOALPLACE_RECONCILIATION_SECRET
+    secret: GOALPLACE_RECONCILIATION_SECRET
+    availability: [RUNTIME]
   - variable: NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
     availability: [BUILD]

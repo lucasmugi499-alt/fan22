@@ -184,6 +184,61 @@ function validateTarget(
     expectSetting(values, 'NEXT_PUBLIC_GOALPLACE_ENABLE_INVESTOR_TOOLS', 'false', problems);
   }
 
+  /**
+   * App Check enforcement and its site key are one setting in two halves.
+   *
+   * `GOALPLACE_REQUIRE_APP_CHECK: "true"` makes the server reject any mutation without a
+   * token. The CLIENT only ever mints a token when `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY`
+   * is present — `src/lib/firebase/client.ts` initializes App Check inside that condition.
+   * Enforce without the key and every mutation in the product answers 401, for everyone,
+   * immediately, with the environment otherwise looking correctly configured.
+   *
+   * Beta is the first environment to enforce it, so this is the environment where that
+   * mistake would first be possible and would land on pilot users.
+   */
+  if (values.get('GOALPLACE_REQUIRE_APP_CHECK') === 'true') {
+    const siteKey = values.get('NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY');
+    if (!siteKey || siteKey.startsWith('REPLACE_WITH_')) {
+      problems.push(
+        'GOALPLACE_REQUIRE_APP_CHECK is "true" with no NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY. '
+        + 'The client cannot mint a token it has no key for, so every mutation would answer 401. '
+        + 'Register App Check (reCAPTCHA Enterprise) and set the site key, or set enforcement to "false".',
+      );
+    }
+  }
+
+  /**
+   * The scheduler's declared auth mode must have a credential behind it.
+   *
+   * `safeSecretEquals` returns false when the expected value is undefined, so a route whose
+   * credential was never declared answers 401 forever and is indistinguishable from somebody
+   * probing it with a wrong secret. That is not hypothetical: `GOALPLACE_RECONCILIATION_SECRET`
+   * was declared on the CALLING side in `functions/src/index.ts` and on no overlay, and
+   * `reconcilePaymentIntents` answered 503 every ten minutes on demo and did no work. Half a
+   * shared credential fails closed, which is right, and silently, which is not.
+   */
+  const schedulerMode = values.get('GOALPLACE_SCHEDULER_AUTH_MODE') ?? 'shared_secret';
+  if (schedulerMode === 'shared_secret') {
+    expectSecret(secrets, values, 'GOALPLACE_FANTASY_SCORING_SECRET', 'goalplaceFantasyScoringSecret', problems);
+    if (!secrets.has('GOALPLACE_RECONCILIATION_SECRET') && !values.get('GOALPLACE_RECONCILIATION_SECRET')) {
+      problems.push(
+        'GOALPLACE_SCHEDULER_AUTH_MODE is "shared_secret" but GOALPLACE_RECONCILIATION_SECRET is '
+        + 'declared on neither side. functions/src/index.ts sends it; nothing here receives it.',
+      );
+    }
+  } else if (schedulerMode === 'oidc') {
+    for (const variable of ['GOALPLACE_SCHEDULER_AUDIENCE', 'GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS']) {
+      const declared = values.get(variable);
+      if (!declared || declared.startsWith('REPLACE_WITH_')) {
+        problems.push(
+          `GOALPLACE_SCHEDULER_AUTH_MODE is "oidc" but ${variable} is not set. An empty allowlist `
+          + 'makes verifySchedulerOidc reject everything, which is the same permanent-401 shape '
+          + 'as a missing secret.',
+        );
+      }
+    }
+  }
+
   if (config.paymentsMode === 'sandbox') expectSetting(values, 'GOALPLACE_PAYMENTS_MODE', 'sandbox', problems);
   if (config.paymentsMode === 'disabled' && values.get('GOALPLACE_PAYMENTS_MODE') === 'sandbox' && target === 'production') {
     problems.push('production cannot activate with sandbox payments');

@@ -1,5 +1,5 @@
 {
-  "reviewedAt": "2026-08-23",
+  "reviewedAt": "2026-09-03",
   "entries": [
     {
       "advisoryId": "GHSA-w5hq-g745-h8pq",
@@ -72,6 +72,69 @@
       "expiresOn": "2026-11-21",
       "fixedIn": "@opentelemetry/core >= 2.8.0 (awaiting upstream firebase-tools bump)",
       "reference": "https://github.com/advisories/GHSA-8988-4f7v-96qf"
+    },
+    {
+      "advisoryId": "GHSA-x5fp-wj9c-mxmx",
+      "package": "qs",
+      "packages": [
+        "qs"
+      ],
+      "severity": "moderate",
+      "tree": "root",
+      "dependencyPath": "firebase-tools 15.29.0 > express 4.22.2 / body-parser 1.20.6 / googleapis-common 8.0.2 > qs 6.15.3",
+      "classification": "dev-tooling",
+      "scope": "dev",
+      "status": "accepted-temporarily",
+      "reason": "No upgrade exists. firebase-tools 15.29.0 is the current latest and still resolves qs 6.15.3 through four separate paths (express, body-parser, exegesis, googleapis-common). Resolution requires firebase-tools to advance those dependencies upstream; nothing in this repository pins qs directly.",
+      "reachability": "Two advisories: an array-limit bypass via bracket-key comma parsing (GHSA-x5fp-wj9c-mxmx) and denial of service via attacker-controlled isBuffer (GHSA-4mjr-xmp4-gh2g). Both require parsing an attacker-supplied query string. Not reachable in any deployed artifact. Every copy is resolved through firebase-tools, a devDependency CLI, and `npm audit --omit=dev` reports zero production vulnerabilities. GoalPlace ships no Express server: the app is Next.js App Router on App Hosting and the Cloud Functions are event-driven with no HTTP body parsing through this stack. The CLI parses only what a developer types and what local emulators return.",
+      "mitigation": "Not shipped. Runs only on developer and CI machines invoking the Firebase CLI against local emulators and Google APIs, never against untrusted network input. Confirmed by a production-only audit returning zero advisories of any severity.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-09-03",
+      "expiresOn": "2026-12-03",
+      "fixedIn": "qs >= 6.15.4 (awaiting upstream firebase-tools bump)",
+      "reference": "https://github.com/advisories/GHSA-x5fp-wj9c-mxmx"
+    },
+    {
+      "advisoryId": "GHSA-qw6h-vgh9-j6wx",
+      "package": "body-parser",
+      "packages": [
+        "body-parser"
+      ],
+      "severity": "moderate",
+      "tree": "root",
+      "dependencyPath": "firebase-tools 15.29.0 > body-parser 1.20.6 / exegesis 4.3.0 > body-parser",
+      "classification": "dev-tooling",
+      "scope": "dev",
+      "status": "accepted-temporarily",
+      "reason": "Inherited from the qs advisory below it: body-parser 1.20.6 is flagged because it depends on the vulnerable qs range. No upgrade exists while firebase-tools 15.29.0, the current latest, resolves it. Fixing qs upstream fixes this entry.",
+      "reachability": "The vulnerable path is HTTP request body parsing of urlencoded input. Not reachable in any deployed artifact. Every copy is resolved through firebase-tools, a devDependency CLI, and `npm audit --omit=dev` reports zero production vulnerabilities. GoalPlace ships no Express server: the app is Next.js App Router on App Hosting and the Cloud Functions are event-driven with no HTTP body parsing through this stack. The CLI parses only what a developer types and what local emulators return.",
+      "mitigation": "Not shipped. Runs only on developer and CI machines invoking the Firebase CLI against local emulators and Google APIs, never against untrusted network input. Confirmed by a production-only audit returning zero advisories of any severity.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-09-03",
+      "expiresOn": "2026-12-03",
+      "fixedIn": "body-parser resolving qs >= 6.15.4 (awaiting upstream firebase-tools bump)",
+      "reference": "https://github.com/advisories/GHSA-x5fp-wj9c-mxmx"
+    },
+    {
+      "advisoryId": "GHSA-x5fp-wj9c-mxmx",
+      "package": "express",
+      "packages": [
+        "express"
+      ],
+      "severity": "moderate",
+      "tree": "root",
+      "dependencyPath": "firebase-tools 15.29.0 > express 4.22.2 and @modelcontextprotocol/sdk 1.30.0 > express 5.2.1",
+      "classification": "dev-tooling",
+      "scope": "dev",
+      "status": "accepted-temporarily",
+      "reason": "Inherited from the same qs range through body-parser. Both express copies live inside firebase-tools 15.29.0, the current latest; there is no version of this repository that pins express, and no upgrade available short of an upstream bump.",
+      "reachability": "Requires an Express application serving attacker-reachable routes. Not reachable in any deployed artifact. Every copy is resolved through firebase-tools, a devDependency CLI, and `npm audit --omit=dev` reports zero production vulnerabilities. GoalPlace ships no Express server: the app is Next.js App Router on App Hosting and the Cloud Functions are event-driven with no HTTP body parsing through this stack. The CLI parses only what a developer types and what local emulators return.",
+      "mitigation": "Not shipped. Runs only on developer and CI machines invoking the Firebase CLI against local emulators and Google APIs, never against untrusted network input. Confirmed by a production-only audit returning zero advisories of any severity.",
+      "owner": "repository owner",
+      "reviewedAt": "2026-09-03",
+      "expiresOn": "2026-12-03",
+      "fixedIn": "express resolving qs >= 6.15.4 (awaiting upstream firebase-tools bump)",
+      "reference": "https://github.com/advisories/GHSA-x5fp-wj9c-mxmx"
     }
   ]
 }

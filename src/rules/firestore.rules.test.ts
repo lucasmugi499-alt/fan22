@@ -2608,3 +2608,115 @@ describe('a Club Operator writes proposals and evidence, never the record', () =
     getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'resultCases/match_001__case1')),
   ));
 });
+
+/**
+ * Ownership decides WHO may write; it says nothing about the SHAPE of what they write, and
+ * Firestore accepts a document up to a megabyte. These collections are created straight from
+ * the browser into records that public pages read, so an unshaped create is a cost and
+ * moderation hole even where the authorization is sound. Same class the
+ * `leagueAdminApplications` rule already closed.
+ */
+describe('browser-created public records carry only the keys they are meant to', () => {
+  const FAN = 'user_shape_fan';
+
+  function post(extra: Record<string, unknown> = {}) {
+    // Exactly what `firebaseProvider.createFeedPost` writes for the fan composer, so a field
+    // this allowlist forgot would fail here rather than in production.
+    return {
+      authorId: FAN,
+      authorName: 'A Fan',
+      authorRole: 'fan',
+      authorType: 'Fan',
+      type: 'fan_comment',
+      caption: 'Great game at Nakivubo today.',
+      verified: false,
+      status: 'active',
+      likesCount: 0,
+      commentsCount: 0,
+      sharesCount: 0,
+      timestamp: '2026-08-31T09:00:00.000Z',
+      createdAt: '2026-08-31T09:00:00.000Z',
+      updatedAt: '2026-08-31T09:00:00.000Z',
+      ...extra,
+    };
+  }
+
+  it('accepts the post the app actually writes', () => assertSucceeds(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_1'), post()),
+  ));
+
+  it('accepts the richer club post shape', () => assertSucceeds(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_2'), post({
+      sport: 'football', mediaUrl: 'https://example.test/a.jpg', mediaType: 'image',
+      relatedTeamId: 'team_a', relatedLeagueId: 'league_001', relatedAthleteId: 'athlete_001',
+      relatedMatchId: 'match_001', supportAmount: 0, statsRow: ['2 goals'],
+    })),
+  ));
+
+  it('refuses a field nobody defined', () => assertFails(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_3'), post({ payload: 'x'.repeat(400) })),
+  ));
+
+  it('refuses a caption used as storage', () => assertFails(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_4'), post({ caption: 'x'.repeat(5001) })),
+  ));
+
+  it('still accepts a long but real post', () => assertSucceeds(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_5'), post({ caption: 'x'.repeat(4999) })),
+  ));
+
+  it('refuses a media url used as storage', () => assertFails(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_6'), post({ mediaUrl: 'x'.repeat(2001) })),
+  ));
+
+  it('still refuses a post authored as somebody else', () => assertFails(
+    // The check that was already here, kept honest: shape rules must not have replaced it.
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_7'), post({ authorId: 'somebody_else' })),
+  ));
+
+  it('still refuses a fan claiming their own post is verified', () => assertFails(
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_8'), post({ verified: true })),
+  ));
+
+  it('refuses growing a caption past the cap by editing', () => assertFails(
+    // Editing must not be the way around the create cap.
+    setDoc(doc(asUser(FAN), 'feedPosts/post_shape_5'), post({ caption: 'y'.repeat(6000) })),
+  ));
+});
+
+describe('operator-created records are shaped too', () => {
+  it('accepts a notice and refuses an invented field on it', async () => {
+    const notice = {
+      leagueId: 'league_001', seasonId: 'season_001', type: 'general',
+      title: 'Fixtures moved', message: 'Round 4 moves to Sunday.',
+      audience: 'public', priority: 'normal', publishedByUserId: LEAGUE_ADMIN,
+      createdAt: '2026-08-31T09:00:00.000Z',
+    };
+    await assertSucceeds(setDoc(doc(asUser(LEAGUE_ADMIN), 'leagueNotices/notice_shape_1'), notice));
+    await assertFails(setDoc(doc(asUser(LEAGUE_ADMIN), 'leagueNotices/notice_shape_2'),
+      { ...notice, attachment: 'x'.repeat(500) }));
+    await assertFails(setDoc(doc(asUser(LEAGUE_ADMIN), 'leagueNotices/notice_shape_3'),
+      { ...notice, message: 'x'.repeat(8001) }));
+  });
+
+  it('refuses re-audiencing a published notice', async () => {
+    /*
+     * `audience` decides who may READ the notice. Making it editable meant a note published to
+     * team admins could be widened to public after the fact — a disclosure decision made by an
+     * edit rather than by a publication.
+     */
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'leagueNotices/notice_audience'), {
+        leagueId: 'league_001', seasonId: 'season_001', type: 'general',
+        title: 'Internal', message: 'For team admins only.', audience: 'team_admins',
+        priority: 'normal', publishedByUserId: LEAGUE_ADMIN, createdAt: '2026-08-31T09:00:00.000Z',
+      });
+    });
+    await assertFails(updateDoc(
+      doc(asUser(LEAGUE_ADMIN), 'leagueNotices/notice_audience'), { audience: 'public' },
+    ));
+    await assertSucceeds(updateDoc(
+      doc(asUser(LEAGUE_ADMIN), 'leagueNotices/notice_audience'), { title: 'Internal notice' },
+    ));
+  });
+});

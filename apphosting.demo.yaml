@@ -40,6 +40,20 @@ env:
   - variable: GOALPLACE_ENABLE_INVESTOR_TOOLS
     value: "true"
     availability: [BUILD]
+  # App Check, staged deliberately.
+  #
+  # Beta and production both enforce this, so beta would otherwise be the FIRST environment
+  # where App Check is ever exercised — with pilot users watching. Demo is where it should be
+  # proven instead, and the two variables below are the whole of that change: register App
+  # Check (reCAPTCHA **Enterprise** — `client.ts` uses ReCaptchaEnterpriseProvider, so a
+  # reCAPTCHA v3 classic key will not work), paste the site key, then flip enforcement to
+  # "true" and confirm mutations still succeed here.
+  #
+  # Order matters and the readiness gate enforces it: the client only mints a token when the
+  # site key is present, so enforcing without one answers 401 to every mutation in the product.
+  - variable: NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY
+    value: ""
+    availability: [BUILD]
   - variable: GOALPLACE_REQUIRE_APP_CHECK
     value: "false"
     availability: [RUNTIME]

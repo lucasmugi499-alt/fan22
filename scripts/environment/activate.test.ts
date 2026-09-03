@@ -31,6 +31,15 @@ function yaml(values: Record<string, string>) {
     '  - variable: RESEND_API_KEY',
     '    secret: resendApiKey',
     '    availability: [RUNTIME]',
+    // A valid fixture declares both halves of the scheduler credential. The environment these
+    // stand in for is a WORKING one, so an omission here would be a fixture that quietly
+    // disagrees with what the assertions call correct.
+    '  - variable: GOALPLACE_FANTASY_SCORING_SECRET',
+    '    secret: goalplaceFantasyScoringSecret',
+    '    availability: [RUNTIME]',
+    '  - variable: GOALPLACE_RECONCILIATION_SECRET',
+    '    secret: GOALPLACE_RECONCILIATION_SECRET',
+    '    availability: [RUNTIME]',
   ].join('\n');
 }
 
@@ -217,6 +226,92 @@ describe('environment activation command', () => {
       })).toThrow(/access engine mode/);
     },
   );
+
+  /**
+   * Enforcement and its site key are one setting in two halves. The server rejects any mutation
+   * without an App Check token; the CLIENT only mints one when the site key is present, because
+   * `client.ts` initializes App Check inside that condition. Enforce without the key and every
+   * mutation answers 401, for everyone, with the environment otherwise looking correct.
+   *
+   * Beta is the first environment to enforce it, so this is where that mistake first becomes
+   * possible and it would land on pilot users.
+   */
+  it('refuses App Check enforcement with no site key behind it', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.beta.yaml'), `${yaml(envValues('beta', {
+      GOALPLACE_REQUIRE_APP_CHECK: 'true',
+      NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY: '',
+    }))}\n`);
+
+    expect(() => activateEnvironment('beta', 'activate', { root, env: controls }))
+      .toThrow(/APP_CHECK_SITE_KEY/);
+  });
+
+  it('refuses App Check enforcement whose site key is still a placeholder', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.beta.yaml'), `${yaml(envValues('beta', {
+      GOALPLACE_REQUIRE_APP_CHECK: 'true',
+      NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY: 'REPLACE_WITH_BETA_APP_CHECK_SITE_KEY',
+    }))}\n`);
+
+    // Refused by the file-wide placeholder gate before the pairing assertion is reached, which
+    // is the stronger of the two guarantees. Asserted on the outcome rather than on which gate
+    // caught it, because a test that pinned the message would break the day the order changed.
+    expect(() => activateEnvironment('beta', 'activate', { root, env: controls })).toThrow();
+  });
+
+  it('allows App Check enforcement once a real site key is set', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.beta.yaml'), `${yaml(envValues('beta', {
+      GOALPLACE_REQUIRE_APP_CHECK: 'true',
+      NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY: '6Lc_a_real_looking_site_key',
+    }))}\n`);
+
+    expect(() => activateEnvironment('beta', 'activate', { root, env: controls })).not.toThrow();
+  });
+
+  /**
+   * `safeSecretEquals` returns false when the expected value is undefined, so a route whose
+   * credential was never declared answers 401 forever and looks exactly like somebody probing
+   * it with a wrong secret. `GOALPLACE_RECONCILIATION_SECRET` was in that state: declared on
+   * the calling side in `functions/src/index.ts` and on no overlay, so `reconcilePaymentIntents`
+   * answered 503 every ten minutes on demo and did no work.
+   */
+  it('refuses a shared-secret scheduler with no receiving credential', () => {
+    const root = fixture();
+    // `yaml()` adds both halves, so this fixture is written without the helper's secret block.
+    writeFileSync(path.join(root, 'apphosting.demo.yaml'), [
+      yaml(envValues('demo', { GOALPLACE_SCHEDULER_AUTH_MODE: 'shared_secret' }))
+        .split('\n')
+        .filter((line, index, lines) =>
+          !line.includes('GOALPLACE_RECONCILIATION_SECRET')
+          && !(lines[index - 1] ?? '').includes('GOALPLACE_RECONCILIATION_SECRET')
+          && !(lines[index - 2] ?? '').includes('GOALPLACE_RECONCILIATION_SECRET'))
+        .join('\n'),
+      '',
+    ].join('\n'));
+
+    expect(() => activateEnvironment('demo', 'activate', { root, env: controls }))
+      .toThrow(/GOALPLACE_RECONCILIATION_SECRET/);
+  });
+
+  it('refuses an OIDC scheduler whose allowlist was never filled', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'apphosting.beta.yaml'), `${yaml(envValues('beta', {
+      GOALPLACE_SCHEDULER_AUTH_MODE: 'oidc',
+      // Empty rather than a placeholder: a placeholder is caught by the file-wide gate first,
+      // and what this test is for is the case where somebody removed the marker to get past it.
+      GOALPLACE_SCHEDULER_AUDIENCE: '',
+      GOALPLACE_SCHEDULER_SERVICE_ACCOUNT_EMAILS: 'sa@example.test',
+      NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY: '6Lc_a_real_looking_site_key',
+      GOALPLACE_REQUIRE_APP_CHECK: 'true',
+    }))}\n`);
+
+    // An empty allowlist makes verifySchedulerOidc reject everything, which is the same
+    // permanent-401 shape as a missing secret.
+    expect(() => activateEnvironment('beta', 'activate', { root, env: controls }))
+      .toThrow(/SCHEDULER_AUDIENCE/);
+  });
 
   it('refuses activation when transactional email is not backed by a Secret Manager key', () => {
     const root = fixture();

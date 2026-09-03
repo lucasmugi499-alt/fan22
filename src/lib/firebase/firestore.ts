@@ -6,13 +6,11 @@ import {
   QueryConstraint,
   addDoc,
   collection,
-  doc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import {
@@ -206,25 +204,6 @@ export async function createFeedPost(input: {
   });
 
   return docRef.id;
-}
-
-export async function updateVerificationStatus({
-  collectionName,
-  id,
-  verificationStatus,
-  verifiedBy,
-}: {
-  collectionName: 'matches' | 'challenges' | 'verifications';
-  id: string;
-  verificationStatus: 'Pending' | 'Verified' | 'Disputed' | 'Rejected';
-  verifiedBy: string;
-}) {
-  const { db } = requireFirebaseClient();
-  await updateDoc(doc(db, collectionName, id), {
-    verificationStatus,
-    verifiedBy,
-    updatedAt: serverTimestamp(),
-  } satisfies DocumentData);
 }
 
 export function constraintsForOwner(field: string, uid: string) {

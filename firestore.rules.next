@@ -410,6 +410,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if
         (hasLeagueOperatorCapability(request.resource.data.leagueId) &&
+          createdKeysWithin([
+            'id', 'name', 'sport', 'leagueId', 'city', 'location', 'country', 'description',
+            'plan', 'verified', 'adminUserIds', 'logoUrl', 'logoURL', 'coverUrl', 'coverURL',
+            'primaryColor', 'secondaryColor', 'foundedYear', 'homeVenue',
+            'totalSupport', 'supportersCount', 'createdAt', 'updatedAt',
+          ]) &&
+          shortText(request.resource.data.get('description', ''), 4000) &&
+          shortText(request.resource.data.get('name', ''), 200) &&
           request.resource.data.adminUserIds is list &&
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
@@ -662,7 +670,15 @@ service cloud.firestore {
 
     match /rosters/{rosterId} {
       allow read: if true;
+      // Shape as well as ownership. `athleteIds` is the field that grows without a ceiling —
+      // a roster is a squad, not a list of every id the caller can think of.
       allow create: if hasTeamOperatorCapability(request.resource.data.teamId) &&
+        createdKeysWithin([
+          'id', 'leagueId', 'seasonId', 'teamId', 'athleteIds', 'status', 'completeness',
+          'submittedByUserId', 'createdAt', 'updatedAt',
+        ]) &&
+        request.resource.data.athleteIds is list &&
+        request.resource.data.athleteIds.size() <= 200 &&
         request.resource.data.submittedByUserId == request.auth.uid &&
         request.resource.data.status in ['draft', 'submitted'] &&
         !('approvedByUserId' in request.resource.data);
@@ -710,11 +726,25 @@ service cloud.firestore {
         isPlatformAdmin() ||
         canReadLeagueById(resource.data.leagueId);
       allow create: if hasLeagueOperatorCapability(request.resource.data.leagueId) &&
+        createdKeysWithin([
+          'id', 'leagueId', 'seasonId', 'type', 'title', 'message', 'audience', 'priority',
+          'publishedByUserId', 'createdAt', 'updatedAt',
+        ]) &&
+        shortText(request.resource.data.get('title', ''), 300) &&
+        shortText(request.resource.data.get('message', ''), 8000) &&
         request.resource.data.publishedByUserId == request.auth.uid;
       allow update: if hasLeagueOperatorCapability(resource.data.leagueId) &&
+        /*
+         * `audience` is immutable now. It was editable, and it is the field that decides who
+         * can READ the notice — so a note published to team admins could be widened to public
+         * after the fact, which is a disclosure decision made by an edit rather than a
+         * publication. Re-audiencing means publishing a new notice.
+         */
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'leagueId', 'seasonId', 'publishedByUserId', 'createdAt'
-        ]);
+          'leagueId', 'seasonId', 'publishedByUserId', 'createdAt', 'audience'
+        ]) &&
+        shortText(request.resource.data.get('title', ''), 300) &&
+        shortText(request.resource.data.get('message', ''), 8000);
       allow delete: if false;
     }
 
@@ -1124,9 +1154,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /**
+     * Community posts, created straight from the browser.
+     *
+     * The ownership, zeroed-counter and verified-gating clauses below decide WHO may post and
+     * what they may claim about themselves. They said nothing about the SHAPE of the document,
+     * and Firestore accepts up to a megabyte — so any signed-in account could attach an
+     * arbitrary payload to a public collection that every feed, club page and league page
+     * reads. Not an authorization hole: a cost and moderation one, and the same class the
+     * `leagueAdminApplications` rule already closed.
+     *
+     * The caption cap is generous on purpose. This is a community feed and a long post is a
+     * real post; what it stops is a field being used as storage.
+     */
     match /feedPosts/{postId} {
       allow read: if true;
       allow create: if signedIn() &&
+        createdKeysWithin([
+          'id', 'authorId', 'authorName', 'authorRole', 'authorType', 'sport', 'type',
+          'caption', 'mediaURL', 'mediaUrl', 'mediaType',
+          'relatedAthleteId', 'relatedTeamId', 'relatedLeagueId', 'relatedMatchId',
+          'supportAmount', 'statsRow', 'verified', 'status',
+          'likesCount', 'commentsCount', 'sharesCount',
+          'timestamp', 'createdAt', 'updatedAt',
+        ]) &&
+        shortText(request.resource.data.get('caption', ''), 5000) &&
+        shortText(request.resource.data.get('mediaUrl', ''), 2000) &&
+        shortText(request.resource.data.get('mediaURL', ''), 2000) &&
+        shortText(request.resource.data.get('authorName', ''), 200) &&
         request.resource.data.authorId == request.auth.uid &&
         request.resource.data.status == 'active' &&
         request.resource.data.likesCount == 0 &&
@@ -1153,7 +1208,11 @@ service cloud.firestore {
           signedIn() &&
           resource.data.authorId == request.auth.uid &&
           request.resource.data.authorId == resource.data.authorId &&
-          changedKeysWithin(['caption', 'mediaUrl', 'mediaURL', 'mediaType', 'updatedAt'])
+          changedKeysWithin(['caption', 'mediaUrl', 'mediaURL', 'mediaType', 'updatedAt']) &&
+          // Editing must not be the way around the create cap.
+          shortText(request.resource.data.get('caption', ''), 5000) &&
+          shortText(request.resource.data.get('mediaUrl', ''), 2000) &&
+          shortText(request.resource.data.get('mediaURL', ''), 2000)
         );
       allow delete: if false;
     }
@@ -1422,13 +1481,15 @@ service cloud.firestore {
 
     match /sponsors/{sponsorId} {
       allow read: if true;
-      // Command-owned: no browser client writes these, and none should.
+      /*
+       * Command-owned: no browser client writes these, and none should. Sponsor records carry
+       * no scoped assignment model of their own, so the legacy array here is retired outright
+       * rather than migrated — platform operators manage sponsors through trusted commands.
+       *
+       * `allow write` already covers create, update and delete; the separate delete clause and
+       * the duplicated write clause were leftovers from two edits meeting.
+       */
       allow write: if false;
-      // Sponsor records carry no scoped assignment model of their own, so the legacy
-      // array here is retired outright rather than migrated: platform operators manage
-      // sponsors through trusted commands.
-      allow write: if false;
-      allow delete: if false;
     }
 
     match /awards/{awardId} {
@@ -1438,11 +1499,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    /**
+     * Verification records. Readable by the league they concern, written by nobody.
+     *
+     * The create and update clauses here accepted ANY league operator capability — eleven of
+     * them, including `league.notice.publish` — and then allowed any field of the document to
+     * be written, with no allowlist, no immutable-field protection and no audit event. That is
+     * a browser path to an official-looking datum, on a platform whose entire claim is that
+     * such data is server-owned.
+     *
+     * It was also reachable by nothing. No route, no provider method and no Cloud Function
+     * writes this collection; the only client code that did was a helper with no callers,
+     * which additionally used the capitalised status spellings `status.ts` exists to have
+     * removed. The rule was permitting a path that existed only as a trap for whoever
+     * eventually wired it up.
+     *
+     * If verification transitions become a product need they go through an audited server
+     * command with a reason, exactly as every other official transition does.
+     */
     match /verifications/{verificationId} {
       allow read: if isPlatformAdmin() || canReadLeagueById(resource.data.leagueId);
-      allow create: if hasLeagueOperatorCapability(request.resource.data.leagueId);
-      allow update: if hasLeagueOperatorCapability(resource.data.leagueId);
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /reports/{reportId} {

@@ -23,12 +23,69 @@ vi.mock('@/lib/firebase/admin', () => ({
 describe('api security primitives', () => {
   it('uses the trusted real-ip header before x-forwarded-for', () => {
     const request = new Request('https://example.test', {
-      headers: {
-        'x-real-ip': '203.0.113.7',
-        'x-forwarded-for': '198.51.100.8, 10.0.0.1',
-      },
+      headers: { 'x-forwarded-for': '198.51.100.8, 203.0.113.7' },
     });
+    // The last hop: the one the infrastructure appended, not the one the caller opened with.
     expect(clientIpFrom(request)).toBe('203.0.113.7');
+  });
+
+  /**
+   * `x-forwarded-for` is a list a client can START and only infrastructure can EXTEND, because
+   * every hop appends. Taking the leftmost entry — which this did — took the one entry the
+   * caller fully controls.
+   *
+   * Eight routes rate limit on this value alone, several public and unauthenticated, so
+   * rotating one header per request bought a fresh bucket every time and the limits bounded
+   * nothing.
+   */
+  describe('an address a caller cannot choose', () => {
+    function ip(headers: Record<string, string>, env: NodeJS.ProcessEnv = {}) {
+      return clientIpFrom(new Request('https://example.test', { headers }), env);
+    }
+
+    it('ignores what the caller prepended', () => {
+      const spoofed = ip({ 'x-forwarded-for': '1.2.3.4, 203.0.113.7' });
+      const alsoSpoofed = ip({ 'x-forwarded-for': '9.9.9.9, 203.0.113.7' });
+      expect(spoofed).toBe('203.0.113.7');
+      // The whole point: two callers rotating the leftmost hop land in ONE bucket.
+      expect(spoofed).toBe(alsoSpoofed);
+    });
+
+    it('is not moved by a long forged chain', () => {
+      const forged = Array.from({ length: 40 }, (_, index) => `10.0.0.${index}`).join(', ');
+      expect(ip({ 'x-forwarded-for': `${forged}, 203.0.113.7` })).toBe('203.0.113.7');
+    });
+
+    it('ignores x-real-ip entirely', () => {
+      // A single header with no positional structure: nothing distinguishes a value the
+      // infrastructure set from one the caller typed. It used to be consulted FIRST.
+      expect(ip({ 'x-real-ip': '1.2.3.4', 'x-forwarded-for': '9.9.9.9, 203.0.113.7' }))
+        .toBe('203.0.113.7');
+      expect(ip({ 'x-real-ip': '1.2.3.4' })).toBe('unknown');
+    });
+
+    it('counts back further when a gateway is declared', () => {
+      // With a gateway in front the chain is `client, gateway`, so the caller is second-last.
+      expect(ip(
+        { 'x-forwarded-for': '1.2.3.4, 203.0.113.7, 10.0.0.1' },
+        { GOALPLACE_TRUSTED_PROXY_HOPS: '2' },
+      )).toBe('203.0.113.7');
+    });
+
+    it('collapses to one bucket when the chain is shorter than configured', () => {
+      // A misconfiguration should over-limit rather than stop limiting. Returning a leftmost
+      // entry here would hand back precisely the value the attacker chose.
+      expect(ip({ 'x-forwarded-for': '1.2.3.4' }, { GOALPLACE_TRUSTED_PROXY_HOPS: '2' }))
+        .toBe('unknown');
+      expect(ip({})).toBe('unknown');
+    });
+
+    it('ignores a nonsense hop count rather than trusting it', () => {
+      for (const value of ['0', '-3', 'many', '']) {
+        expect(ip({ 'x-forwarded-for': '1.2.3.4, 203.0.113.7' }, { GOALPLACE_TRUSTED_PROXY_HOPS: value }))
+          .toBe('203.0.113.7');
+      }
+    });
   });
 
   it('parses schema-validated JSON under the body limit', async () => {

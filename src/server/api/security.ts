@@ -301,9 +301,56 @@ export function safeSecretEquals(supplied: string | null, expected: string | und
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export function clientIpFrom(request: Request) {
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return request.headers.get('x-real-ip') ?? forwarded ?? 'unknown';
+/**
+ * How many hops of `x-forwarded-for` this deployment adds in front of the app.
+ *
+ * One for App Hosting today: Google's infrastructure appends the peer address, so the last
+ * entry is the caller. Put a gateway in front — the Cloudflare plan in the deployment docs —
+ * and it becomes two, because the gateway appends its own hop after the client's address.
+ *
+ * Configurable rather than inferred. A count that guessed from the chain length would be told
+ * what to guess by the attacker, who controls how many entries arrive.
+ */
+function trustedProxyHops(env: NodeJS.ProcessEnv = process.env): number {
+  const declared = Number(env.GOALPLACE_TRUSTED_PROXY_HOPS);
+  return Number.isInteger(declared) && declared >= 1 ? declared : 1;
+}
+
+/**
+ * The caller's address, counted from the RIGHT.
+ *
+ * `x-forwarded-for` is a list a client can start and only infrastructure can extend, because
+ * each hop APPENDS. So everything an attacker writes stays to the left of everything the
+ * infrastructure adds, and the leftmost entry — which this used to take — is the one entry
+ * they fully control.
+ *
+ * That mattered because eight routes rate limit on this value alone, several of them public
+ * and unauthenticated: `/api/discover`, `/api/search`, `/api/public-inquiries`,
+ * `/api/client-errors`. Rotating one header per request bought a fresh bucket every time, so
+ * the limits bounded nothing and the Firestore reads behind them were unbounded. (The Field
+ * Manager PIN exchange was never exposed by this: its per-assignment limit is what actually
+ * guards the PIN, and the IP ceiling in front of it is only there to avoid a read per guess.)
+ *
+ * `x-real-ip` is gone rather than demoted. It is a single header with no positional structure,
+ * so there is no way to tell a value the infrastructure set from one the caller typed — and it
+ * was consulted FIRST, which made the whole chain bypassable with one header even after the
+ * list parsing was fixed.
+ */
+export function clientIpFrom(request: Request, env: NodeJS.ProcessEnv = process.env) {
+  const chain = (request.headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const hops = trustedProxyHops(env);
+  /*
+   * Too few entries means the request did not arrive through the infrastructure this is
+   * configured for. Falling back to a leftmost entry would hand back exactly the value the
+   * attacker chose, so this collapses to one shared bucket instead: a misconfiguration should
+   * over-limit rather than stop limiting.
+   */
+  if (chain.length < hops) return 'unknown';
+  return chain[chain.length - hops] ?? 'unknown';
 }
 
 function hashParts(parts: string[]) {
