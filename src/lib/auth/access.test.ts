@@ -33,6 +33,20 @@ function assignment(overrides: Partial<AccessAssignment>): AccessAssignment {
 }
 
 describe('access assignments and scope-aware authorization', () => {
+  it('still unions V1 capabilities when a drain stage is named explicitly', () => {
+    // The projector's mechanics, proved with a live bundle. Reachable only by naming the stage.
+    const indexes = buildAccessIndexDocuments({
+      assignments: [
+        assignment({ id: 'assignment_2', permissionBundleId: 'results_only', roleKey: 'result_reporter' }),
+        assignment({ id: 'assignment_1' }),
+      ],
+      accessVersion: 4,
+      updatedAt: now,
+      stage: 'frozen',
+    });
+    expect(indexes[0].capabilities).toContain('team.result.submit');
+  });
+
   it('projects active assignments into deterministic accessIndex documents', () => {
     const indexes = buildAccessIndexDocuments({
       assignments: [
@@ -53,14 +67,16 @@ describe('access assignments and scope-aware authorization', () => {
     });
     expect(indexes[0].assignmentIds).toEqual(['assignment_1', 'assignment_2']);
     /**
-     * Still granting, because the default stage is `frozen`.
+     * Granting NOTHING, because the default stage is now `retired`.
      *
-     * This is the safety property the stage exists for. A deploy that carried the zeroed
-     * bundles would strand every open V1 workflow the moment a team scope rebuilt, since the
-     * two-sided guard on `resultSubmissions` fails on both its terms at once. Authority drops
-     * when somebody retires it, having confirmed the drain, not when the code ships.
+     * This used to assert the opposite, and was right to: during the drain a deploy that
+     * carried the zeroed bundles would have stranded every open V1 workflow the moment a team
+     * scope rebuilt. The drain is done and every deployed environment sets `retired`, so the
+     * safety property has flipped. A local server that forgot the variable rebuilt a team
+     * scope under `frozen` and wrote `team.result.submit` into the live database, where the
+     * rules read it and would have honoured it. Forget the variable: grant less, never more.
      */
-    expect(indexes[0].capabilities).toContain('team.result.submit');
+    expect(indexes[0].capabilities).toEqual([]);
 
     const retired = buildAccessIndexDocuments({
       assignments: [assignment({ id: 'assignment_1' })],

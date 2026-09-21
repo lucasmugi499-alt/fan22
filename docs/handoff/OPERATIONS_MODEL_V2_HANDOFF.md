@@ -971,3 +971,46 @@ the guard catches the original fixture when it is put back. If you write a fixtu
 be "still valid", derive it from `Date.now()` — there is no other date that stays in the future.
 
 Demo is still down on billing; nothing was deployed.
+
+### Same day, later: the Club Operator surfaces, and a trap that bit the live database
+
+The authority from ADR-005 now has screens. `/team-admin/*` is rebuilt on the six
+`club_operations` capabilities (details in the ADR's *Since accepted*): `useTeamConsoleAccess`
+answers per capability, `ClubResultSheet` is the single form (evidence report on an unofficial
+match, result case on an official one), `POST /api/matches/[matchId]/team-report` writes
+`teamMatchReports/{matchId}__{teamId}` with revisions and never a candidate, and
+`ResultSubmissionSheet`, the confirmation inbox and `pendingActions` are gone. A League Admin
+assigns the authority with the `assign_club_operator` admin action.
+
+**Trap: `GOALPLACE_TEAM_AUTHORITY_STAGE` unset meant `frozen`, and `frozen` still grants.**
+The `assign_club_operator` command rebuilds the target's `accessIndex` projection in the same
+transaction as the assignment. Run locally with no stage in `.env.local`, it projected the
+retired V1 team bundle — `team.result.submit`, `team.roster.manage` and friends — into
+`accessIndex/team_team_football_01_01_user_team_admin_01_01` on the **live** demo database.
+Repaired the same hour by re-running `projectScopeIndex` with `stage: 'retired'`; the index now
+holds exactly the six ADR-005 capabilities. The default is flipped to `retired`
+(`src/lib/auth/teamAuthorityStage.ts`), `active` and `frozen` are honoured only when named, and
+`.env.example` says so. Any script that projects access must be run with the stage it means.
+
+**Trap: `secureLeagueCommand` swallowed refusals.** `PlatformCommandRefusal` thrown inside a
+league command was never converted to a response, so every deliberate refusal reached the
+route's generic catch as a 500 "The trusted action failed". `securePlatformCommand` already
+did the conversion; the league wrapper now does too. Anything that tested a league-side
+refusal by status code before today was testing the wrong thing.
+
+**Dependencies.** Eighteen days of advisories had arrived: a **critical** on `next` (Windows
+RCE, not our runtime, and the gate correctly refuses to waive criticals regardless) and a high
+on `sharp` via libheif, both production-reaching. `next` 16.3.2 → 16.3.5, `sharp` 0.35.3 →
+0.35.4. The `overrides.next.sharp` pin — added as a floor when 0.35.3 was the patched version —
+was what kept the vulnerable nested copy alive; it is raised to 0.35.4, and the stale
+`node_modules/next/node_modules/sharp` lock entry had to be removed by hand because npm trusts
+the lock over an override change. `npm audit fix` then took `vitest` 4.1.11, `vite` 8.3.0 and
+`firebase-tools` 15.30.2 (which cleared `js-yaml`, `morgan`, `hono`, `qs`, `body-parser`,
+`express`), and in `functions/` `firebase-admin` 14.4.0, which finally cleared the `uuid` chain
+that had been on the register since August. Production and functions trees audit at **zero**.
+The register is rewritten to the three moderates that remain, all inside the `firebase-tools`
+CLI, with call-site reachability (`auth:import`, `database:import`, `npm ls` over the
+developer's own tree). Five stale waivers were deleted rather than left: the gate matches by
+package name, so a stale `qs` waiver would silently cover the next `qs` advisory of any kind.
+
+Demo is still down on billing; nothing was deployed.

@@ -111,7 +111,7 @@ export function TeamProfile() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-text-strong">Team profile</h1>
-        {access.canManage ? (
+        {access.canEditProfile ? (
           <Button size="sm" variant="secondary" icon={PencilSimple} onClick={openEditor}>
             Edit
           </Button>
@@ -167,7 +167,7 @@ export function TeamProfile() {
             offer once team authority is retired. Naming the destination truthfully is the
             same fix as removing the buttons, applied to navigation. */}
         <Link href="/team-admin/roster" className="text-sm font-medium text-brand hover:underline">
-          {access.canManage ? 'Manage' : 'View'}
+          {access.canEditProfile ? 'Manage' : 'View'}
         </Link>
       </Card>
 
@@ -178,7 +178,7 @@ export function TeamProfile() {
         viewer who actually holds authority over this club; the league operator who does still
         sees them here.
       */}
-      {access.canManage ? <ChallengeWorkflow scope="team" targetId={team.id} /> : null}
+      {access.canEditProfile ? <ChallengeWorkflow scope="team" targetId={team.id} /> : null}
       <SupportNeedWorkflow scope="team" targetId={team.id} />
 
       <Sheet

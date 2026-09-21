@@ -64,7 +64,7 @@ const KNOWN: Budget[] = [
   { file: 'src/components/core/EntityCards.tsx', reads: 2, why: 'team points fallback, and the league team count on LeagueCard' },
   { file: 'src/components/core/TeamPublic.tsx', reads: 2, why: 'fallback behind officialRecord' },
   { file: 'src/components/team/TeamProfile.tsx', reads: 3, why: 'fallbacks behind the standings projection' },
-  { file: 'src/components/team/TeamConsoleHome.tsx', reads: 2, why: 'fallback behind the standings projection' },
+  { file: 'src/components/team/TeamConsoleHome.tsx', reads: 1, why: 'fallback behind the standings projection' },
   { file: 'src/components/discover/TeamsDiscover.tsx', reads: 2, why: 'sort fallback when a league has no table' },
   { file: 'src/components/discover/DiscoverHub.tsx', reads: 1, why: 'fallback when a league has no table' },
   { file: 'src/components/discover/LeaguesDiscover.tsx', reads: 1, why: 'already prefers the actual team records; count is the fallback' },

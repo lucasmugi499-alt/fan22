@@ -228,8 +228,13 @@ describe('trusted access resolver', () => {
     expect(context.indexes).toHaveLength(1);
     expect(context.indexes[0].assignmentIds).toEqual(['assignment_a', 'assignment_b']);
     expect(context.indexes[0].activeRoles).toEqual(['result_reporter', 'team_admin']);
-    // Still granting at the default stage. ADR-004 retires this authority, and retiring it is
-    // an operation that waits for the V1 drain rather than something a deploy does.
-    expect(context.indexes[0].capabilities).toContain('team.result.submit');
+    /*
+     * Both assignments are live and both are retired V1 bundles, so the projection unions
+     * their roles and ids and grants nothing. It used to assert `team.result.submit` here
+     * while the default stage was `frozen`; the drain is done, the default is `retired`, and
+     * this is now the property that matters: an environment that forgets the stage variable
+     * must not hand a club its V1 authority back.
+     */
+    expect(context.indexes[0].capabilities).toEqual([]);
   });
 });

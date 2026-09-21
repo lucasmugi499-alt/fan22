@@ -248,14 +248,33 @@ export async function secureLeagueCommand<TResult>({
     return { response: jsonError('You do not manage this league.', 403) };
   }
 
-  return {
-    result: await handler({
-      actor,
-      requestId,
-      reason: normalizedReason,
-      profile,
-      league: leagueSnapshot,
-      isPlatformActor,
-    }),
-  };
+  try {
+    return {
+      result: await handler({
+        actor,
+        requestId,
+        reason: normalizedReason,
+        profile,
+        league: leagueSnapshot,
+        isPlatformActor,
+      }),
+    };
+  } catch (cause) {
+    /*
+     * The same rule the platform wrapper has always applied, which this one never did.
+     *
+     * A deliberate refusal is returned to the operator verbatim, with the status it names.
+     * Anything else propagates, because turning an unexpected exception into a friendly 4xx
+     * would tell an operator their command was rejected when it in fact broke.
+     *
+     * Without this, a `refuse()` inside a league handler fell through to the route's outer
+     * catch and came back as "The trusted action failed. Quote this reference when reporting
+     * it." — a 500 with a support id, for a League Admin who had simply been told no. That is
+     * the inverse lie: rejected reads as broken.
+     */
+    if (cause instanceof PlatformCommandRefusal) {
+      return { response: jsonError(cause.message, cause.status) };
+    }
+    throw cause;
+  }
 }

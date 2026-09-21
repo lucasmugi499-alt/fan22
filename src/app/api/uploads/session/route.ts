@@ -90,10 +90,13 @@ async function canUploadMatchEvidence(actor: AuthenticatedActor, matchId: string
   if (!match.exists) return false;
   const data = match.data() ?? {};
   if (data.homeTeamId !== teamId && data.awayTeamId !== teamId) return false;
-  // Evidence for a result is League work now: the two team capabilities this used to accept
-  // grant nothing, and field capture attaches its own evidence through the match ops routes.
+  // The league that governs the result, or the club that played it. `team.result.report` is
+  // ADR-005's club capability and it is EVIDENCE authority only: a photo of the scoreboard
+  // attached to the club's account of the match, which a League Admin may weigh and the
+  // finalizer never reads. The retired V1 team capabilities still grant nothing here.
   return await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.enter')
-    || await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.resolve');
+    || await hasLeagueCapabilityForTeam(actor.uid, teamId, 'league.result.resolve')
+    || await hasCapability(actor.uid, { scopeType: 'team', scopeId: teamId }, 'team.result.report');
 }
 
 /**

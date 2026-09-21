@@ -99,25 +99,35 @@ The gate reads `security/advisory-register.json` and fails when:
 - a registered advisory increases above its accepted severity
 - an exception lacks a reason or mitigation
 
-Current temporary exceptions expire on `2026-08-30`.
+Current temporary exceptions expire on `2026-12-20`.
 
 ## Current Dependency Remediation
 
-Implemented:
+As of 2026-09-21, `npm audit --omit=dev` and the `functions/` tree both report **zero**
+advisories of any severity. Implemented:
 
-- `firebase-tools` lockfile updated from `15.24.0` to `15.25.0`
-- vulnerable transitive `sharp` under Next overridden to `0.35.3`
-- Storage rules are now covered by emulator tests for private user media, approved media,
+- `next` 16.3.5 (critical Windows-hosted RCE advisory cleared) and `sharp` 0.35.4 (libheif).
+  `overrides.next.sharp` is a floor at `0.35.4`; when raising it, also delete the stale
+  `node_modules/next/node_modules/sharp` entry from the lockfile — npm keeps the lock's copy
+  over an override change and reports it as `invalid`.
+- `firebase-tools` 15.30.2, `vitest` 4.1.11, `vite` 8.3.0 via `npm audit fix`.
+- `functions/`: `firebase-admin` 14.4.0, which cleared the `uuid` chain through
+  `@google-cloud/storage` that had been registered since August.
+- Storage rules are covered by emulator tests for private user media, approved media,
   server-issued media upload boundaries, match evidence read isolation, immutability,
   content type, and size limits.
 
-Still registered:
+Still registered (all moderate, all inside the `firebase-tools` devDependency, none shipped):
 
-- Next-pinned `postcss` copy. Next `16.2.12` is current, and npm audit proposes an unsafe
-  downgrade instead of a real patched upgrade.
-- Current `firebase-admin` storage chain advisory. The application does not expose the
-  affected uuid buffer APIs to untrusted input.
-- Development/deploy tooling glob/minimatch advisories through Firebase CLI and ESLint.
+- `@opentelemetry/core` < 2.8.0 through `@google-cloud/pubsub` 5.x — W3C Baggage memory
+  allocation; no deployed service parses baggage headers.
+- `csv-parse` < 7.0.2 — prototype replacement via the `columns` option; the CLI's only caller
+  (`auth:import`) never passes `columns`.
+- `stream-json` <= 3.4.0 — quadratic filters on nested JSON; every caller reads a file or
+  command output the developer chose on their own machine.
+
+Waivers are matched by package name. Delete a waiver the moment its advisory clears — a stale
+one would silently cover the next advisory on that package, whatever it is.
 
 ## Production Blockers
 

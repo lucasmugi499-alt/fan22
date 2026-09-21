@@ -32,11 +32,32 @@ export type TeamAuthorityStage =
   /** Drain confirmed at zero. The bundles grant nothing and projections may be rebuilt. */
   | 'retired';
 
-export const DEFAULT_TEAM_AUTHORITY_STAGE: TeamAuthorityStage = 'frozen';
+/**
+ * The default flipped from `frozen` to `retired` on 21 September 2026, and the reason is the
+ * mirror image of the reason it was `frozen`.
+ *
+ * During the drain, `frozen` was fail-closed: an environment that forgot the variable kept V1
+ * workflows alive rather than stranding them. The drain is finished. Every deployed environment
+ * sets `retired`, the V1 bundles must never grant again under ADR-005, and the new club
+ * authority is a different bundle that no stage gates.
+ *
+ * So an unset variable now points the other way. A local dev server without it ran under
+ * `frozen`, and when a league command rebuilt a team scope through it, the projection it wrote
+ * to the LIVE database carried `team.result.submit`, `team.roster.manage` and the rest of the
+ * retired bundle — which the deployed rules, reading `accessIndex` directly, would have
+ * honoured. Fail-closed today means: forget the variable, grant less, never more.
+ *
+ * `active` and `frozen` remain reachable by name, for the tests that prove the drain logic and
+ * for any environment that has genuinely not drained. Nothing reaches them by omission.
+ */
+export const DEFAULT_TEAM_AUTHORITY_STAGE: TeamAuthorityStage = 'retired';
 
-/** An unrecognised value falls back to `frozen`: a typo must not retire anybody's authority. */
+/**
+ * An unrecognised value falls back to the default. A typo must not restore anybody's
+ * authority, which is now the direction a typo could go.
+ */
 export function resolveTeamAuthorityStage(raw: string | undefined): TeamAuthorityStage {
-  if (raw === 'active' || raw === 'retired') return raw;
+  if (raw === 'active' || raw === 'frozen') return raw;
   return DEFAULT_TEAM_AUTHORITY_STAGE;
 }
 

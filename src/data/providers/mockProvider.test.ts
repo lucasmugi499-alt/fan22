@@ -33,14 +33,17 @@ describe('mock provider league applications', () => {
       activeRoles: ['league_admin'],
       capabilities: expect.arrayContaining(['league.team.manage']),
     }));
-    // The seeded Team Admin still projects and still grants, because the default migration
-    // stage is `frozen`: issuance has stopped, authority has not been retired, and a live V1
-    // workflow can still be finished by the people who started it.
+    /*
+     * The seeded Team Admin still PROJECTS — the scope, the role, the assignment id — and
+     * grants NOTHING, because the default stage is now `retired`. This asserted the opposite
+     * while the drain was open; the drain is done, every deployed environment retires V1
+     * authority, and an environment that forgot the variable must not hand it back.
+     */
     await expect(mockProvider.getAccessIndexByUser('user_team_admin_01_01')).resolves.toContainEqual(expect.objectContaining({
       scopeType: 'team',
       scopeId: 'team_football_01_01',
       activeRoles: ['team_admin'],
-      capabilities: expect.arrayContaining(['team.athlete.create']),
+      capabilities: [],
     }));
     await expect(mockProvider.getAccessIndexByUser('user_ath_football_01_01_01')).resolves.toContainEqual(expect.objectContaining({
       scopeType: 'athlete',

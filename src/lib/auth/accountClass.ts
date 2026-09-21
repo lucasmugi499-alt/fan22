@@ -14,6 +14,9 @@ const organizationRoles = new Set<string>([
   'league_verifier',
   'team_owner',
   'team_admin',
+  // ADR-005. Without this a Club Operator resolves to `fan`, and every operator route —
+  // including the ones their own bundle is for — refuses them at the account-class gate.
+  'club_operator',
   'roster_manager',
   'result_reporter',
   'content_manager',

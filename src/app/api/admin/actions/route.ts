@@ -5,13 +5,14 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
-import { platformAuditEvent, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
+import { platformAuditEvent, refuse, secureLeagueCommand, securePlatformCommand } from '@/server/platform/commands/securePlatformCommand';
 import type {
   AccessAssignment,
   AccessAssignmentStatus,
   PermissionCapability,
 } from '@/lib/auth/access';
 import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
+import { resolveAccountClass } from '@/lib/auth/accountClass';
 import { assertLeagueKeepsAnAdmin } from '@/server/access/lastAdmin';
 import { seasonRegistrationId } from '@/server/standings/seasonMembership';
 import { normalizeAccessAssignment, readScopeProjection, rebuildUserProjections } from '@/server/access/projector';
@@ -239,6 +240,13 @@ const adminActionSchema = z.discriminatedUnion('action', [
     action: z.literal('transition_access_assignment'),
     assignmentId: z.string().trim().min(1).max(180),
     status: z.enum(['active', 'suspended', 'expired', 'revoked']),
+    note: z.string().trim().max(1200).optional().default(''),
+  }),
+  z.object({
+    action: z.literal('assign_club_operator'),
+    teamId: z.string().trim().min(1).max(180),
+    /** The person's account email. They must already have an operator account. */
+    email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
     note: z.string().trim().max(1200).optional().default(''),
   }),
   z.object({
@@ -754,6 +762,114 @@ export async function POST(request: Request) {
       return Response.json({
         error: 'Team administration has moved to League Operations. Athletes and rosters are managed from the league.',
       }, { status: 410 });
+    }
+
+    if (body.action === 'assign_club_operator') {
+      /**
+       * A league assigning its club's operator. ADR-005.
+       *
+       * `create_team_invitation` above answers 410, and until this existed nothing replaced
+       * it: the `club_operations` bundle was defined, the rules honoured it, the console
+       * rendered for it, and no route could grant it. A role nobody can hold is a decision on
+       * paper.
+       *
+       * Assignment, not invitation. Staff invitation is deferred for beta, and the League
+       * Admin assigns each Club Operator directly to an account that already exists — which is
+       * also why the target is an email rather than a uid: the league knows the person's
+       * address, and nobody knows a uid.
+       *
+       * The separate-account model holds. A fan account is refused rather than upgraded, with
+       * the same words the invitation flow uses, because an account class is a security
+       * boundary and not a thing a league can change about somebody else.
+       */
+      const teamSnapshot = await adminDb.collection('teams').doc(body.teamId).get();
+      if (!teamSnapshot.exists) return Response.json({ error: 'Club not found.' }, { status: 404 });
+      const leagueId = String(teamSnapshot.data()?.leagueId ?? '');
+
+      const guarded = await secureLeagueCommand({
+        actor,
+        command: 'league.club_operator.assign',
+        leagueId,
+        requiredCapability: 'league.team.manage',
+        handler: async ({ requestId, reason }) => {
+          /*
+           * Refusals are THROWN, not returned. The command wrapper turns a `PlatformCommandRefusal`
+           * into the 4xx it names; a `Response` returned from a handler is treated as the
+           * result and spread into `{ ok: true }`. That is exactly what the first version of
+           * this did — a fan account was correctly refused, nothing was written, and the
+           * League Admin was told it succeeded.
+           */
+          const account = await adminAuth.getUserByEmail(body.email).catch(() => null);
+          if (!account) {
+            refuse('No GoalPlace256 account uses that email. Ask them to create an Organization Operator account first.', 404);
+          }
+          const profile = await adminDb.collection('users').doc(account.uid).get();
+          const accountClass = resolveAccountClass({
+            accountClass: profile.data()?.accountClass,
+            role: typeof account.customClaims?.role === 'string' ? account.customClaims.role : profile.data()?.role,
+          });
+          if (accountClass !== 'organization_operator') {
+            refuse('That account is not an Organization Operator account. A club is run from an operator account, not a fan or athlete one; ask them to create one with this email.', 409);
+          }
+
+          const assignmentId = `assignment_club_${body.teamId}_${account.uid}`;
+          const nowIso = new Date().toISOString();
+          const assignment = {
+            id: assignmentId,
+            userId: account.uid,
+            roleKey: 'club_operator',
+            scopeType: 'team' as const,
+            scopeId: body.teamId,
+            permissionBundleId: 'club_operations',
+            status: 'active',
+            grantedByUserId: actor.uid,
+            validFrom: nowIso,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          };
+          const projected = normalizeAccessAssignment(assignmentId, assignment, nowIso);
+          const scope = { userId: account.uid, scopeType: 'team' as const, scopeId: body.teamId };
+
+          await adminDb.runTransaction(async (transaction) => {
+            // The same projection path every other assignment takes, so `accessIndex` — what
+            // the rules and the routes actually read — is written in the same transaction as
+            // the assignment. An assignment with no projection grants nothing anywhere.
+            const projection = await readScopeProjection(transaction, scope, {
+              now: new Date(),
+              pending: [{ operation: 'upsert', assignment: projected }],
+            });
+            transaction.set(adminDb.collection('accessAssignments').doc(assignmentId), assignment);
+            projection.apply(transaction);
+            transaction.update(adminDb.collection('teams').doc(body.teamId), {
+              adminUserIds: FieldValue.arrayUnion(account.uid),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            transaction.set(adminDb.collection('adminAuditEvents').doc(), platformAuditEvent({
+              actor,
+              requestId,
+              action: 'granted',
+              targetCollection: 'accessAssignments',
+              targetId: assignmentId,
+              note: reason || body.note || `Assigned ${body.email} as Club Operator of ${body.teamId}.`,
+              beforeSummary: { teamId: body.teamId, userId: account.uid, held: false },
+              afterSummary: { teamId: body.teamId, userId: account.uid, roleKey: 'club_operator', bundle: 'club_operations' },
+            }));
+          });
+
+          /*
+           * The UI persona. `team_admin` is what the shell renders the club console under and
+           * what the product still calls the person; `club_operator` is the authority key on
+           * the assignment. A privileged claim (a platform role) is never downgraded by this.
+           */
+          const current = typeof account.customClaims?.role === 'string' ? account.customClaims.role : 'fan';
+          if (!['platform_admin', 'super_admin', 'league_admin'].includes(current)) {
+            await adminAuth.setCustomUserClaims(account.uid, { ...(account.customClaims ?? {}), role: 'team_admin' });
+          }
+
+          return { assignmentId, userId: account.uid };
+        },
+      });
+      return 'response' in guarded ? guarded.response : Response.json({ ok: true, ...guarded.result });
     }
 
     if (body.action === 'create_teams') {

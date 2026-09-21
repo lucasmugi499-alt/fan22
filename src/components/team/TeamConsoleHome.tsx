@@ -8,8 +8,6 @@ import {
   Clock,
   Users as UsersIcon,
   CalendarBlank,
-  Warning,
-  Broadcast,
   SealCheck,
   Coins,
 } from '@phosphor-icons/react';
@@ -18,44 +16,44 @@ import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useTeamOfficialStanding } from '@/lib/team/useTeamStanding';
 import {
   resolveMyTeam,
-  pendingActions,
-  upcomingForTeam,
+  matchesForTeam,
   rosterForTeam,
-  teamRecord,
   recentForm,
-  type TeamAction,
   type FormResult,
 } from '@/lib/team/teamContext';
+import { isOfficialMatch, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { Card, Bezel, Eyebrow } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { MatchCard } from '@/components/core/MatchCard';
-import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
+import { ClubResultSheet } from '@/components/team/ClubResultSheet';
 import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
-import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import type { Match, Team } from '@/types';
 
-const ACTION_COPY: Record<TeamAction['kind'], { title: string; body: string; cta: string }> = {
-  live: {
-    title: 'A match is live',
-    body: 'Keep the score updated. You can submit the result the moment it ends.',
-    cta: 'Open fixtures',
+/**
+ * The one thing the club is being asked for, and why.
+ *
+ * Both are the same ask — "tell us what you saw" — and the copy differs only in what the
+ * league is waiting on. Neither says "submit the result", because a club does not set a
+ * result. ADR-005: Field Manager captures, League governs, clubs report and dispute.
+ */
+const ACCOUNT_COPY = {
+  unofficial: {
+    title: 'A played match has no official result yet',
+    body: 'Your league is settling it. Your club was there: record what you saw and it is weighed alongside the field report.',
+    cta: 'Record our account',
   },
-  unverified: {
-    title: 'A result needs verifying',
-    body: 'A played result is not official until the opposing team confirms it. Submit or confirm it to move it forward.',
-    cta: 'Review result',
+  missed: {
+    title: 'A fixture passed with nothing recorded',
+    body: 'Kickoff has gone by and no result arrived. If the match was played, say so; if it was not, say that too.',
+    cta: 'Say what happened',
   },
-  disputed: {
-    title: 'A result is disputed',
-    body: 'The two teams disagree on this scoreline. The league is reviewing it. Add your evidence to help resolve it.',
-    cta: 'View dispute',
-  },
-};
+} as const;
 
 const FORM_STYLE: Record<FormResult, string> = {
   W: 'bg-[var(--state-verified-bg)] text-[var(--state-verified)] border-[var(--state-verified)]/30',
@@ -80,14 +78,29 @@ export function TeamConsoleHome() {
   const teams = catalog.teams;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
+  const now = useNow();
 
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
-    useTeamConfirmationInbox(team?.id);
+
+  /*
+   * What is waiting on the club's account: played matches with no official result, and
+   * scheduled ones whose kickoff passed with nothing recorded. Newest first, so the fixture
+   * the club most likely remembers is the one on top.
+   */
+  const awaitingAccount = useMemo(() => {
+    type Awaiting = { match: Match; kind: keyof typeof ACCOUNT_COPY };
+    if (!team) return [] as Awaiting[];
+    return matchesForTeam(team.id, matches)
+      .flatMap((match): Awaiting[] => {
+        if (match.status === 'completed' && !isOfficialMatch(match)) return [{ match, kind: 'unofficial' }];
+        if (match.status === 'scheduled' && !isStillToPlay(match, now)) return [{ match, kind: 'missed' }];
+        return [];
+      })
+      .sort((a, b) => +new Date(b.match.scheduledAt) - +new Date(a.match.scheduledAt));
+  }, [team, matches, now]);
 
   if (loading) return <TeamConsoleHomeSkeleton />;
   if (error) return <ErrorState onRetry={retry} />;
-  if (inboxError) return <ErrorState onRetry={refreshInbox} />;
 
   if (!team) {
     return (
@@ -99,14 +112,20 @@ export function TeamConsoleHome() {
     );
   }
 
-  const actions = pendingActions(team.id, matches);
-  const upcoming = upcomingForTeam(team.id, matches).slice(0, 4);
+  const upcoming = matchesForTeam(team.id, matches)
+    .filter((m) => isStillToPlay(m, now))
+    .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))
+    .slice(0, 4);
   const roster = rosterForTeam(team.id, athletes);
   const form = recentForm(team.id, matches);
-  const confirmationIds = new Set(confirmationInbox.map((item) => item.matchId));
-  const top =
-    actions.find((action) => confirmationIds.has(action.match.id)) ??
-    actions[0];
+  const top = awaitingAccount[0];
+  /*
+   * From the standings projection, never the stored aggregate. `teamRecord(team)` read
+   * `team.wins` and friends, which were seeded independently of any match and are exactly
+   * the numbers the standings projection exists to be the only writer of. No row yet means
+   * no record yet, and saying so is more honest than printing zeros that look like a season.
+   */
+  const record = standing ? `${standing.wins}-${standing.draws}-${standing.losses}` : 'No record yet';
 
   return (
     <div className="space-y-5">
@@ -125,7 +144,7 @@ export function TeamConsoleHome() {
           <div className="mt-0.5 flex items-center gap-2 text-sm text-muted">
             <span>{team.city}</span>
             <span className="h-1 w-1 rounded-full bg-subtle" aria-hidden />
-            <span className="tabular tabular-nums">{teamRecord(team)}</span>
+            <span className="tabular tabular-nums">{record}</span>
             {form.length ? (
               <span className="ml-1 flex items-center gap-1">
                 {form.map((r, i) => (
@@ -146,12 +165,13 @@ export function TeamConsoleHome() {
       </header>
 
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Today</p>
-      {/* Priority: the one thing that needs the admin now */}
+      {/* The one thing the club is being asked for. */}
       {top ? (
         <PriorityCard
-          action={top}
+          kind={top.kind}
+          match={top.match}
           teamById={teamById}
-          onReview={access.canSubmitResult ? () => setReviewMatch(top.match) : undefined}
+          onReview={access.canReportResult ? () => setReviewMatch(top.match) : undefined}
         />
       ) : (
         <AllClearCard />
@@ -159,7 +179,7 @@ export function TeamConsoleHome() {
 
       {/* Metric strip */}
       <div className="grid grid-cols-3 gap-2.5">
-        <Metric label="Needs action" value={actions.length} tone={actions.length ? 'pending' : 'default'} />
+        <Metric label="Awaiting you" value={awaitingAccount.length} tone={awaitingAccount.length ? 'pending' : 'default'} />
         <Metric label="Squad" value={roster.length} />
         {/* Official standings projection, not the stored aggregate. */}
         <Metric label="Points" value={standing?.points ?? team.leaguePoints ?? 0} tone="brand" />
@@ -211,20 +231,15 @@ export function TeamConsoleHome() {
         )}
       </section>
 
-      {reviewMatch ? (
-        <ResultSubmissionSheet
-          open
-          onClose={() => setReviewMatch(null)}
-          onComplete={() => {
-            retry();
-            void refreshInbox();
-          }}
-          match={reviewMatch}
-          home={teamById.get(reviewMatch.homeTeamId)}
-          away={teamById.get(reviewMatch.awayTeamId)}
-          myTeamId={team.id}
-        />
-      ) : null}
+      <ClubResultSheet
+        match={reviewMatch}
+        team={team}
+        opponent={reviewMatch
+          ? teamById.get(reviewMatch.homeTeamId === team.id ? reviewMatch.awayTeamId : reviewMatch.homeTeamId)
+          : undefined}
+        onClose={() => setReviewMatch(null)}
+        onDone={retry}
+      />
     </div>
   );
 }
@@ -236,29 +251,31 @@ function formatUgx(n: number): string {
 }
 
 function PriorityCard({
-  action,
+  kind,
+  match,
   teamById,
   onReview,
 }: {
-  action: TeamAction;
+  kind: keyof typeof ACCOUNT_COPY;
+  match: Match;
   teamById: Map<string, Team>;
   /**
    * Absent when the viewer cannot act on this match. The card still renders — knowing a
-   * result is outstanding is useful to a club whether or not they are the one who resolves
+   * result is outstanding is useful to a club whether or not they are the one who reports on
    * it — but it stops offering a button that would be refused.
    */
   onReview?: () => void;
 }) {
-  const copy = ACTION_COPY[action.kind];
-  const Icon = action.kind === 'live' ? Broadcast : action.kind === 'disputed' ? Warning : Clock;
-  const home = teamById.get(action.match.homeTeamId);
-  const away = teamById.get(action.match.awayTeamId);
+  const copy = ACCOUNT_COPY[kind];
+  const Icon = kind === 'missed' ? CalendarBlank : Clock;
+  const home = teamById.get(match.homeTeamId);
+  const away = teamById.get(match.awayTeamId);
 
   return (
     <Bezel glow>
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <Eyebrow className="text-brand">Needs you now</Eyebrow>
-        <MatchStatusBadge match={action.match} size="sm" />
+        <Eyebrow className="text-brand">Waiting on your account</Eyebrow>
+        <MatchStatusBadge match={match} size="sm" />
       </div>
       <div className="p-4">
         <div className="flex items-start gap-3">
@@ -280,7 +297,7 @@ function PriorityCard({
             </Button>
           ) : (
             <p className="text-sm text-muted">
-              Your league resolves this. It is shown here so your club can see what is outstanding.
+              Your league settles this. It is shown so your club can see what is outstanding.
             </p>
           )}
         </div>
@@ -296,8 +313,8 @@ function AllClearCard() {
         <CheckCircle className="h-5 w-5" weight="bold" />
       </span>
       <div>
-        <h2 className="text-base font-semibold text-text-strong">You are all caught up</h2>
-        <p className="text-sm text-muted">No results to submit or confirm right now.</p>
+        <h2 className="text-base font-semibold text-text-strong">Nothing is waiting on you</h2>
+        <p className="text-sm text-muted">Every played match has an official result.</p>
       </div>
     </Card>
   );

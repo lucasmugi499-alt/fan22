@@ -57,27 +57,6 @@ export function rosterForTeam(teamId: string, athletes: Athlete[]): Athlete[] {
   return athletes.filter((a) => a.teamId === teamId);
 }
 
-/**
- * The result trust-chain items that need the admin's attention, most urgent first:
- * a match being played, then a played-but-unverified result (a claim to submit or confirm),
- * then a disputed result. Official and upcoming matches are not "actions".
- */
-export interface TeamAction {
-  match: Match;
-  kind: 'live' | 'unverified' | 'disputed';
-}
-
-export function pendingActions(teamId: string, matches: Match[]): TeamAction[] {
-  const actions: TeamAction[] = [];
-  for (const m of matchesForTeam(teamId, matches)) {
-    if (m.status === 'live') actions.push({ match: m, kind: 'live' });
-    else if (m.verificationStatus === 'disputed') actions.push({ match: m, kind: 'disputed' });
-    else if (m.status === 'completed' && !isOfficialMatch(m)) actions.push({ match: m, kind: 'unverified' });
-  }
-  const order = { live: 0, disputed: 1, unverified: 2 } as const;
-  return actions.sort((a, b) => order[a.kind] - order[b.kind]);
-}
-
 export function upcomingForTeam(teamId: string, matches: Match[]): Match[] {
   return matchesForTeam(teamId, matches)
     .filter(isUpcomingMatch)

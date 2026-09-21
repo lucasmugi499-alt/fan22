@@ -151,8 +151,33 @@ words rather than a control that was silently hidden. Exercised end to end again
 routes and real Firestore with a demo league-admin session: every guard refused with the right
 message, an upheld ruling landed, and the match was untouched.
 
+**21 September 2026 — the Club Operator surfaces exist, and the retired bundle is retired by
+default.** `/team-admin/*` no longer describes the V1 workflows. `useTeamConsoleAccess` answers
+the six ADR-005 capabilities (`canEditProfile`, `canProposeRoster`, `canPublish`,
+`canReportResult`) instead of a single `canManage`; the profile, roster and updates screens
+gate on the one they need. The home and fixtures screens are rebuilt on this record: a match
+is either still to play, unofficial and awaiting the club's account, or final and open to
+dispute. `ClubResultSheet` is the one form for both — on an unofficial match it POSTs a
+`teamMatchReport` (evidence, never a candidate; revisable; plausibility-checked; refused for
+unplayed or cancelled fixtures); on an official one it opens a `resultCase`. The 892-line
+`ResultSubmissionSheet`, the confirmation inbox and the pending-actions feed are deleted rather
+than hidden. A League Admin grants the authority with the `assign_club_operator` action, which
+writes the assignment and its projection in one transaction and refuses anyone who is not
+already an organisation operator; there is still no staff invitation for beta.
+
+Two things learned the hard way. `secureLeagueCommand` never converted a
+`PlatformCommandRefusal` into a response, so every deliberate league-side refusal since it was
+written reached the route's generic 500 — fixed in the wrapper, and the club-operator command
+was the first to prove it. And `GOALPLACE_TEAM_AUTHORITY_STAGE` defaulted to `frozen`, which
+still *grants* the retired V1 bundle: running the command locally without the stage set rebuilt
+a real club operator's projection on the live database with `team.result.submit` and
+`team.roster.manage` in it. The projection was repaired by hand and the default is now
+`retired`; `active` and `frozen` must be asked for by name. Exercised end to end against real
+Firestore as the KMCFL club operator: fan and foreign-league refusals, report and revision,
+implausible score, impersonation, dispute, withdraw — with the official record untouched
+throughout.
+
 ## Not decided here
 
 Whether a Club Operator may delegate to same-team staff, and whether athlete stat issues become
-case openers rather than a parallel collection. The Club Operator surfaces themselves — the
-authority exists and `/team-admin/*` still describes the retired workflows.
+case openers rather than a parallel collection.

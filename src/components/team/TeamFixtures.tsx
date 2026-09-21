@@ -4,163 +4,169 @@ import { useMemo, useState } from 'react';
 import { CalendarBlank } from '@phosphor-icons/react';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import {
-  resolveMyTeam,
-  matchesForTeam,
-  upcomingForTeam,
-  pendingActions,
-} from '@/lib/team/teamContext';
-import { isOfficialMatch } from '@/lib/status';
+import { resolveMyTeam, matchesForTeam } from '@/lib/team/teamContext';
+import { isOfficialMatch, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { MatchCard } from '@/components/core/MatchCard';
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { ResultSubmissionSheet } from '@/components/team/ResultSubmissionSheet';
-import { useTeamConfirmationInbox } from '@/lib/resultSubmissionQueues';
+import { ClubResultSheet } from '@/components/team/ClubResultSheet';
 import type { Match } from '@/types';
 import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
-const TABS = ['Needs action', 'Upcoming', 'Results'] as const;
+const TABS = ['Needs your account', 'Upcoming', 'Results'] as const;
 type Tab = (typeof TABS)[number];
 
-export function TeamFixtures({ fieldMode = false }: { fieldMode?: boolean }) {
+/**
+ * A club's fixtures, in the three states a club actually thinks in.
+ *
+ * ## What changed under ADR-005
+ *
+ * This page was built on the V1 bilateral model: a "Needs action" tab of results waiting for
+ * the club to submit or confirm, fed by a confirmation inbox, opening a submission sheet that
+ * made agreement official. That model is retired, and the tab lied twice: it asked for an
+ * action the authority model no longer granted, on a workflow that no longer existed.
+ *
+ * Now the first tab is "Needs your account" — played fixtures with no official result yet,
+ * and scheduled ones whose kickoff has passed with nothing recorded. A club can say what it
+ * saw. That account is evidence a League Admin may weigh, and the finalizer never reads it.
+ * The Results tab holds official results, and a club that believes one is wrong opens a case
+ * from it rather than editing anything.
+ *
+ *   Field Manager captures. League governs. Clubs report and dispute. GoalPlace finalizes.
+ */
+export function TeamFixtures() {
+  const now = useNow();
   const { userProfile, isDemoMode, accessContext } = useAuth();
   const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
+  const team = useMemo(
+    () => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext),
+    [userProfile, catalog.teams, isDemoMode, accessContext],
+  );
   const detail = useGoalPlaceData({
     collections: ['matches'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
-  // Capability, not role. `team.result.submit` is zeroed since ADR-004, so a team_admin
-  // opening this sheet was always going to be refused at the rules layer — the fixture list
-  // stays fully readable, the write path does not open.
   const access = useTeamConsoleAccess(team?.id);
   const teams = catalog.teams;
   const { matches, error, retry } = detail;
   const loading = catalog.loading || (Boolean(team) && detail.loading);
-  const [tab, setTab] = useState<Tab>(fieldMode ? 'Needs action' : 'Needs action');
+  const [tab, setTab] = useState<Tab>('Needs your account');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const { items: confirmationInbox, error: inboxError, refresh: refreshInbox } =
-    useTeamConfirmationInbox(team?.id);
 
   const buckets = useMemo(() => {
-    if (!team) return { 'Needs action': [], Upcoming: [], Results: [] } as Record<Tab, Match[]>;
-    const results = matchesForTeam(team.id, matches)
-      .filter((m) => m.status === 'completed')
-      .sort((a, b) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt));
-    const confirmationIds = new Set(confirmationInbox.map((item) => item.matchId));
-    const confirmations = confirmationInbox.flatMap((item) => {
-      const match = matches.find((candidate) => candidate.id === item.matchId);
-      return match ? [match] : [];
-    });
-    const remainingActions = pendingActions(team.id, matches)
-      .map((action) => action.match)
-      .filter((match) => !confirmationIds.has(match.id));
+    if (!team) return { 'Needs your account': [], Upcoming: [], Results: [] } as Record<Tab, Match[]>;
+    const mine = matchesForTeam(team.id, matches);
+    const byKickoffDesc = (a: Match, b: Match) => +new Date(b.scheduledAt) - +new Date(a.scheduledAt);
     return {
-      'Needs action': [...confirmations, ...remainingActions],
-      Upcoming: upcomingForTeam(team.id, matches),
-      Results: results,
+      /*
+       * Played and not yet official, or scheduled and never started. Both are matches the
+       * league is still settling and the club was at, which is exactly when its account is
+       * worth having and exactly when the platform otherwise has no way to hear it.
+       */
+      'Needs your account': mine
+        .filter((m) => (m.status === 'completed' && !isOfficialMatch(m))
+          || (m.status === 'scheduled' && !isStillToPlay(m, now)))
+        .sort(byKickoffDesc),
+      Upcoming: mine
+        .filter((m) => isStillToPlay(m, now))
+        .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
+      Results: mine.filter(isOfficialMatch).sort(byKickoffDesc),
     } as Record<Tab, Match[]>;
-  }, [confirmationInbox, team, matches]);
+  }, [team, matches, now]);
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-28 w-full rounded-[var(--radius-lg)]" />
-        <Skeleton className="h-28 w-full rounded-[var(--radius-lg)]" />
+      <div className="space-y-3">
+        <Skeleton className="h-9 w-1/2" />
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-28 w-full rounded-[var(--radius-lg)]" />
+        ))}
       </div>
     );
   }
   if (error) return <ErrorState onRetry={retry} />;
-  if (inboxError) return <ErrorState onRetry={refreshInbox} />;
+  if (!team) {
+    return (
+      <EmptyState
+        icon={CalendarBlank}
+        title="No club linked yet"
+        description="Once your account is attached to a club, its fixtures appear here."
+      />
+    );
+  }
 
   const list = buckets[tab];
 
   return (
-    <div className={fieldMode ? 'mx-auto max-w-2xl space-y-4' : '-mx-[var(--gutter)] md:mx-0'}>
-      <div className="mb-4">
-        <h1 className="px-[var(--gutter)] pb-1 text-xl font-semibold text-text-strong md:px-0">
-          {fieldMode ? 'Matchday field mode' : 'Fixtures'}
-        </h1>
-        {fieldMode ? (
-          <p className="px-[var(--gutter)] text-sm text-muted md:px-0">
-            Low-data reporting with large controls. Drafts remain on this device until submission succeeds.
-          </p>
-        ) : (
-          <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
-        )}
+    <div className="-mx-[var(--gutter)] space-y-4 md:mx-0">
+      <div className="space-y-3 px-[var(--gutter)] md:px-0">
+        <h1 className="text-xl font-semibold tracking-tight text-text-strong">Fixtures</h1>
+        <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} className="md:px-0" />
       </div>
 
       <div className="px-[var(--gutter)] md:px-0">
-        {(fieldMode ? buckets['Needs action'] : list).length ? (
-          <div className={fieldMode ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 gap-3 md:grid-cols-2'}>
-            {(fieldMode ? buckets['Needs action'] : list).map((m) => {
-              const actionable = access.canSubmitResult
-                && m.status !== 'scheduled'
-                && !isOfficialMatch(m);
+        {list.length ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {list.map((m) => {
+              // Upcoming fixtures have nothing to report on. Everything else the club was at.
+              const actionable = access.canReportResult && tab !== 'Upcoming';
               return (
-                <div key={m.id} className={fieldMode ? 'rounded-[var(--radius-lg)] border border-brand/30 bg-surface-1 p-2' : ''}>
-                  <MatchCard
-                    match={m}
-                    home={teamById.get(m.homeTeamId)}
-                    away={teamById.get(m.awayTeamId)}
-                    onClick={actionable ? () => setActiveMatch(m) : undefined}
-                  />
-                  {fieldMode && actionable ? (
-                    <button
-                      type="button"
-                      className="mt-2 min-h-14 w-full rounded-[var(--radius-md)] bg-brand px-4 text-base font-semibold text-on-brand"
-                      onClick={() => setActiveMatch(m)}
-                    >
-                      Open match report
-                    </button>
-                  ) : null}
-                </div>
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  home={teamById.get(m.homeTeamId)}
+                  away={teamById.get(m.awayTeamId)}
+                  onClick={actionable ? () => setActiveMatch(m) : undefined}
+                />
               );
             })}
           </div>
         ) : (
           <EmptyState
             icon={CalendarBlank}
-            title={fieldMode ? 'No active match report' : emptyTitle(tab)}
-            description={!access.canSubmitResult && fieldMode
-              ? 'Match reports are captured by the Field Manager your league assigns to each fixture.'
-              : fieldMode
-                ? 'Live, completed, and confirmation requests appear here when field action is required.'
-                : emptyBody(tab)}
+            title={emptyTitle(tab)}
+            description={emptyBody(tab, access.canReportResult)}
           />
         )}
+        {list.length && tab !== 'Upcoming' && access.canReportResult ? (
+          <p className="mt-3 text-xs leading-5 text-muted">
+            {tab === 'Results'
+              ? 'Tap a result to dispute it. Your league rules; nothing is edited.'
+              : 'Tap a match to record what your club saw. Your league weighs it when settling the result.'}
+          </p>
+        ) : null}
       </div>
 
-      {team && activeMatch ? (
-        <ResultSubmissionSheet
-          open
-          onClose={() => setActiveMatch(null)}
-          onComplete={() => {
-            retry();
-            void refreshInbox();
-          }}
-          match={activeMatch}
-          home={teamById.get(activeMatch.homeTeamId)}
-          away={teamById.get(activeMatch.awayTeamId)}
-          myTeamId={team.id}
-        />
-      ) : null}
+      <ClubResultSheet
+        match={activeMatch}
+        team={team}
+        opponent={activeMatch
+          ? teamById.get(activeMatch.homeTeamId === team.id ? activeMatch.awayTeamId : activeMatch.homeTeamId)
+          : undefined}
+        onClose={() => setActiveMatch(null)}
+        onDone={retry}
+      />
     </div>
   );
 }
 
 function emptyTitle(tab: Tab): string {
-  if (tab === 'Needs action') return 'Nothing needs you';
+  if (tab === 'Needs your account') return 'Nothing is waiting on your account';
   if (tab === 'Upcoming') return 'No upcoming fixtures';
-  return 'No results yet';
+  return 'No official results yet';
 }
-function emptyBody(tab: Tab): string {
-  if (tab === 'Needs action') return 'Results waiting on you to submit, confirm or dispute will show here.';
+
+function emptyBody(tab: Tab, canReport: boolean): string {
+  if (tab === 'Needs your account') {
+    return canReport
+      ? 'Played matches without an official result appear here, so your club can say what it saw while the league settles them.'
+      : 'Played matches without an official result appear here. Your league settles them.';
+  }
   if (tab === 'Upcoming') return 'Scheduled matches appear here once the league publishes them.';
-  return 'Played matches appear here. Each stays pending until the opponent confirms it, then it turns official.';
+  return 'A result appears here once the league finalizes it. Results are captured by the Field Manager or entered by the league; they are never set by a club.';
 }

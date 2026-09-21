@@ -104,7 +104,7 @@ export function TeamUpdates() {
           <h1 className="text-xl font-semibold text-text-strong">Updates</h1>
           <p className="text-sm text-muted">News, highlights and announcements from your team.</p>
         </div>
-        {access.canManage ? (
+        {access.canPublish ? (
           <Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>
             Publish
           </Button>
@@ -121,10 +121,10 @@ export function TeamUpdates() {
         <EmptyState
           icon={Megaphone}
           title="No updates yet"
-          description={access.canManage
+          description={access.canPublish
             ? 'Share match previews, results and athlete highlights here. Your supporters see them in their feed.'
             : 'Your league publishes updates for this club.'}
-          action={access.canManage
+          action={access.canPublish
             ? <Button size="sm" icon={PlusCircle} onClick={() => setPublishing(true)}>Publish your first update</Button>
             : undefined}
         />

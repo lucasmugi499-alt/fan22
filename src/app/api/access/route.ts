@@ -30,6 +30,7 @@ const ORGANIZATION_OPERATOR_ROLES = new Set([
   'league_admin',
   'team_owner',
   'team_admin',
+  'club_operator',
   'roster_manager',
   'result_reporter',
   'content_manager',
@@ -117,7 +118,8 @@ function assignmentRecord(input: {
 
 function primaryPersonaForRole(roleKey: string) {
   if (roleKey === 'league_owner' || roleKey === 'league_admin') return 'league_admin';
-  if (roleKey === 'team_owner' || roleKey === 'team_admin' || roleKey === 'roster_manager' || roleKey === 'result_reporter' || roleKey === 'content_manager') return 'team_admin';
+  // `club_operator` is the ADR-005 authority key; `team_admin` stays the UI persona it renders as.
+  if (roleKey === 'team_owner' || roleKey === 'team_admin' || roleKey === 'club_operator' || roleKey === 'roster_manager' || roleKey === 'result_reporter' || roleKey === 'content_manager') return 'team_admin';
   if (roleKey === 'athlete_self') return 'athlete';
   if (roleKey === 'platform_admin' || roleKey === 'super_admin') return roleKey;
   return 'fan';

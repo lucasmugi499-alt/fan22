@@ -143,16 +143,18 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
   },
   /**
-   * A club VIEW, not an operations console.
+   * The club console, under ADR-005.
    *
-   * ADR-004 retired Team Admin as an account class and the deployed environments run the
-   * bundles at `retired`, so nothing on these screens can be written by the person the nav is
-   * being drawn for. The label said "Team Console" and the six entries read as a set of jobs,
-   * which is what made the refusals feel like breakage rather than a boundary.
+   * ADR-004 retired Team Admin as an account class and this block was rewritten to say "a
+   * club VIEW, not an operations console", because nothing on these screens could be written
+   * by the person the nav was drawn for. ADR-005 restored club operations as `club_operator`:
+   * narrower than what was retired, and real. A Club Operator keeps the profile, proposes the
+   * roster, publishes as the club, and gives the club's account of a result. What they still
+   * cannot do — author a result, touch standings, administer the league — is enforced by the
+   * capability bundle and the rules, not by leaving destinations out of a menu.
    *
-   * The screens stay — a club official genuinely needs to see their roster, fixtures and
-   * results, and all of it is theirs to read. What is gone is `Field mode`, which was never
-   * theirs at all: field capture belongs to a Field Manager the league assigns, who works
+   * The product still calls the person a Team Admin; `team_admin` here is the nav key.
+   * `Field mode` stays gone: capture belongs to a Field Manager the league assigns, who works
    * through `/m/{secret}` with a PIN and has no Firebase account.
    */
   team_admin: {
@@ -165,7 +167,8 @@ export const ROLE_NAV: Record<string, RoleNav> = {
     ],
     more: [
       { name: 'Club profile', href: '/team-admin/profile', icon: Buildings },
-      { name: 'Matches', href: '/matches', icon: Calendar },
+      // The whole-platform list, one tap away. "Fixtures" above is the club's own.
+      { name: 'All matches', href: '/matches', icon: Calendar },
       ...COMMON_MORE,
     ],
   },

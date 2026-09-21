@@ -2607,6 +2607,68 @@ describe('a Club Operator writes proposals and evidence, never the record', () =
   it('can read a result case, because a correction that happened invisibly proves nothing', () => assertSucceeds(
     getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'resultCases/match_001__case1')),
   ));
+
+  /*
+   * The three things a Club Operator MAY write, each within the same field list the retired
+   * role had. These are the positive half of the boundary: a role that can write nothing is
+   * not a role, and ADR-005 exists because the retired one had become exactly that.
+   */
+  it('can edit its own club profile, within the allowed fields', () => assertSucceeds(
+    updateDoc(doc(asUser(CLUB_USER), 'teams/team_a'), {
+      description: 'Founded in Kisenyi in 2019.', homeVenue: 'Kisenyi Ground',
+    }),
+  ));
+
+  it('cannot use a profile edit to declare its own club verified', () => assertFails(
+    // `verified`, `leagueId`, `plan` and `sport` are facts about the club's standing in the
+    // competition, and the club is the one party that must not set them.
+    updateDoc(doc(asUser(CLUB_USER), 'teams/team_a'), { verified: true }),
+  ));
+
+  it('cannot use a profile edit to touch a stored sporting aggregate', () => assertFails(
+    updateDoc(doc(asUser(CLUB_USER), 'teams/team_a'), { wins: 99 }),
+  ));
+
+  it("cannot edit another club's profile", () => assertFails(
+    updateDoc(doc(asUser(CLUB_USER), 'teams/team_b'), { description: 'Ours now.' }),
+  ));
+
+  it('can propose a roster draft for its own club', () => assertSucceeds(
+    setDoc(doc(asUser(CLUB_USER), 'rosters/roster_club_draft'), {
+      leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_a',
+      athleteIds: ['athlete_001'], status: 'draft', completeness: 0.5,
+      submittedByUserId: CLUB_USER, createdAt: '2026-09-21T09:00:00.000Z',
+    }),
+  ));
+
+  it('cannot confirm its own roster, which is the league\'s decision', () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'rosters/roster_club_confirmed'), {
+      leagueId: 'league_001', seasonId: 'season_001', teamId: 'team_a',
+      athleteIds: ['athlete_001'], status: 'confirmed', completeness: 1,
+      submittedByUserId: CLUB_USER, approvedByUserId: CLUB_USER,
+      createdAt: '2026-09-21T09:00:00.000Z',
+    }),
+  ));
+
+  it('can publish a verified post as its own club', () => assertSucceeds(
+    setDoc(doc(asUser(CLUB_USER), 'feedPosts/post_club_1'), {
+      authorId: CLUB_USER, authorName: 'Kisenyi United', authorRole: 'team', authorType: 'Team',
+      type: 'team_update', caption: 'Training moved to Thursday.', relatedTeamId: 'team_a',
+      verified: true, status: 'active', likesCount: 0, commentsCount: 0, sharesCount: 0,
+      timestamp: '2026-09-21T09:00:00.000Z', createdAt: '2026-09-21T09:00:00.000Z',
+      updatedAt: '2026-09-21T09:00:00.000Z',
+    }),
+  ));
+
+  it("cannot publish a verified post as another club", () => assertFails(
+    setDoc(doc(asUser(CLUB_USER), 'feedPosts/post_club_2'), {
+      authorId: CLUB_USER, authorName: 'Not Our Club', authorRole: 'team', authorType: 'Team',
+      type: 'team_update', caption: 'Impersonation.', relatedTeamId: 'team_b',
+      verified: true, status: 'active', likesCount: 0, commentsCount: 0, sharesCount: 0,
+      timestamp: '2026-09-21T09:00:00.000Z', createdAt: '2026-09-21T09:00:00.000Z',
+      updatedAt: '2026-09-21T09:00:00.000Z',
+    }),
+  ));
 });
 
 /**

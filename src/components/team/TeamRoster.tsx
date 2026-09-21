@@ -144,14 +144,14 @@ export function TeamRoster() {
             {rosterRecord ? ` / ${rosterRecord.status}` : ''}
           </p>
         </div>
-        {access.canManage || access.canCreateAthlete ? (
+        {access.canProposeRoster || access.canCreateAthlete ? (
           <div className="flex gap-2">
             {access.canCreateAthlete ? (
               <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setCreating(true)}>
                 Add athlete
               </Button>
             ) : null}
-            {access.canManage ? (
+            {access.canProposeRoster ? (
               <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>
                 Manage
               </Button>
@@ -184,10 +184,10 @@ export function TeamRoster() {
         <EmptyState
           icon={UsersIcon}
           title="No athletes yet"
-          description={access.canManage
+          description={access.canProposeRoster
             ? 'Add your players to build the roster. Each can then request verification to earn a verified profile.'
             : 'Your league registers athletes and manages this roster.'}
-          action={access.canManage
+          action={access.canProposeRoster
             ? <Button size="sm" icon={UserPlus} onClick={openRosterEditor}>Build roster</Button>
             : undefined}
         />

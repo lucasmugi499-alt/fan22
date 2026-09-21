@@ -7,17 +7,29 @@ import {
 } from './teamAuthorityStage';
 
 describe('team authority retires as an operation, not a deploy', () => {
-  it('defaults to frozen', () => {
-    // The safe default. A deploy that silently retired authority would strand every open V1
-    // workflow the moment a team scope rebuilt, and nothing about the deploy would suggest it.
-    expect(DEFAULT_TEAM_AUTHORITY_STAGE).toBe('frozen');
-    expect(resolveTeamAuthorityStage(undefined)).toBe('frozen');
+  it('defaults to retired now that the drain is finished', () => {
+    /*
+     * This was `frozen`, and rightly, while V1 workflows were draining: an environment that
+     * forgot the variable kept them alive rather than stranding them. The drain is done and
+     * every deployed environment sets `retired`, so the fail-closed direction has flipped. A
+     * local server without the variable rebuilt a team scope under `frozen` and wrote the
+     * retired bundle's capabilities into the live database. Forget the variable: grant less.
+     */
+    expect(DEFAULT_TEAM_AUTHORITY_STAGE).toBe('retired');
+    expect(resolveTeamAuthorityStage(undefined)).toBe('retired');
   });
 
-  it('falls back to frozen for anything unrecognised', () => {
-    // A typo must not retire anybody's authority, and must not restore it either.
-    expect(resolveTeamAuthorityStage('retried')).toBe('frozen');
-    expect(resolveTeamAuthorityStage('')).toBe('frozen');
+  it('falls back to retired for anything unrecognised', () => {
+    // A typo must not restore anybody's authority, which is now the direction a typo could go.
+    expect(resolveTeamAuthorityStage('retried')).toBe('retired');
+    expect(resolveTeamAuthorityStage('')).toBe('retired');
+  });
+
+  it('still reaches the drain stages by name', () => {
+    // For the tests that prove the drain logic, and for an environment that genuinely has not
+    // drained. Nothing reaches them by omission any more.
+    expect(resolveTeamAuthorityStage('active')).toBe('active');
+    expect(resolveTeamAuthorityStage('frozen')).toBe('frozen');
   });
 
   it('separates freezing issuance from retiring authority', () => {

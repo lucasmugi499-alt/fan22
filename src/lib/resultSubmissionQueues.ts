@@ -53,15 +53,8 @@ function useResultSubmissionQueue(
   return { items, error, refresh };
 }
 
-const loadTeamInbox = (provider: typeof dataProvider, teamId: string) =>
-  provider.getTeamConfirmationInbox(teamId);
-
 const loadLeagueExceptions = (provider: typeof dataProvider, leagueId: string) =>
   provider.getLeagueResultExceptions(leagueId);
-
-export function useTeamConfirmationInbox(teamId?: string) {
-  return useResultSubmissionQueue(teamId, loadTeamInbox);
-}
 
 export function useLeagueResultExceptions(leagueId?: string) {
   return useResultSubmissionQueue(leagueId, loadLeagueExceptions);

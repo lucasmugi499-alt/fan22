@@ -58,13 +58,13 @@ describe('projectScopeIndex', () => {
       ],
       updatedAt: NOW_ISO,
       now: NOW,
+      // Named, because the default is `retired` now and these V1 bundles grant nothing under
+      // it. This test is about the union mechanics; the stage test covers what the default does.
+      stage: 'frozen',
     });
 
     expect(projected?.activeRoles).toEqual(['result_reporter', 'roster_manager']);
     expect(projected?.assignmentIds).toEqual(['a_results', 'a_roster']);
-    // Still granting at the default stage, so a live V1 workflow can be finished by the people
-    // who started it. The projection is the mechanism that retires them, and it does that when
-    // somebody retires them.
     expect(projected?.capabilities).toContain('team.result.submit');
   });
 

@@ -421,11 +421,28 @@ service cloud.firestore {
           request.resource.data.adminUserIds is list &&
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
+      /*
+       * Two authorities may edit a club's profile, and the field list is what keeps both
+       * honest. `team.profile.manage` is the retired V1 spelling, left so an old grant keeps
+       * working through the drain. `team.profile.edit` is the Club Operator's, from ADR-005.
+       *
+       * Neither reaches `verified`, `leagueId`, `plan` or `sport`: those are facts about the
+       * club's standing in the competition, and the club is the one party that must not set
+       * them. Also not reachable: the stored sporting aggregates, which a club would have every
+       * incentive to improve and which the standings projection is the only writer of.
+       */
       allow update: if
-        (hasScopeCapability('team', teamId, ['team.profile.manage']) && changedKeysWithin([
-          'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
-          'teamAdminName', 'teamAdminEmail', 'lastUpdated', 'updatedAt'
-        ]));
+        (
+          (hasScopeCapability('team', teamId, ['team.profile.manage']) ||
+            hasClubOperatorCapability(teamId, 'team.profile.edit')) &&
+          changedKeysWithin([
+            'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
+            'coverUrl', 'coverURL', 'primaryColor', 'secondaryColor', 'foundedYear', 'homeVenue',
+            'teamAdminName', 'teamAdminEmail', 'lastUpdated', 'updatedAt'
+          ]) &&
+          shortText(request.resource.data.get('description', ''), 4000) &&
+          shortText(request.resource.data.get('name', ''), 200)
+        );
       allow delete: if false;
     }
 
@@ -672,7 +689,11 @@ service cloud.firestore {
       allow read: if true;
       // Shape as well as ownership. `athleteIds` is the field that grows without a ceiling —
       // a roster is a squad, not a list of every id the caller can think of.
-      allow create: if hasTeamOperatorCapability(request.resource.data.teamId) &&
+      // `team.roster.propose` is the whole of a Club Operator's roster authority: a draft they
+      // write and submit, which the league confirms or returns. Nothing here reaches
+      // `athletes/*`, so a club cannot manufacture eligibility by proposing it.
+      allow create: if (hasTeamOperatorCapability(request.resource.data.teamId) ||
+          hasClubOperatorCapability(request.resource.data.teamId, 'team.roster.propose')) &&
         createdKeysWithin([
           'id', 'leagueId', 'seasonId', 'teamId', 'athleteIds', 'status', 'completeness',
           'submittedByUserId', 'createdAt', 'updatedAt',
@@ -682,7 +703,8 @@ service cloud.firestore {
         request.resource.data.submittedByUserId == request.auth.uid &&
         request.resource.data.status in ['draft', 'submitted'] &&
         !('approvedByUserId' in request.resource.data);
-      allow update: if hasTeamOperatorCapability(resource.data.teamId) &&
+      allow update: if (hasTeamOperatorCapability(resource.data.teamId) ||
+          hasClubOperatorCapability(resource.data.teamId, 'team.roster.propose')) &&
         request.resource.data.teamId == resource.data.teamId &&
         request.resource.data.leagueId == resource.data.leagueId &&
         request.resource.data.seasonId == resource.data.seasonId &&
@@ -963,6 +985,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /**
+     * A club's own account of a match. Evidence, never a result.
+     *
+     * Readable by the league that governs the match and by the club that wrote it. Not public:
+     * a club's contested account of a match is not a record, and publishing it beside the
+     * official one would let a reader mistake the two. Written only by the server route, which
+     * checks the club actually played the fixture and refuses a score that could not be this
+     * sport's.
+     *
+     * Nothing reads this collection to produce an official record. That is the line.
+     */
+    match /teamMatchReports/{reportId} {
+      allow read: if isPlatformAdmin() ||
+        canReadLeagueById(resource.data.leagueId) ||
+        hasClubOperatorCapability(resource.data.teamId, 'team.result.report') ||
+        hasClubOperatorCapability(resource.data.teamId, 'team.result.dispute');
+      allow write: if false;
+    }
+
     match /seasonTeams/{registrationId} {
       allow read: if true;
       allow write: if false;
@@ -1192,7 +1233,8 @@ service cloud.firestore {
           isPlatformAdmin() ||
           (
             request.resource.data.relatedTeamId is string &&
-            hasTeamOperatorCapability(request.resource.data.relatedTeamId)
+            (hasTeamOperatorCapability(request.resource.data.relatedTeamId) ||
+              hasClubOperatorCapability(request.resource.data.relatedTeamId, 'team.content.publish'))
           ) ||
           (
             request.resource.data.relatedLeagueId is string &&
