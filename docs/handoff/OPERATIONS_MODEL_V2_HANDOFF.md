@@ -908,3 +908,46 @@ Rules, all 12 Functions and App Hosting `build-2026-08-30-015` are current. Veri
   still describes the retired workflows.
 - **Fantasy and catalogue scale**, deliberately deferred: correctness and unbounded reads only
   until after beta.
+
+---
+
+## Session log — 21 September 2026: demo is down, and it is billing
+
+### What is wrong
+
+`https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app` answers a Google **404**, not
+the app. The cause is not in this repository:
+
+```
+cloudbilling.googleapis.com/v1/projects/manifest-quasar-479416-s7/billingInfo
+  billingAccountName: billingAccounts/015709-CEAC40-5ADE7E
+  billingEnabled:     false
+```
+
+A billing account is still attached and **billing is disabled** on it. Cloud Run, which App
+Hosting serves through, stops routing traffic without billing; the Cloud Run service `fan22`
+itself is healthy (every condition `CONDITION_SUCCEEDED`) and is still on
+`fan22-build-2026-09-03-001`, the last rollout. Firestore still answers because reads fall
+inside the free quota. Scheduled Functions fire and fail: `reconcilePaymentIntents` has logged
+*"The request failed because billing is disabled for this project"* every ten minutes since at
+least **2026-09-15 14:29 UTC**, which is the earliest retained log line.
+
+**Only the billing account administrator can fix this.** Re-enable billing on the account (or
+attach a working one) in the GCP console. No redeploy is needed: the revision is in place and
+Google will resume routing to it. Verify afterwards with
+`curl https://fan22--manifest-quasar-479416-s7.us-east4.hosted.app/api/environment` — it should
+report `environmentVersion: fan22-build-2026-09-03-001`.
+
+### What could not be verified because of it
+
+The 3 September commit `b5baffd` paired the receiving half of
+`GOALPLACE_RECONCILIATION_SECRET`, which should have turned the function's permanent 503 into a
+working job. The rollout landed at 13:24 UTC that day, but every log line from before 15
+September has rotated out, so **whether the 503s actually stopped between 3 and 15 September is
+unknown**. The pairing is proven by the readiness-gate tests; the runtime proof is gone. Check
+the function's logs after billing is restored — the first successful run is the evidence.
+
+### What this session did
+
+Nothing was deployed, because nothing can be. The repository is at `b5baffd`, clean, with
+`npm run deploy:ready` passing.
