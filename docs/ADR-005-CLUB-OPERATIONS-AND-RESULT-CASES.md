@@ -140,8 +140,19 @@ opposite ends of the pipeline and now have a test asserting they agree.
 A club can now be told the record is wrong by the people who were there, and the league can settle
 it, without either of them being able to write the answer themselves.
 
+## Since accepted
+
+**21 September 2026 — the correction UI exists.** `ResultCasePanel` sits in the `official`
+branch of the League Admin match page, where the copy used to say a change "requires a governed
+correction version rather than an edit" and then offered nothing. It opens a case, acts on it,
+and shows what was ruled before. It decides nothing itself: every action is a POST the server
+judges, and a refusal — including a conflicted admin trying to rule — comes back as the server's
+words rather than a control that was silently hidden. Exercised end to end against the real
+routes and real Firestore with a demo league-admin session: every guard refused with the right
+message, an upheld ruling landed, and the match was untouched.
+
 ## Not decided here
 
-Whether a Club Operator may delegate to same-team staff; whether athlete stat issues become case
-openers rather than a parallel collection; and the correction UI, which currently reaches this
-model through the legacy address.
+Whether a Club Operator may delegate to same-team staff, and whether athlete stat issues become
+case openers rather than a parallel collection. The Club Operator surfaces themselves — the
+authority exists and `/team-admin/*` still describes the retired workflows.

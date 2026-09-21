@@ -12,6 +12,14 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
+/**
+ * Relative to now, not typed. A fixture carried `expiresAt: '2026-09-09'` and this suite went
+ * red on 9 September for a reason unrelated to any change — the second time in a month that
+ * class of rot fired in this repository. `npm run test:future` now runs the whole suite with
+ * the clock 400 days ahead so the next one fails when it is written, not on its calendar date.
+ */
+const STILL_VALID = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
 function request(token = 'invite_token', kind?: string) {
   const url = new URL('https://goalplace256.test/api/access/invitations/invite_1');
   if (token) url.searchParams.set('token', token);
@@ -64,7 +72,7 @@ describe('safe invitation preview route', () => {
       tokenHash: createHash('sha256').update('invite_token').digest('hex'),
       status: 'sent',
       invitedByUserId: 'league_admin_1',
-      expiresAt: '2026-09-09T00:00:00.000Z',
+      expiresAt: STILL_VALID,
       createdAt: '2026-08-02T00:00:00.000Z',
       updatedAt: '2026-08-02T00:00:00.000Z',
     });
@@ -111,7 +119,7 @@ describe('safe invitation preview route', () => {
       status: 'invited',
       invitedEmail: 'operator@example.com',
       tokenHash: createHash('sha256').update('invite_token').digest('hex'),
-      expiresAt: '2026-08-09T00:00:00.000Z',
+      expiresAt: STILL_VALID,
     });
 
     const response = await GET(request('invite_token', 'team'), context('team_assignment_1'));

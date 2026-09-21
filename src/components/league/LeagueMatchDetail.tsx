@@ -14,6 +14,7 @@ import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerS
 import { RescheduleSheet } from '@/components/league/RescheduleSheet';
 import { EmergencyTakeoverSheet } from '@/components/league/EmergencyTakeoverSheet';
 import { PostMatchEntrySheet } from '@/components/league/PostMatchEntrySheet';
+import { ResultCasePanel } from '@/components/league/ResultCasePanel';
 import { effectiveCapturePolicy } from '@/lib/capturePolicy';
 import { cn } from '@/lib/utils';
 
@@ -199,10 +200,17 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
           </>
         ) : null}
         {row.state === 'official' ? (
-          <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
-            This result is official. Standings are derived from it; a change requires a
-            governed correction version rather than an edit.
-          </p>
+          /*
+           * This used to be a sentence saying a change "requires a governed correction version
+           * rather than an edit", with nothing to click. The model existed and was reachable
+           * only through the API. The panel is the handle on that door: open a case, act on
+           * it, and see what was ruled before.
+           */
+          <ResultCasePanel
+            matchId={row.matchId}
+            officialResultVersion={(match as { officialResultVersion?: number }).officialResultVersion}
+            currentScore={row.score}
+          />
         ) : null}
       </section>
 

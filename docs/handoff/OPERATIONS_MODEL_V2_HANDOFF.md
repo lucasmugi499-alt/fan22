@@ -951,3 +951,23 @@ the function's logs after billing is restored — the first successful run is th
 
 Nothing was deployed, because nothing can be. The repository is at `b5baffd`, clean, with
 `npm run deploy:ready` passing.
+
+### Later the same day: the correction UI, and a guard for rotting tests
+
+**`ResultCasePanel`** now renders in the `official` branch of the League Admin match page. It
+was exercised end to end on a local server against the real routes and real demo Firestore,
+signed in as `collins_tumwesigye.kmcfl@demo.goalplace256.test` via an Admin-SDK custom token
+(the shared demo password is not set locally). Every guard refused with the right message —
+stale version, second case while one is active, corrected ruling with no score, action on a
+closed case — and an **upheld** ruling landed. One artefact remains on demo by design:
+`resultCases/match_kmcfl_01_02__case1`, status `resolved_upheld`, with a reason that says it is
+a workflow verification. The match itself is untouched: 0-1, version 1, verified.
+
+**`npm run test:future`** runs the unit suite with the clock 400 days ahead, and `deploy:ready`
+runs it. A hardcoded `expiresAt` went red on its calendar date for the second time in three
+weeks (3 September in one file, 9 September in another). Sweeping the suite by hand found
+thirty hardcoded dates; running it from the future found the one that actually rots. Verified
+the guard catches the original fixture when it is put back. If you write a fixture that must
+be "still valid", derive it from `Date.now()` — there is no other date that stays in the future.
+
+Demo is still down on billing; nothing was deployed.
