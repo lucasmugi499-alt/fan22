@@ -2,7 +2,9 @@ import type { AppRole } from '@/types';
 import type { AccessContext, AccessIndexDocument, PermissionCapability } from './access';
 
 const LEAGUE_ROLES = new Set(['league_owner', 'league_admin', 'league_operator', 'league_verifier']);
-const TEAM_ROLES = new Set(['team_owner', 'team_admin', 'roster_manager', 'result_reporter', 'content_manager']);
+// `club_operator` is ADR-005's team role. It was missing here and the console only worked
+// because assign_club_operator also sets a `team_admin` claim; the index is the authority.
+const TEAM_ROLES = new Set(['team_owner', 'team_admin', 'club_operator', 'roster_manager', 'result_reporter', 'content_manager']);
 const ATHLETE_ROLES = new Set(['athlete_self', 'athlete_guardian']);
 
 function hasRole(indexes: AccessIndexDocument[], roles: Set<string>) {

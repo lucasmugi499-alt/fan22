@@ -141,6 +141,33 @@ describe('matching a shape against the declared indexes', () => {
       .toBe(true);
   });
 
+  it('rejects a descending read against an ascending index', () => {
+    // The League Admin's Matches page. `where(leagueId) + orderBy(scheduledAt, desc)` was
+    // called covered by the (leagueId ASC, scheduledAt ASC) index, and Firestore refused it
+    // with FAILED_PRECONDITION on every environment that had never had the descending index
+    // created by hand. Direction is part of the index.
+    const directional = [
+      { collectionGroup: 'matches', fields: ['leagueId', 'scheduledAt'], orders: { leagueId: 'ASCENDING' as const, scheduledAt: 'ASCENDING' as const } },
+    ];
+    const shape = { file: '', line: 1, collection: 'matches', fields: ['leagueId', 'scheduledAt'], directions: { scheduledAt: 'DESCENDING' as const } };
+    expect(isCovered(shape, directional)).toBe(false);
+    expect(isCovered(shape, [
+      ...directional,
+      { collectionGroup: 'matches', fields: ['leagueId', 'scheduledAt'], orders: { leagueId: 'ASCENDING' as const, scheduledAt: 'DESCENDING' as const } },
+    ])).toBe(true);
+  });
+
+  it('reads the direction out of the source', () => {
+    const shapes = queryShapesIn('route.ts', `
+      db.collection('matches')
+        .where('leagueId', '==', leagueId)
+        .orderBy('scheduledAt', 'desc')
+        .limit(400)
+        .get();
+    `);
+    expect(shapes[0].directions).toEqual({ scheduledAt: 'DESCENDING' });
+  });
+
   it('rejects a shape with no index at all', () => {
     expect(isCovered({ file: '', line: 1, collection: 'mediaRecords', fields: ['moderationStatus', 'createdAt'] }, indexes))
       .toBe(false);

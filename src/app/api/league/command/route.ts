@@ -83,8 +83,14 @@ export async function GET(request: Request) {
 
   /*
    * Newest first for the season read, so a truncated response holds the most recent fixtures
-   * rather than the oldest. Both queries are served by the existing
-   * (leagueId ASC, scheduledAt ASC) composite index, which Firestore also traverses in reverse.
+   * rather than the oldest.
+   *
+   * This comment used to claim the (leagueId ASC, scheduledAt ASC) index "also traverses in
+   * reverse". It does not: with an equality prefix Firestore wants the exact direction, and the
+   * season read failed FAILED_PRECONDITION on every environment that had never had the
+   * descending index created by hand — which was the League Admin's entire Matches page
+   * returning 500 on real data. (leagueId ASC, scheduledAt DESC) is now declared in
+   * firestore.indexes.json; the window read still uses the ascending one.
    */
   const matchQuery = scope === 'season'
     ? adminDb.collection('matches')

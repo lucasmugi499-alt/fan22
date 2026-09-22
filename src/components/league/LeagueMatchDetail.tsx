@@ -12,6 +12,7 @@ import { NoAssignment } from '@/components/ui/NoAssignment';
 import { StateChip } from '@/components/league/LeagueCommandCentre';
 import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerSheet';
 import { RescheduleSheet } from '@/components/league/RescheduleSheet';
+import { CancelFixtureSheet } from '@/components/league/CancelFixtureSheet';
 import { EmergencyTakeoverSheet } from '@/components/league/EmergencyTakeoverSheet';
 import { PostMatchEntrySheet } from '@/components/league/PostMatchEntrySheet';
 import { ResultCasePanel } from '@/components/league/ResultCasePanel';
@@ -51,9 +52,12 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
     lastSyncAt: string | null;
     status: string;
   } | null>(null);
+  const [clubAccounts, setClubAccounts] = useState<ClubAccount[]>([]);
+  const [pendingReport, setPendingReport] = useState<{ declaredHomeScore: number | null; declaredAwayScore: number | null; status: string } | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
   const [takingOver, setTakingOver] = useState(false);
   const [enteringResult, setEnteringResult] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const { currentUser } = useAuth();
   useEffect(() => {
@@ -67,7 +71,11 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         });
         if (!response.ok) return;
         const body = await response.json().catch(() => ({}));
-        if (!cancelled) setAssignment(body.assignment ?? null);
+        if (!cancelled) {
+          setAssignment(body.assignment ?? null);
+          setClubAccounts(Array.isArray(body.clubAccounts) ? body.clubAccounts : []);
+          setPendingReport(body.pendingReport ?? null);
+        }
       } catch {
         // Operational context, not the record. A failure must not take the page down.
       }
@@ -82,9 +90,10 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
       match,
       teams: teamsInLeague(league.id, detail.teams),
       assignment,
+      pendingReport,
       now: new Date().toISOString(),
     });
-  }, [assignment, detail.teams, league, match]);
+  }, [assignment, pendingReport, detail.teams, league, match]);
 
   if (catalog.loading || detail.loading) return <DetailSkeleton />;
   if (!league) return <NoAssignment kind="league" />;
@@ -147,6 +156,11 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         ) : null}
       </section>
 
+      <ClubAccounts
+        accounts={clubAccounts}
+        teamName={(teamId) => teamId === match?.homeTeamId ? row.homeTeamName : teamId === match?.awayTeamId ? row.awayTeamName : teamId}
+      />
+
       {/* Contextual: only what this state permits. */}
       <section aria-label="Actions" className="space-y-2">
         {(row.state === 'unassigned' || row.state === 'ready') ? (
@@ -184,19 +198,45 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
             Review exception
           </Link>
         ) : null}
-        {row.state === 'awaiting_result' ? (
+        {row.state === 'missed' ? (
+          /*
+           * A fixture whose kickoff passed with nothing recorded has exactly three honest
+           * endings, and this state used to offer none of them: it was played (enter what
+           * happened), it is still to be played (move it), or it never will be (call it off).
+           */
           <>
             <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
-              This match has been played and no official result has arrived. A captured report
-              becomes official on its own; enter a result by hand only if none is coming.
+              Kickoff has passed and nothing was recorded. Say what happened to it: enter the
+              result if it was played, move it if it is still to be played, or record that it
+              was not played.
             </p>
-            <button
-              type="button"
-              onClick={() => setEnteringResult(true)}
-              className="min-h-11 w-full rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-text-strong hover:border-border-strong"
-            >
-              Enter post-match result
-            </button>
+            <ActionButton primary onClick={() => setEnteringResult(true)}>Enter the result</ActionButton>
+            <ActionButton onClick={() => setRescheduling(true)}>Reschedule match</ActionButton>
+            <ActionButton onClick={() => setCancelling(true)}>Record as not played</ActionButton>
+          </>
+        ) : null}
+        {row.state === 'awaiting_result' ? (
+          <>
+            {pendingReport ? (
+              <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+                A result has been entered and is being made official. Nothing more is needed
+                from you; if it is held for review it will appear under Review.
+              </p>
+            ) : (
+              <>
+                <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+                  This match has been played and no official result has arrived. A captured report
+                  becomes official on its own; enter a result by hand only if none is coming.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEnteringResult(true)}
+                  className="min-h-11 w-full rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-text-strong hover:border-border-strong"
+                >
+                  Enter post-match result
+                </button>
+              </>
+            )}
           </>
         ) : null}
         {row.state === 'official' ? (
@@ -237,6 +277,15 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         fieldManagerName={row.fieldManager?.displayName}
         onClose={() => setTakingOver(false)}
         onTakenOver={() => window.location.reload()}
+      />
+
+      <CancelFixtureSheet
+        open={cancelling}
+        matchId={row.matchId}
+        matchLabel={`${row.homeTeamName} v ${row.awayTeamName}`}
+        scheduledAt={row.scheduledAt}
+        onClose={() => setCancelling(false)}
+        onCancelled={() => window.location.reload()}
       />
 
       <RescheduleSheet
@@ -324,8 +373,9 @@ function MatchHistory({ matchId }: { matchId: string }) {
   const { currentUser, isDemoMode } = useAuth();
   const [changes, setChanges] = useState<Array<{
     id: string;
+    kind?: string;
     fromScheduledAt: string;
-    toScheduledAt: string;
+    toScheduledAt: string | null;
     reason: string;
     createdAt: string;
   }>>([]);
@@ -363,14 +413,90 @@ function MatchHistory({ matchId }: { matchId: string }) {
         {changes.map((change) => (
           <li key={change.id} className="text-sm leading-6">
             <p className="text-xs text-subtle">{format(change.createdAt)}</p>
-            <p className="text-text-strong">Fixture rescheduled</p>
-            <p className="text-muted">
-              From {format(change.fromScheduledAt)} to {format(change.toScheduledAt)}
-            </p>
+            {change.kind === 'cancelled' || !change.toScheduledAt ? (
+              <>
+                <p className="text-text-strong">Recorded as not played</p>
+                <p className="text-muted">Was scheduled for {format(change.fromScheduledAt)}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-text-strong">Fixture rescheduled</p>
+                <p className="text-muted">
+                  From {format(change.fromScheduledAt)} to {format(change.toScheduledAt)}
+                </p>
+              </>
+            )}
             <p className="text-muted">Reason: {change.reason}</p>
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+type ClubAccount = {
+  id: string;
+  teamId: string;
+  declaredScore: { home: number; away: number } | null;
+  notes: string;
+  evidenceCount: number;
+  revisions: number;
+  firstReportedAt: string | null;
+  reportedAt: string | null;
+  officialResultVersionAtReport: number | null;
+};
+
+/**
+ * What the clubs said happened (ADR-005).
+ *
+ * A club's account is evidence the league weighs; it never sets the result. Until this
+ * section existed the account was written, stored, readable by rule — and shown to nobody.
+ * A League Admin deciding a missed fixture saw "no result was recorded" while the club's
+ * declared score and notes sat one collection away. The section is deliberately plain: the
+ * score the club declared, in their words, when, and how many times they changed it.
+ */
+function ClubAccounts({
+  accounts,
+  teamName,
+}: {
+  accounts: ClubAccount[];
+  teamName: (teamId: string) => string;
+}) {
+  if (!accounts.length) return null;
+  const format = (value: string | null) => value
+    ? new Intl.DateTimeFormat('en-UG', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kampala',
+    }).format(new Date(value))
+    : '';
+  return (
+    <section aria-label="Club accounts" className="rounded-[var(--radius-lg)] border border-border bg-surface-1 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">What the clubs said</p>
+      <p className="mt-1 text-xs leading-5 text-muted">
+        Evidence from the clubs. It informs the league&apos;s decision and never sets the result on its own.
+      </p>
+      <ul className="mt-3 space-y-3">
+        {accounts.map((account) => (
+          <li key={account.id} className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-text-strong">{teamName(account.teamId)}</p>
+              {account.declaredScore ? (
+                <p data-numeric className="text-lg font-bold tabular-nums text-text-strong">
+                  {account.declaredScore.home}–{account.declaredScore.away}
+                </p>
+              ) : (
+                <p className="text-xs text-muted">No score declared</p>
+              )}
+            </div>
+            <p className="mt-1.5 whitespace-pre-line text-sm leading-6 text-text">{account.notes}</p>
+            <p className="mt-2 text-xs text-subtle">
+              {format(account.reportedAt)}
+              {account.revisions > 1 ? ` · revised ${account.revisions - 1} ${account.revisions === 2 ? 'time' : 'times'}` : ''}
+              {account.evidenceCount ? ` · ${account.evidenceCount} ${account.evidenceCount === 1 ? 'attachment' : 'attachments'}` : ''}
+              {account.officialResultVersionAtReport ? ` · filed against official v${account.officialResultVersionAtReport}` : ''}
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

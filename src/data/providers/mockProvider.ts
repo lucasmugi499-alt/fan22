@@ -646,6 +646,10 @@ export const mockProvider: GoalPlaceDataProvider = {
       updatedAt: new Date().toISOString(),
     });
   },
+  // The mock world has no club accounts; the console reads an empty list and asks as before.
+  async getTeamMatchReports() {
+    return [];
+  },
   async getRosters(options) {
     return take(rosters
       .filter((roster) =>

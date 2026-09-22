@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import type { IconComponent } from '@/lib/icons';
 import type { Match, ResultSubmissionStatus, VerificationStatus } from '@/types';
+import { isLiveNow } from '@/lib/status';
 
 /**
  * The single source of truth for how a record's trust state is presented.
@@ -225,9 +226,16 @@ export function stateForSubmission(status: ResultSubmissionStatus): StateDescrip
  * match whose result is unverified must never look settled.
  */
 export function stateForMatch(
-  match: Pick<Match, 'status' | 'verificationStatus'> & Partial<Pick<Match, 'awardedResult'>>,
+  match: Pick<Match, 'status' | 'verificationStatus'> & Partial<Pick<Match, 'awardedResult' | 'scheduledAt'>>,
+  now: number = Date.now(),
 ): StateDescriptor {
-  if (match.status === 'live') return STATE.live;
+  // A live flag hours old is a result that never arrived, not a match in progress. Without a
+  // kickoff to measure against the flag is believed (see `isLiveNow`).
+  if (match.status === 'live') {
+    return match.scheduledAt === undefined || isLiveNow({ status: 'live', scheduledAt: match.scheduledAt }, now)
+      ? STATE.live
+      : STATE.pending;
+  }
   if (match.status === 'scheduled') return STATE.draft;
   if (match.status === 'cancelled') return STATE.archived;
   if (match.verificationStatus !== 'verified') return stateForVerification(match.verificationStatus);

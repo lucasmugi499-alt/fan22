@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PLACEHOLDER_PREFIX, registeredProjectId } from '../lib/deployTarget';
 import { resolveProjectId } from '../lib/firestoreTarget';
+import { planCalendar, type DemoDatabase } from './calendar';
 
 const ROOT = process.cwd();
 const MANIFEST_FILE = path.join(ROOT, 'data/demo/seed-manifest.json');
@@ -56,6 +57,21 @@ function validate() {
 
   if (mismatches.length) throw new Error(`Demo validation failed:\n${mismatches.join('\n')}`);
   console.log(`Demo seed ${manifest.seedVersion} validation passed.`);
+
+  /*
+   * How stale the package is as dated, and that it can still be planned onto today. The
+   * package's calendar ended in May 2026 and was seeded as dated for months, so every
+   * "Coming up" list on the demo was empty; the shift is applied at seed time, and this line
+   * is the reminder that a seed without --rebase-calendar writes the May world again.
+   */
+  const plan = planCalendar(database as unknown as DemoDatabase, new Date());
+  const matches = database.matches as Array<{ scheduledAt: string }>;
+  const lastFixture = Math.max(...matches.map((match) => Date.parse(match.scheduledAt)));
+  const daysStale = Math.floor((Date.now() - lastFixture) / 86_400_000);
+  console.log(
+    `As dated, the package's last fixture was ${daysStale} days ago. Seed with --rebase-calendar: `
+    + `${plan.leagues.map((s) => `${s.leagueId} +${s.weeks}w`).join(', ')}; social +${plan.social.days}d.`,
+  );
 }
 
 function requireResetControls(environment: 'demo' | 'beta') {
@@ -152,7 +168,7 @@ function protectedLifecycle(environment: 'demo' | 'beta', lifecycleAction: 'rese
     nextStep:
       environment === 'beta'
         ? 'Run scripts/seed-investor-demo.ts with the beta project, --reset, --create-auth and --execute.'
-        : 'Run the approved demo reset workflow against the demo project after entering maintenance mode.',
+        : 'Enter maintenance mode, then: npx tsx scripts/seed-investor-demo.ts --environment demo --project manifest-quasar-479416-s7 --database fg256 --rebase-calendar --reset --create-auth --confirm SEED-GOALPLACE-DEMO --execute (with FIREBASE_DEMO_PASSWORD set).',
   });
 }
 

@@ -33,6 +33,7 @@ import {
   ResultSubmission,
   ResultSubmissionEvent,
   Roster,
+  TeamMatchReport,
   Season,
   Sport,
   Sponsor,
@@ -96,6 +97,7 @@ export type FirestoreCollectionMap = {
   accessAssignments: AccessAssignmentRecord;
   accessIndex: AccessIndexRecord;
   rosters: Roster;
+  teamMatchReports: TeamMatchReport;
   standings: StoredStanding;
   sponsorReports: SponsorReport;
   sponsorCampaigns: SponsorCampaign;

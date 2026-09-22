@@ -6,7 +6,7 @@ import { Check, MagnifyingGlass, Plus, Star, X } from '@phosphor-icons/react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { FANTASY_SQUAD_RULES } from '@/lib/fantasy/profiles';
-import type { FantasyCompetition } from '@/types/fantasy';
+import type { FantasyCompetition, FantasyRound } from '@/types/fantasy';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthProvider';
 import { budgetApplies } from '@/lib/fantasy/budget';
@@ -29,13 +29,25 @@ export function FantasySquadBuilder({
   competition,
   players,
   roundId,
+  roundName,
+  roundStatus,
   deadlineAt,
 }: {
   competition: FantasyCompetition;
   players: FantasyPlayerCard[];
   roundId: string;
+  roundName?: string;
+  roundStatus?: FantasyRound['status'];
   deadlineAt: string;
 }) {
+  // Only an open round takes a squad. The server refuses everything else; the builder says so
+  // before the first pick instead of after the fifteenth.
+  const roundOpen = roundStatus === undefined || roundStatus === 'open';
+  const roundNotice = roundStatus === 'upcoming'
+    ? `${roundName ?? 'This round'} has not opened yet. You can draft now; submitting opens with the round.`
+    : roundStatus && roundStatus !== 'open'
+      ? `${roundName ?? 'This round'} is ${roundStatus === 'locked' ? 'locked' : 'closed'}. Squads are no longer accepted for it.`
+      : null;
   const rules = FANTASY_SQUAD_RULES.find((item) => item.id === competition.squadRulesId)!;
   // A budget-free competition has no credits to spend, so it must not display a budget
   // counter. "0.0 credits left" reads as a broken game rather than an absent constraint.
@@ -116,7 +128,7 @@ export function FantasySquadBuilder({
     });
 
   async function submitSquad() {
-    if (!complete || submitting) return;
+    if (!complete || submitting || !roundOpen) return;
     setSubmitting(true);
     setSubmissionMessage('');
     if (isDemoMode) {
@@ -161,6 +173,11 @@ export function FantasySquadBuilder({
           <p className="text-sm font-semibold capitalize text-brand">{competition.sport} fantasy</p>
           <h1 className="mt-1 font-display text-3xl font-bold text-text-strong">Build your squad</h1>
           <p className="mt-2 text-sm text-muted">Drafts save on this device. Server time enforces the final deadline.</p>
+          {roundNotice ? (
+            <p role="status" className="mt-3 rounded-[var(--radius-md)] border border-[var(--state-pending)]/40 bg-[var(--state-pending-bg)] px-3 py-2 text-sm font-medium text-[var(--state-pending)]">
+              {roundNotice}
+            </p>
+          ) : null}
         </div>
         <div className="text-right">
           <p className="text-xs text-muted">Round deadline</p>
@@ -258,8 +275,8 @@ export function FantasySquadBuilder({
             {complete ? 'Squad is valid and ready.' : 'Complete the squad and choose leadership.'}
           </div>
           {submissionMessage ? <p className="hidden text-sm text-muted sm:block" role="status">{submissionMessage}</p> : null}
-          <Button disabled={!complete || submitting} onClick={() => void submitSquad()} className="ml-auto w-full sm:w-auto" icon={Star}>
-            {submitting ? 'Submitting…' : 'Submit squad'}
+          <Button disabled={!complete || submitting || !roundOpen} onClick={() => void submitSquad()} className="ml-auto w-full sm:w-auto" icon={Star}>
+            {submitting ? 'Submitting…' : roundOpen ? 'Submit squad' : 'Round not open'}
           </Button>
         </div>
       </div>

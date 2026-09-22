@@ -1,4 +1,5 @@
 import type { Match, Team } from '@/types';
+import { isLiveNow } from '@/lib/status';
 
 /**
  * What a League Admin needs to know on a matchday, computed once.
@@ -131,12 +132,19 @@ export function matchOperationalRow({
   teams,
   assignment,
   hasOpenException,
+  pendingReport,
   now,
 }: {
   match: Match;
   teams: readonly Team[];
   assignment?: { displayName?: string | null; lastSyncAt?: string | null; status?: string } | null;
   hasOpenException?: boolean;
+  /**
+   * A match report submitted and not yet made official. The match record itself does not
+   * change until the finalizer runs, so without this a fixture whose result was entered a
+   * minute ago still reads as never played and offers to have its result entered again.
+   */
+  pendingReport?: { declaredHomeScore?: number | null; declaredAwayScore?: number | null; status?: string } | null;
   now: string;
 }): LeagueMatchRow {
   const presence = assignment
@@ -145,7 +153,9 @@ export function matchOperationalRow({
 
   const score = typeof match.score?.home === 'number' && typeof match.score?.away === 'number'
     ? { home: match.score.home, away: match.score.away }
-    : null;
+    : pendingReport && typeof pendingReport.declaredHomeScore === 'number' && typeof pendingReport.declaredAwayScore === 'number'
+      ? { home: pendingReport.declaredHomeScore, away: pendingReport.declaredAwayScore }
+      : null;
 
   let state: MatchOperationalState;
   let attention: string | null = null;
@@ -158,8 +168,21 @@ export function matchOperationalRow({
   } else if (match.status === 'completed') {
     state = 'awaiting_result';
     attention = 'Played, and still waiting for an official result.';
+  } else if (pendingReport && match.status !== 'cancelled') {
+    // Entered, not yet official. Checked before the time-based branches so a missed fixture
+    // whose result was just typed in stops being offered as missed.
+    state = 'awaiting_result';
+    attention = pendingReport.status === 'league_review'
+      ? 'A result was entered and is held for review.'
+      : 'A result was entered and is being made official.';
   } else if (match.status === 'cancelled') {
     state = 'cancelled';
+  } else if (match.status === 'live' && !isLiveNow(match, Date.parse(now))) {
+    // A live flag hours old is not a match in progress; it is a match whose capture never
+    // closed and whose result never arrived. Listing it under Live for months is how the
+    // one thing that needs a person reads as the one thing that is fine.
+    state = 'awaiting_result';
+    attention = 'Recorded as live and never closed. No result has arrived.';
   } else if (match.status === 'live') {
     state = 'live';
     if (!assignment) {

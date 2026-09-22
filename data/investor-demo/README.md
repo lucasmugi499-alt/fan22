@@ -15,6 +15,40 @@ be presented as live traction or as an official historical record.
 - `public/demo/assets/`: synthetic league, team, and avatar SVG assets referenced by the
   database records.
 
+## The calendar is applied at seed time
+
+The package is a fixed world dated February to July 2026 and is never edited. Passing
+`--rebase-calendar` shifts every timestamp at write time so each league lands mid-season on
+the day the seed runs: results up to last weekend, a live matchday pinned to minutes ago, the
+next fixtures this coming weekend, fantasy round 3 open. Without the flag the package is
+written as dated, which is a calendar that ended months ago and every "Coming up" list empty.
+`npm run demo:validate` prints how stale the package is as dated and the shift it would apply.
+
+The seed also writes the world's authority — six league admins, sixty Club Operators
+(ADR-005), two platform accounts — as `accessAssignments` and projected `accessIndex`
+documents, so nobody needs a second tool before anyone can act.
+
+## Demo reset
+
+The importer binds `--environment` to `config/environments.json`, and the confirmation phrase
+carries the environment name. Enter maintenance mode first; the protected controls in
+`scripts/demo/data-lifecycle.ts --action=demo-reset` record the request.
+
+```sh
+FIREBASE_DEMO_PASSWORD='<shared demo password>' \
+npx tsx scripts/seed-investor-demo.ts \
+  --environment demo \
+  --project manifest-quasar-479416-s7 \
+  --database fg256 \
+  --rebase-calendar \
+  --confirm SEED-GOALPLACE-DEMO \
+  --reset \
+  --create-auth \
+  --execute
+```
+
+Leave `--execute` off for a dry run that prints the plan and the counts.
+
 ## Staging seed
 
 Preview and validate without credentials:

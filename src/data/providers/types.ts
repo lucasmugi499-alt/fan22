@@ -18,6 +18,7 @@ import {
   ResultSubmission,
   ResultSubmissionEvent,
   Roster,
+  TeamMatchReport,
   ScorerEntry,
   AthleteStatLine,
   Season,
@@ -250,6 +251,8 @@ export interface GoalPlaceDataProvider {
   getTeamAssignmentById(id: string): Promise<TeamAssignment | undefined>;
   getAccessIndexByUser(userId: string): Promise<AccessIndexRecord[]>;
   getRosters(options?: DataQueryOptions): Promise<Roster[]>;
+  /** A club's own accounts of its matches, readable by the club, its league and Platform. */
+  getTeamMatchReports(options: { teamId: string; limit?: number }): Promise<TeamMatchReport[]>;
   getResultSubmissionEvents(matchId: string): Promise<ResultSubmissionEvent[]>;
   getSponsorReports(): Promise<SponsorReport[]>;
   getSponsorCampaigns(): Promise<SponsorCampaign[]>;

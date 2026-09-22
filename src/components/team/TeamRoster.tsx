@@ -6,7 +6,8 @@ import { Check, Copy, UserPlus, Users as UsersIcon } from '@phosphor-icons/react
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { resolveMyTeam, rosterForTeam } from '@/lib/team/teamContext';
+import { rosterForTeam } from '@/lib/team/teamContext';
+import { useMyTeam } from '@/lib/team/useMyTeam';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -20,10 +21,11 @@ import { AthleteClaiming } from '@/components/athlete/AthleteClaiming';
 import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 export function TeamRoster() {
-  const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
+  const { userProfile, currentUser, isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const catalog = useGoalPlaceData({ collections: ['teams', 'seasons'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
+  const catalog = useMyTeam();
+  const team = catalog.team;
+  const seasonCatalog = useGoalPlaceData({ collections: ['seasons'] });
   const detail = useGoalPlaceData({
     collections: ['athletes', 'rosters'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },
@@ -33,10 +35,9 @@ export function TeamRoster() {
   // which is how a retired team_admin ended up looking at a full set of controls the server
   // refuses. This asks the capability index the server itself will consult.
   const access = useTeamConsoleAccess(team?.id);
-  const teams = catalog.teams;
-  const seasons = catalog.seasons;
+  const seasons = seasonCatalog.seasons;
   const { athletes, rosters, retry } = detail;
-  const loading = catalog.loading || (Boolean(team) && detail.loading);
+  const loading = catalog.loading || seasonCatalog.loading || (Boolean(team) && detail.loading);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -48,7 +49,7 @@ export function TeamRoster() {
   const [inviteLink, setInviteLink] = useState('');
 
   const teamAthletes = useMemo(() => (team ? rosterForTeam(team.id, athletes) : []), [team, athletes]);
-  const season = team ? seasons.find((item) => item.id === teams.find((item) => item.id === team.id)?.leagueId) ?? seasons.find((item) => item.leagueId === team.leagueId && item.status !== 'completed') : undefined;
+  const season = team ? seasons.find((item) => item.leagueId === team.leagueId && item.status !== 'completed') : undefined;
   const rosterRecord = team ? rosters.find((item) => item.teamId === team.id && (!season || item.seasonId === season.id)) : undefined;
   const roster = rosterRecord
     ? teamAthletes.filter((athlete) => rosterRecord.athleteIds.includes(athlete.id))

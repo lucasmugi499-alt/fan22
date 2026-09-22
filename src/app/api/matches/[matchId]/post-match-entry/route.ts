@@ -54,6 +54,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
   );
   if (!permitted) return Response.json({ error: 'You cannot enter results for this league.' }, { status: 403 });
 
+  /*
+   * What state the match is in, checked before any question of policy. There was no check
+   * here at all: a result could be typed in for a fixture called off, for one whose kickoff
+   * had not happened, or for one already official — the last being a second door to a record
+   * the platform corrects through result cases and nowhere else.
+   */
+  const refusal = postMatchEntryRefusal(match, Date.now());
+  if (refusal) return Response.json({ error: refusal }, { status: 409 });
+
   /**
    * The policy bound onto this fixture when it was created, not the competition's current
    * setting. A fixture created before the field existed resolves to the permissive default,
@@ -121,4 +130,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ mat
     // Said plainly: this result is trustworthy enough to publish and will never be Gold.
     dataQualityCeiling: 'bronze',
   });
+}
+
+/**
+ * Why a post-match entry cannot be accepted for this match, or null when it can.
+ *
+ * Exported for the test. A `live` match is deliberately allowed: field capture that stalled is
+ * the most common reason a League Admin reaches for this at all.
+ */
+export function postMatchEntryRefusal(
+  match: Pick<Match, 'status' | 'scheduledAt' | 'verificationStatus'>,
+  now: number,
+): string | null {
+  if (match.status === 'cancelled') return 'This fixture was recorded as not played. Create a new fixture if it is to be played.';
+  if (match.status === 'completed' && match.verificationStatus === 'verified') {
+    return 'This result is already official. Open a result case to correct it.';
+  }
+  if (match.status === 'completed') return 'This match already has a result awaiting verification.';
+  if (match.status === 'scheduled') {
+    const kickoff = Date.parse(String(match.scheduledAt));
+    if (Number.isFinite(kickoff) && kickoff > now) return 'This match has not been played yet.';
+  }
+  return null;
 }

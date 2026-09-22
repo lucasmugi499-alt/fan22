@@ -593,3 +593,40 @@ export function parseFixtureImport({
 
   return { rows: deduped, errors };
 }
+
+export type CancelDecision =
+  | { ok: true; fromScheduledAt: string }
+  | { ok: false; reason: string };
+
+/**
+ * Recording that a fixture will not be played.
+ *
+ * The status model always had `cancelled`; nothing could produce it. A fixture the clubs never
+ * played had two doors — reschedule it, or enter a result for a match that did not happen — and
+ * neither is the truth. So it stayed `scheduled`, the club's console asked for an account of it
+ * forever, and the league's "never played" count only ever went up.
+ *
+ * A cancellation is an administrative fact like a reschedule, and is kept the same way: the
+ * reason is required and written beside the change. What it must never touch is a match with
+ * a record. A live match is being played; a completed one is part of the season; a cancelled
+ * one is already cancelled. Only a scheduled fixture can be called off.
+ */
+export function decideCancel({
+  status,
+  currentScheduledAt,
+  reason,
+}: {
+  status: string;
+  currentScheduledAt: string;
+  reason: string;
+}): CancelDecision {
+  if (status === 'cancelled') return { ok: false, reason: 'This fixture is already recorded as not played.' };
+  if (status === 'live') return { ok: false, reason: 'This match is under way. A match in progress cannot be called off.' };
+  if (status !== 'scheduled') {
+    return { ok: false, reason: `A ${status} match cannot be called off. Its record is already part of the season.` };
+  }
+  if (reason.trim().length < 4) {
+    return { ok: false, reason: 'Give a reason. Clubs are told why their fixture was called off.' };
+  }
+  return { ok: true, fromScheduledAt: currentScheduledAt };
+}

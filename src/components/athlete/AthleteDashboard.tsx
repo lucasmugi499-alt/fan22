@@ -7,7 +7,8 @@ import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { resolveMyAthlete } from '@/lib/athlete/athleteContext';
 import { athletePhoto, bannerImage } from '@/lib/media';
-import { normalizeChallengeStatus, challengeLabel } from '@/lib/status';
+import { normalizeChallengeStatus, challengeLabel, isStillToPlay } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { OfficialStats } from '@/components/athlete/OfficialStats';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -37,19 +38,22 @@ export function AthleteDashboard() {
   const [manageMode, setManageMode] = useState<AthleteManageMode | null>(null);
   const [activeNeed, setActiveNeed] = useState<SupportNeed | null>(null);
 
+  const now = useNow();
   const athlete = useMemo(() => resolveMyAthlete(userProfile, athletes, isDemoMode), [userProfile, athletes, isDemoMode]);
   const team = useMemo(() => teams.find((t) => t.id === athlete?.teamId), [teams, athlete]);
   const myChallenges = useMemo(
     () => (athlete ? challenges.filter((c) => c.athleteId === athlete.id) : []),
     [challenges, athlete]
   );
+  // Still to play by the clock, not by status: a fixture from April that nobody recorded is
+  // not this athlete's next match, and sorted earliest-first it used to be exactly that.
   const nextMatch = useMemo(
     () => athlete
       ? matches
-        .filter((match) => (match.homeTeamId === athlete.teamId || match.awayTeamId === athlete.teamId) && match.status === 'scheduled')
+        .filter((match) => (match.homeTeamId === athlete.teamId || match.awayTeamId === athlete.teamId) && isStillToPlay(match, now))
         .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0]
       : undefined,
-    [athlete, matches],
+    [athlete, matches, now],
   );
 
   if (loading) return <AthleteDashboardSkeleton />;

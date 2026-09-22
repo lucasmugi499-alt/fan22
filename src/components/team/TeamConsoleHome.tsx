@@ -11,11 +11,11 @@ import {
   SealCheck,
   Coins,
 } from '@phosphor-icons/react';
-import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
+import { useMyTeam } from '@/lib/team/useMyTeam';
+import { useTeamMatchReports } from '@/lib/team/useTeamMatchReports';
 import { useTeamOfficialStanding } from '@/lib/team/useTeamStanding';
 import {
-  resolveMyTeam,
   matchesForTeam,
   rosterForTeam,
   recentForm,
@@ -62,12 +62,17 @@ const FORM_STYLE: Record<FormResult, string> = {
 };
 
 export function TeamConsoleHome() {
-  const { userProfile, isDemoMode, accessContext } = useAuth();
-  const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
+  const catalog = useMyTeam();
+  const team = catalog.team;
   const detail = useGoalPlaceData({
     collections: ['matches', 'athletes'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },
+    recordLimit: 250,
+  });
+  // Opponents' names. The club's own league is a bounded list; the whole catalogue is not.
+  const league = useGoalPlaceData({
+    collections: ['teams'],
+    scope: { leagueId: team?.leagueId ?? 'goalplace-pending' },
     recordLimit: 250,
   });
   // Capability, not role — see useTeamConsoleAccess. The console stays fully readable; what
@@ -75,8 +80,12 @@ export function TeamConsoleHome() {
   const access = useTeamConsoleAccess(team?.id);
   const { matches, athletes, error, retry } = detail;
   const { standing } = useTeamOfficialStanding(team ?? undefined);
-  const teams = catalog.teams;
-  const loading = catalog.loading || (Boolean(team) && detail.loading);
+  // What the club has already said, so the card never asks for an account twice.
+  const [reportsToken, setReportsToken] = useState(0);
+  const clubReports = useTeamMatchReports(team?.id, reportsToken);
+  const reportedMatchIds = useMemo(() => new Set(clubReports.reports.map((report) => report.matchId)), [clubReports.reports]);
+  const teams = league.teams;
+  const loading = catalog.loading || (Boolean(team) && (detail.loading || league.loading));
   const [reviewMatch, setReviewMatch] = useState<Match | null>(null);
   const now = useNow();
 
@@ -92,12 +101,20 @@ export function TeamConsoleHome() {
     if (!team) return [] as Awaiting[];
     return matchesForTeam(team.id, matches)
       .flatMap((match): Awaiting[] => {
+        // Already answered. The league has the club's account; asking again is noise.
+        if (reportedMatchIds.has(match.id)) return [];
         if (match.status === 'completed' && !isOfficialMatch(match)) return [{ match, kind: 'unofficial' }];
         if (match.status === 'scheduled' && !isStillToPlay(match, now)) return [{ match, kind: 'missed' }];
         return [];
       })
       .sort((a, b) => +new Date(b.match.scheduledAt) - +new Date(a.match.scheduledAt));
-  }, [team, matches, now]);
+  }, [team, matches, now, reportedMatchIds]);
+
+  // Filed and still not settled: recorded by the club, no official result yet.
+  const awaitingLeague = useMemo(() => {
+    if (!team) return [] as Match[];
+    return matchesForTeam(team.id, matches).filter((match) => reportedMatchIds.has(match.id) && !isOfficialMatch(match));
+  }, [team, matches, reportedMatchIds]);
 
   if (loading) return <TeamConsoleHomeSkeleton />;
   if (error) return <ErrorState onRetry={retry} />;
@@ -173,6 +190,8 @@ export function TeamConsoleHome() {
           teamById={teamById}
           onReview={access.canReportResult ? () => setReviewMatch(top.match) : undefined}
         />
+      ) : awaitingLeague.length ? (
+        <RecordedCard count={awaitingLeague.length} />
       ) : (
         <AllClearCard />
       )}
@@ -238,7 +257,7 @@ export function TeamConsoleHome() {
           ? teamById.get(reviewMatch.homeTeamId === team.id ? reviewMatch.awayTeamId : reviewMatch.homeTeamId)
           : undefined}
         onClose={() => setReviewMatch(null)}
-        onDone={retry}
+        onDone={() => { retry(); setReportsToken((value) => value + 1); }}
       />
     </div>
   );
@@ -365,5 +384,25 @@ function TeamConsoleHomeSkeleton() {
       <Skeleton className="h-6 w-32" />
       <Skeleton className="h-32 w-full rounded-[var(--radius-lg)]" />
     </div>
+  );
+}
+
+/**
+ * The club has answered; the league has not. Said once, without a button, because there is
+ * nothing more for the club to do until the league settles it.
+ */
+function RecordedCard({ count }: { count: number }) {
+  return (
+    <Card className="flex items-center gap-3 p-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--state-pending-bg)] text-[var(--state-pending)]">
+        <Clock className="h-5 w-5" weight="bold" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-text-strong">
+          Your account is recorded for {count} {count === 1 ? 'match' : 'matches'}
+        </p>
+        <p className="text-xs text-muted">Waiting on the league. You will see the official result here when it lands.</p>
+      </div>
+    </Card>
   );
 }

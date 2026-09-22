@@ -96,6 +96,14 @@ describe('match operational state', () => {
     expect(result.attention).toBeNull();
   });
 
+  it('stops calling a match live months after its kickoff', () => {
+    // The demo carried six matches "live" since April, and the Matches page listed them
+    // under Live all summer. Nothing closes a live flag; time has to.
+    const result = row({ match: match({ status: 'live', scheduledAt: '2026-04-04T15:00:00.000Z' }) });
+    expect(result.state).toBe('awaiting_result');
+    expect(result.attention).toMatch(/never closed/);
+  });
+
   it('separates a played match from an official one', () => {
     expect(row({ match: match({ status: 'completed' }) }).state).toBe('awaiting_result');
     expect(row({ match: match({ status: 'completed', verificationStatus: 'verified' }) }).state)

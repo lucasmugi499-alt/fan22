@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Broadcast, CaretRight, Fire, MapPin, SlidersHorizontal, Trophy } from '@phosphor-icons/react';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
 import { useAuth } from '@/context/AuthProvider';
-import { isStillToPlay } from '@/lib/status';
+import { isLiveNow, isStillToPlay } from '@/lib/status';
 import { useNow } from '@/lib/useNow';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { currentSeasonFor, scoringForSeason } from '@/lib/season';
@@ -61,7 +61,7 @@ export function FanHome() {
     followedTeamIds.includes(match.homeTeamId) ||
     followedTeamIds.includes(match.awayTeamId), [followedLeagueIds, followedTeamIds]);
 
-  const live = useMemo(() => matches.filter((m) => m.status === 'live' && preferredMatch(m)), [matches, preferredMatch]);
+  const live = useMemo(() => matches.filter((m) => isLiveNow(m, now) && preferredMatch(m)), [matches, preferredMatch, now]);
   const upcoming = useMemo(
     () => matches.filter((m) => isStillToPlay(m, now)).filter((m) => m.status !== 'live' && preferredMatch(m)).sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)).slice(0, 6),
     [matches, now, preferredMatch]
@@ -103,7 +103,7 @@ export function FanHome() {
   // Group the fixtures rail by day, broadcast-style.
   const byDay = new Map<string, Match[]>();
   for (const m of [...live, ...upcoming]) {
-    const key = m.status === 'live' ? 'Live now' : dayLabel(m.scheduledAt);
+    const key = isLiveNow(m, now) ? 'Live now' : dayLabel(m.scheduledAt);
     byDay.set(key, [...(byDay.get(key) ?? []), m]);
   }
 

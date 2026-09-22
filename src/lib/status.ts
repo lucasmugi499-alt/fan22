@@ -114,6 +114,23 @@ export function isUpcomingMatch(match: Pick<Match, 'status'>): boolean {
 }
 
 /**
+ * How long after kickoff a `live` flag is still believed.
+ *
+ * No server path writes `status: 'live'`; the flag is set by seeds and, in future, by field
+ * operations that may never close it. A match that has been "live" since April is not being
+ * played, it is a match whose result never arrived. Six hours covers any real fixture with
+ * delays; beyond that the card must stop saying "Playing now".
+ */
+export const LIVE_BELIEF_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+export function isLiveNow(match: Pick<Match, 'status' | 'scheduledAt'>, now: number): boolean {
+  if (match.status !== 'live') return false;
+  const kickoff = Date.parse(match.scheduledAt);
+  // An unparseable kickoff cannot prove the flag stale, so the flag stands.
+  return !Number.isFinite(kickoff) || now - kickoff <= LIVE_BELIEF_WINDOW_MS;
+}
+
+/**
  * Still to play, as a question about TIME.
  *
  * A scheduled fixture whose kickoff has passed is not upcoming. It was never played, and a
@@ -121,11 +138,11 @@ export function isUpcomingMatch(match: Pick<Match, 'status'>): boolean {
  * fixture from February, and every Upcoming list on the platform led with matches that had
  * already been missed.
  *
- * A live match is always still to play whatever its kickoff time says, because it is being
- * played right now.
+ * A live match is still to play while the flag is believable (see `isLiveNow`); after that it
+ * is a played match with no result, which is a different list.
  */
 export function isStillToPlay(match: Pick<Match, 'status' | 'scheduledAt'>, now: number): boolean {
-  if (match.status === 'live') return true;
+  if (match.status === 'live') return isLiveNow(match, now);
   if (match.status !== 'scheduled') return false;
   const kickoff = Date.parse(match.scheduledAt);
   // An unparseable date is treated as still to play: a fixture with a broken date is a data

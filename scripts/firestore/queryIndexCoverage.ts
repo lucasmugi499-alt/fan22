@@ -44,9 +44,21 @@ export type QueryShape = {
   collection: string;
   /** Equality-filtered fields, then range/ordered fields, in the order an index needs them. */
   fields: string[];
+  /**
+   * The direction each ordered field is read in. Absent for a field the source does not order
+   * explicitly (a bare range reads ascending). Firestore does NOT serve `orderBy('x', 'desc')`
+   * from an ascending composite index when an equality filter precedes it; the League Admin's
+   * whole Matches page returned 500 while this guard called that query covered.
+   */
+  directions?: Record<string, 'ASCENDING' | 'DESCENDING'>;
 };
 
-export type DeclaredIndex = { collectionGroup: string; fields: string[] };
+export type DeclaredIndex = {
+  collectionGroup: string;
+  fields: string[];
+  /** Per-field order as declared. Absent in older fixtures, which then match any direction. */
+  orders?: Record<string, 'ASCENDING' | 'DESCENDING'>;
+};
 
 const SKIP_DIRECTORIES = new Set(['node_modules', '.next', 'lib', 'dist']);
 
@@ -86,7 +98,9 @@ export function queryShapesIn(file: string, text: string): QueryShape[] {
       .map((match) => match[1]);
     const ranges = [...query.matchAll(/\.where\(\s*'([\w.]+)'\s*,\s*'(?:>=|<=|>|<|!=|not-in)'/g)]
       .map((match) => match[1]);
-    const orders = [...query.matchAll(/\.orderBy\(\s*'([\w.]+)'/g)].map((match) => match[1]);
+    const orderMatches = [...query.matchAll(/\.orderBy\(\s*'([\w.]+)'(?:\s*,\s*'(asc|desc)')?/g)];
+    const orders = orderMatches.map((match) => match[1]);
+    const directions = orderDirections(orderMatches, ranges);
 
     const constrained = new Set([...equalities, ...arrayContains]);
     // Only an ordering or a range on a field the equality filters do not already pin needs a
@@ -102,7 +116,7 @@ export function queryShapesIn(file: string, text: string): QueryShape[] {
     // Deduplicated: a window can span two branches of a ternary that build the same query two
     // ways, and the same field named twice is one field to an index.
     const fields = [...new Set([...equalities, ...arrayContains, ...sorting])];
-    shapes.push({ file, line: index + 1, collection: opener[1], fields });
+    shapes.push({ file, line: index + 1, collection: opener[1], fields, directions });
   }
 
   shapes.push(...constraintArrayShapes(file, lines));
@@ -135,7 +149,9 @@ function constraintArrayShapes(file: string, lines: string[]): QueryShape[] {
     const equalities = [...body.matchAll(/\bwhere\(\s*'([\w.]+)'\s*,\s*'(?:==|in)'/g)].map((m) => m[1]);
     const arrayContains = [...body.matchAll(/\bwhere\(\s*'([\w.]+)'\s*,\s*'array-contains(?:-any)?'/g)].map((m) => m[1]);
     const ranges = [...body.matchAll(/\bwhere\(\s*'([\w.]+)'\s*,\s*'(?:>=|<=|>|<|!=|not-in)'/g)].map((m) => m[1]);
-    const orders = [...body.matchAll(/\borderBy\(\s*'([\w.]+)'/g)].map((m) => m[1]);
+    const orderMatches = [...body.matchAll(/\borderBy\(\s*'([\w.]+)'(?:\s*,\s*'(asc|desc)')?/g)];
+    const orders = orderMatches.map((m) => m[1]);
+    const directions = orderDirections(orderMatches, ranges);
 
     const constrained = new Set([...equalities, ...arrayContains]);
     const sorting = [...new Set([...ranges, ...orders])].filter((field) => !constrained.has(field));
@@ -169,7 +185,7 @@ function constraintArrayShapes(file: string, lines: string[]): QueryShape[] {
       const fields = [...new Set([...always, ...variant, ...sorting])];
       // A variant with nothing but the sort is a plain ordered read, which needs no composite.
       if (fields.length === sorting.length) continue;
-      shapes.push({ file, line: index + 1, collection: call[1], fields });
+      shapes.push({ file, line: index + 1, collection: call[1], fields, directions });
     }
   }
 
@@ -217,11 +233,16 @@ function enclosingFunctionStart(lines: string[], from: number): number {
 }
 
 export function declaredIndexes(json: string): DeclaredIndex[] {
-  const parsed = JSON.parse(json) as { indexes: Array<{ collectionGroup: string; fields: Array<{ fieldPath: string }> }> };
+  const parsed = JSON.parse(json) as { indexes: Array<{ collectionGroup: string; fields: Array<{ fieldPath: string; order?: string }> }> };
   return parsed.indexes.map((index) => ({
     collectionGroup: index.collectionGroup,
     // `__name__` is a tiebreaker Firestore appends and never something a query names.
     fields: index.fields.map((field) => field.fieldPath).filter((path) => path !== '__name__'),
+    orders: Object.fromEntries(
+      index.fields
+        .filter((field): field is { fieldPath: string; order: 'ASCENDING' | 'DESCENDING' } => typeof field.order === 'string')
+        .map((field) => [field.fieldPath, field.order]),
+    ),
   }));
 }
 
@@ -238,8 +259,23 @@ export function isCovered(shape: QueryShape, indexes: DeclaredIndex[]): boolean 
     if (index.collectionGroup !== shape.collection) return false;
     if (index.fields.length < shape.fields.length) return false;
     const prefix = index.fields.slice(0, shape.fields.length);
-    return shape.fields.every((field) => prefix.includes(field));
+    if (!shape.fields.every((field) => prefix.includes(field))) return false;
+    // Direction is part of the index. An ascending index does not serve a descending read.
+    if (!shape.directions || !index.orders) return true;
+    return Object.entries(shape.directions).every(([field, direction]) =>
+      index.orders![field] === undefined || index.orders![field] === direction);
   });
+}
+
+/** Explicit orderBy directions, with a bare range reading ascending as Firestore does. */
+function orderDirections(
+  orderMatches: RegExpMatchArray[],
+  ranges: string[],
+): Record<string, 'ASCENDING' | 'DESCENDING'> {
+  const directions: Record<string, 'ASCENDING' | 'DESCENDING'> = {};
+  for (const field of ranges) directions[field] = 'ASCENDING';
+  for (const match of orderMatches) directions[match[1]] = match[2] === 'desc' ? 'DESCENDING' : 'ASCENDING';
+  return directions;
 }
 
 export function uncoveredShapes(roots: string[], indexesJson: string): QueryShape[] {

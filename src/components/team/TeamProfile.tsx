@@ -7,7 +7,8 @@ import { Check, SealCheck, PencilSimple, MapPin, Trophy, Coins, Users } from '@p
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { resolveMyTeam, teamRecord } from '@/lib/team/teamContext';
+import { teamRecord } from '@/lib/team/teamContext';
+import { useMyTeam } from '@/lib/team/useMyTeam';
 import { useTeamOfficialStanding } from '@/lib/team/useTeamStanding';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -29,10 +30,10 @@ function ugx(n: number): string {
 }
 
 export function TeamProfile() {
-  const { userProfile, isDemoMode, accessContext } = useAuth();
+  const { isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
+  const catalog = useMyTeam();
+  const team = catalog.team;
   const detail = useGoalPlaceData({
     collections: ['athletes'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

@@ -1014,3 +1014,69 @@ developer's own tree). Five stale waivers were deleted rather than left: the gat
 package name, so a stale `qs` waiver would silently cover the next `qs` advisory of any kind.
 
 Demo is still down on billing; nothing was deployed.
+
+## Session log — 22 September 2026: the device pass, and what it found
+
+The audit's last unexecuted blocker was a device pass on the five core journeys. Run at 375px
+against a local server in **firebase data mode** (`NEXT_PUBLIC_DATA_MODE=firebase`, now in
+`.env.example` — without it the client renders the mock provider while every route talks to
+real Firestore, and the earlier walkthroughs had been looking at the mock) with real sessions
+minted from Admin-SDK custom tokens for the seeded accounts.
+
+### Broken on real data, fixed
+
+- **Every club screen said "No team linked yet" to a Club Operator with a live assignment.**
+  Six screens listed the whole `teams` catalogue (capped at 100) and picked their club out of
+  it; the demo holds 141 teams and the football clubs sort past the cut. `useMyTeam` reads the
+  scoped team document by id — one read, no cap. Opponents come from the club's league.
+- **The League Admin's Matches page returned 500.** `where(leagueId) + orderBy(scheduledAt,
+  desc)` had no index; a comment claimed the ascending index "traverses in reverse", and it
+  does not. `(leagueId ASC, scheduledAt DESC)` is declared and deployed. The query-index
+  guard passed it because it ignored direction; it reads direction now and fails on exactly
+  that query when the index is removed.
+- **The demo's Firestore rules were three weeks stale.** `teamMatchReports` had no rule on the
+  project (deny by default), so a club's filed account could not be read back. Rules and
+  indexes deployed to demo on 22 September; both need no billing. The app and functions still
+  cannot deploy.
+- **A club's account was written and shown to nobody.** The league match page now carries the
+  clubs' accounts (`/history` returns them) beside the decision. The club console reads its
+  own reports back so a filed fixture stops being asked for.
+- **A missed fixture had no honest ending.** `missed` offered nothing; a League Admin could
+  only move it to a date that would also pass, or type a result for a match nobody played.
+  It now offers the three true endings: enter the result, reschedule, or **record as not
+  played** — a new `cancel` command with a required reason, a history entry and an audit
+  event, the sibling of reschedule. `decideCancel` refuses anything that is not plainly
+  scheduled, so it can never touch a record. Post-match entry gained the status guard it never
+  had (a result could be typed onto an official match). A submitted-not-yet-official report
+  now reads as "awaiting result" on the match page instead of "not played" again.
+- **"Live" was a permanent state.** No server path writes `status: 'live'`; seeds do, and six
+  demo matches had been "Playing now" since April. `isLiveNow` believes the flag for six hours
+  after kickoff; the card, the badge, the fan home, `isStillToPlay` and the league operations
+  model all read it. The athlete dashboard's "next match" was the April fixture again, for the
+  same reason `isStillToPlay` was written; it uses it now.
+- The fantasy squad builder fell back to a locked round and let a fan build fifteen picks
+  before a 409. It picks the open round, then the next upcoming, and says which case it is in.
+- `club_operator` was missing from the client's team-role set; it worked only through the
+  `team_admin` claim. Small things: fantasy cards said "basic data" (an enum), the login page
+  said "seeded staging demo accounts" to an investor, `PagePlaceholder` was dead code.
+
+### The demo dataset is stale by design, and now fixable
+
+The package's match calendar ended on 3 May and its social calendar on 25 July, so it has
+shown empty "Coming up" lists since the day it was generated. The live database is also
+polluted: eighteen leagues (six canonical, ten from an older seed with nonsense geography, a
+draft), 81 foreign teams, 201 foreign users. **`scripts/demo/calendar.ts`** shifts the package
+onto today at seed time — each league by whole weeks so its live matchday is the most recent
+same weekday, social data by whole days from `generatedAt` — pins live matches to minutes
+ago, re-draws the fantasy rounds around the live matchday (round 3 open), and writes the
+world's authority (6 league admins, 60 Club Operators, 2 platform) through the real projector.
+The importer now accepts `--environment demo` bound to the registry (it accepted only staging;
+there was no tool that could seed demo at all) with `SEED-GOALPLACE-DEMO` as the phrase. Dry
+run passes; `npm run demo:validate` prints the drift. **The reset itself is an operator action
+under the protected controls and has not been run.** Do it when billing is back, before any
+investor session: the exact command is in `data/investor-demo/README.md`.
+
+### Still blocked
+
+Demo billing (app and functions cannot deploy; a result entered on demo sits at `submitted`
+because the finalizer cannot run). App Check registration. Beta placeholders.

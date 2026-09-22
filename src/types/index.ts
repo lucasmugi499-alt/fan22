@@ -664,6 +664,26 @@ export interface TeamAssignment {
   updatedAt?: string;
 }
 
+/**
+ * A club's own account of a match (ADR-005). Evidence the league weighs; never a candidate.
+ * Written only by POST /api/matches/[matchId]/team-report, id `${matchId}__${teamId}`.
+ */
+export interface TeamMatchReport {
+  id: string;
+  matchId: string;
+  teamId: string;
+  leagueId: string;
+  seasonId?: string | null;
+  reportedByUserId: string;
+  declaredScore: { home: number; away: number } | null;
+  notes: string;
+  evidenceRefs: string[];
+  officialResultVersionAtReport: number | null;
+  revisions: number;
+  firstReportedAt: string;
+  reportedAt: string;
+}
+
 export interface Roster {
   id: string;
   leagueId: string;

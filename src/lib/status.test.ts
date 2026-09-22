@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   challengeLabel,
   isOfficialMatch,
+  isLiveNow,
   isStillToPlay,
   isUpcomingMatch,
   matchLabel,
@@ -132,9 +133,16 @@ describe('still to play, as a question about time', () => {
       .toBe(true);
   });
 
-  it('includes a live match whatever its kickoff says', () => {
-    expect(isStillToPlay({ status: 'live', scheduledAt: '2026-04-04T15:00:00.000Z' }, now))
+  it('includes a live match while the flag is believable', () => {
+    expect(isStillToPlay({ status: 'live', scheduledAt: '2026-08-30T10:00:00.000Z' }, now))
       .toBe(true);
+  });
+
+  it('stops believing a live flag months after kickoff', () => {
+    // The demo carried six matches "live" since April. Nothing ever closes a live flag, so
+    // the card said "Playing now" about a match nobody had played for five months.
+    expect(isStillToPlay({ status: 'live', scheduledAt: '2026-04-04T15:00:00.000Z' }, now))
+      .toBe(false);
   });
 
   it('excludes anything already played or called off', () => {
@@ -142,6 +150,14 @@ describe('still to play, as a question about time', () => {
       .toBe(false);
     expect(isStillToPlay({ status: 'cancelled', scheduledAt: '2026-09-05T15:00:00.000Z' }, now))
       .toBe(false);
+  });
+
+  it('answers live-now only inside the belief window', () => {
+    expect(isLiveNow({ status: 'live', scheduledAt: '2026-08-30T07:00:00.000Z' }, now)).toBe(true);
+    expect(isLiveNow({ status: 'live', scheduledAt: '2026-08-30T05:59:00.000Z' }, now)).toBe(false);
+    expect(isLiveNow({ status: 'scheduled', scheduledAt: '2026-08-30T11:00:00.000Z' }, now)).toBe(false);
+    // An unreadable kickoff cannot prove the flag stale.
+    expect(isLiveNow({ status: 'live', scheduledAt: 'not a date' }, now)).toBe(true);
   });
 
   it('keeps a fixture with an unreadable date visible', () => {

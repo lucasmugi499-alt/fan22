@@ -177,6 +177,12 @@ Firestore as the KMCFL club operator: fan and foreign-league refusals, report an
 implausible score, impersonation, dispute, withdraw — with the official record untouched
 throughout.
 
+**22 September 2026 — the account reaches the league, and a missed fixture can end.** The
+league match page shows the clubs' accounts beside the decision; the club console reads its
+own back and stops asking. A fixture whose kickoff passed with nothing recorded now has three
+doors — enter the result, reschedule, record as not played — where it had none. The seed writes
+sixty Club Operators through the projector, so a reset demo needs no assignment step.
+
 ## Not decided here
 
 Whether a Club Operator may delegate to same-team staff, and whether athlete stat issues become

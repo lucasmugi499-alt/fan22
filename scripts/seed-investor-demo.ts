@@ -4,6 +4,17 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fantasyDemo } from '../src/data/fantasyDemo';
+import { registeredProjectId, type DeployEnvironment } from './lib/deployTarget';
+import {
+  auditCalendar,
+  demoAccessDocuments,
+  fantasyCollections,
+  planCalendar,
+  rebaseCalendar,
+  rebaseFantasy,
+  type CalendarPlan,
+  type DemoDatabase,
+} from './demo/calendar';
 
 type JsonScalar = string | number | boolean | null;
 type JsonValue = JsonScalar | JsonValue[] | { [key: string]: JsonValue };
@@ -34,7 +45,13 @@ type Args = {
   reset: boolean;
   createAuth: boolean;
   mergeFantasy: boolean;
+  /** Which registered environment the target project must be. Defaults to staging. */
+  environment: SeedEnvironment;
+  /** Shift the package onto today's calendar at write time. See scripts/demo/calendar.ts. */
+  rebaseCalendar: boolean;
 };
+
+type SeedEnvironment = Extract<DeployEnvironment, 'staging' | 'demo' | 'beta'>;
 
 const EXPECTED_COUNTS: Record<string, number> = {
   sports: 3,
@@ -62,6 +79,9 @@ const EXPECTED_COUNTS: Record<string, number> = {
   reports: 12,
   awards: 9,
   finalizations: 240,
+  // Seeded authority (scripts/demo/calendar.ts): 6 league admins, 60 club operators, 2 platform.
+  accessAssignments: 68,
+  accessIndex: 68,
   fantasyCompetitions: fantasyDemo.competitions.length,
   fantasyScoringProfiles: fantasyDemo.scoringProfiles.length,
   fantasySquadRules: fantasyDemo.squadRules.length,
@@ -80,8 +100,12 @@ const EXPECTED_COUNTS: Record<string, number> = {
   fantasyCorrections: fantasyDemo.corrections.length,
 };
 
-const REQUIRED_CONFIRMATION = 'SEED-GOALPLACE-STAGING';
-const FANTASY_CONFIRMATION = 'SYNC-GOALPLACE-FANTASY-STAGING';
+/**
+ * The phrase carries the environment, so a demo reset cannot be confirmed with the staging
+ * phrase and a copied shell history cannot land on the wrong project.
+ */
+const REQUIRED_CONFIRMATION = (environment: SeedEnvironment) => `SEED-GOALPLACE-${environment.toUpperCase()}`;
+const FANTASY_CONFIRMATION = (environment: SeedEnvironment) => `SYNC-GOALPLACE-FANTASY-${environment.toUpperCase()}`;
 const DEFAULT_SOURCE = path.join(process.cwd(), 'data', 'investor-demo');
 const FIREBASE_CONFIG = path.join(
   process.env.HOME ?? '',
@@ -149,6 +173,8 @@ function parseArgs(argv: string[]): Args {
     reset: argv.includes('--reset'),
     createAuth: argv.includes('--create-auth'),
     mergeFantasy: argv.includes('--merge-fantasy'),
+    environment: (value('--environment') ?? 'staging') as SeedEnvironment,
+    rebaseCalendar: argv.includes('--rebase-calendar'),
   };
 }
 
@@ -228,10 +254,22 @@ function validatePackage(database: DatabaseExport, accounts: DemoAccount[]) {
 function requireSafeTarget(args: Args) {
   if (!args.project) throw new Error('--project is required.');
   if (!args.database) throw new Error('--database is required.');
-  const staging = stagingProjectId();
-  if (args.project !== staging) {
+  if (!['staging', 'demo', 'beta'].includes(args.environment)) {
+    throw new Error(`Refusing environment "${args.environment}". Use --environment staging|demo|beta.`);
+  }
+  /*
+   * The project must be the one the registry binds to the named environment. This importer
+   * used to accept only the staging alias, which left the demo project with no tool able to
+   * seed it at all; the registry is the same source the deploy planes check, so a project that
+   * is not registered for the environment named on the command line is refused, not guessed.
+   */
+  const registered = args.environment === 'staging' ? stagingProjectId() : registeredProjectId(args.environment);
+  if (!registered) {
+    throw new Error(`Refusing: '${args.environment}' has no registered project in config/environments.json.`);
+  }
+  if (args.project !== registered) {
     throw new Error(
-      `Refusing target "${args.project}". This importer only accepts the staging alias "${staging}".`,
+      `Refusing target "${args.project}". '${args.environment}' is registered to "${registered}".`,
     );
   }
   if (args.database !== 'fg256') {
@@ -244,13 +282,13 @@ function requireSafeTarget(args: Args) {
       if (args.reset || args.createAuth) {
         throw new Error('Fantasy merge cannot reset data or modify Authentication users.');
       }
-      if (args.confirm !== FANTASY_CONFIRMATION) {
-        throw new Error(`Fantasy merge requires --confirm ${FANTASY_CONFIRMATION}.`);
+      if (args.confirm !== FANTASY_CONFIRMATION(args.environment)) {
+        throw new Error(`Fantasy merge requires --confirm ${FANTASY_CONFIRMATION(args.environment)}.`);
       }
     } else {
       if (!args.reset) throw new Error('Execute requires --reset so package counts remain exact.');
-      if (args.confirm !== REQUIRED_CONFIRMATION) {
-        throw new Error(`Execute requires --confirm ${REQUIRED_CONFIRMATION}.`);
+      if (args.confirm !== REQUIRED_CONFIRMATION(args.environment)) {
+        throw new Error(`Execute requires --confirm ${REQUIRED_CONFIRMATION(args.environment)}.`);
       }
     }
   }
@@ -671,24 +709,31 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   requireSafeTarget(args);
   const source = path.resolve(args.source ?? DEFAULT_SOURCE);
+  const now = new Date();
+  const canonical = readJson<DatabaseExport>(path.join(source, 'database.json'));
+
+  /*
+   * The world as it will be written. With --rebase-calendar every timestamp moves so the
+   * season is in progress today (see scripts/demo/calendar.ts); without it the package is
+   * written as dated, which for the canonical package means a calendar that ended in May.
+   */
+  let plan: CalendarPlan | null = null;
+  let world = canonical as unknown as DemoDatabase;
+  let fantasy = fantasyCollections(fantasyDemo as unknown as Record<string, unknown[]>);
+  if (args.rebaseCalendar) {
+    plan = planCalendar(world, now);
+    world = rebaseCalendar(world, plan);
+    const problems = auditCalendar(world, now);
+    if (problems.length) throw new Error(`Calendar re-base failed its own audit:\n${problems.join('\n')}`);
+    fantasy = rebaseFantasy(fantasy, canonical as unknown as DemoDatabase, world, now);
+  }
+  const access = demoAccessDocuments(world, now);
+
   const database = withAccessProfileFields({
-    ...readJson<DatabaseExport>(path.join(source, 'database.json')),
-    fantasyCompetitions: fantasyDemo.competitions,
-    fantasyScoringProfiles: fantasyDemo.scoringProfiles,
-    fantasySquadRules: fantasyDemo.squadRules,
-    fantasyRounds: fantasyDemo.rounds,
-    fantasyPlayers: fantasyDemo.players,
-    fantasyPlayerPrices: fantasyDemo.playerPrices,
-    fantasyTeams: fantasyDemo.teams,
-    fantasyLineupVersions: fantasyDemo.lineupVersions,
-    fantasyTransfers: fantasyDemo.transfers,
-    fantasyPointEvents: fantasyDemo.pointEvents,
-    fantasyRoundScores: fantasyDemo.roundScores,
-    fantasyLeaderboards: fantasyDemo.leaderboards,
-    fantasyMiniLeagues: fantasyDemo.miniLeagues,
-    fantasyMiniLeagueMembers: fantasyDemo.miniLeagueMembers,
-    fantasyAchievements: fantasyDemo.achievements,
-    fantasyCorrections: fantasyDemo.corrections,
+    ...(world as unknown as DatabaseExport),
+    ...(fantasy as unknown as Record<string, JsonRecord[]>),
+    accessAssignments: access.accessAssignments as unknown as JsonRecord[],
+    accessIndex: access.accessIndex as unknown as JsonRecord[],
   } as unknown as DatabaseExport);
   const accounts = readJson<DemoAccount[]>(path.join(source, 'demo-accounts.json'));
   const counts = validatePackage(database, accounts);
@@ -698,9 +743,13 @@ async function main() {
       {
         mode: args.execute ? 'EXECUTE' : 'DRY RUN',
         operation: args.mergeFantasy ? 'merge-fantasy' : 'full-seed',
+        environment: args.environment,
         project: args.project,
         database: args.database,
         synthetic: database.metadata.synthetic,
+        calendar: plan
+          ? { rebasedTo: plan.now, socialDays: plan.social.days, leagueWeeks: Object.fromEntries(plan.leagues.map((s) => [s.leagueId, s.weeks])) }
+          : 'as dated in the package (pass --rebase-calendar to shift onto today)',
         collections: counts,
         demoAccounts: accounts.length,
       },

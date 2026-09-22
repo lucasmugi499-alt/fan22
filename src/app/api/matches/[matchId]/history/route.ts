@@ -59,11 +59,56 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
     }
     : null;
 
-  const snapshot = await adminDb.collection('matchScheduleChanges')
-    .where('matchId', '==', matchId)
-    .limit(50)
-    .get()
-    .catch(() => null);
+  const [snapshot, reportSnapshot, matchReportSnapshot] = await Promise.all([
+    adminDb.collection('matchScheduleChanges')
+      .where('matchId', '==', matchId)
+      .limit(50)
+      .get()
+      .catch(() => null),
+    /*
+     * The clubs' own accounts of the match (ADR-005). Evidence the league weighs, never a
+     * candidate; it travels with the history because the match page is where the league
+     * decides, and a decision made without seeing what the clubs said is the failure ADR-005
+     * was written to end.
+     */
+    adminDb.collection('teamMatchReports')
+      .where('matchId', '==', matchId)
+      .limit(4)
+      .get()
+      .catch(() => null),
+    // The submitted-not-yet-official report, if one exists (see `matchOperationalRow`).
+    adminDb.collection('matchReports').doc(matchId).get().catch(() => null),
+  ]);
+
+  const matchReport = matchReportSnapshot?.exists ? matchReportSnapshot.data() ?? null : null;
+  // `official` is the finalizer's terminal status; anything else is still in flight.
+  const pendingReport = matchReport && matchReport.status !== 'official'
+    ? {
+      status: String(matchReport.status ?? 'submitted'),
+      source: String(matchReport.source ?? ''),
+      declaredHomeScore: typeof matchReport.declaredHomeScore === 'number' ? matchReport.declaredHomeScore : null,
+      declaredAwayScore: typeof matchReport.declaredAwayScore === 'number' ? matchReport.declaredAwayScore : null,
+      attestedAt: matchReport.attestedAt ?? null,
+    }
+    : null;
+
+  const clubAccounts = (reportSnapshot?.docs ?? []).map((doc) => {
+    const data = doc.data();
+    const declared = data.declaredScore as { home?: number; away?: number } | null | undefined;
+    return {
+      id: doc.id,
+      teamId: String(data.teamId ?? ''),
+      declaredScore: declared && typeof declared.home === 'number' && typeof declared.away === 'number'
+        ? { home: declared.home, away: declared.away }
+        : null,
+      notes: String(data.notes ?? ''),
+      evidenceCount: Array.isArray(data.evidenceRefs) ? data.evidenceRefs.length : 0,
+      revisions: Number(data.revisions ?? 1),
+      firstReportedAt: data.firstReportedAt ?? null,
+      reportedAt: data.reportedAt ?? null,
+      officialResultVersionAtReport: data.officialResultVersionAtReport ?? null,
+    };
+  });
 
   const changes = (snapshot?.docs ?? [])
     .map((doc) => ({ id: doc.id, ...doc.data() }))
@@ -71,5 +116,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
       Date.parse(String((right as { createdAt?: string }).createdAt ?? '')) -
       Date.parse(String((left as { createdAt?: string }).createdAt ?? '')));
 
-  return Response.json({ matchId, assignment, changes }, { headers: { 'cache-control': 'private, no-store' } });
+  return Response.json({ matchId, assignment, changes, clubAccounts, pendingReport }, { headers: { 'cache-control': 'private, no-store' } });
 }

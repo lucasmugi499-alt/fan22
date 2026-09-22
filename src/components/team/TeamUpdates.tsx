@@ -5,7 +5,7 @@ import { Camera, Check, Megaphone, PlusCircle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { resolveMyTeam } from '@/lib/team/teamContext';
+import { useMyTeam } from '@/lib/team/useMyTeam';
 import { FeedPostCard } from '@/components/core/FeedPostCard';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -17,10 +17,10 @@ import { uploadPublishedMedia } from '@/lib/firebase/storage';
 import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 export function TeamUpdates() {
-  const { userProfile, currentUser, isDemoMode, accessContext } = useAuth();
+  const { userProfile, currentUser, isDemoMode } = useAuth();
   const provider = isDemoMode ? mockProvider : dataProvider;
-  const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(() => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext), [userProfile, catalog.teams, isDemoMode, accessContext]);
+  const catalog = useMyTeam();
+  const team = catalog.team;
   const detail = useGoalPlaceData({
     collections: ['feedPosts'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },

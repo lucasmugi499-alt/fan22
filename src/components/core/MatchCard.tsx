@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { CalendarBlank, MapPin, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import type { Match, Team, SportSlug, SportType } from '@/types';
-import { isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { isLiveNow, isOfficialMatch, isUpcomingMatch } from '@/lib/status';
 import { clubColor } from '@/lib/clubColors';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { cn } from '@/lib/utils';
@@ -102,7 +102,8 @@ export function MatchCard({
   const upcoming = isUpcomingMatch(match);
   const official = isOfficialMatch(match);
   const played = match.status === 'completed' || match.status === 'live';
-  const live = match.status === 'live';
+  // "Playing now" is a claim about the present; a flag that has said so since April is not.
+  const live = isLiveNow(match, Date.now());
   const accent = sportColor(match.sport);
 
   const hs = played ? match.score.home : null;

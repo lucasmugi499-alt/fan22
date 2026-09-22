@@ -14,6 +14,7 @@ import { FANTASY_SCORING_PROFILES, FANTASY_SQUAD_RULES } from '@/lib/fantasy/pro
 import { budgetApplies } from '@/lib/fantasy/budget';
 import type {
   FantasyCompetition,
+  FantasyDataLevel,
   FantasyLeaderboardEntry,
   FantasyPlayer,
   FantasyPlayerPrice,
@@ -21,6 +22,17 @@ import type {
   FantasyRound,
 } from '@/types/fantasy';
 import type { League } from '@/types';
+
+/**
+ * What the competition scores from, in words a fan reads. `dataLevel` is the scoring
+ * profile's own name for how much of the match record it consumes; rendered raw it said
+ * "basic data" on every card, which reads as a product that is not finished.
+ */
+const DATA_LEVEL_LABEL: Record<FantasyDataLevel, string> = {
+  basic: 'Scores from core stats',
+  standard: 'Scores from full stats',
+  advanced: 'Scores from advanced stats',
+};
 
 const sportIcon = {
   football: SoccerBall,
@@ -105,7 +117,7 @@ export function FantasyHub({
                       <Icon className="h-6 w-6" weight="fill" />
                     </span>
                     <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-muted">
-                      {competition.dataLevel} data
+                      {DATA_LEVEL_LABEL[competition.dataLevel]}
                     </span>
                   </div>
                   <h3 className="mt-6 text-xl font-bold text-text-strong">{competition.shortName}</h3>
@@ -216,7 +228,7 @@ export function FantasyCompetitionOverview({ bundle }: { bundle: FantasyCompetit
             <span className="rounded-full bg-brand-subtle px-2.5 py-1 capitalize text-brand">{competition.sport}</span>
             <span>{competition.variant.replaceAll('_', ' ')}</span>
             <span>·</span>
-            <span>{competition.dataLevel} data</span>
+            <span>{DATA_LEVEL_LABEL[competition.dataLevel]}</span>
           </div>
           <h1 className="mt-4 font-display text-3xl font-bold text-text-strong sm:text-5xl">{competition.name}</h1>
           <p className="mt-3 text-muted">{league?.name} · 2026 season</p>

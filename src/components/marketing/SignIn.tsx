@@ -199,7 +199,7 @@ export function SignIn({
                   : 'Welcome back'}
           </h1>
           {demoAccessActive ? (
-            <p className="mt-1 text-sm text-muted">Sign in with one of the seeded staging demo accounts.</p>
+            <p className="mt-1 text-sm text-muted">Sign in as one of the demonstration accounts. Every person, club and result here is fictional.</p>
           ) : (
             <p className="mt-1 text-sm text-muted">
               {mode === 'register'
@@ -281,7 +281,7 @@ export function SignIn({
                   {showPassword ? <EyeSlash className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              <p className="text-xs text-muted">Uses the password already seeded in Firebase Auth for this account.</p>
+              <p className="text-xs text-muted">The shared demonstration password. Ask the GoalPlace team if you do not have it.</p>
             </div> : (
               <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 px-3 py-2 text-xs leading-5 text-muted">
                 Local demo mode opens the selected seeded workspace without a password. Firebase staging still requires the seeded demo password.

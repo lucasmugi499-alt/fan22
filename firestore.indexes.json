@@ -627,6 +627,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "leagueId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "scheduledAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "matches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "sport",
           "order": "ASCENDING"
         },

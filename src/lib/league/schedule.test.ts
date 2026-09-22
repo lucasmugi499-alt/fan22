@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSchedulePreview,
+  decideCancel,
   decideReschedule,
   parseFixtureImport,
   matchDates,
@@ -483,5 +484,26 @@ describe('fixture import', () => {
     });
     expect(result.rows).toEqual([]);
     expect(result.errors).toHaveLength(1);
+  });
+});
+
+describe('decideCancel', () => {
+  it('calls off a scheduled fixture with a reason', () => {
+    expect(decideCancel({ status: 'scheduled', currentScheduledAt: '2026-06-06T13:00:00.000Z', reason: 'Pitch waterlogged; no date could be agreed.' }))
+      .toEqual({ ok: true, fromScheduledAt: '2026-06-06T13:00:00.000Z' });
+  });
+
+  it('refuses without a reason', () => {
+    const decision = decideCancel({ status: 'scheduled', currentScheduledAt: '2026-06-06T13:00:00.000Z', reason: 'no' });
+    expect(decision.ok).toBe(false);
+  });
+
+  it('never touches a match with a record', () => {
+    // The failure this guards: a "cancel" that could reach a completed match would be a second
+    // door to the official record, and the platform has exactly one.
+    for (const status of ['live', 'completed', 'cancelled']) {
+      const decision = decideCancel({ status, currentScheduledAt: '2026-06-06T13:00:00.000Z', reason: 'A perfectly good reason.' });
+      expect(decision.ok).toBe(false);
+    }
   });
 });

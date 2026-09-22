@@ -1,10 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { useAuth } from '@/context/AuthProvider';
-import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { resolveMyTeam } from '@/lib/team/teamContext';
+import { useMyTeam } from '@/lib/team/useMyTeam';
 import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
 
 /**
@@ -30,17 +27,12 @@ import { useTeamConsoleAccess } from '@/lib/team/useTeamConsoleAccess';
  * that controls work without knowing why.
  */
 export function ClubAuthorityNotice() {
-  const { userProfile, isDemoMode, accessContext } = useAuth();
-  const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(
-    () => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext),
-    [userProfile, catalog.teams, isDemoMode, accessContext],
-  );
+  const { team, loading } = useMyTeam();
   const access = useTeamConsoleAccess(team?.id);
 
   // Nothing to say until there is a club to say it about, and nothing to say to somebody who
   // can act: the working controls are the notice.
-  if (catalog.loading || !team || !access.readOnly) return null;
+  if (loading || !team || !access.readOnly) return null;
 
   return (
     <aside

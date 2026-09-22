@@ -56,6 +56,7 @@ import {
   ResultSubmissionEvent,
   ResultSubmissionStatus,
   Roster,
+  TeamMatchReport,
   SponsorReport,
   SponsorCampaign,
   SupportNeed,
@@ -444,6 +445,13 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     else if (options?.leagueId) constraints.push(where('leagueId', '==', options.leagueId));
     constraints.push(limitQuery(options?.limit ?? 100));
     return readCollection<Roster>('rosters', constraints);
+  },
+  async getTeamMatchReports(options) {
+    if (!isFirebaseConfigured) return mockProvider.getTeamMatchReports(options);
+    return readCollection<TeamMatchReport>('teamMatchReports', [
+      where('teamId', '==', options.teamId),
+      limitQuery(options.limit ?? 100),
+    ]);
   },
   async getResultSubmissionEvents(matchId) {
     if (!isFirebaseConfigured) return mockProvider.getResultSubmissionEvents(matchId);

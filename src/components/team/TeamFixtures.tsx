@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { CalendarBlank } from '@phosphor-icons/react';
-import { useAuth } from '@/context/AuthProvider';
 import { useGoalPlaceData } from '@/lib/firebase/useGoalPlaceData';
-import { resolveMyTeam, matchesForTeam } from '@/lib/team/teamContext';
+import { matchesForTeam } from '@/lib/team/teamContext';
+import { useMyTeam } from '@/lib/team/useMyTeam';
+import { useTeamMatchReports } from '@/lib/team/useTeamMatchReports';
 import { isOfficialMatch, isStillToPlay } from '@/lib/status';
 import { useNow } from '@/lib/useNow';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
@@ -38,23 +39,29 @@ type Tab = (typeof TABS)[number];
  */
 export function TeamFixtures() {
   const now = useNow();
-  const { userProfile, isDemoMode, accessContext } = useAuth();
-  const catalog = useGoalPlaceData({ collections: ['teams'] });
-  const team = useMemo(
-    () => resolveMyTeam(userProfile, catalog.teams, [], isDemoMode, accessContext),
-    [userProfile, catalog.teams, isDemoMode, accessContext],
-  );
+  const catalog = useMyTeam();
+  const team = catalog.team;
   const detail = useGoalPlaceData({
     collections: ['matches'],
     scope: { teamId: team?.id ?? 'goalplace-pending' },
     recordLimit: 250,
   });
+  // Opponents' names. The club's own league is a bounded list; the whole catalogue is not.
+  const league = useGoalPlaceData({
+    collections: ['teams'],
+    scope: { leagueId: team?.leagueId ?? 'goalplace-pending' },
+    recordLimit: 250,
+  });
   const access = useTeamConsoleAccess(team?.id);
-  const teams = catalog.teams;
+  const teams = league.teams;
   const { matches, error, retry } = detail;
-  const loading = catalog.loading || (Boolean(team) && detail.loading);
+  const loading = catalog.loading || (Boolean(team) && (detail.loading || league.loading));
   const [tab, setTab] = useState<Tab>('Needs your account');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
+  // What the club has already said, so a filed account is not asked for again.
+  const [reportsToken, setReportsToken] = useState(0);
+  const clubReports = useTeamMatchReports(team?.id, reportsToken);
+  const reportedMatchIds = useMemo(() => new Set(clubReports.reports.map((report) => report.matchId)), [clubReports.reports]);
 
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
@@ -69,6 +76,7 @@ export function TeamFixtures() {
        * worth having and exactly when the platform otherwise has no way to hear it.
        */
       'Needs your account': mine
+        .filter((m) => !reportedMatchIds.has(m.id))
         .filter((m) => (m.status === 'completed' && !isOfficialMatch(m))
           || (m.status === 'scheduled' && !isStillToPlay(m, now)))
         .sort(byKickoffDesc),
@@ -77,7 +85,7 @@ export function TeamFixtures() {
         .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt)),
       Results: mine.filter(isOfficialMatch).sort(byKickoffDesc),
     } as Record<Tab, Match[]>;
-  }, [team, matches, now]);
+  }, [team, matches, now, reportedMatchIds]);
 
   if (loading) {
     return (
@@ -149,7 +157,7 @@ export function TeamFixtures() {
           ? teamById.get(activeMatch.homeTeamId === team.id ? activeMatch.awayTeamId : activeMatch.homeTeamId)
           : undefined}
         onClose={() => setActiveMatch(null)}
-        onDone={retry}
+        onDone={() => { retry(); setReportsToken((value) => value + 1); }}
       />
     </div>
   );
