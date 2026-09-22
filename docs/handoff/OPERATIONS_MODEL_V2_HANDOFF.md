@@ -1133,3 +1133,67 @@ only action on the Matches list. Page titles no longer read "… | GoalPlace256 
 
 A 375px sweep of every fan, league and platform surface found no page-level horizontal
 overflow and no leaked `undefined`/`NaN` anywhere.
+
+## Session log — 22 September 2026: the scale-and-misconfiguration pass
+
+Demo is still down on billing (the account is attached but `billingEnabled: false`, so the
+billing account itself is closed or suspended — only its administrator can see why). This
+round went looking for what the earlier passes had not: cost, scale, and the misconfiguration
+that fails open.
+
+### Verified sound, no change needed
+
+Recorded because "we looked" is worth more than silence next time somebody wonders:
+match-ops session authority (takeover revokes **every** prior session, and the generation
+check is defence in depth); the payment webhook (signature before parse, size cap, timestamp
+window) and its settlement (deterministic event id, `create` inside a transaction, so a
+replay loses); upload-session path authority (server-built path, and the team must be in the
+fixture); the points route (server-side amounts, `userId == actor.uid`, idempotency key, and
+the rate-limit identity always carries uid/appId/IP beneath any custom discriminators); the
+search-index repair queue; no un-awaited async guard in a boolean context anywhere.
+
+Also verified as a consequence of last round's work: a **cancelled** fixture is excluded from
+the unreported sweep (`isUnreportedAndStale` requires `scheduled` or `completed`) and can
+never reach a table (`isOfficialMatch`). The new cancel command cannot corrupt a standing.
+
+### Fixed: reads that grow forever
+
+- **The platform desk read eight collections whole and paginated in memory.** On the history
+  filter that is every verified athlete on the platform — a hundred thousand documents to
+  render thirty rows, on every page load. Now capped at 200 per source, with the true queue
+  size coming from `count()` aggregations beside it and a `truncated` flag. Capping alone
+  would have been worse than slow: a desk that says "30 waiting" when thousands are waiting
+  is a lie, so the totals had to stay exact.
+- **The capture-policy preview read every season on the platform** to count the ones below a
+  proposed floor. Now a handful of aggregations; the untagged group (no `capturePolicy`,
+  which Firestore cannot query for) is derived as total minus the tagged counts, so the
+  number is identical to the one the filter produced.
+- **The fantasy admin route read every season on the platform for both roles** — including
+  for the League Admin it had just carefully fetched leagues-by-id for. Seasons are now read
+  by the visible leagues; the platform league catalogue is capped at 300 with a flag.
+- **The fantasy leaderboard rebuild reads its whole competition, and must.** A rank is a
+  statement about every entrant, so a capped read is a *wrong* leaderboard rather than a slow
+  one, and there is no aggregation that ranks. Left alone, with the ceiling and the real fix
+  (incremental maintenance) written into the code so nobody optimises it into wrongness.
+
+### Fixed: demo mode could have shipped to beta
+
+`isDemoModeEnabled` was a denylist of exactly one name: anything that was not `production`
+could enable click-to-become-anyone with a flag alone. `apphosting.yaml` **is** the demo
+overlay and sets `NEXT_PUBLIC_ENABLE_DEMO_LOGIN: "true"`, so a beta backend created without
+naming its overlay inherits that — GP-A7's exact scenario, and the denylist could not close
+it because the dangerous case is the environment nobody thought to list. It is now an
+allowlist (`local`, `unconfigured`, `demo`).
+
+Writing the test for that found a second hole in the fix itself: `goalPlaceEnvironment()`
+answers `'local'` both when nothing is configured **and** when the configured name is
+unrecognised — so a typo'd overlay would have read as a developer's laptop and turned demo
+mode on. `environmentNameIsRecognised()` now separates the two, and the gate fails closed.
+
+### Tests added
+
+The two commands written last round had no route tests: 17 now cover them. The adjudicate
+suite proves the narrow things — right league, real reason, plausible score, legal
+transition, corrected score into `corrected*` fields only, and **nothing written to
+`matches/`**. The cancel suite proves it touches exactly one field and refuses every match
+that carries a record.

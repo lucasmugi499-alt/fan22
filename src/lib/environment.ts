@@ -61,6 +61,19 @@ export function goalPlaceEnvironment(env: NodeJS.ProcessEnv = process.env): Goal
   return 'local';
 }
 
+/**
+ * Whether the environment this process resolved was actually DECLARED, or fell back.
+ *
+ * `goalPlaceEnvironment()` answers 'local' both when nothing is configured and when the
+ * configured name is one it does not recognise. For most callers that is the right, forgiving
+ * behaviour. For anything that decides how much to trust the deployment it is not: a typo in
+ * an overlay would read as a developer's laptop. This separates the two.
+ */
+export function environmentNameIsRecognised(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.GOALPLACE_ENVIRONMENT ?? env.NEXT_PUBLIC_GOALPLACE_ENVIRONMENT;
+  return !raw || ENVIRONMENTS.has(raw as GoalPlaceEnvironment);
+}
+
 export function environmentFlags(env: NodeJS.ProcessEnv = process.env): EnvironmentFlags {
   return {
     allowDemoLogin: booleanEnv(env.GOALPLACE_ALLOW_DEMO_LOGIN) || booleanEnv(env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN),

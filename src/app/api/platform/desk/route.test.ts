@@ -18,9 +18,17 @@ function request(token = 'token', suffix = '') {
 function installFirestore(collections: Record<string, Row[]>) {
   vi.mocked(adminDb.collection).mockImplementation((name: string) => {
     const rows = collections[name] ?? [];
+    // `limit` and `count` mirror the real query the desk builds: documents are capped and the
+    // true queue size comes from an aggregation beside them.
+    const snapshot = (taken: Row[]) => ({
+      docs: taken.map((row) => ({ id: row.id, data: () => row.data })),
+      size: taken.length,
+    });
     const query = {
       where: vi.fn(() => query),
-      get: vi.fn(async () => ({ docs: rows.map((row) => ({ id: row.id, data: () => row.data })) })),
+      limit: vi.fn((n: number) => ({ get: vi.fn(async () => snapshot(rows.slice(0, n))) })),
+      count: vi.fn(() => ({ get: vi.fn(async () => ({ data: () => ({ count: rows.length }) })) })),
+      get: vi.fn(async () => snapshot(rows)),
       doc: (id: string) => ({
         get: vi.fn(async () => {
           const row = rows.find((item) => item.id === id);
@@ -60,5 +68,33 @@ describe('Platform Desk route', () => {
 
     const second = await (await GET(request('token', `&cursor=${encodeURIComponent(first.nextCursor)}`))).json();
     expect(second.items[0]).toMatchObject({ kind: 'application' });
+  });
+
+  it('caps what it reads without understating what is waiting', async () => {
+    /*
+     * The failure this guards. The desk read every matching document in eight collections
+     * and paginated in memory — on the history filter, every verified athlete on the
+     * platform, to render thirty rows. Capping the read is only safe if the queue size
+     * still comes from somewhere exact, or the desk quietly tells an operator there are
+     * thirty decisions waiting when there are thousands.
+     */
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'admin_1', role: 'platform_admin' } as never);
+    const manyAthletes = Array.from({ length: 640 }, (_, index) => ({
+      id: `athlete_${index}`,
+      data: { legalName: `Athlete ${index}`, verificationStatus: 'pending', createdAt: '2026-08-01T00:00:00.000Z' },
+    }));
+    installFirestore({
+      users: [{ id: 'admin_1', data: { role: 'platform_admin', accountClass: 'platform_operator', accountStatus: 'active' } }],
+      accessIndex: [{ id: 'platform_global_admin_1', data: { capabilities: ['platform.audit.read'] } }],
+      athletes: manyAthletes,
+    });
+
+    const body = await (await GET(request())).json();
+
+    // Bounded work: the cap, not the collection.
+    expect(body.counts.athlete_verification).toBe(200);
+    // Honest queue: the aggregation, not the cap.
+    expect(body.sourceTotals.athletes).toBe(640);
+    expect(body.truncated).toBe(true);
   });
 });

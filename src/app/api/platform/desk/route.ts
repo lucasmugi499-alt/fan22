@@ -28,26 +28,65 @@ function decodeCursor(value: string | null) {
   }
 }
 
-async function loadSources(includeClosed = false) {
-  const [applications, athletes, operationalExceptions, reconciliationExceptions, trustReports, payees, settlements, failedJobs] = await Promise.all([
-    adminDb.collection('leagueAdminApplications').where('status', 'in', includeClosed ? ['approved', 'rejected', 'closed'] : ['submitted', 'pending', 'under_review', 'requested_information', 'needs_information']).get(),
-    adminDb.collection('athletes').where('verificationStatus', 'in', includeClosed ? ['verified', 'rejected'] : ['pending', 'disputed']).get(),
-    adminDb.collection('matchOperationalExceptions').where('status', 'in', includeClosed ? ['resolved', 'superseded', 'closed'] : ['open', 'acknowledged', 'escalated', 'pending']).get(),
-    adminDb.collection('reconciliationExceptions').where('status', 'in', includeClosed ? ['resolved', 'superseded', 'closed'] : ['open', 'acknowledged', 'escalated', 'pending']).get(),
-    adminDb.collection('reports').where('status', 'in', includeClosed ? ['resolved', 'dismissed', 'closed'] : ['open', 'investigating', 'escalated', 'pending']).get(),
-    adminDb.collection('athletePayees').where('status', 'in', includeClosed ? ['verified', 'revoked', 'suspended'] : ['submitted', 'rejected']).get(),
-    adminDb.collection('settlements').where('status', 'in', includeClosed ? ['released', 'completed', 'revoked'] : ['held', 'review_required']).get(),
-    adminDb.collection('finalizations').where('status', '==', includeClosed ? 'completed' : 'failed').get(),
-  ]);
+/**
+ * How many documents one source contributes to a single desk read.
+ *
+ * The queue used to read every matching document in all eight collections and paginate the
+ * result in memory. On the history filter that is every verified athlete on the platform —
+ * a hundred thousand documents read to render thirty rows, on every page load. The cap
+ * bounds the work; the exact totals below come from aggregation queries instead, so
+ * bounding what is READ never makes the desk understate what is WAITING.
+ */
+const SOURCE_LIMIT = 200;
+
+function sourceQueries(includeClosed: boolean) {
   return {
-    applications: rows(applications),
-    athletes: rows(athletes),
-    operationalExceptions: rows(operationalExceptions),
-    reconciliationExceptions: rows(reconciliationExceptions),
-    trustReports: rows(trustReports),
-    payees: rows(payees),
-    settlements: rows(settlements),
-    failedJobs: rows(failedJobs),
+    applications: adminDb.collection('leagueAdminApplications').where('status', 'in', includeClosed ? ['approved', 'rejected', 'closed'] : ['submitted', 'pending', 'under_review', 'requested_information', 'needs_information']),
+    athletes: adminDb.collection('athletes').where('verificationStatus', 'in', includeClosed ? ['verified', 'rejected'] : ['pending', 'disputed']),
+    operationalExceptions: adminDb.collection('matchOperationalExceptions').where('status', 'in', includeClosed ? ['resolved', 'superseded', 'closed'] : ['open', 'acknowledged', 'escalated', 'pending']),
+    reconciliationExceptions: adminDb.collection('reconciliationExceptions').where('status', 'in', includeClosed ? ['resolved', 'superseded', 'closed'] : ['open', 'acknowledged', 'escalated', 'pending']),
+    trustReports: adminDb.collection('reports').where('status', 'in', includeClosed ? ['resolved', 'dismissed', 'closed'] : ['open', 'investigating', 'escalated', 'pending']),
+    payees: adminDb.collection('athletePayees').where('status', 'in', includeClosed ? ['verified', 'revoked', 'suspended'] : ['submitted', 'rejected']),
+    settlements: adminDb.collection('settlements').where('status', 'in', includeClosed ? ['released', 'completed', 'revoked'] : ['held', 'review_required']),
+    failedJobs: adminDb.collection('finalizations').where('status', '==', includeClosed ? 'completed' : 'failed'),
+  };
+}
+
+async function loadSources(includeClosed = false) {
+  const queries = sourceQueries(includeClosed);
+  const names = Object.keys(queries) as Array<keyof ReturnType<typeof sourceQueries>>;
+  /*
+   * Documents capped, totals exact. `count()` is an aggregation served by the same
+   * single-field index the filter already uses, so the true size of each queue costs one
+   * cheap query rather than reading the queue.
+   */
+  const [snapshots, totals] = await Promise.all([
+    Promise.all(names.map((name) => queries[name].limit(SOURCE_LIMIT).get())),
+    Promise.all(names.map((name) => queries[name].count().get().catch(() => null))),
+  ]);
+
+  const sourceTotals: Record<string, number> = {};
+  let truncated = false;
+  names.forEach((name, index) => {
+    // A failed aggregation falls back to what was read, which can only understate, never
+    // invent. That is the only case where a printed total could be short.
+    const total = totals[index]?.data().count ?? snapshots[index].size;
+    sourceTotals[name] = total;
+    if (total > snapshots[index].size) truncated = true;
+  });
+
+  const read = (name: keyof ReturnType<typeof sourceQueries>) => rows(snapshots[names.indexOf(name)]);
+  return {
+    applications: read('applications'),
+    athletes: read('athletes'),
+    operationalExceptions: read('operationalExceptions'),
+    reconciliationExceptions: read('reconciliationExceptions'),
+    trustReports: read('trustReports'),
+    payees: read('payees'),
+    settlements: read('settlements'),
+    failedJobs: read('failedJobs'),
+    sourceTotals,
+    truncated,
   };
 }
 
@@ -113,11 +152,18 @@ export async function GET(request: Request) {
     return result;
   }, {});
 
+  /*
+   * `total` and `counts` describe what was ASSEMBLED, which is now a capped read. When a
+   * source is larger than its cap, the true size travels beside it: a desk that says "30
+   * waiting" when a hundred thousand are waiting is worse than a slow desk.
+   */
   return Response.json({
     generatedAt: new Date().toISOString(),
     filter,
     total: filtered.length,
     counts,
+    sourceTotals: source.sourceTotals,
+    truncated: source.truncated,
     items,
     nextCursor: hasMore && items.length ? encodeCursor(items[items.length - 1]) : null,
   }, { headers: { 'cache-control': 'private, no-store' } });

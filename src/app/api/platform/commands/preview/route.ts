@@ -12,7 +12,7 @@ import { environmentReadiness, routingMechanismAvailable } from '@/server/platfo
 import { mergeDependencies, networkDependencies, type NetworkObjectKind } from '@/server/platform/networkDependencies';
 import { policiesBelow } from '@/lib/platform/capturePolicyFloor';
 import { planMerge } from '@/lib/platform/merge';
-import { isCapturePolicy } from '@/lib/capturePolicy';
+import { isCapturePolicy, CAPTURE_POLICIES } from '@/lib/capturePolicy';
 
 export const runtime = 'nodejs';
 
@@ -157,14 +157,29 @@ async function loadLiveFacts(input: {
     facts.proposedPolicyFloor = typeof proposed === 'string' ? proposed : undefined;
     if (isCapturePolicy(proposed)) {
       const lower = policiesBelow(proposed);
-      const [seasons, fixtures] = await Promise.all([
-        adminDb.collection('seasons').get(),
+      /*
+       * Counted, not downloaded. This read every season on the platform to filter them in
+       * memory for a number — a whole-collection read that grows for the life of the
+       * product, to render one preview line.
+       *
+       * A season with no `capturePolicy` resolves to POST_MATCH_ALLOWED, and Firestore
+       * cannot query for an absent field. So the untagged group is derived: the total minus
+       * every season that does carry a policy. Each piece is an aggregation, and the answer
+       * is the same number the filter produced.
+       */
+      const [total, fixtures, ...byPolicy] = await Promise.all([
+        adminDb.collection('seasons').count().get(),
         adminDb.collection('matches').where('status', '==', 'scheduled').count().get(),
+        ...CAPTURE_POLICIES.map((policy) =>
+          adminDb.collection('seasons').where('capturePolicy', '==', policy).count().get()),
       ]);
-      facts.affectedSeasonCount = seasons.docs.filter((document) => {
-        const policy = document.data().capturePolicy;
-        return lower.includes(isCapturePolicy(policy) ? policy : 'POST_MATCH_ALLOWED');
-      }).length;
+      const counted = new Map(CAPTURE_POLICIES.map((policy, index) => [policy, byPolicy[index].data().count]));
+      const tagged = [...counted.values()].reduce((sum, value) => sum + value, 0);
+      const untagged = Math.max(0, total.data().count - tagged);
+      facts.affectedSeasonCount = lower.reduce(
+        (sum, policy) => sum + (counted.get(policy) ?? 0),
+        lower.includes('POST_MATCH_ALLOWED') ? untagged : 0,
+      );
       facts.existingFixtureCount = fixtures.data().count;
     }
   }

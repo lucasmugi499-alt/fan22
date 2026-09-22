@@ -114,6 +114,30 @@ function canAdministerLeague(
  * short-circuits rather than issuing a query that would match nothing.
  */
 /** Reads specific leagues by id, chunked to Firestore's 30-value `in` limit. */
+/**
+ * How many leagues one platform-scoped read returns.
+ *
+ * A Platform Admin is offered the catalogue so they can enable fantasy for a league that has
+ * no competition yet, so this one cannot be narrowed to "leagues with competitions". It can
+ * be bounded: past this the page is a directory, not a console, and the caller is told the
+ * list was cut rather than shown a short list that looks complete.
+ */
+const LEAGUE_CATALOGUE_LIMIT = 300;
+
+/** Documents whose `field` is one of `values`, in chunks of the `in` operator's ceiling. */
+async function readWhereIn(collection: string, field: string, values: string[]) {
+  if (!values.length) return [];
+  const CHUNK = 30;
+  const chunks: string[][] = [];
+  for (let index = 0; index < values.length; index += CHUNK) {
+    chunks.push(values.slice(index, index + CHUNK));
+  }
+  const snapshots = await Promise.all(chunks.map((chunk) =>
+    adminDb.collection(collection).where(field, 'in', chunk).get()));
+  return snapshots.flatMap((snapshot) =>
+    snapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data())));
+}
+
 async function readLeaguesByIds(leagueIds: string[]) {
   if (!leagueIds.length) return [];
   const CHUNK = 30;
@@ -157,7 +181,6 @@ export async function GET(request: Request) {
 
   const [
     leaguesSnapshot,
-    seasonsSnapshot,
     competitionsSnapshot,
     profilesSnapshot,
     rulesSnapshot,
@@ -167,9 +190,8 @@ export async function GET(request: Request) {
     // page and an incident, and every row it discards was one they were never allowed to see.
     role === 'league_admin'
       ? readLeaguesByIds([...scopedLeagueIds])
-      : adminDb.collection('leagues').get().then((snapshot) =>
+      : adminDb.collection('leagues').limit(LEAGUE_CATALOGUE_LIMIT).get().then((snapshot) =>
         snapshot.docs.map((item) => normalizeFirestoreValue(item.id, item.data()))),
-    adminDb.collection('seasons').get(),
     adminDb.collection('fantasyCompetitions').get(),
     // Definition collections: one document per scoring profile and squad rule set, shared
     // across competitions. These stay whole reads because they are bounded by design.
@@ -180,6 +202,12 @@ export async function GET(request: Request) {
     ? leaguesSnapshot.filter((league) => canAdministerLeague(role, String(league.id), scopedLeagueIds))
     : leaguesSnapshot;
   const visibleLeagueIds = new Set(visibleLeagues.map((league) => String(league.id)));
+  /*
+   * Seasons for the leagues on screen, not every season on the platform. This collection was
+   * read whole and filtered down here — for a League Admin too, which undid the care taken
+   * directly above to fetch only their own leagues by id.
+   */
+  const seasons = await readWhereIn('seasons', 'leagueId', [...visibleLeagueIds]);
   const competitions = competitionsSnapshot.docs
     .map((item) => normalizeFirestoreValue(item.id, item.data()))
     .filter((competition) => visibleLeagueIds.has(String(competition.leagueId)));
@@ -248,9 +276,8 @@ export async function GET(request: Request) {
   return Response.json({
     role,
     leagues: visibleLeagues,
-    seasons: seasonsSnapshot.docs
-      .map((item) => normalizeFirestoreValue(item.id, item.data()))
-      .filter((season) => visibleLeagueIds.has(String(season.leagueId))),
+    seasons,
+    leaguesTruncated: role !== 'league_admin' && visibleLeagues.length >= LEAGUE_CATALOGUE_LIMIT,
     competitions,
     scoringProfiles,
     squadRules,

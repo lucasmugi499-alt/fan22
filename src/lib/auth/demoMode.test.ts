@@ -29,4 +29,42 @@ describe('demo mode flag', () => {
       isDemoModeEnabled: false,
     });
   });
+
+  /**
+   * The case a denylist of `production` could not see.
+   *
+   * `apphosting.yaml` IS the demo overlay, and it sets NEXT_PUBLIC_ENABLE_DEMO_LOGIN true.
+   * A beta backend created without naming `apphosting.beta.yaml` inherits that, and beta is
+   * not production — so the old gate would have shipped a click-to-become-anyone switch to
+   * real beta users.
+   */
+  it.each(['beta', 'maintenance'])('keeps demo login disabled in %s however the flags arrive', async (environment) => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_GOALPLACE_ENVIRONMENT', environment);
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_DEMO_LOGIN', 'true');
+    vi.stubEnv('GOALPLACE_ALLOW_DEMO_LOGIN', 'true');
+
+    await expect(loadDemoMode()).resolves.toMatchObject({
+      isDemoModeEnabled: false,
+    });
+  });
+
+  it('refuses an environment name it does not recognise', async () => {
+    // Fail closed: a typo in an overlay is not a licence to hand out demo sessions.
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_GOALPLACE_ENVIRONMENT', 'beta-2');
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_DEMO_LOGIN', 'true');
+
+    await expect(loadDemoMode()).resolves.toMatchObject({
+      isDemoModeEnabled: false,
+    });
+  });
+
+  it('still works for local development with nothing configured', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+
+    await expect(loadDemoMode()).resolves.toMatchObject({
+      isDemoModeEnabled: true,
+    });
+  });
 });

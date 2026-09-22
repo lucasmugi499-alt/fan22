@@ -367,6 +367,21 @@ export async function scoreFinalizedFantasyMatch(
   return outcome;
 }
 
+/**
+ * The whole competition, read whole, deliberately.
+ *
+ * Every other large read in this codebase has been bounded — capped with an aggregation
+ * beside it for the true total, or scoped to the ids actually being shown. This one is not,
+ * and must not be: a rank is a statement about every entrant, so a leaderboard built from a
+ * capped read is not a slower leaderboard, it is a wrong one. There is no aggregation that
+ * ranks.
+ *
+ * So the ceiling is real and is stated here rather than hidden: at competition sizes in the
+ * tens of thousands this holds every team and every round score in memory, inside a
+ * scheduled function bounded by `maxInstances` and a 300s timeout. The fix when that day
+ * comes is incremental maintenance — a running total updated as each round is scored — not
+ * a limit on this query.
+ */
 async function rebuildFantasyLeaderboard(db: Firestore, competitionId: string) {
   const [teamSnapshots, scoreSnapshots] = await Promise.all([
     db.collection('fantasyTeams').where('competitionId', '==', competitionId).get(),

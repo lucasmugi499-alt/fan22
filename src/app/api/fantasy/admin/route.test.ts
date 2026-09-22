@@ -15,6 +15,9 @@ vi.mock('@/lib/firebase/admin', () => ({
 /** Records which league ids were requested by id rather than scanned. */
 const requestedLeagueIds: string[] = [];
 
+/** Records which league ids the seasons query asked for. */
+const requestedSeasonLeagueIds: string[] = [];
+
 /** Records which competition ids a per-competition query asked for. */
 const requestedCompetitionIds: Record<string, string[]> = {};
 
@@ -80,6 +83,7 @@ function capturePolicyStubs(seasonPolicy: string | undefined = 'FIELD_REQUIRED')
 describe('fantasy admin activation route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requestedSeasonLeagueIds.length = 0;
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({
       uid: 'platform_1',
       role: 'platform_admin',
@@ -297,10 +301,20 @@ describe('fantasy admin activation route', () => {
         ])),
       },
       seasons: {
-        get: vi.fn().mockResolvedValue(querySnapshot([
-          doc('season_allowed', { id: 'season_allowed', leagueId: 'league_allowed' }),
-          doc('season_blocked', { id: 'season_blocked', leagueId: 'league_blocked' }),
-        ])),
+        // Seasons are fetched by league now, not scanned. The mock serves only what was
+        // asked for, so a route that went back to scanning would return nothing and fail.
+        where: (_field: string, _op: string, ids: string[]) => {
+          requestedSeasonLeagueIds.push(...ids);
+          const all = [
+            doc('season_allowed', { id: 'season_allowed', leagueId: 'league_allowed' }),
+            doc('season_blocked', { id: 'season_blocked', leagueId: 'league_blocked' }),
+          ];
+          return {
+            get: vi.fn().mockResolvedValue(querySnapshot(
+              all.filter((season) => ids.includes(String(season.data()?.leagueId))),
+            )),
+          };
+        },
       },
       fantasyCompetitions: {
         get: vi.fn().mockResolvedValue(querySnapshot([
@@ -359,6 +373,8 @@ describe('fantasy admin activation route', () => {
     expect(requestedCompetitionIds.fantasyPlayerPrices).toEqual(['competition_allowed']);
     expect(requestedCompetitionIds.fantasyRounds).toEqual(['competition_allowed']);
     expect(body.leagues.map((league: { id: string }) => league.id)).toEqual(['league_allowed']);
+    // Stronger than filtering the result: the other league's seasons are never requested.
+    expect(requestedSeasonLeagueIds).toEqual(['league_allowed']);
     expect(body.seasons.map((season: { id: string }) => season.id)).toEqual(['season_allowed']);
     expect(body.competitions.map((competition: { id: string }) => competition.id)).toEqual(['competition_allowed']);
   });
