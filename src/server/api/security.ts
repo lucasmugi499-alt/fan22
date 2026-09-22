@@ -250,10 +250,18 @@ export async function requireAuthenticatedMutation<T extends z.ZodTypeAny>(
         ?? (typeof data?.role === 'string' ? data.role : null),
     });
     if (!allowed.includes(accountClass)) {
+      // Said in the product's words. The enum names read as "a organization_operator account"
+      // to the person refused, which is both ungrammatical and an implementation detail.
+      const names: Record<string, string> = {
+        fan: 'Fan',
+        athlete: 'Athlete',
+        organization_operator: 'Organization Operator',
+        platform_operator: 'Platform Operator',
+      };
       return {
         response: jsonError(
           options.accountClassError
-            ?? `This action requires a ${allowed.join(' or ')} account.`,
+            ?? `This action needs ${allowed.map((value) => names[value] ?? value).join(' or ')} account access.`,
           403,
         ),
       };

@@ -95,7 +95,8 @@ describe('athlete creation route hardening', () => {
   });
 
   it('allows a League Admin with scoped athlete access even without legacy team arrays', async () => {
-    const transaction = { set: vi.fn() };
+    // `get` serves the rate limiter that now guards registration; `set` is the athlete write.
+    const transaction = { set: vi.fn(), get: vi.fn(async () => ({ exists: false, data: () => undefined })) };
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValue({ uid: 'team_admin_1', role: 'league_admin' });
     vi.mocked(adminDb.runTransaction).mockImplementation(async (callback: (tx: typeof transaction) => unknown) => callback(transaction) as never);
     installFirestoreMock({

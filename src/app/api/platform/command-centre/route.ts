@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { jsonError, requireAuthenticatedUser, requireRole } from '@/server/api/security';
+import { jsonError, requireActivePrincipal, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 
 export const runtime = 'nodejs';
 
@@ -176,6 +176,9 @@ export async function GET(request: Request) {
 
   const forbidden = requireRole(auth.actor, ['platform_admin', 'super_admin'], 'Platform Admin access required.');
   if (forbidden) return forbidden;
+  // Same as the desk and integrity feeds: a suspended platform account reads nothing.
+  const inactive = await requireActivePrincipal(auth.actor);
+  if (inactive) return inactive;
 
   const profile = await adminDb.collection('users').doc(auth.actor.uid).get();
   const profileData = profile.data();

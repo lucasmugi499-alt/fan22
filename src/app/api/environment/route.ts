@@ -1,7 +1,8 @@
 import { publicEnvironment } from '@/lib/environment';
 import { activationFromEnvironment } from '@/server/finalizerActivation';
 import { currentTeamAuthorityStage } from '@/lib/auth/teamAuthorityStage';
-import { schedulerAuthDiagnostics } from '@/server/api/security';
+import { requireAuthenticatedUser, schedulerAuthDiagnostics } from '@/server/api/security';
+import { hasCapabilityOrPlatformGrant } from '@/server/access/capabilities';
 
 export const runtime = 'nodejs';
 
@@ -18,8 +19,31 @@ export const runtime = 'nodejs';
  * Public and unauthenticated: it exposes only what a client already needs in order to
  * decide whether its local state belongs to this environment.
  */
-export function GET(request: Request) {
+/**
+ * Who may read the enforcement state below.
+ *
+ * Identity (which environment, which version, which project, which host) is public: the
+ * boundary component reads it anonymously to notice that it has been moved. The enforcement
+ * state — whether the gateway is required, whether the finalizer is on, which scheduler
+ * credentials are unconfigured — was public too, and it is a map of what is not enforced.
+ * That belongs to the operator who can act on it, so it is reported only to an authenticated
+ * platform operator; everyone else gets the identity and nothing about the locks.
+ */
+async function callerMayReadDiagnostics(request: Request) {
+  if (!request.headers.get('authorization')) return false;
+  const auth = await requireAuthenticatedUser(request);
+  if ('response' in auth) return false;
+  // A capability, not a role string: the same one the system-health console reads with.
+  return hasCapabilityOrPlatformGrant(
+    auth.actor.uid,
+    { scopeType: 'platform', scopeId: 'global' },
+    'platform.audit.read',
+  );
+}
+
+export async function GET(request: Request) {
   const identity = publicEnvironment();
+  const diagnostics = await callerMayReadDiagnostics(request);
 
   return Response.json({
     ...identity,
@@ -37,7 +61,7 @@ export function GET(request: Request) {
     publicBaseUrl: process.env.GOALPLACE_APP_BASE_URL ?? null,
     // Reported so the boundary and an operator can see enforcement state without
     // guessing. Gateway-only protection is deliberately off for the direct demo origin.
-    gatewayRequired: process.env.GOALPLACE_REQUIRE_GATEWAY_SECRET === 'true',
+    ...(diagnostics ? { gatewayRequired: process.env.GOALPLACE_REQUIRE_GATEWAY_SECRET === 'true' } : {}),
     // The finalizer activation this runtime believes it is in.
     //
     // The gate binds to the finalization path, and App Hosting reaches that path through
@@ -45,7 +69,7 @@ export function GET(request: Request) {
     // An unset variable resolves to `off`, which would silently stop those routes
     // finalizing — reporting the mode makes that visible instead of a mystery. It is the
     // mode only, never the canary allowlist: submission ids are not public.
-    finalizerMode: activationFromEnvironment().mode,
+    ...(diagnostics ? { finalizerMode: activationFromEnvironment().mode } : {}),
     /**
      * The team authority sunset stage THIS runtime is in.
      *
@@ -61,7 +85,7 @@ export function GET(request: Request) {
      * `frozen`, so a deployment that failed to declare it looks identical to one that chose
      * it, which is exactly the ambiguity worth removing. It is a stage name, not a secret.
      */
-    teamAuthorityStage: currentTeamAuthorityStage(),
+    ...(diagnostics ? { teamAuthorityStage: currentTeamAuthorityStage() } : {}),
     /**
      * Whether each scheduler-authenticated route can authenticate a scheduler at all.
      *
@@ -74,7 +98,7 @@ export function GET(request: Request) {
      * Names variables and operations only. No secret value, and no indication of what a
      * correct credential looks like, so it is safe on a public endpoint.
      */
-    schedulerAuth: schedulerAuthDiagnostics(),
+    ...(diagnostics ? { schedulerAuth: schedulerAuthDiagnostics() } : { diagnostics: 'withheld' }),
   }, {
     headers: {
       // Never cached: a stale identity is worse than none, since the entire purpose is

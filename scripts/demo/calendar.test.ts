@@ -103,6 +103,10 @@ describe('the authority the demo starts with', () => {
   it('gives every league admin and platform account a projected index', () => {
     expect(docs.accessIndex.filter((i) => i.scopeType === 'league')).toHaveLength(6);
     expect(docs.accessIndex.filter((i) => i.scopeType === 'platform')).toHaveLength(2);
+    // The platform scope id the routes read is `global`; any other spelling is an index nobody consults.
+    expect(docs.accessIndex.filter((i) => i.scopeType === 'platform').map((i) => i.id)).toEqual([
+      'platform_global_user_platform_001', 'platform_global_user_platform_002',
+    ]);
   });
 });
 

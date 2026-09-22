@@ -1080,3 +1080,39 @@ investor session: the exact command is in `data/investor-demo/README.md`.
 
 Demo billing (app and functions cannot deploy; a result entered on demo sits at `submitted`
 because the finalizer cannot run). App Check registration. Beta placeholders.
+
+### Same day, later: the second audit pass
+
+Read every browser write path against the rules, every route against its guard, and the
+storage rules, headers and seeded deep links.
+
+- **A League Admin's browser could still write corrected scores onto a V1 claim**, with no
+  command, no reason and no audit event, and the finalizer made them official.
+  `LeagueResolveSheet` ran a Firestore transaction the rules permitted for any league
+  operator. That is a second door to the record. It is closed: `resultSubmissions` and its
+  events accept **no browser writes from any role in any state** (the rules tests now assert
+  that shape), the sheet goes through `POST /api/result-submissions/{matchId}/adjudicate`
+  under `secureLeagueCommand` with `league.result.resolve` and a required reason, and the
+  four V1 provider methods refuse with the new address. Exercised on demo: fan, foreign
+  league, missing reason, implausible score and repeat decision all refused; a reject landed
+  with its audit event. The 24 seeded disputes are still open for the league to settle.
+- **`hasTeamOperatorCapability` is gone from the rules.** It listed the retired V1 bundle
+  and gated rosters, support needs and feed posts — dormant only until somebody set the stage
+  to `active`. Each write names its ADR-005 capability; `isClubOperatorFor` is the read
+  predicate. The last `team.profile.manage` spelling went with it.
+- Shape caps where the standard had not reached: `challenges` and `supportNeeds` creates
+  carry key allowlists, text caps and numeric ceilings; the user's follow arrays are capped
+  (500/500/200) and profile text bounded.
+- `/api/environment` reported the gateway, finalizer and scheduler-credential state to
+  anyone. Identity stays public; enforcement state needs `platform.audit.read`. The probe
+  reads it with `GOALPLACE_PROBE_ID_TOKEN`.
+- `POST /api/athletes` sent an invitation email per call with no ceiling: 60 an hour per
+  operator now. The platform command-centre feed checks the principal is active like its
+  siblings. Refusal copy no longer reads "a organization_operator account".
+- The seed wrote platform assignments under scope id `platform`; the routes read `global`.
+  Caught by the test that now pins the ids.
+
+**Process failure, recorded so it is not repeated:** `40e6e67` was pushed on a background-task
+notification that said "exit code 0". That was the wrapper's exit; the gate log ended
+`EXIT=1` on a lint error (`Date.now()` in `MatchCard` render). Fixed here with `useNow`.
+The only evidence a gate passed is the `REAL_EXIT=0` line read from its log.

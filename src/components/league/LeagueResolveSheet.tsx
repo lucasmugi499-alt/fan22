@@ -112,17 +112,52 @@ export function LeagueResolveSheet({
       return;
     }
 
+    if (note.trim().length < 4) {
+      toast.error('Write the reason for this decision. It is kept beside the result.');
+      return;
+    }
+
     outcome.start();
     try {
-      await provider.resolveDisputedSubmission({
-        matchId: match.id,
-        resolvedByUserId: actorUserId,
-        decision,
-        ...(decision === 'correct'
-          ? { correctedScore: { home: correctedHome, away: correctedAway } }
-          : {}),
-        ...(note.trim() ? { note: note.trim() } : {}),
-      });
+      if (isDemoMode) {
+        await provider.resolveDisputedSubmission({
+          matchId: match.id,
+          resolvedByUserId: actorUserId,
+          decision,
+          ...(decision === 'correct' ? { correctedScore: { home: correctedHome, away: correctedAway } } : {}),
+          note: note.trim(),
+        });
+      } else {
+        /*
+         * Through the audited command, never a browser transaction. The decision used to be
+         * written straight to Firestore from here, which was a second door to the official
+         * record beside the one the platform governs. The command carries the capability
+         * check on the claim's own league, the reason, and the audit event.
+         */
+        if (!currentUser) throw new Error('Sign in again to settle this result.');
+        const response = await fetch(`/api/result-submissions/${encodeURIComponent(match.id)}/adjudicate`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${await currentUser.getIdToken()}` },
+          body: JSON.stringify({
+            decision,
+            ...(decision === 'correct' ? { correctedScore: { home: correctedHome, away: correctedAway } } : {}),
+            reason: note.trim(),
+          }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error ?? 'The decision could not be saved.');
+        if (decision !== 'reject') {
+          const finalize = await fetch(`/api/result-submissions/${encodeURIComponent(match.id)}/finalize`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${await currentUser.getIdToken()}` },
+            body: '{}',
+          });
+          if (!finalize.ok) {
+            const detail = await finalize.json().catch(() => ({}));
+            throw new Error(detail.error ?? 'The decision was recorded but finalization could not be requested.');
+          }
+        }
+      }
       if (decision === 'reject') {
         // Rejection is terminal on its own: nothing is finalized, so there is no outcome to
         // wait for. Ending the wait explicitly keeps the sheet from timing out on a decision
@@ -284,7 +319,7 @@ export function LeagueResolveSheet({
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 rows={3}
-                placeholder="Record the evidence or ruling behind this decision."
+                placeholder="Record the evidence or ruling behind this decision. Required."
                 className="w-full resize-none rounded-[var(--radius-md)] border border-border-strong bg-surface-2 px-3 py-2.5 text-sm text-text-strong outline-none focus:border-brand"
               />
             </label>

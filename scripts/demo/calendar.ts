@@ -275,9 +275,9 @@ export function demoAccessDocuments(database: DemoDatabase, now: Date): {
     const role = String(user.role ?? '');
     const userId = String(user.id ?? user.uid);
     if (role === 'platform_admin') {
-      assignments.push({ ...base, id: `assignment_seed_platform_${userId}`, userId, roleKey: 'platform_admin', scopeType: 'platform', scopeId: 'platform', permissionBundleId: 'platform_admin' });
+      assignments.push({ ...base, id: `assignment_seed_platform_${userId}`, userId, roleKey: 'platform_admin', scopeType: 'platform', scopeId: 'global', permissionBundleId: 'platform_admin' });
     } else if (role === 'super_admin') {
-      assignments.push({ ...base, id: `assignment_seed_platform_${userId}`, userId, roleKey: 'super_admin', scopeType: 'platform', scopeId: 'platform', permissionBundleId: 'super_admin_governance' });
+      assignments.push({ ...base, id: `assignment_seed_platform_${userId}`, userId, roleKey: 'super_admin', scopeType: 'platform', scopeId: 'global', permissionBundleId: 'super_admin_governance' });
     }
   }
 

@@ -37,7 +37,18 @@ async function getJson(url: string, timeoutMs: number) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+    /*
+     * The enforcement-state fields (gateway, finalizer, scheduler credentials) are reported
+     * only to an authenticated platform operator; anonymously the endpoint answers with the
+     * identity alone and `diagnostics: "withheld"`. Pass a platform operator's ID token in
+     * GOALPLACE_PROBE_ID_TOKEN to read them.
+     */
+    const token = process.env.GOALPLACE_PROBE_ID_TOKEN;
+    const response = await fetch(url, {
+      signal: controller.signal,
+      cache: 'no-store',
+      ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+    });
     return { ok: response.ok, status: response.status, body: await response.json().catch(() => null) };
   } catch {
     return { ok: false, status: 0, body: null };
@@ -88,7 +99,7 @@ export async function probeOrigin(
     environmentVersion: typeof body.environmentVersion === 'string' ? body.environmentVersion : undefined,
     firebaseProjectId,
     servedBy: typeof body.servedBy === 'string' ? body.servedBy : undefined,
-    gatewayRequired: body.gatewayRequired === true,
+    gatewayRequired: typeof body.gatewayRequired === 'boolean' ? body.gatewayRequired : undefined,
     finalizerMode: typeof body.finalizerMode === 'string' ? body.finalizerMode : undefined,
     checks: (healthBody.checks ?? {}) as Record<string, string>,
     problems,
@@ -111,10 +122,14 @@ async function main() {
   console.log(`Environment: ${result.environment ?? 'unknown'} (${result.environmentVersion ?? 'unknown'})`);
   console.log(`Project: ${result.firebaseProjectId ?? 'unknown'}`);
   console.log(`Served by: ${result.servedBy ?? 'unknown'}`);
-  console.log(`Gateway required: ${result.gatewayRequired ? 'yes' : 'no'}`);
-  // The activation this origin would apply to a correction or a /finalize call. `off` here
-  // while the Cloud Functions are `enabled` means the two runtimes disagree.
-  console.log(`Finalizer mode (this origin): ${result.finalizerMode ?? 'unreported'}`);
+  if (result.gatewayRequired === undefined && result.finalizerMode === undefined) {
+    console.log('Enforcement state: withheld (set GOALPLACE_PROBE_ID_TOKEN to a platform operator ID token to read it)');
+  } else {
+    console.log(`Gateway required: ${result.gatewayRequired ? 'yes' : 'no'}`);
+    // The activation this origin would apply to a correction or a /finalize call. `off` here
+    // while the Cloud Functions are `enabled` means the two runtimes disagree.
+    console.log(`Finalizer mode (this origin): ${result.finalizerMode ?? 'unreported'}`);
+  }
   console.log(`Dependencies: ${JSON.stringify(result.checks ?? {})}`);
   for (const problem of result.problems) console.log(`  ! ${problem}`);
 

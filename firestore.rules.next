@@ -137,16 +137,23 @@ service cloud.firestore {
         ]);
     }
 
-    function hasTeamOperatorCapability(teamId) {
+    /**
+     * Any Club Operator authority over the team, for READS of the club's own private records.
+     *
+     * `hasTeamOperatorCapability` used to live here, listing the retired V1 authority — a club
+     * writing its own roster and confirming its opponent's result. With the team stage at
+     * `retired` nothing held those capabilities, so every rule consulting it was dormant,
+     * waiting on nothing more than `GOALPLACE_TEAM_AUTHORITY_STAGE=active` to reopen. The
+     * helper is gone; each write below names the one ADR-005 capability it needs.
+     */
+    function isClubOperatorFor(teamId) {
       return hasScopeCapability('team', teamId, [
-          'team.profile.manage',
-          'team.staff.invite',
-          'team.roster.manage',
-          'team.athlete.create',
-          'team.athlete.invite',
-          'team.result.submit',
-          'team.result.confirm',
-          'team.update.publish',
+          'team.profile.edit',
+          'team.roster.propose',
+          'team.content.publish',
+          'team.media.manage',
+          'team.result.report',
+          'team.result.dispute',
         ]);
     }
 
@@ -173,7 +180,7 @@ service cloud.firestore {
     }
 
     function canReadTeamById(teamId) {
-      return isPlatformAdmin() || hasTeamOperatorCapability(teamId);
+      return isPlatformAdmin() || isClubOperatorFor(teamId);
     }
 
     function athletePath(athleteId) {
@@ -223,66 +230,6 @@ service cloud.firestore {
         'athleteStatLines', 'evidenceRefs', 'evidenceNote', 'status', 'revision', 'submittedAsFinal',
         'confirmationDeadline', 'resultVersion', 'submittedAt'
       ];
-    }
-
-    function validNewSubmission(matchId) {
-      return request.resource.data.keys().hasOnly(newSubmissionFields()) &&
-        matchId == request.resource.data.matchId &&
-        submissionMatchesFixture(matchId, request.resource.data) &&
-        request.resource.data.submittedByTeamId != request.resource.data.opponentTeamId &&
-        request.resource.data.status == 'pending_confirmation' &&
-        request.resource.data.submittedByUserId == request.auth.uid &&
-        request.resource.data.homeScore is int &&
-        request.resource.data.homeScore >= 0 &&
-        request.resource.data.awayScore is int &&
-        request.resource.data.awayScore >= 0 &&
-        request.resource.data.scorers is list &&
-        // Size caps, not just type checks.
-        //
-        // The finalizer expands these lists into squad, scoring and stat events inside one
-        // transaction. Unbounded input is an unbounded write plan; a plan over Firestore's
-        // operation budget fails, the trigger retries, and one oversized document becomes a
-        // permanently retrying function with the match stuck out of official state. The
-        // ceilings are generous by design — they stop amplification, they do not referee
-        // team sheets. Mirrored in src/lib/sport/submissionLimits.ts.
-        request.resource.data.scorers.size() <= 60 &&
-        request.resource.data.homeScore <= 300 &&
-        request.resource.data.awayScore <= 300 &&
-        (!request.resource.data.keys().hasAny(['activeSquads']) || (
-          request.resource.data.activeSquads is map &&
-          request.resource.data.activeSquads.keys().size() <= 2
-        )) &&
-        (!request.resource.data.keys().hasAny(['athleteStatLines']) || (
-          request.resource.data.athleteStatLines is list &&
-          request.resource.data.athleteStatLines.size() <= 120
-        )) &&
-        request.resource.data.evidenceRefs is list &&
-        request.resource.data.evidenceRefs.size() <= 20 &&
-        get(matchPath(matchId)).data.status in ['completed', 'live'] &&
-        get(matchPath(matchId)).data.verificationStatus != 'verified' &&
-        !('officialResultVersion' in get(matchPath(matchId)).data) &&
-        request.resource.data.revision is int &&
-        request.resource.data.revision >= 1 &&
-        request.resource.data.resultVersion is int &&
-        request.resource.data.resultVersion >= 1 &&
-        request.resource.data.submittedAsFinal == true &&
-        request.resource.data.confirmationDeadline is string &&
-        request.resource.data.submittedAt is string;
-    }
-
-    // Fields that describe the original claim. Once submitted they are immutable: an
-    // adjudicated score is written to correctedHomeScore/correctedAwayScore so the claim
-    // and the ruling both survive for audit.
-    function submissionClaimFields() {
-      return [
-        'matchId', 'leagueId', 'seasonId', 'submittedByTeamId', 'opponentTeamId',
-        'submittedByUserId', 'homeScore', 'awayScore', 'scorers', 'revision', 'submittedAt'
-      ];
-    }
-
-    function claimUnchanged() {
-      return !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(submissionClaimFields());
     }
 
     function changedKeysWithin(allowed) {
@@ -340,13 +287,21 @@ service cloud.firestore {
         request.resource.data.points == 0 &&
         request.resource.data.walletBalance == 0;
       allow read: if isOwner(uid) || isPlatformAdmin();
+      // The follow arrays are the one thing on this document that grows without a natural
+      // ceiling. Five hundred follows is a devoted fan; a megabyte of ids is a payload.
       allow update: if
         (isOwner(uid) && changedKeysWithin([
           'name', 'displayName', 'city', 'avatarUrl', 'photoURL',
           'followedAthletes', 'followedTeams', 'followedLeagues',
           'sportPreferences', 'notificationPreferences', 'onboardingCompletedAt',
           'lowDataMode', 'updatedAt'
-        ]));
+        ]) &&
+        shortText(request.resource.data.get('name', ''), 200) &&
+        shortText(request.resource.data.get('displayName', ''), 200) &&
+        shortText(request.resource.data.get('city', ''), 120) &&
+        request.resource.data.get('followedAthletes', []).size() <= 500 &&
+        request.resource.data.get('followedTeams', []).size() <= 500 &&
+        request.resource.data.get('followedLeagues', []).size() <= 200);
       allow delete: if false;
     }
 
@@ -422,9 +377,9 @@ service cloud.firestore {
           request.resource.data.adminUserIds.size() == 0 &&
           request.resource.data.verified == false);
       /*
-       * Two authorities may edit a club's profile, and the field list is what keeps both
-       * honest. `team.profile.manage` is the retired V1 spelling, left so an old grant keeps
-       * working through the drain. `team.profile.edit` is the Club Operator's, from ADR-005.
+       * The Club Operator edits the club's profile (`team.profile.edit`, ADR-005), and the field
+       * list is what keeps that honest. The retired V1 spelling `team.profile.manage` was
+       * honoured here "through the drain"; the drain is over and it is gone.
        *
        * Neither reaches `verified`, `leagueId`, `plan` or `sport`: those are facts about the
        * club's standing in the competition, and the club is the one party that must not set
@@ -433,8 +388,7 @@ service cloud.firestore {
        */
       allow update: if
         (
-          (hasScopeCapability('team', teamId, ['team.profile.manage']) ||
-            hasClubOperatorCapability(teamId, 'team.profile.edit')) &&
+          hasClubOperatorCapability(teamId, 'team.profile.edit') &&
           changedKeysWithin([
             'name', 'city', 'location', 'description', 'logoUrl', 'logoURL',
             'coverUrl', 'coverURL', 'primaryColor', 'secondaryColor', 'foundedYear', 'homeVenue',
@@ -519,142 +473,46 @@ service cloud.firestore {
         canReadTeamById(resource.data.submittedByTeamId) ||
         canReadTeamById(resource.data.opponentTeamId);
 
-      // Only an admin of the submitting team may open a claim, only against a team they are
-      // not also running, and only in the awaiting-response state.
-      allow create: if hasTeamOperatorCapability(request.resource.data.submittedByTeamId) &&
-        !hasTeamOperatorCapability(request.resource.data.opponentTeamId) &&
-        validNewSubmission(matchId);
+      /*
+       * No browser writes, from any role, in any state.
+       *
+       * This block used to carry the whole V1 claim-and-confirm workflow: a club opened a
+       * claim, the opponent confirmed or disputed it, the submitter withdrew it, and the
+       * league adjudicated it with corrected scores — every one of those a rule evaluated
+       * against a capability. ADR-004 retired the team capabilities, so the club paths were
+       * dormant, waiting for nothing more than `GOALPLACE_TEAM_AUTHORITY_STAGE=active` to
+       * grant them back. The league path was not dormant: a League Admin's browser wrote
+       * corrected scores here with no command, no reason and no audit event, and the
+       * finalizer made them official. That was a second door to the record.
+       *
+       * The claims that were open when V1 retired are settled through
+       * POST /api/result-submissions/{matchId}/adjudicate, under `secureLeagueCommand`.
+       * Every other transition belongs to the finalizer and the sweeps, which write with the
+       * Admin SDK. Reads stay as they were: the parties to a claim can still see it.
+       */
+      allow create, update, delete: if false;
 
-      // A rejected or withdrawn claim may be replaced in place. The revision advances,
-      // while the official result version remains stable because neither terminal claim
-      // ever became official.
-      allow update: if resource.data.status in ['rejected', 'withdrawn'] &&
-        hasTeamOperatorCapability(request.resource.data.submittedByTeamId) &&
-        !hasTeamOperatorCapability(request.resource.data.opponentTeamId) &&
-        validNewSubmission(matchId) &&
-        request.resource.data.revision == resource.data.revision + 1 &&
-        request.resource.data.resultVersion == resource.data.resultVersion;
-
-      // The opponent answers: confirm or dispute. They may never edit the claimed score.
-      allow update: if hasTeamOperatorCapability(resource.data.opponentTeamId) &&
-        !hasTeamOperatorCapability(resource.data.submittedByTeamId) &&
-        resource.data.status in ['pending_confirmation', 'confirmation_overdue'] &&
-        request.resource.data.status in ['confirmed', 'disputed'] &&
-        claimUnchanged() &&
-        changedKeysWithin(['status', 'respondedByUserId', 'respondedAt', 'disputeReason', 'resolution']) &&
-        request.resource.data.respondedByUserId == request.auth.uid &&
-        (
-          (
-            request.resource.data.status == 'confirmed' &&
-            request.resource.data.resolution == 'opponent_confirmed'
-          ) ||
-          (
-            request.resource.data.status == 'disputed' &&
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['resolution'])
-          )
-        );
-
-      // The submitter may retract an unanswered claim, and nothing else.
-      allow update: if hasTeamOperatorCapability(resource.data.submittedByTeamId) &&
-        resource.data.status == 'pending_confirmation' &&
-        request.resource.data.status == 'withdrawn' &&
-        claimUnchanged() &&
-        changedKeysWithin(['status', 'resolvedAt', 'resolvedByUserId']);
-
-      // The league adjudicates. It may correct a score, but only into the corrected fields,
-      // and it still cannot declare a result official.
-      allow update: if hasLeagueOperatorCapability(resource.data.leagueId) &&
-        resource.data.status in ['pending_confirmation', 'confirmation_overdue', 'confirmed', 'disputed'] &&
-        // 'pending_confirmation' is how a league extends the window: it resets the clock
-        // rather than deciding anything.
-        request.resource.data.status in ['confirmed', 'disputed', 'rejected', 'pending_confirmation'] &&
-        claimUnchanged() &&
-        changedKeysWithin([
-          'status', 'resolution', 'resolvedByUserId', 'resolvedAt', 'finalDecisionNote',
-          'disputeReason', 'correctedHomeScore', 'correctedAwayScore',
-          'confirmationDeadline', 'confirmedByUserId', 'confirmationReason', 'confirmedAt',
-          'evidenceRefs', 'evidenceNote'
-        ]) &&
-        (
-          request.resource.data.status == 'pending_confirmation' ||
-          request.resource.data.resolvedByUserId == request.auth.uid
-        ) &&
-        (
-          request.resource.data.status != 'confirmed' ||
-          (
-            request.resource.data.resolution == 'league_corrected' &&
-            request.resource.data.correctedHomeScore is number &&
-            request.resource.data.correctedHomeScore >= 0 &&
-            request.resource.data.correctedAwayScore is number &&
-            request.resource.data.correctedAwayScore >= 0
-          ) ||
-          (
-            request.resource.data.resolution in [
-              'league_upheld', 'league_confirmed_unresponsive'
-            ] &&
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-              'correctedHomeScore', 'correctedAwayScore'
-            ])
-          )
-        );
-
-      allow delete: if false;
-
-      // Append-only audit trail. Entries are never edited, so the history of a disputed
-      // result cannot be rewritten after the fact.
+      // Append-only audit trail, written only by the server beside the transition it records.
       match /events/{eventId} {
         allow read: if isPlatformAdmin() || canAccessMatchResult(matchId);
-        allow create: if signedIn() &&
-          request.resource.data.keys().hasOnly([
-            'submissionId', 'from', 'to', 'actor', 'actorUserId', 'note', 'createdAt'
-          ]) &&
-          request.resource.data.submissionId == matchId &&
-          request.resource.data.actorUserId == request.auth.uid &&
-          request.resource.data.from != request.resource.data.to &&
-          request.resource.data.to ==
-            getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId)).data.status &&
-          (
-            (
-              request.resource.data.actor == 'submitting_team' &&
-              hasTeamOperatorCapability(
-                getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
-                  .data.submittedByTeamId
-              )
-            ) ||
-            (
-              request.resource.data.actor == 'opponent_team' &&
-              hasTeamOperatorCapability(
-                getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
-                  .data.opponentTeamId
-              )
-            ) ||
-            (
-              request.resource.data.actor == 'league_admin' &&
-              hasLeagueOperatorCapability(
-                getAfter(/databases/$(database)/documents/resultSubmissions/$(matchId))
-                  .data.leagueId
-              )
-            )
-          ) &&
-          (
-            (
-              !exists(/databases/$(database)/documents/resultSubmissions/$(matchId)) &&
-              request.resource.data.from == null
-            ) ||
-            (
-              exists(/databases/$(database)/documents/resultSubmissions/$(matchId)) &&
-              request.resource.data.from ==
-                get(/databases/$(database)/documents/resultSubmissions/$(matchId)).data.status
-            )
-          );
-        allow update: if false;
-        allow delete: if false;
+        allow write: if false;
       }
     }
 
     match /challenges/{challengeId} {
       allow read: if true;
+      // Shape as well as ownership: the fields the athlete sheet writes, and their sizes.
       allow create: if canManageAthleteById(request.resource.data.athleteId) &&
+        createdKeysWithin([
+          'id', 'athleteId', 'leagueId', 'seasonId', 'sport', 'type', 'target', 'description',
+          'targetDescription', 'totalPledged', 'supportersCount', 'status', 'fundingModel',
+          'verificationStatus', 'submittedBy', 'createdAt', 'updatedAt',
+        ]) &&
+        shortText(request.resource.data.get('description', ''), 1000) &&
+        shortText(request.resource.data.get('targetDescription', ''), 1000) &&
+        request.resource.data.target is number &&
+        request.resource.data.target > 0 &&
+        request.resource.data.target <= 10000 &&
         request.resource.data.submittedBy == request.auth.uid &&
         request.resource.data.status == 'proposed' &&
         request.resource.data.fundingModel in ['non_cash', 'sponsor_grant'] &&
@@ -692,8 +550,7 @@ service cloud.firestore {
       // `team.roster.propose` is the whole of a Club Operator's roster authority: a draft they
       // write and submit, which the league confirms or returns. Nothing here reaches
       // `athletes/*`, so a club cannot manufacture eligibility by proposing it.
-      allow create: if (hasTeamOperatorCapability(request.resource.data.teamId) ||
-          hasClubOperatorCapability(request.resource.data.teamId, 'team.roster.propose')) &&
+      allow create: if hasClubOperatorCapability(request.resource.data.teamId, 'team.roster.propose') &&
         createdKeysWithin([
           'id', 'leagueId', 'seasonId', 'teamId', 'athleteIds', 'status', 'completeness',
           'submittedByUserId', 'createdAt', 'updatedAt',
@@ -703,8 +560,7 @@ service cloud.firestore {
         request.resource.data.submittedByUserId == request.auth.uid &&
         request.resource.data.status in ['draft', 'submitted'] &&
         !('approvedByUserId' in request.resource.data);
-      allow update: if (hasTeamOperatorCapability(resource.data.teamId) ||
-          hasClubOperatorCapability(resource.data.teamId, 'team.roster.propose')) &&
+      allow update: if hasClubOperatorCapability(resource.data.teamId, 'team.roster.propose') &&
         request.resource.data.teamId == resource.data.teamId &&
         request.resource.data.leagueId == resource.data.leagueId &&
         request.resource.data.seasonId == resource.data.seasonId &&
@@ -772,7 +628,22 @@ service cloud.firestore {
 
     match /supportNeeds/{needId} {
       allow read: if true;
+      // Shape as well as ownership. A support need is a public appeal for money; its story is
+      // bounded, its target is a number a human typed, and nothing a reviewer sets arrives on it.
       allow create: if signedIn() &&
+        createdKeysWithin([
+          'id', 'athleteId', 'teamId', 'leagueId', 'title', 'story', 'targetAmount',
+          'status', 'approvalStatus', 'verificationStatus', 'preferredPayoutDestination',
+          'payoutDestinationStatus', 'recipientIsMinor', 'createdByUserId', 'raisedAmount',
+          'recipientUpdates', 'createdAt', 'updatedAt',
+        ]) &&
+        shortText(request.resource.data.get('title', ''), 200) &&
+        shortText(request.resource.data.get('story', ''), 4000) &&
+        request.resource.data.targetAmount is number &&
+        request.resource.data.targetAmount > 0 &&
+        request.resource.data.targetAmount <= 100000000 &&
+        request.resource.data.recipientUpdates is list &&
+        request.resource.data.recipientUpdates.size() == 0 &&
         request.resource.data.createdByUserId == request.auth.uid &&
         request.resource.data.raisedAmount == 0 &&
         request.resource.data.status == 'open' &&
@@ -787,7 +658,7 @@ service cloud.firestore {
           ) ||
           (
             request.resource.data.teamId is string &&
-            hasTeamOperatorCapability(request.resource.data.teamId)
+            hasClubOperatorCapability(request.resource.data.teamId, 'team.profile.edit')
           )
         );
       allow update: if
@@ -1233,8 +1104,7 @@ service cloud.firestore {
           isPlatformAdmin() ||
           (
             request.resource.data.relatedTeamId is string &&
-            (hasTeamOperatorCapability(request.resource.data.relatedTeamId) ||
-              hasClubOperatorCapability(request.resource.data.relatedTeamId, 'team.content.publish'))
+            hasClubOperatorCapability(request.resource.data.relatedTeamId, 'team.content.publish')
           ) ||
           (
             request.resource.data.relatedLeagueId is string &&

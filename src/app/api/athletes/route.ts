@@ -2,7 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createHash, randomBytes } from 'crypto';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
+import { enforceRateLimit, parseJsonBody, requireAuthenticatedUser, requireRole } from '@/server/api/security';
 import { accessIndexId, type PermissionCapability } from '@/lib/auth/access';
 import { indexGrantsCapability } from '@/server/access/capabilities';
 import { sendAthleteInvitationEmail } from '@/server/email/athleteInvitation';
@@ -74,6 +74,19 @@ export async function POST(request: Request) {
   if ('response' in parsed) return Response.json({ error: 'Team, name, position, and age group are required.' }, { status: parsed.response.status });
 
   const actor = auth.actor;
+  /*
+   * Every registration sends an invitation email to an address the caller typed. That is a
+   * mutation with a cost and an outbound side effect, and it had no ceiling: one operator
+   * account could register athletes — and mail strangers from the platform's identity — as
+   * fast as the request loop ran. A club registers players in dozens, not thousands.
+   */
+  const limited = await enforceRateLimit({
+    bucket: 'athlete_register',
+    identity: [actor.uid],
+    limit: 60,
+    windowSeconds: 3600,
+  });
+  if (limited) return limited;
   const { teamId, name, position, ageGroup, invitedEmail } = parsed.data;
   const team = await adminDb.collection('teams').doc(teamId).get();
   if (!team.exists) return Response.json({ error: 'Team not found.' }, { status: 404 });

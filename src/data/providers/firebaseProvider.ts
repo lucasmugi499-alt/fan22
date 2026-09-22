@@ -33,7 +33,6 @@ import {
   FeedEngagementInput,
   FollowTargetType,
   GoalPlaceDataProvider,
-  ResolveResultSubmissionInput,
   ApproveResultCorrectionInput,
   RecordPointsActionInput,
   ReviewSupportNeedInput,
@@ -52,9 +51,7 @@ import {
   Report,
   ReconciliationException,
   ResultSubmission,
-  ResultSubmissionActor,
   ResultSubmissionEvent,
-  ResultSubmissionStatus,
   Roster,
   TeamMatchReport,
   SponsorReport,
@@ -70,11 +67,6 @@ import {
 import type { Allocation, ComplianceCase, Contribution } from '@/types/money';
 import { buildLeagueStandings } from '@/lib/leagueModel';
 import { normalizeAthleteIdentities, normalizeAthleteIdentity } from '@/lib/athleteIdentity';
-import {
-  canAcceptNewSubmission,
-  checkTransition,
-  confirmationDeadlineFrom,
-} from '@/lib/resultSubmission';
 
 function missingFirebase<T>(fallback: T): T {
   if (typeof window !== 'undefined') {
@@ -214,26 +206,6 @@ function submissionFromSnapshot(
   return { id: snapshot.id, ...snapshot.data() } as ResultSubmission;
 }
 
-function eventPayload(input: {
-  matchId: string;
-  from: ResultSubmissionStatus | null;
-  to: ResultSubmissionStatus;
-  actor: ResultSubmissionActor;
-  actorUserId: string;
-  note?: string;
-  createdAt: string;
-}): Omit<ResultSubmissionEvent, 'id'> {
-  return {
-    submissionId: input.matchId,
-    from: input.from,
-    to: input.to,
-    actor: input.actor,
-    actorUserId: input.actorUserId,
-    createdAt: input.createdAt,
-    ...(input.note ? { note: input.note } : {}),
-  };
-}
-
 function requireActor(expectedUserId?: string) {
   const { auth } = requireFirebaseClient();
   const actor = auth.currentUser?.uid;
@@ -242,19 +214,6 @@ function requireActor(expectedUserId?: string) {
     throw new Error('This action must be attributed to the signed-in account.');
   }
   return actor;
-}
-
-function assertTransition(
-  submission: ResultSubmission,
-  to: ResultSubmissionStatus,
-  actor: ResultSubmissionActor,
-  input: {
-    resolution?: ResultSubmission['resolution'];
-    correctedScore?: { home: number; away: number };
-  } = {}
-) {
-  const decision = checkTransition({ submission, to, actor, ...input });
-  if (!decision.ok) throw new Error(decision.message);
 }
 
 export const firebaseProvider: GoalPlaceDataProvider = {
@@ -1131,195 +1090,29 @@ export const firebaseProvider: GoalPlaceDataProvider = {
     await requestTrustedAdminAction({ action: 'resolve_report', ...input });
     return writeResult(input.reportId, 'Trust decision recorded.');
   },
-  async createResultSubmission(data) {
-    if (!isFirebaseConfigured) return mockProvider.createResultSubmission(data);
-    if (
-      data.submittedByTeamId !== data.match.homeTeamId &&
-      data.submittedByTeamId !== data.match.awayTeamId
-    ) {
-      throw new Error('The submitting team is not part of this fixture.');
-    }
-
-    const { db } = requireFirebaseClient();
-    const submissionRef = doc(db, 'resultSubmissions', data.match.id);
-    await runTransaction(db, async (transaction) => {
-      const existing = submissionFromSnapshot(await transaction.get(submissionRef));
-      if (!canAcceptNewSubmission(existing)) {
-        throw new Error('This match already has an active result submission.');
-      }
-
-      const now = new Date().toISOString();
-      const opponentTeamId =
-        data.match.homeTeamId === data.submittedByTeamId
-          ? data.match.awayTeamId
-          : data.match.homeTeamId;
-      const submission: Omit<ResultSubmission, 'id'> = {
-        matchId: data.match.id,
-        leagueId: data.match.leagueId,
-        seasonId: data.match.seasonId,
-        submittedByTeamId: data.submittedByTeamId,
-        opponentTeamId,
-        submittedByUserId: data.submittedByUserId,
-        homeScore: data.homeScore,
-        awayScore: data.awayScore,
-        scorers: data.scorers ?? [],
-        activeSquads: data.activeSquads ?? {},
-        athleteStatLines: data.athleteStatLines ?? [],
-        evidenceRefs: data.evidenceRefs ?? [],
-        ...(data.evidenceNote ? { evidenceNote: data.evidenceNote } : {}),
-        status: 'pending_confirmation',
-        revision: (existing?.revision ?? 0) + 1,
-        submittedAsFinal: true,
-        confirmationDeadline: confirmationDeadlineFrom(now),
-        resultVersion: existing?.resultVersion ?? 1,
-        submittedAt: now,
-      };
-
-      transaction.set(submissionRef, submission);
-      transaction.set(
-        doc(collection(submissionRef, 'events')),
-        eventPayload({
-          matchId: data.match.id,
-          from: existing?.status ?? null,
-          to: 'pending_confirmation',
-          actor: 'submitting_team',
-          actorUserId: data.submittedByUserId,
-          createdAt: now,
-        })
-      );
-    });
-    return writeResult(data.match.id, 'Result submitted for opponent confirmation.');
+  /**
+   * The V1 claim-and-confirm workflow is retired (ADR-004) and the Firestore rules for it are
+   * closed. These four methods used to run the transitions from the browser; they now refuse
+   * with the address of the door that replaced them, so a stale caller reads why rather than
+   * a permission error. Club accounts go to POST /api/matches/{matchId}/team-report; a league
+   * settles an open V1 claim through POST /api/result-submissions/{matchId}/adjudicate.
+   */
+  async createResultSubmission() {
+    throw new Error('Clubs no longer open result claims. Record your account of the match from the club console.');
   },
-  async confirmResultSubmission(matchId, respondedByUserId) {
-    if (!isFirebaseConfigured) {
-      return mockProvider.confirmResultSubmission(matchId, respondedByUserId);
-    }
-
-    const { db } = requireFirebaseClient();
-    const submissionRef = doc(db, 'resultSubmissions', matchId);
-    await runTransaction(db, async (transaction) => {
-      const submission = submissionFromSnapshot(await transaction.get(submissionRef));
-      if (!submission) throw new Error('Result submission not found.');
-      assertTransition(submission, 'confirmed', 'opponent_team');
-
-      const now = new Date().toISOString();
-      transaction.update(submissionRef, {
-        status: 'confirmed',
-        resolution: 'opponent_confirmed',
-        respondedByUserId,
-        respondedAt: now,
-      });
-      transaction.set(
-        doc(collection(submissionRef, 'events')),
-        eventPayload({
-          matchId,
-          from: submission.status,
-          to: 'confirmed',
-          actor: 'opponent_team',
-          actorUserId: respondedByUserId,
-          createdAt: now,
-        })
-      );
-    });
-    await requestTrustedFinalization(matchId);
-    return writeResult(matchId, 'Result confirmed. Finalization is in progress.');
+  async confirmResultSubmission() {
+    throw new Error('Opponent confirmation was retired. The league settles results.');
   },
-  async disputeResultSubmission(matchId, respondedByUserId, reason) {
-    if (!isFirebaseConfigured) {
-      return mockProvider.disputeResultSubmission(matchId, respondedByUserId, reason);
-    }
-    if (!reason.trim()) throw new Error('Add a reason for the dispute.');
-
-    const { db } = requireFirebaseClient();
-    const submissionRef = doc(db, 'resultSubmissions', matchId);
-    await runTransaction(db, async (transaction) => {
-      const submission = submissionFromSnapshot(await transaction.get(submissionRef));
-      if (!submission) throw new Error('Result submission not found.');
-      assertTransition(submission, 'disputed', 'opponent_team');
-
-      const now = new Date().toISOString();
-      transaction.update(submissionRef, {
-        status: 'disputed',
-        respondedByUserId,
-        respondedAt: now,
-        disputeReason: reason.trim(),
-      });
-      transaction.set(
-        doc(collection(submissionRef, 'events')),
-        eventPayload({
-          matchId,
-          from: submission.status,
-          to: 'disputed',
-          actor: 'opponent_team',
-          actorUserId: respondedByUserId,
-          note: reason.trim(),
-          createdAt: now,
-        })
-      );
-    });
-    return writeResult(matchId, 'Dispute sent to the league for review.');
+  async disputeResultSubmission() {
+    throw new Error('Disputes are raised as result cases from the club console.');
   },
   async finalizeResultSubmission(matchId) {
     if (!isFirebaseConfigured) return mockProvider.finalizeResultSubmission(matchId);
     await requestTrustedFinalization(matchId);
     return writeResult(matchId, 'Finalization completed.');
   },
-  async resolveDisputedSubmission(data: ResolveResultSubmissionInput) {
-    if (!isFirebaseConfigured) return mockProvider.resolveDisputedSubmission(data);
-
-    const { db } = requireFirebaseClient();
-    const submissionRef = doc(db, 'resultSubmissions', data.matchId);
-    await runTransaction(db, async (transaction) => {
-      const submission = submissionFromSnapshot(await transaction.get(submissionRef));
-      if (!submission) throw new Error('Result submission not found.');
-      const to = data.decision === 'reject' ? 'rejected' : 'confirmed';
-      const resolution =
-        data.decision === 'correct'
-          ? 'league_corrected'
-          : submission.status === 'confirmation_overdue'
-            ? 'league_confirmed_unresponsive'
-            : 'league_upheld';
-      assertTransition(submission, to, 'league_admin', {
-        resolution,
-        correctedScore: data.correctedScore,
-      });
-
-      const now = new Date().toISOString();
-      transaction.update(submissionRef, {
-        status: to,
-        resolvedByUserId: data.resolvedByUserId,
-        resolvedAt: now,
-        ...(to === 'confirmed' ? { resolution } : {}),
-        ...(data.correctedScore
-          ? {
-              correctedHomeScore: data.correctedScore.home,
-              correctedAwayScore: data.correctedScore.away,
-            }
-          : {}),
-        ...(data.note?.trim() ? { finalDecisionNote: data.note.trim() } : {}),
-      });
-      transaction.set(
-        doc(collection(submissionRef, 'events')),
-        eventPayload({
-          matchId: data.matchId,
-          from: submission.status,
-          to,
-          actor: 'league_admin',
-          actorUserId: data.resolvedByUserId,
-          note: data.note?.trim(),
-          createdAt: now,
-        })
-      );
-    });
-    if (data.decision !== 'reject') {
-      await requestTrustedFinalization(data.matchId);
-    }
-    return writeResult(
-      data.matchId,
-      data.decision === 'reject'
-        ? 'Result rejected.'
-        : 'League decision recorded. Finalization is in progress.'
-    );
+  async resolveDisputedSubmission() {
+    throw new Error('League decisions are recorded through the audited command, not from the browser.');
   },
   async requestResultCorrection(matchId, requestedByUserId, reason) {
     if (!isFirebaseConfigured) {

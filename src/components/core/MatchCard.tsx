@@ -1,7 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import { CalendarBlank, MapPin, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import type { Match, Team, SportSlug, SportType } from '@/types';
 import { isLiveNow, isOfficialMatch, isUpcomingMatch } from '@/lib/status';
+import { useNow } from '@/lib/useNow';
 import { clubColor } from '@/lib/clubColors';
 import { MatchStatusBadge } from '@/components/ui/StatusBadge';
 import { cn } from '@/lib/utils';
@@ -103,7 +106,8 @@ export function MatchCard({
   const official = isOfficialMatch(match);
   const played = match.status === 'completed' || match.status === 'live';
   // "Playing now" is a claim about the present; a flag that has said so since April is not.
-  const live = isLiveNow(match, Date.now());
+  const now = useNow();
+  const live = isLiveNow(match, now);
   const accent = sportColor(match.sport);
 
   const hs = played ? match.score.home : null;
