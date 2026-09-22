@@ -13,6 +13,7 @@ import { StateChip } from '@/components/league/LeagueCommandCentre';
 import { AssignFieldManagerSheet } from '@/components/league/AssignFieldManagerSheet';
 import { RescheduleSheet } from '@/components/league/RescheduleSheet';
 import { CancelFixtureSheet } from '@/components/league/CancelFixtureSheet';
+import { LeagueResolveSheet } from '@/components/league/LeagueResolveSheet';
 import { EmergencyTakeoverSheet } from '@/components/league/EmergencyTakeoverSheet';
 import { PostMatchEntrySheet } from '@/components/league/PostMatchEntrySheet';
 import { ResultCasePanel } from '@/components/league/ResultCasePanel';
@@ -58,6 +59,8 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
   const [takingOver, setTakingOver] = useState(false);
   const [enteringResult, setEnteringResult] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [settling, setSettling] = useState(false);
+  const [claim, setClaim] = useState<{ status: string; homeScore: number | null; awayScore: number | null; submittedByTeamId: string; disputeReason: string | null } | null>(null);
 
   const { currentUser } = useAuth();
   useEffect(() => {
@@ -75,6 +78,7 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
           setAssignment(body.assignment ?? null);
           setClubAccounts(Array.isArray(body.clubAccounts) ? body.clubAccounts : []);
           setPendingReport(body.pendingReport ?? null);
+          setClaim(body.claim ?? null);
         }
       } catch {
         // Operational context, not the record. A failure must not take the page down.
@@ -217,7 +221,26 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         ) : null}
         {row.state === 'awaiting_result' ? (
           <>
-            {pendingReport ? (
+            {claim && ['pending_confirmation', 'confirmation_overdue', 'disputed'].includes(claim.status) ? (
+              /*
+               * A V1 claim still open. The screen that settled these was unmounted with the
+               * verification page, which left twenty-four disputes on the demo with no door at
+               * all. This is the door; the sheet goes through the audited command.
+               */
+              <>
+                <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+                  {claim.submittedByTeamId === match?.homeTeamId ? row.homeTeamName : claim.submittedByTeamId === match?.awayTeamId ? row.awayTeamName : 'A club'} claimed
+                  {claim.homeScore !== null && claim.awayScore !== null ? ` ${claim.homeScore}–${claim.awayScore}` : ' a result'}
+                  {claim.status === 'disputed' ? ' and the opponent disputed it' : claim.status === 'confirmation_overdue' ? ' and the opponent never answered' : ' and the opponent has not yet answered'}.
+                  {claim.disputeReason ? ` Reason given: ${claim.disputeReason}` : ''} The league settles it.
+                </p>
+                <ActionButton primary onClick={() => setSettling(true)}>Settle the claim</ActionButton>
+              </>
+            ) : claim?.status === 'confirmed' ? (
+              <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
+                The claim is settled and is being made official. Nothing more is needed from you.
+              </p>
+            ) : pendingReport ? (
               <p className="rounded-[var(--radius-md)] border border-border bg-surface-2 p-3 text-sm leading-6 text-muted">
                 A result has been entered and is being made official. Nothing more is needed
                 from you; if it is held for review it will appear under Review.
@@ -278,6 +301,17 @@ export function LeagueMatchDetail({ matchId }: { matchId: string }) {
         onClose={() => setTakingOver(false)}
         onTakenOver={() => window.location.reload()}
       />
+
+      {match ? (
+        <LeagueResolveSheet
+          open={settling}
+          match={match}
+          home={detail.teams.find((team) => team.id === match.homeTeamId)}
+          away={detail.teams.find((team) => team.id === match.awayTeamId)}
+          onClose={() => setSettling(false)}
+          onComplete={() => window.location.reload()}
+        />
+      ) : null}
 
       <CancelFixtureSheet
         open={cancelling}

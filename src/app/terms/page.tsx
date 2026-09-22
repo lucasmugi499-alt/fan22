@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { MarketingHero, MarketingShell } from '@/components/marketing/MarketingShell';
 
-export const metadata: Metadata = { title: 'Terms | GoalPlace256' };
+export const metadata: Metadata = { title: 'Terms' };
 
 export default function TermsPage() {
   return (

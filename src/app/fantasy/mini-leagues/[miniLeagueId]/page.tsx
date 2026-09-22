@@ -3,7 +3,7 @@ import { FantasyMiniLeagueDetailLoader } from '@/components/fantasy/FantasyMiniL
 import { getFantasyMiniLeague } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Fantasy Mini-League | GoalPlace256',
+  title: 'Fantasy Mini-League',
   description: 'A free GoalPlace Fantasy mini-league table.',
 };
 

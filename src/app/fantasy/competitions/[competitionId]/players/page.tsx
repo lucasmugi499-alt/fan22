@@ -7,7 +7,7 @@ import {
 } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Fantasy Players | GoalPlace256',
+  title: 'Fantasy Players',
   description: 'Browse eligible athletes, verified recent form, availability and Fantasy Credit prices.',
 };
 

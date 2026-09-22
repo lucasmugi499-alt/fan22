@@ -4,7 +4,7 @@ import { getFantasyMiniLeagueCatalogue } from '@/server/fantasy/catalogue';
 import { getFantasyCompetitions } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Fantasy Mini-Leagues | GoalPlace256',
+  title: 'Fantasy Mini-Leagues',
   description: 'Create or join a free private fantasy mini-league with no entry fee or cash pool.',
 };
 

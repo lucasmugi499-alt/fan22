@@ -3,7 +3,7 @@ import { FantasyLeaderboard } from '@/components/fantasy/FantasyExperience';
 import { getFantasyCompetitionBundle } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Official Fantasy Leaderboard | GoalPlace256',
+  title: 'Official Fantasy Leaderboard',
   description: 'Free fantasy rankings calculated only from verified official match records.',
 };
 

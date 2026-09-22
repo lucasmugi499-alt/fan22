@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { MarketingHero, MarketingShell } from '@/components/marketing/MarketingShell';
 
-export const metadata: Metadata = { title: 'Privacy | GoalPlace256' };
+export const metadata: Metadata = { title: 'Privacy' };
 
 export default function PrivacyPage() {
   return (

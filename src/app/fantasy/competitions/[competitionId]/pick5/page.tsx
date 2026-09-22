@@ -7,7 +7,7 @@ import {
 } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Pick 5 | GoalPlace256',
+  title: 'Pick 5',
   description: 'Five athletes, one captain, one scout pick. Free, and it resets every round.',
 };
 

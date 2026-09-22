@@ -3,7 +3,7 @@ import { FantasyPoints } from '@/components/fantasy/FantasyExperience';
 import { getFantasyCompetitionBundle } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Fantasy Points Centre | GoalPlace256',
+  title: 'Fantasy Points Centre',
   description: 'See provisional, official and corrected Fantasy Points with verified scoring explanations.',
 };
 

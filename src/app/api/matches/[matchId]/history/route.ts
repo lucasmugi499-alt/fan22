@@ -59,7 +59,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
     }
     : null;
 
-  const [snapshot, reportSnapshot, matchReportSnapshot] = await Promise.all([
+  const [snapshot, reportSnapshot, matchReportSnapshot, claimSnapshot] = await Promise.all([
     adminDb.collection('matchScheduleChanges')
       .where('matchId', '==', matchId)
       .limit(50)
@@ -78,6 +78,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
       .catch(() => null),
     // The submitted-not-yet-official report, if one exists (see `matchOperationalRow`).
     adminDb.collection('matchReports').doc(matchId).get().catch(() => null),
+    // A V1 claim still open on this match. Settled through the adjudicate command.
+    adminDb.collection('resultSubmissions').doc(matchId).get().catch(() => null),
   ]);
 
   const matchReport = matchReportSnapshot?.exists ? matchReportSnapshot.data() ?? null : null;
@@ -116,5 +118,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
       Date.parse(String((right as { createdAt?: string }).createdAt ?? '')) -
       Date.parse(String((left as { createdAt?: string }).createdAt ?? '')));
 
-  return Response.json({ matchId, assignment, changes, clubAccounts, pendingReport }, { headers: { 'cache-control': 'private, no-store' } });
+  const claimData = claimSnapshot?.exists ? claimSnapshot.data() ?? null : null;
+  const claim = claimData && claimData.status !== 'official' && claimData.status !== 'superseded'
+    ? {
+      status: String(claimData.status ?? ''),
+      homeScore: typeof claimData.homeScore === 'number' ? claimData.homeScore : null,
+      awayScore: typeof claimData.awayScore === 'number' ? claimData.awayScore : null,
+      submittedByTeamId: String(claimData.submittedByTeamId ?? ''),
+      disputeReason: typeof claimData.disputeReason === 'string' ? claimData.disputeReason : null,
+    }
+    : null;
+
+  return Response.json({ matchId, assignment, changes, clubAccounts, pendingReport, claim }, { headers: { 'cache-control': 'private, no-store' } });
 }

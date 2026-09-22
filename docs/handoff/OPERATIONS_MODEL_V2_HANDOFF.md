@@ -1116,3 +1116,20 @@ storage rules, headers and seeded deep links.
 notification that said "exit code 0". That was the wrapper's exit; the gate log ended
 `EXIT=1` on a lint error (`Date.now()` in `MatchCard` render). Fixed here with `useNow`.
 The only evidence a gate passed is the `REAL_EXIT=0` line read from its log.
+
+### Same day, later still: the open V1 claims had no screen
+
+`LeagueOverview` — the component that mounted the verification list and the resolve sheet —
+was imported by nothing. `/league-admin/verification` redirects to Matches, and Matches
+never mounted the sheet. So the twenty-four disputes seeded on demo, and any V1 claim still
+open on a real league, could not be settled from any screen; the new post-match guard
+rightly refuses a typed result for a match that already has a claim, which would have made
+that final. The league match page now shows the claim (who claimed what, whether the
+opponent disputed or never answered, the reason) and offers **Settle the claim**, which opens
+`LeagueResolveSheet` through the adjudicate command. Proven on `match_kmcfl_09_02`: upheld,
+`league_upheld`, event and audit written, match untouched until the finalizer runs. The two
+dead components are deleted. A played match no longer offers "Assign Field Manager" as its
+only action on the Matches list. Page titles no longer read "… | GoalPlace256 | GoalPlace256".
+
+A 375px sweep of every fan, league and platform surface found no page-level horizontal
+overflow and no leaked `undefined`/`NaN` anywhere.

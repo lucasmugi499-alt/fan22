@@ -276,7 +276,8 @@ export function MatchRow({ row, onAssign }: { row: LeagueMatchRow; onAssign?: ()
         a result, a cancellation, a reschedule — and those live on the match page the card
         already links to.
       */}
-      {onAssign && !row.fieldManager && row.state !== 'missed' ? (
+      {/* A Field Manager records a match that is still to be played. Not one already played. */}
+      {onAssign && !row.fieldManager && row.state !== 'missed' && row.state !== 'awaiting_result' && row.state !== 'official' && row.state !== 'cancelled' ? (
         <div className="border-t border-border p-2">
           <button
             type="button"

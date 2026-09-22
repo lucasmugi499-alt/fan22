@@ -6,7 +6,7 @@ import {
 } from '@/server/fantasy/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Build Fantasy Squad | GoalPlace256',
+  title: 'Build Fantasy Squad',
   description: 'Select a valid free fantasy squad before the trusted server deadline.',
 };
 
